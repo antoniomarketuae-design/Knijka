@@ -580,6 +580,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
   // следващата точка от маршрута», which was round 3's rule and is false under
   // ruling 2: it holds through the stretch the task names and stops where that
   // stretch ends — for an arrival mark, its own zone.
+  //
+  // ROUND 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): nothing on this card names the bill line — the measurement
+  // prefix quotes the speed and the glass figure, as a speeding card quotes the speed and the sign — so its sentences
+  // hold under the new line unchanged; every bill is still for a mark passed over the glass figure.
   TASK_SPEED_CAP_EXCEEDED: {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,

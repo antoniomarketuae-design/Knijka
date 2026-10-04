@@ -113,10 +113,10 @@ describe("ruling 4 · the arrival is ONE event at the blow", () => {
     expect(viol(drive(fs).events).map((e) => e.code)).toEqual([TASK]);
   });
 
-  it("the blow line is the product's own: an arrival AT cap + grace (35.0) bills nothing, 35.1 bills", () => {
-    expect(viol(drive(frames([{ sec: 2, speedKmh: 30 }, at(ZONE30(2, 35), 35), { sec: 2, speedKmh: 30 }])).events)).toEqual([]);
+  it("ROUND 15 — the bill line is the glass figure plus the sign's tolerance (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): an arrival AT 30 + 3 (33.0) bills nothing, 33.1 bills (rounds 5–14: 35 / 35.1, the gate plus the slack)", () => {
+    expect(viol(drive(frames([{ sec: 2, speedKmh: 30 }, at(ZONE30(2, 33), 33), { sec: 2, speedKmh: 30 }])).events)).toEqual([]);
     expect(
-      viol(drive(frames([{ sec: 2, speedKmh: 30 }, at(ZONE30(2, 35.1), 35.1), { sec: 2, speedKmh: 30 }])).events).map(
+      viol(drive(frames([{ sec: 2, speedKmh: 30 }, at(ZONE30(2, 33.1), 33.1), { sec: 2, speedKmh: 30 }])).events).map(
         (e) => e.code,
       ),
     ).toEqual([TASK]);

@@ -10400,3 +10400,74 @@ beside a strict comparison («не повече от 10 км/ч, а стигна
 accepted by the integrator as the required R1 fix) and the speeding arithmetic above 100 km/h are true. Conditions: V5/V8/TL11 survivors
 (no committed drive changes), the shared 100-row coached-mistakes ceiling in a synthetic sandbox, praise timing, X19/X21/X22. Rows made
 judgeable: sc-ac-truck-spray:990e5f64 (critical) and :8ed4d8b3 (the wrong leg ran 127–131 km/h against a task cap of 80 and booked 0).
+
+## Wave C verdicts — 2026-10-03
+
+This run retired 2 row(s). Their evidence frames were driven at `7c7359025adb` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`7c7359025adb`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 2 |
+| UNJUDGED (re-drive did not exercise it) | 33 |
+
+**Open list: 47 → 45**, out of 1525 filed across the whole programme (1478 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## The task cap bills like a speed sign — landed 2026-10-04 (founder ruling 2026-10-03, late)
+
+capsign-r1 (wf_99cf9d73-419), SIGNED OFF WITH CONDITIONS. A blown task cap bills above the number the glass shows plus the posted-limit
+tolerance (`taskCapBillLineKmh` = `speedingBands(shown).gradedAbove`: ≤36 bills above 39,6, ≤80 above 85) on every rung; the ladder grace
+only credits the objective and shapes the coach copy. The arrival is decided AT the mark: the latch forms on the frame the car crosses the
+mark and `arrivalKmh` is interpolated there (sc-follow-tailgater:4b342eee — slow early then fast through the mark no longer escapes); a mark
+credited short of itself is watched until the crossing. The «Намали СЕГА» save-tail is replaced, when a journey arm already refused the
+task, by a sentence that names the real reason and promises no remedy (5a56612e). Recorded w72 traces: the PC wrong leg (40,8 at the mark)
+is now coached TASK; the phone leg (slowed before the mark, 19,5 across it) is not billed. Censuses: F1 property 0 breaches, 0 correct legs
+changed. Conditions: slow-then-fast hits 8 rows (not 5); a sampling band near the line; the older kerbward clause still appended on kerbward
+gates; a debrief can show the objective ✓ and a TASK row for one mark (ruled); 6 surviving mutants on uncommitted inputs.
+
+## Brake check at a tailgater billed, at every frame rate — landed 2026-10-04 (sc-follow-tailgater:63c0c28c, :f42dce4f)
+
+brakecheck rounds 1–5 (wf_88d62e83-222 … wf_3fa0b891-835). The acquitting input was the FRONT lead (a steady car 70–95 m ahead) read through
+a per-frame closing difference, so the verdict depended on the tick rate. The harsh-brake cause ledger now measures the lead rate-free
+(windowed track, trapezoid/position odometer), bridges blinks, treats unknown readings and newly entered leads as causes, uses a 0.5 m/s²
+demand line (integrator A12 ruling: a closing lift-off absorbs is no reason to brake), and beyond 120 m restores base-like acquittal with a
+lag-free closing. On all 181 recorded w69/w71 replays the brake check at the tailgater (stop 1) is coached and named «Рязко спиране без
+причина» under «Грешката на този урок» at every rate/phase/jitter; stops 2–3 (lead 129–140 m ahead closing 4.6 m/s) are acquitted like base.
+A12 files unmoved; 0 correct legs gain a bill. Round 5 refuted on ONE residual, accepted by the integrator as a CONDITION (doc 93): beyond
+120 m a lead that starts braking only 0.1–0.25 s before the student's stamp, with the closing 3.05–3.3 m/s at the pedal, can be billed where
+base acquits — no human reacts in 0.25 s, so that onset is not a cause the student responded to, the closing is within 0.3 m/s of the line,
+base itself splits these acts by rate, and no committed lesson produces them.
+
+## Wave C verdicts — 2026-10-04
+
+This run retired 2 row(s). Their evidence frames were driven at MIXED:9792cd45b242+54c02a86d253 — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`7c7359025adb`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 2 |
+| UNJUDGED (re-drive did not exercise it) | 33 |
+
+**Open list: 47 → 45**, out of 1527 filed across the whole programme (1480 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.

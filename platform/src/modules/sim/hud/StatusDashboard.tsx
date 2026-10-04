@@ -646,7 +646,11 @@ export function GovernorCapMark({
         </>
       ) : null}
       {/* THE NUMBER THE STUDENT IS ACTUALLY BILLED AGAINST, when it is neither
-          of the two already on this bar.
+          of the two already on this bar — and billed the way a posted limit is
+          (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): above this figure plus
+          the same tolerance the sign gets (`rules taskCapBillLineKmh`), on every
+          rung, so «≤36» bills above 39,6. The rung's ladder grace credits the
+          objective and words the coach's copy; it never moves this line.
           It is amber type and nothing else: a red annulus around a numeral IS
           В26, and that shape belongs to the law alone. The mark above is held
           to the same ban by `governor-cap.test.ts`, which greps this slice for

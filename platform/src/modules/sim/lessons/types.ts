@@ -1826,8 +1826,9 @@ export interface LessonSessionState {
   lastTick?: SpeedingSettleTick;
   /**
    * THE TASK CEILING'S LATCH — round 3 of the 2026-09-25 ruling (verifier R1,
-   * R2). Created on the first frame the active objective's mark is blown
-   * (`approachCap: "blown"`): it fixes the STRETCH that cap governs
+   * R2). Created on the frame the car crosses the active objective's mark over
+   * the bill line (round 15; rounds 3–14: the evaluator's `approachCap:
+   * "blown"`): it fixes the STRETCH that cap governs
    * (`finish.ts taskCapStretch`, a bounded region) and walks the car through
    * it (`stepTaskCapStretch`). While it is live and the car is inside the
    * stretch the reducer's tick carries the task stamp, whatever the objective's
@@ -1846,6 +1847,17 @@ export interface LessonSessionState {
    * (`advisor.ts taskCapReleased`).
    */
   taskCapLatch?: TaskCapLatch;
+  /**
+   * ROUND 15 — A CAPPED MARK CREDITED SHORT OF ITSELF, STILL TO BE CROSSED (founder ruling 2026-10-03 «LIKE A SPEED
+   * SIGN», and «the arrival is decided at the mark»). A flow-capped objective may complete up to `REACH_ZONE_GRACE_M`
+   * short of its mark, or at rest anywhere on the approach side of its disc, with the rung's ladder grace — and the car
+   * then crosses the mark itself on a later frame, while the NEXT objective is active. This records the completed
+   * objective and the axis it was graded on until the car crosses its mark (`lessons/engine.ts stepTaskCapMarkWatch`
+   * reads the crossing speed and hands the reducer the arrival if it is over the bill line) or leaves the mark's
+   * neighbourhood (its disc plus `REACH_ZONE_GRACE_M`) without crossing it. Absent on every drive whose capped
+   * objectives complete at or past their marks; written back only when present or being cleared.
+   */
+  taskCapMarkWatch?: TaskCapMarkWatch;
   /**
    * EVERY TASK CEILING THIS DRIVE BLEW AND WAS GRADED FOR — round 3 (verifier
    * R4). One row per latch, written on the latch's first STAMPED frame (so a cap
@@ -2190,6 +2202,14 @@ export interface TaskCapBreach {
   t: number;
 }
 
+/** A completed capped objective whose mark the car has yet to cross — see `LessonSessionState.taskCapMarkWatch`. */
+export interface TaskCapMarkWatch {
+  /** The completed objective. */
+  objectiveIndex: number;
+  /** The approach axis its evaluator graded it on (`approachFrom` on its final eval state). */
+  approachFrom: { x: number; y: number };
+}
+
 /** The task ceiling's latch — see `LessonSessionState.taskCapLatch`. */
 export interface TaskCapLatch {
   /** The objective whose blown cap this is. */
@@ -2201,6 +2221,9 @@ export interface TaskCapLatch {
   progress: TaskCapStretchProgress;
   /** The latch's breach row is written (it stamped, or — round 4 — it was created at a graded cap). */
   stamped: boolean;
-  /** Spent, and the objective has since stopped reading „blown": the next blow is a new latch. */
+  /**
+   * Spent, and the objective has since stopped reading „blown" with the car back short of the mark on its axis (round
+   * 15 — the only place it can cross the mark again): the next crossing over the line is a new latch.
+   */
   rearmed: boolean;
 }

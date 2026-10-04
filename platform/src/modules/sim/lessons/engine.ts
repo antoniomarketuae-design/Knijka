@@ -39,6 +39,7 @@ import {
   settleUnpaidAdaptationTeach,
   settleUnpaidSpeedingTeach,
   settleUnpaidTaskTeach,
+  taskCapBillLineKmh,
   violationPeekBg,
   type ConditionsCause,
   type RuleEngineConfig,
@@ -60,6 +61,7 @@ import {
 import {
   REACH_ZONE_CAP_SLACK_KMH,
   REACH_ZONE_GRACE_M,
+  REACH_ZONE_HALT_CAP_KMH,
   brakingFaultVoidsObjective,
   contactVoidsObjective,
   createEvalState,
@@ -69,6 +71,9 @@ import {
   personContactVoidsObjective,
   personHaltVoidsObjective,
   railBarredVoidsObjective,
+  reachZoneApproachAxis,
+  reachZoneJourneyRefusal,
+  reachZoneMarkCrossing,
   reachZoneStateRefusal,
   restFaultVoidsObjective,
   solidLineFaultVoidsObjective,
@@ -77,6 +82,7 @@ import {
   stopSignRollVoidsObjective,
   yieldFailedVoidsObjective,
   type ObjectiveContext,
+  type ReachZoneJourneyRefusal,
   type YieldFaultCode,
   type YieldFaultRecord,
 } from "./objectives";
@@ -120,6 +126,7 @@ import type {
   SpeedingSettleTick,
   TaskCapBreach,
   TaskCapLatch,
+  TaskCapMarkWatch,
   TeachMoment,
 } from "./types";
 
@@ -547,9 +554,19 @@ function withoutKinMarks(e: ViolationEvent): ViolationEvent {
  * `sc-speed-creep`). The catalogue authors these caps as ARRIVAL demands, and
  * every gate in `objectives.ts` grades them that way. So the ceiling binds from
  * the mark the task names: it is LATCHED once the student has gone THROUGH that
- * mark over it — `approachCap === "blown"`, the evaluator's own verdict (flow
- * caps only; more than the slack over the gate; past the mark, never having
- * honoured it). A student who brakes in time is never latched at all.
+ * mark over it. A student who brakes in time is never latched at all.
+ *
+ * ROUND 15 — THROUGH THE MARK MEANS AT THE MARK (founder ruling 2026-10-03
+ * «LIKE A SPEED SIGN»; `sc-follow-tailgater:4b342eee`). Rounds 3–14 latched
+ * off `approachCap === "blown"`, the evaluator's verdict — and an approach
+ * HONOURED anywhere on the capsule kept that verdict through the mark, so a car
+ * eased to the gate 20 m short and then accelerated through the mark at 53,6
+ * under a «≤36» was never latched. The latch is now created on the frame the
+ * car CROSSES the mark (`markCrossingOf`), at the speed interpolated to the
+ * crossing point, when that speed is over the bill line — the glass figure plus
+ * the tolerance a posted limit gets (`taskCapBillLineKmh`), flow caps only. A
+ * mark credited a few metres short of itself is still read when the car crosses
+ * it (`LessonSessionState.taskCapMarkWatch`).
  *
  * ROUND 3 — ONE LATCH PER BLOW (verifier R2). Round 2 re-derived the stamp every
  * frame from `approachCap`, and `stepReachZone` CLEARS that verdict on a fresh
@@ -557,12 +574,13 @@ function withoutKinMarks(e: ViolationEvent): ViolationEvent {
  * once a lap at the mark (and once more at the half-line's far edge), each drop
  * ended the act, and each re-appearance charged a new one — a constant 30 round
  * the ≤20 ring paid 3 points in 2.5 laps and 5 in 3.5. The latch is created on
- * the first blown frame and then holds on its own: it stamps whenever the car
+ * the blow's frame and then holds on its own: it stamps whenever the car
  * is inside the stretch it fixed at the blow, whatever `approachCap` does in
  * between, and it is released only when the objective changes. Once the car
  * leaves the stretch's goal behind it is SPENT and stamps nothing; the mark
- * blown AGAIN after the verdict has cleared (`rearmed`) is a new latch — a new
- * `blownAtSec` — and the reducer treats it as a new act.
+ * crossed over the line AGAIN once the objective's verdict no longer reads
+ * „blown" (`rearmed`) is a new latch — a new `blownAtSec` — and the reducer
+ * treats it as a new act.
  *
  * …OVER THE STRETCH THE CAP GOVERNS (rounds 2–3, verifier C2 then R1): a bounded
  * region, the carriageway from the mark to the next goal (`finish.ts
@@ -574,8 +592,8 @@ function withoutKinMarks(e: ViolationEvent): ViolationEvent {
  *  · the ACTIVE objective of a DRIVING session — the strip's «задачата иска
  *    ≤N» and the banner's task line both drop the figure the moment the
  *    objective changes (`LessonPlayShell heldTaskCapKmh`);
- *  · never the halt band: „blown" is a flow-cap verdict by construction
- *    (`isFlowCap`, `objectives.ts`);
+ *  · never the halt band: a blow is a flow cap's by construction
+ *    (`isFlowTaskCap`, the evaluator's `isFlowCap` line);
  *  · strictly UNDER the posted limit on this frame — at or above it the strip
  *    stays silent and the sign is the stricter ceiling, which SPEEDING_*
  *    already grades (`readSpeedContract`'s `binding`); a silent frame does not
@@ -585,9 +603,11 @@ function withoutKinMarks(e: ViolationEvent): ViolationEvent {
  *
  * THE NUMBERS. `shownKmh` is `shownObjectiveCapKmh` (the figure the strip
  * reads its number out of), `capKmh` the objective's compiled gate, `graceKmh`
- * REACH_ZONE_CAP_SLACK_KMH (round 2, C1 — the reducer bills only above the
- * speed this mark was BLOWN at, so the sheet is never stricter than the gate
- * that armed it), `blownAtSec` the latch's name (round 3).
+ * REACH_ZONE_CAP_SLACK_KMH (the objective's slack), `blownAtSec` the latch's
+ * name (round 3). ROUND 15: the reducer bills above `shownKmh` plus the sign's
+ * tolerance (`taskCapBillLineKmh`, founder ruling 2026-10-03 «LIKE A SPEED
+ * SIGN») — the gate and its slack are the objective's crediting numbers and
+ * bill nothing.
  *
  * ROUND 4 — ONLY THE NAMED STRETCH (founder ruling 2026-09-25). The stretch
  * fixed at the blow now also ends where the feature the task NAMES ends
@@ -604,6 +624,116 @@ function withoutKinMarks(e: ViolationEvent): ViolationEvent {
  * car is already past the end of its (now often short) stretch — a mark blown at
  * a graded cap is a broken cap, whether or not a stamped frame follows it.
  */
+/** Where the car crossed a capped mark on this frame, and at what speed (round 15). */
+interface MarkCrossing {
+  /** The speed at the crossing point, interpolated between the last frame and this one (absolute, km/h). */
+  kmh: number;
+}
+
+/** What the crossing reads off the frame before this one (`LessonSessionState.lastTick`). */
+type CrossingFrame = { t: number; speedKmh: number; position: { x: number; y: number } };
+
+/**
+ * ROUND 15 — THE ARRIVAL IS DECIDED AT THE MARK (`sc-follow-tailgater:4b342eee`). Did the car cross this reachZone's
+ * mark between the last frame and this one, and at what speed? The axis is the evaluator's own after this frame
+ * (`objectives.ts reachZoneApproachAxis` — this runs before the evaluator steps), the crossing is
+ * `reachZoneMarkCrossing`'s (short of the mark → at or past it, inside the disc), and the speed is interpolated
+ * between the two frames' speeds at the fraction of the segment where the crossing happened: the speed the car had AT
+ * the mark, which no single frame samples.
+ */
+function markCrossingOf(
+  params: Extract<ObjectiveParams, { kind: "reachZone" }>,
+  prevPos: { x: number; y: number } | null,
+  approachFrom: { x: number; y: number } | null,
+  last: CrossingFrame | undefined,
+  tick: SimTick,
+): { crossing: MarkCrossing | null; approachFrom: { x: number; y: number } | null } {
+  const axis = reachZoneApproachAxis(params, prevPos, approachFrom, tick.position);
+  if (last === undefined || !(last.t < tick.t)) return { crossing: null, approachFrom: axis.approachFrom };
+  const f = reachZoneMarkCrossing(params, axis.approachFrom, last.position, tick.position);
+  if (f === null) return { crossing: null, approachFrom: axis.approachFrom };
+  const v0 = Math.abs(last.speedKmh);
+  const v1 = Math.abs(tick.speedKmh);
+  return { crossing: { kmh: v0 + f * (v1 - v0) }, approachFrom: axis.approachFrom };
+}
+
+/** How far past the mark `pos` is on the approach axis from `from` (+ = beyond it), or null with no axis. */
+function alongMarkOf(mark: { x: number; y: number }, from: { x: number; y: number } | null, pos: { x: number; y: number }): number | null {
+  if (from === null) return null;
+  const ax = mark.x - from.x;
+  const ay = mark.y - from.y;
+  const m = Math.hypot(ax, ay);
+  if (m < 1e-6) return null;
+  return ((pos.x - mark.x) * ax + (pos.y - mark.y) * ay) / m;
+}
+
+/** A flow cap — above the halt band (`objectives.ts isFlowCap`): the only caps a mark can be blown at. */
+function isFlowTaskCap(capKmh: number): boolean {
+  return capKmh > REACH_ZONE_HALT_CAP_KMH;
+}
+
+/**
+ * ROUND 15 — A CAPPED MARK CREDITED SHORT OF ITSELF IS STILL DECIDED WHERE THE CAR CROSSES IT
+ * (`LessonSessionState.taskCapMarkWatch`). The evaluator completes a flow-capped objective up to `REACH_ZONE_GRACE_M`
+ * short of the mark (`objectives.ts` „THE MARK IS WHERE THE BANNER POINTS"), or at rest anywhere on its approach side,
+ * with the rung's ladder grace; the car then crosses the mark itself on a later frame, while the NEXT objective is
+ * active. «Slow early, then speed up through the mark» is exactly that frame, so it is read: the crossing speed against
+ * the glass figure plus the sign's tolerance, exactly as for the active objective's own mark. Nothing is stamped — the
+ * objective is done and no stretch is graded after a mark the task has credited — only the arrival (and, where the glass
+ * figure was under the sign, the breach row) is handed over.
+ *
+ * WHY NOT THE CREDITING FRAME (measured, then withdrawn in this round): billing the speed the objective was credited at
+ * billed a CORRECT demonstration — `sc-sig-controller-live` shadow-correct, L1 and L2: credited 4,98 m short of the
+ * «≤20» mark at 23,4 km/h while braking (L2: 22,3), and across the mark at about 12. The crossing is what the student did
+ * AT the mark; the crediting frame is a point of the deceleration before it.
+ */
+function stepTaskCapMarkWatch(
+  prev: LessonSessionState,
+  tick: SimTick,
+  last: CrossingFrame | undefined,
+): { watch: TaskCapMarkWatch | undefined; arrival: TaskCapArrival | undefined; breach: TaskCapBreach | undefined } {
+  const watch = prev.taskCapMarkWatch;
+  const cleared = { watch: undefined, arrival: undefined, breach: undefined };
+  if (watch === undefined) return cleared;
+  const o = prev.objectives[watch.objectiveIndex];
+  if (o === undefined || o.params.kind !== "reachZone" || watch.objectiveIndex === prev.currentObjectiveIndex) return cleared;
+  const params = o.params;
+  const capKmh = params.maxSpeedKmh;
+  if (capKmh === undefined || !Number.isFinite(capKmh)) return cleared;
+  // The axis is frozen at the completion: the evaluator no longer steps this objective.
+  const { crossing } = markCrossingOf(params, null, watch.approachFrom, last, tick);
+  if (crossing === null) {
+    // Left the mark's neighbourhood without crossing it (backed away, turned off): nothing more to decide.
+    const d = Math.hypot(tick.position.x - params.x, tick.position.y - params.y);
+    return d > params.radiusM + REACH_ZONE_GRACE_M ? cleared : { watch, arrival: undefined, breach: undefined };
+  }
+  const shownKmh = shownObjectiveCapKmh(o.spec, capKmh, prev.lesson.postedLimitKmh);
+  if (!(crossing.kmh > taskCapBillLineKmh(shownKmh, prev.rules.config))) return cleared;
+  const arrival: TaskCapArrival = { capKmh, shownKmh, graceKmh: REACH_ZONE_CAP_SLACK_KMH, blownAtSec: tick.t, arrivalKmh: crossing.kmh };
+  return { watch: undefined, arrival, breach: shownKmh < tick.maxSpeedKmh ? { objectiveId: o.spec.id, t: tick.t } : undefined };
+}
+
+/**
+ * ROUND 15 — the watch a capped objective leaves behind when it completes SHORT of its mark: a flow cap, on a practice
+ * rung, graded on a known approach axis, with the car still short of the mark (`along < 0`) on the completing frame. One
+ * completed at or past its mark had its crossing read already — on this frame or an earlier one — by
+ * `stepActiveTaskCapLatch`.
+ */
+function taskCapMarkWatchOnCompletion(
+  prev: LessonSessionState,
+  params: ObjectiveParams,
+  evalState: ObjectiveEvalState,
+  objectiveIndex: number,
+  tick: SimTick,
+): TaskCapMarkWatch | undefined {
+  if (prev.lesson.examMode === true) return undefined;
+  if (params.kind !== "reachZone" || params.maxSpeedKmh === undefined || !isFlowTaskCap(params.maxSpeedKmh)) return undefined;
+  if (evalState.type !== "reachZone" || evalState.approachFrom === null) return undefined;
+  const along = alongMarkOf(params, evalState.approachFrom, tick.position);
+  if (along === null || !(along < 0)) return undefined;
+  return { objectiveIndex, approachFrom: { x: evalState.approachFrom.x, y: evalState.approachFrom.y } };
+}
+
 function stepTaskCapLatch(
   prev: LessonSessionState,
   tick: SimTick,
@@ -612,9 +742,31 @@ function stepTaskCapLatch(
   latch: TaskCapLatch | undefined;
   breach: TaskCapBreach | undefined;
   arrival: TaskCapArrival | undefined;
+  watch: TaskCapMarkWatch | undefined;
+} {
+  if (prev.lesson.examMode === true || prev.phase !== "driving") {
+    return { cap: undefined, latch: undefined, breach: undefined, arrival: undefined, watch: undefined };
+  }
+  const last = prev.lastTick !== undefined && prev.lastTick.t < tick.t ? prev.lastTick : undefined;
+  const watched = stepTaskCapMarkWatch(prev, tick, last);
+  const active = stepActiveTaskCapLatch(prev, tick, last);
+  // The frame's one arrival slot is the active mark's when both marks are crossed on the same frame (two capped marks
+  // inside one frame's travel); otherwise the watched mark's arrival and breach row ride it.
+  if (active.arrival !== undefined || watched.arrival === undefined) return { ...active, watch: watched.watch };
+  return { ...active, arrival: watched.arrival, breach: active.breach ?? watched.breach, watch: watched.watch };
+}
+
+function stepActiveTaskCapLatch(
+  prev: LessonSessionState,
+  tick: SimTick,
+  last: CrossingFrame | undefined,
+): {
+  cap: TaskSpeedCap | undefined;
+  latch: TaskCapLatch | undefined;
+  breach: TaskCapBreach | undefined;
+  arrival: TaskCapArrival | undefined;
 } {
   const none = { cap: undefined, latch: undefined, breach: undefined, arrival: undefined };
-  if (prev.lesson.examMode === true || prev.phase !== "driving") return none;
   const idx = prev.currentObjectiveIndex;
   const active = prev.objectives[idx];
   if (active === undefined || active.params.kind !== "reachZone") return none;
@@ -622,11 +774,32 @@ function stepTaskCapLatch(
   if (capKmh === undefined || !Number.isFinite(capKmh)) return none;
   const st = prev.evalStates[idx];
   if (st === undefined || st.type !== "reachZone") return none;
-  const blownNow = st.approachCap === "blown";
+  const shownKmh = shownObjectiveCapKmh(active.spec, capKmh, prev.lesson.postedLimitKmh);
+  // ROUND 15 — THE BLOW IS THE CROSSING, OVER THE LINE (founder ruling 2026-10-03 «LIKE A SPEED SIGN»; see
+  // `markCrossingOf`). Rounds 3–14 latched off the evaluator's `approachCap === "blown"`, and that verdict keeps an
+  // «honoured» it earned anywhere on the approach — up to `REACH_ZONE_GRACE_M` behind the disc, i.e. 20 m short of the
+  // mark on L1's radius 15 — so «slow early, then speed up through the mark» was never blown: eased to 39,6 at y = 180
+  // on `sc-follow-tailgater` L1, +2,5 m/s², the mark passed at 53,6 over a line of 46, and no latch, no row, no bill.
+  // The cap now asks only what the car did AT the mark: the crossing speed against the glass figure plus the sign's
+  // tolerance. The approach verdict still credits the objective (its ladder grace untouched) and still re-arms a spent
+  // latch (`rearmed` below); it no longer decides a bill.
+  const flow = isFlowTaskCap(capKmh);
+  const { crossing, approachFrom } = flow
+    ? markCrossingOf(active.params, st.prevPos, st.approachFrom, last, tick)
+    : { crossing: null, approachFrom: st.approachFrom };
+  const blownNow = crossing !== null && crossing.kmh > taskCapBillLineKmh(shownKmh, prev.rules.config);
+  const verdictBlown = st.approachCap === "blown";
+  // ROUND 15 — RE-ARMED MEANS BACK ON THE APPROACH. A spent latch re-arms (and `advisor.ts taskCapReleased` puts the
+  // figure back on the strip) only once the evaluator's verdict no longer reads „blown" AND the car is short of the mark
+  // again on its axis — the only place from which it can cross the mark again. Through round 14 every latch came from
+  // a „blown" verdict, which clears only on a fresh approach, so the verdict alone said it; a latch now also comes from a
+  // crossing over the line on an approach the evaluator HONOURED (its verdict never „blown"), and the verdict alone would
+  // re-arm it the frame its stretch is spent — the strip showing a cap the sheet no longer grades.
+  const behindMark = (alongMarkOf(active.params, approachFrom, tick.position) ?? 0) < 0;
   let latch = prev.taskCapLatch !== undefined && prev.taskCapLatch.objectiveIndex === idx ? prev.taskCapLatch : undefined;
   if (latch !== undefined && latch.progress.spent) {
-    if (!blownNow && !latch.rearmed) latch = { ...latch, rearmed: true };
-    // A spent cap blown AGAIN after its verdict cleared: a new latch below.
+    if (!verdictBlown && behindMark && !latch.rearmed) latch = { ...latch, rearmed: true };
+    // A spent cap crossed over the line AGAIN from a fresh approach: a new latch below.
     if (latch.rearmed && blownNow) latch = undefined;
   }
   // Round 4: where the feature the task names ends — absent is its own zone.
@@ -638,7 +811,7 @@ function stepTaskCapLatch(
     const stretch = taskCapStretch(
       prev.objectives.map((o) => o.params),
       idx,
-      st.approachFrom,
+      approachFrom,
       feature?.end,
     );
     if (stretch === null) return none;
@@ -652,16 +825,15 @@ function stepTaskCapLatch(
     };
     created = true;
   }
-  const shownKmh = shownObjectiveCapKmh(active.spec, capKmh, prev.lesson.postedLimitKmh);
   const graded = shownKmh < tick.maxSpeedKmh;
   /*
    * ROUND 5 — THE ARRIVAL (founder ruling 2026-09-26 «Bill the arrival»). On the
    * one frame a latch is created, graded under the sign here, the reducer is
    * handed the blow itself, so it can bill passing the mark over the cap as ONE
    * event whatever the stretch does next — including a zone swept faster than
-   * itself, whose latch is spent on this very frame. The speed is the one the
-   * evaluator judged the mark blown at: the previous frame's, which `lastTick`
-   * holds (its own `Math.abs`, as the evaluator reads it).
+   * itself, whose latch is spent on this very frame. ROUND 15: the speed is the
+   * one AT THE MARK — interpolated between the two frames that straddle it
+   * (`markCrossingOf`) — and the latch is created on the crossing frame itself.
    *
    * ROUND 6 — ON EVERY CAPPED OBJECTIVE (the integrator's reading of ruling 4,
    * binding: «every capped objective has a mark, so the arrival event applies
@@ -693,15 +865,13 @@ function stepTaskCapLatch(
    * stamp and the breach row still bind only under the sign, as since round 2.
    */
   const arrival: TaskCapArrival | undefined =
-    created
+    created && crossing !== null
       ? {
           capKmh,
           shownKmh,
           graceKmh: REACH_ZONE_CAP_SLACK_KMH,
           blownAtSec: latch.blownAtSec,
-          arrivalKmh: Math.abs(
-            prev.lastTick !== undefined && prev.lastTick.t < tick.t ? prev.lastTick.speedKmh : tick.speedKmh,
-          ),
+          arrivalKmh: crossing.kmh,
         }
       : undefined;
   if (latch.progress.spent) return { cap: undefined, latch, breach: undefined, arrival: undefined };
@@ -747,6 +917,37 @@ function stepTaskCapLatch(
  * Neither touches scoring: these are `lesson` toasts, the coach's channel for
  * things that are taught and not billed.
  */
+/**
+ * WHAT HAPPENED, for each journey demand that can withhold a tick whatever the speed (round 15 —
+ * `objectives.ts reachZoneJourneyRefusal`). Each clause completes «по-рано в този урок …» and is TRUE BY THE FACT THE
+ * ARM READS — the context flag is set only by the code named here (`applyTick` builds them from the scored events and
+ * the coached rows), so the sentence states exactly what the rule engine reported and nothing it did not:
+ *   noContact / haltForVru / vruUntouched — `COLLISION` (any body; a pedestrian or cyclist for the two person arms);
+ *   railClear — `RAIL_CROSSING_VIOLATION` «entered-barred»; restClean — `ILLEGAL_STOP_IN_BAN_ZONE` or the
+ *   «stopped-on-track» rail act; yieldClean — `FAILED_TO_YIELD` / `EMERGENCY_NOT_YIELDED` / `PEDESTRIAN_NOT_YIELDED`;
+ *   solidLineClean — `CROSSED_SOLID_LINE`; stopSignRoll — `STOP_SIGN_NO_FULL_STOP`; speedClean — the two SPEEDING_*
+ *   codes or `SPEED_TOO_FAST_FOR_CONDITIONS`; brakingClean — `STOPPED_WITHOUT_CAUSE` or `HARSH_BRAKING_NO_CAUSE`;
+ *   greenStartClean — `HESITATION_AT_GREEN`.
+ */
+const JOURNEY_REFUSAL_BG: Record<
+  ReachZoneJourneyRefusal,
+  (ctx: ObjectiveContext, params: Extract<ObjectiveParams, { kind: "reachZone" }>) => string
+> = {
+  vruUntouched: () => "колата удари човек на пътя",
+  noContact: () => "колата участва в удар",
+  railClear: () => "колата влезе в прелеза, докато той беше затворен",
+  yieldClean: () => "не пропусна участник в движението, на когото дължеше предимство",
+  haltForVru: () => "колата удари човек на пътя",
+  restClean: (_ctx, params) =>
+    params.requireRestClean === "banZone" ? "колата спря в зона, в която спирането е забранено" : "колата спря върху прелеза",
+  solidLineClean: () => "колата пресече непрекъсната линия",
+  stopSignRoll: () => "колата не спря напълно на знак Б2 „Спри!“",
+  speedClean: () => "скоростта беше над позволената от знака или от условията",
+  brakingClean: (ctx) =>
+    ctx.stoppedWithoutCauseInRun === true ? "колата спря без причина на открит път" : "колата спря рязко без причина",
+  greenStartClean: () => "колата се забави да потегли на зелено",
+};
+
 function objectiveNotice(
   spec: LessonObjective,
   params: ObjectiveParams,
@@ -754,6 +955,7 @@ function objectiveNotice(
   after: ObjectiveEvalState,
   tick: SimTick,
   postedLimitKmh: number | undefined,
+  ctx: ObjectiveContext,
 ): HudEvent | null {
   if (
     params.kind === "reachZone" &&
@@ -860,10 +1062,24 @@ function objectiveNotice(
     );
     const stillAtTheMark = distToMarkM <= params.radiusM + REACH_ZONE_GRACE_M;
     const blownApproach = after.approachCap === "blown";
+    // ── …AND «ЗАТОВА» HAS TO BE THE REASON (round 15 of the task cap, `sc-follow-tailgater:5a56612e`) ──────────
+    //
+    // The save-tail says the SPEED is why the tick is withheld («затова още не се отчита») and that slowing down
+    // on the mark earns it («Намали СЕГА»). On a gate whose arrival also carries a JOURNEY demand that has already
+    // refused (`objectives.ts reachZoneJourneyRefusal` — the eleven arms of `arrivalHonoured` outside the `capMet`
+    // latch, every one session-monotone), both halves are false: the photographed pc wrong leg of
+    // `sc-follow-tailgater` (`w72-cap-pc/…/04-t042s.png`) read «…вдигна скоростта до 41 км/ч — затова още не се
+    // отчита. Намали СЕГА…» on a drive whose dead stop on the open road (`requireBrakingClean`) had already made the
+    // task unreachable at ANY speed. So on that frame the card names the reason that holds, says that slowing down
+    // cannot change it, and gives no remedy — the true thing, never an instruction that will not work (THEO-4).
+    // Only the save-tail is replaced: the other tail already promises nothing.
+    const journeyRefusal = reachZoneJourneyRefusal(params, ctx);
     const tailBg =
       blownApproach || !stillAtTheMark
         ? "— това е над допустимото и задачата остава неизпълнена. Намаляване след маркера вече не се отчита: измерва се самото приближаване, а то вече се случи с тази скорост. Намалявай по-рано — още преди маркера. Урокът продължава и разборът показва задачата накрая."
-        : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
+        : journeyRefusal !== null
+          ? `— но задачата няма да се отчете и при по-ниска скорост: по-рано в този урок ${JOURNEY_REFUSAL_BG[journeyRefusal](ctx, params)}, а тя се отчита само ако това не се е случило. Затова намаляването сега не може да я отчете. Урокът продължава и разборът показва задачата накрая.`
+          : "— затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.";
     // ── AND IF THE SPEED IS NOT THE ONLY THING MISSING, SAY SO HERE ─────────
     // (sc-vp-police-stop:ab262758, with the `requireKerbwardM` demand.)
     //
@@ -2714,6 +2930,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let currentIndex = prev.currentObjectiveIndex;
   let phase: LessonPhase = prev.phase;
   let endedAtSec = prev.endedAtSec;
+  // Round 15 — a capped objective that completed short of its mark on THIS frame (`taskCapMarkWatchOnCompletion`).
+  let completedMarkWatch: TaskCapMarkWatch | undefined;
   // THE RUN-OUT (finish.ts). `undefined` = the chain has not finished yet;
   // an object = running out to the mark; `null` = the chain finished on a
   // route that ends nowhere, which terminates on the spot exactly as it always
@@ -2794,6 +3012,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         step.evalState,
         tick,
         prev.lesson.postedLimitKmh,
+        ctx,
       );
       if (notice !== null) hudEvents.push(notice);
 
@@ -2815,6 +3034,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ...(step.detail !== undefined ? { detail: step.detail } : {}),
       };
       hudEvents.push({ kind: "objectiveComplete", titleBg: current.spec.titleBg });
+      // Round 15: a capped mark credited SHORT of itself is still decided where the car crosses it.
+      const watchHere = taskCapMarkWatchOnCompletion(prev, current.params, step.evalState, currentIndex, tick);
+      if (watchHere !== undefined) completedMarkWatch = watchHere;
       currentIndex += 1;
       if (currentIndex < objectives.length) {
         objectives[currentIndex] = { ...objectives[currentIndex], status: "active" };
@@ -3671,6 +3893,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // same as speeding»). Round 14: the cap's settlement reads only the stamp, so
   // the flags are kept exactly as on the same drive with no cap.
   const weatherRecord = rules.conditionsSpeed.emitted;
+  // Round 15: a watch set on this frame replaces the carried one (which was for an earlier objective's mark).
+  const nextMarkWatch = completedMarkWatch ?? capStep.watch;
 
   return {
     state: {
@@ -3732,6 +3956,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // to CLEAR it (`...prev` cannot express a field going back to absent);
       // a drive that never blows a graded cap writes neither.
       ...(capStep.latch !== undefined || prev.taskCapLatch !== undefined ? { taskCapLatch: capStep.latch } : {}),
+      // Round 15: the capped mark a completed objective has yet to cross — set on the completing frame, carried by
+      // `stepTaskCapMarkWatch` until it is crossed or left; written only when present or being cleared.
+      ...(nextMarkWatch !== undefined || prev.taskCapMarkWatch !== undefined ? { taskCapMarkWatch: nextMarkWatch } : {}),
       ...(capStep.breach !== undefined
         ? { taskCapBreaches: [...(prev.taskCapBreaches ?? []), capStep.breach] }
         : {}),

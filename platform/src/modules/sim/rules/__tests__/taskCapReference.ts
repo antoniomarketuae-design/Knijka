@@ -251,6 +251,8 @@ export interface Coverage14 {
   gradedBlowsGateAtOrAboveSign: number;
   signBoundBlowsGlassUnderGate: number;
   gradedBlowsGlassUnderGate: number;
+  /** Round 15: frames in the band founder ruling 2026-10-03 moved — over the glass figure plus the sign's tolerance (billed
+   *  now), at or under the old gate + slack line (unbilled through round 14). */
   betweenTheLinesFrames: number;
   overGlassUnderGateFrames: number;
   reversingFrames: number;
@@ -338,6 +340,9 @@ export interface Expected {
  * THE EXPECTED OUTCOME of one programme, frame by frame.
  */
 export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C: RuleEngineConfig = DEFAULT_CONFIG): Expected {
+  // ROUND 15 — THE CAP'S BILL LINE, restated from the ruling (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): the glass figure
+  // plus the tolerance a posted limit gets — the sign's own two config numbers, the gate and its slack never read.
+  const taskLine = (shownKmh: number): number => shownKmh + Math.min(shownKmh * C.speedingGraceRatio, C.speedingGraceMaxKmh);
   // ── THE NO-CAP LEDGER'S DETECTORS ──
   const spMinor = new Continuing(C.speedingMinorSustainSec, C.speedingRearmSec, C.speedingRepeatSec, true);
   const spDang = new Continuing(C.speedingDangerousSustainSec, C.speedingRearmSec, 0, false);
@@ -406,7 +411,7 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
       ending.speeding = billKey({ t, code: OVER, kind: "regrade" });
     }
     if (waiting !== null && !act.named) ending.pending = billKey({ t, code: TASK, kind: "shown", blow: waiting.blow });
-    if (act.named && !act.charged && cap !== undefined && speed > cap.capKmh + cap.graceKmh && task.emitted && taskRg.since !== null && !taskRg.emitted) {
+    if (act.named && !act.charged && cap !== undefined && speed > taskLine(cap.shownKmh) && task.emitted && taskRg.since !== null && !taskRg.emitted) {
       ending.task = billKey({ t, code: TASK, kind: "regrade" });
     }
     if (wx.emitted && wxRg.since !== null && !wxRg.emitted && E !== null && speed > E) ending.adaptation.push(billKey({ t, code: COND, kind: "regrade" }));
@@ -482,7 +487,7 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
       latch = name;
       arrivalAct = null; // round 6: a new blow never resumes the old latch's act
     }
-    const taskOver = cap !== undefined && moving && v > cap.capKmh + cap.graceKmh;
+    const taskOver = cap !== undefined && moving && v > taskLine(cap.shownKmh);
     // ROUND 6 — THE KEPT ACT RESUMES on the same latch over its task line (its first bill and its charge with it).
     if (arrivalAct !== null && arrivalAct.kept !== null && taskOver && cap !== undefined && cap.blownAtSec === arrivalAct.latch) {
       if (!act.named) act = { ...arrivalAct.kept };
@@ -490,7 +495,7 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
       if (cov !== undefined) cov.restores++;
     }
     // THE ARRIVAL (founder ruling 4): one event, on its latch's first frame, over the line its mark was blown at.
-    const blown = fresh && arrival !== undefined && arrival.blownAtSec === name && Math.abs(arrival.arrivalKmh) > arrival.capKmh + arrival.graceKmh;
+    const blown = fresh && arrival !== undefined && arrival.blownAtSec === name && Math.abs(arrival.arrivalKmh) > taskLine(arrival.shownKmh);
     // A cap the glass showed at or above the sign on the blow frame: the overspeed it names is the sign's too.
     const signBound = blown && arrival !== undefined && arrival.shownKmh >= S;
     // THIS FILE'S OWN M-16 CLOCK (the sign held for `speedingRearmSec`): no speeding episode is read.
@@ -498,11 +503,12 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
     const signHeld = atSign && atSignSince !== null && t - atSignSince >= C.speedingRearmSec;
     if (cov !== undefined) {
       if ((cap !== undefined && cap.shownKmh !== cap.capKmh) || (arrival !== undefined && arrival.shownKmh !== arrival.capKmh)) cov.pairFrames++;
-      if (cap !== undefined && moving && v > cap.shownKmh + cap.graceKmh && !taskOver) cov.betweenTheLinesFrames++;
+      // Round 15: the band the ruling MOVED — over the glass figure's line, at or under the old gate + slack line.
+      if (cap !== undefined && moving && taskOver && v <= cap.capKmh + cap.graceKmh) cov.betweenTheLinesFrames++;
       if (cap !== undefined && v > cap.shownKmh && v <= cap.capKmh) cov.overGlassUnderGateFrames++;
       if (v < 0) {
         cov.reversingFrames++;
-        if (cap !== undefined && speed > cap.capKmh + cap.graceKmh) cov.reversingOverTaskLineFrames++;
+        if (cap !== undefined && speed > taskLine(cap.shownKmh)) cov.reversingOverTaskLineFrames++;
         if (E !== null && speed > E) cov.reversingOverEnvelopeFrames++;
       }
       if (x.isNight === true) cov.nightFrames++;

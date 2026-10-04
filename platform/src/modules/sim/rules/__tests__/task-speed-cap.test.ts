@@ -4,10 +4,12 @@
  *
  * The reducer half. `SimTick.taskSpeedCap` is stamped by `lessons/engine.ts`
  * only; here it is stamped by hand, so every case states the numbers it grades
- * against: `capKmh` (the objective's gate), `graceKmh` (the objective's own
- * slack — only a speed ABOVE gate + grace bills; round 2, verifier C1) and
- * `shownKmh` (the figure the glass printed — back at or under it is the
- * correction). Frames are 0.1 s, the shape the product ticks at.
+ * against: `shownKmh` (the figure the glass printed — only a speed ABOVE it
+ * plus the tolerance a posted limit gets bills, founder ruling 2026-10-03 «LIKE
+ * A SPEED SIGN», round 15; back at or under it is the correction), with
+ * `capKmh` (the objective's gate) and `graceKmh` (its slack) carried on the
+ * stamp and never read for billing (rounds 2–14 billed above gate + grace).
+ * Frames are 0.1 s, the shape the product ticks at.
  *
  * ROUND 2 also replaced round 1's stand-down (the task code held its episode
  * wherever the weather envelope or a bend was armed) with THE KIN LEDGER: one
@@ -119,16 +121,19 @@ describe("the ceiling bills, with the grace the product already has", () => {
     expect(bills(over.events)).toHaveLength(2);
   });
 
-  it("…and the grace is read off the stamp, not assumed: the same 83 bills under a 0 km/h stamp", () => {
-    const zero = drive(frames([{ sec: 20, speedKmh: 83, over: { taskSpeedCap: { ...SPRAY, graceKmh: 0 } } }]));
-    expect(bills(zero.events)).toHaveLength(2);
-    const five = drive(frames([{ sec: 20, speedKmh: 83, over: { taskSpeedCap: SPRAY } }]));
-    expect(bills(five.events)).toEqual([]);
+  it("ROUND 15 — the stamp's gate and slack are NOT read for billing (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): under «≤80» 83 never bills and 85.5 always does, whatever gate (80 / 85 / 120) or slack (0 / 5 / 40) the stamp carries", () => {
+    for (const [capKmh, graceKmh] of [[80, 0], [80, 5], [85, 5], [120, 40]] as const) {
+      const stamp = { ...SPRAY, capKmh, graceKmh };
+      expect(bills(drive(frames([{ sec: 20, speedKmh: 83, over: { taskSpeedCap: stamp } }])).events)).toEqual([]);
+      expect(bills(drive(frames([{ sec: 20, speedKmh: 85.5, over: { taskSpeedCap: stamp } }])).events)).toHaveLength(2);
+    }
   });
 
-  it("the rung's grace (shown 80, bill line 90) is a band that neither bills nor forgives", () => {
-    // 88 for two minutes: over the figure on the glass, inside the bill line.
-    const inside = drive(frames([{ sec: 120, speedKmh: 88, over: { taskSpeedCap: SPRAY_L1 } }]));
+  it("ROUND 15 — on L1 (shown 80, gate 85) the line is the GLASS figure's, 85: 88 bills (rounds 2–14: inside the old line 90, never billed), and the band between the glass figure and its line neither bills nor forgives", () => {
+    // 88 for twenty seconds: over the glass figure plus the sign's tolerance — the first bill and its re-grade.
+    expect(bills(drive(frames([{ sec: 20, speedKmh: 88, over: { taskSpeedCap: SPRAY_L1 } }])).events)).toHaveLength(2);
+    // 84 for two minutes: over the figure on the glass, inside its line.
+    const inside = drive(frames([{ sec: 120, speedKmh: 84, over: { taskSpeedCap: SPRAY_L1 } }]));
     expect(bills(inside.events)).toEqual([]);
     // Billed at 95, then parked in the band: the episode is NOT over, so the
     // return to 95 reaches the re-grade rather than a fresh first bill.

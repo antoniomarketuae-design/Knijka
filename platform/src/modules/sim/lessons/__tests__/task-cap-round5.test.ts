@@ -358,9 +358,16 @@ describe("ruling 4 · the arrival at a zone-default mark over its cap is ONE eve
     expect(o.breaches).toBe(0);
   });
 
-  it("GUARD — at the blow line itself (35 through ≤30 + 5): not blown, nothing", () => {
-    const o = drive(ZONE_LESSON(), { pts: line(300), posted: 50, maxT: 60, speed: () => 35 });
+  // ROUND 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): the line is the glass figure plus the sign's tolerance,
+  // 30 + 3 = 33 — rounds 5–14 put it at the gate plus the slack, 35.
+  it("GUARD — at the bill line itself (33 through ≤30 + 3): not blown, nothing", () => {
+    const o = drive(ZONE_LESSON(), { pts: line(300), posted: 50, maxT: 60, speed: () => 33 });
     expect(taskCoached(o)).toEqual([]);
+    expect(taskCharged(o)).toEqual([]);
+  });
+  it("ROUND 15 — 35 through ≤30 (the old gate + slack line) is over the glass figure's line: ONE taught arrival", () => {
+    const o = drive(ZONE_LESSON(), { pts: line(300), posted: 50, maxT: 60, speed: () => 35 });
+    expect(taskCoached(o).length).toBe(1);
     expect(taskCharged(o)).toEqual([]);
   });
 

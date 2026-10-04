@@ -144,9 +144,9 @@ export const PAIR_SIGN_BOUND_SPEEDING: SimTick[] = prog(
   { maxSpeedKmh: 50 },
 );
 /**
- * An arrival the reducer's own re-check must REFUSE (out of the product's domain — the evaluator blows a mark only
- * strictly above gate + slack — and that is the point): handed over at 57 through a gate of 54.5 (line 59.5) whose
- * glass shows 50. Over the GLASS figure plus the slack (55), not over the line the mark is blown at: no bill.
+ * An arrival handed over at 57 through a gate of 54.5 whose glass shows 50. Rounds 13–14 refused it (over the glass
+ * figure plus the slack, under the gate's 59.5); round 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN») bills it:
+ * the line is the glass figure plus the sign's tolerance, 55.
  */
 export const PAIR_UNDER_THE_LINE: SimTick[] = prog(
   [
@@ -208,8 +208,8 @@ export function stampCard(gate: number, glass: number): SimTick[] {
 
 /**
  * A graded mark (glass ≤50 over a gate of 54.5, posted 70) blown at 62, then 10 s at 57: over the GLASS figure plus the
- * slack (55), under the line the mark is blown at (59.5). The grace band of the task's own line: no stretch bill at
- * all, and no re-grade.
+ * sign's tolerance (55), under the old gate + slack line (59.5). Through round 14 that was the task's grace band; since
+ * round 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN») it is over the line — a continuing breach.
  */
 export const PAIR_BETWEEN_THE_LINES: SimTick[] = prog(
   [

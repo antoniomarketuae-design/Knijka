@@ -314,7 +314,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-jx-priority-confidence",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-jx-priority-confidence/mistake-phantom-brake.trace.json",
-    "faultTimeSec": 8.07,
+    "faultTimeSec": 8.05,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -398,7 +398,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-merge-accel-lane",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-merge-accel-lane/mistake-stop-at-end.trace.json",
-    "faultTimeSec": 14.5,
+    "faultTimeSec": 14.47,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",
@@ -802,7 +802,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vp-police-stop",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json",
-    "faultTimeSec": 16.78,
+    "faultTimeSec": 16.75,
     "requiredActors": [
       {
         "kind": "police",

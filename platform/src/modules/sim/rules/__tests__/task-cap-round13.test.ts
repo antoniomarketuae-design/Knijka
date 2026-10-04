@@ -104,11 +104,14 @@ describe("A · THE PAIR — the glass figure and the compiled gate are two numbe
     expect(shownFirst(events)[0].signBoundArrival).toBeUndefined();
     expect(state.taskSignAct).toBeNull();
   });
-  it("RED-ON-V15 · the arrival's own re-check reads the GATE plus its slack: an arrival handed over at 57 through a gate of 54.5 (line 59.5) is not billed, though it is over the glass figure plus the slack (55)", () => {
-    expect(labels(drive(PAIR_UNDER_THE_LINE).events)).toEqual([]);
+  // ROUND 15 — founder ruling 2026-10-03 «LIKE A SPEED SIGN» reverses the two pins below. Round 13 read the GATE plus
+  // its slack (59,5) here, and named the glass reading V15/V14 as mutants; the ruling makes the glass figure plus the
+  // sign's tolerance (50 + min(5, 5) = 55) THE line, on every rung — the gate's ladder grace credits, never bills.
+  it("ROUND 15 (was RED-ON-V15) · the arrival's own re-check reads the GLASS figure plus the sign's tolerance: an arrival handed over at 57 through «≤50» (gate 54,5) is over 55 — billed at its blow", () => {
+    expect(labels(drive(PAIR_UNDER_THE_LINE).events)).toEqual([`${TASK}@1`]);
   });
-  it("RED-ON-V14 · the stretch bills above the GATE plus its slack: 10 s at 57 after the blow (over 55, under 59.5) is the task's grace band — no stretch bill, no re-grade", () => {
-    expect(kinLabels(PAIR_BETWEEN_THE_LINES)).toEqual([`${TASK}@1`]);
+  it("ROUND 15 (was RED-ON-V14) · the stretch bills above the GLASS figure plus the sign's tolerance: 10 s at 57 after the blow (over 55) is a continuing breach — its first bill absorbed into the arrival's act, the act's one re-grade at 10", () => {
+    expect(kinLabels(PAIR_BETWEEN_THE_LINES)).toEqual([`${TASK}@1`, `${TASK}>${TASK}@4`, `${TASK}:rg@10`]);
   });
   it("RED-ON-V12 · the correction is the GLASS figure: 5 s at 52 (over «≤50», under the gate 54.5) corrects nothing — the breach carries on, its seconds over the line accrue across the gap and the act's ONE re-grade lands at 15.1", () => {
     expect(kinLabels(PAIR_GRADED_GRACE_BAND)).toEqual([`${TASK}@1`, `${TASK}>${TASK}@4`, `${TASK}:rg@15.1`]);
@@ -225,12 +228,12 @@ describe("D · A SIGN-BOUND MARK BLOWN IN REVERSE — the verdict runs on the bl
     expect(kinLabels(f)).toEqual([`${TASK}@6`]);
     expect(checkExact("blown in reverse", f)).toEqual([]);
   });
-  it("the gate above the glass figure (L1's 25 over «≤20»): 26.5 is not over the gate's line (30), the reducer refuses the arrival exactly as the evaluator would never hand it over — nothing is billed, nothing waits", () => {
+  it("ROUND 15 · the gate above the glass figure (L1's 25 over «≤20»): the line is the GLASS figure's (20 + 2 = 22, founder ruling 2026-10-03 «LIKE A SPEED SIGN»), so 26,5 in reverse is over it — billed on its blow frame exactly as the gate-equals-glass twin above, the gate's ladder grace forgiving nothing", () => {
     const f = blownInReverse(25, 20, 20);
     const { events, state } = drive(f);
-    expect(kinLabels(f)).toEqual([]);
-    expect(shownFirst(events)).toEqual([]);
+    expect(kinLabels(f)).toEqual([`${TASK}@6`]);
+    expect(shownFirst(events)[0].signBoundArrival).toEqual({ arrivalKmh: 26.5, shownKmh: 20, postedKmh: 20 });
     expect(state.taskArrivalPending).toBeNull();
-    expect(checkExact("blown in reverse, under the gate's line", f)).toEqual([]);
+    expect(checkExact("blown in reverse, gate above the glass", f)).toEqual([]);
   });
 });

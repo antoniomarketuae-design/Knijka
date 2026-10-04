@@ -245,7 +245,7 @@ describe("a lawful RIGHT leg is never billed", () => {
     }
   });
 
-  it("a leg that blows the mark at 100 and is back inside the L1 grace (84) at once: the arrival is taught, and the 84 after it is never billed — the gate is the objective's own", () => {
+  it("a leg that blows the mark at 100 and is back under the line (84 ≤ 80 + 5) at once: the arrival is taught, and the 84 after it is never billed; 88 and 95 are over it (round 15: the glass figure's line, not the gate's)", () => {
     // The mark is at y = 450 (radius 12); 100 is past the gate plus the slack
     // (85 + 5), so the approach is blown and the ceiling is stamped. 84 is over
     // the figure on the glass (80) and inside the gate the objective itself
@@ -256,12 +256,14 @@ describe("a lawful RIGHT leg is never billed", () => {
     const d = driveLesson(spray(1), (y) => (y < 470 ? 100 : 84));
     expect(taught(d, TASK)).toHaveLength(1);
     expect(charged(d.session)).not.toContain(TASK);
-    // ROUND 2 (C1): 88 is ALSO inside now — the ceiling bills above the gate
-    // plus the objective's own slack (85 + 5 = 90), the speed this mark was
-    // blown at. Round 1 billed 88 here, with 0 km/h of slack.
+    // ROUND 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): 88 is OVER the
+    // line again — the ceiling bills above the figure on the glass plus the
+    // tolerance a posted 80 gets (80 + 5 = 85) on every rung, and the L1 ladder's
+    // gate (85, + slack = 90) credits the objective, never the bill. Rounds 2–14
+    // let 88 ride inside the gate's line here: the act's re-grade is charged now.
     const slack = driveLesson(spray(1), (y) => (y < 470 ? 100 : 88));
     expect(taught(slack, TASK)).toHaveLength(1);
-    expect(charged(slack.session)).not.toContain(TASK);
+    expect(charged(slack.session)).toEqual([TASK]);
     // Positive control: the same leg settling at 95 is over gate + slack, so the
     // act keeps running on the curtain and its re-grade is charged.
     const over = driveLesson(spray(1), (y) => (y < 470 ? 100 : 95));

@@ -221,6 +221,76 @@ export interface RuleEngineState {
   /** Previous frame's lead gap (null = none reported) — cut-in recovery (A12). */
   prevLeadGapM: number | null;
   /**
+   * THE LEAD TRACK — the harsh-brake cause ledger's RATE-FREE view of the lead
+   * (`sc-follow-tailgater:f42dce4f`). One sample per frame while the gap channel
+   * reports a vehicle: the frame's time, `leadOdoM` and the gap. Trimmed to
+   * `2 × LEAD_TRACK_WINDOW_SEC` with the newest sample older than that kept as
+   * the anchor (the `stepSpeedWindow` discipline). A BLINK IS NOT AN ABSENCE
+   * (round 2, 2026-10-03): a null frame no more than `LEAD_TRACK_WINDOW_SEC`
+   * after the last reading is bridged and the track kept; it is emptied only by
+   * a silence longer than that, a re-stage of the car, or a gap discontinuity
+   * the motion cannot explain (`stepLeadTrack`), so a derivative is never taken
+   * across two different leads. Entries are pushed and shifted, never mutated,
+   * so cloneState's shallow copy is enough. See `leadTrackAt` and the cause
+   * ledger above `causelessBraking`.
+   */
+  leadTrack: Array<{ t: number; odoM: number; gapM: number; sM?: number }>;
+  /**
+   * The cause ledger's MEMORY of the lead (round 2, `sc-follow-tailgater:63c0c28c`
+   * R1). `enteredAt`: the last time a lead within `harshBrakeSignalCauseM`
+   * newly ENTERED the corridor (first sight, back after a silence longer than
+   * the window, or a nearer car in place of the old one — a car pulling out
+   * ahead). `brakingAt`: the last frame a lead within that reach read braking at
+   * the braking line. `demandAt`: the last frame a lead's closing demanded
+   * `LEAD_DEMAND_LINE_MPS2`. `heldCause`: the lead-cause verdict of the last
+   * frame the lead was actually in the channel, which a bridged blink reuses.
+   * `nullSinceReading` (round 3, verifier C1): the channel has reported nobody
+   * on at least one frame since the last reading — what makes a long hole
+   * before the next reading a SILENCE (a fresh track) rather than one long
+   * frame of a coarse fixture feed.
+   * THE FAR MEMORIES (round 4, integrator ruling: beyond the reach restore
+   * base-like acquittal). Read only while the ledger's lead is beyond it or absent, so nothing of
+   * them reaches a lead inside the reach, where rounds 1–3 stand exactly:
+   * `farEnteredAt` — a lead ENTERED the corridor (the same three ways as
+   * `enteredAt`, at any range — within the reach `enteredAt` already says it);
+   * `farBrakingAt` — a lead beyond the reach read braking at the line on its
+   * quick reading; `farClosingAt` — a lead
+   * beyond the reach closed at `harshBrakeClosingLeadMps` or more (round 5: the
+   * closing NOW, `leadClosingNowMps`, not the window's mean). Plain numbers/booleans — cloneState copies the object.
+   */
+  leadMemory: {
+    enteredAt: number | null;
+    brakingAt: number | null;
+    demandAt: number | null;
+    heldCause: boolean;
+    nullSinceReading: boolean;
+    farEnteredAt: number | null;
+    farBrakingAt: number | null;
+    farClosingAt: number | null;
+  };
+  /**
+   * Forward path length, metres, integrated by the TRAPEZOID of consecutive
+   * speed readings (`min(dt, 2)`, the contact odometer's pause clamp). Not the
+   * contact odometer: that one is a right-endpoint sum, which under a 9 m/s²
+   * stop at 2.5 Hz understates each frame by a·dt²/2 = 0.75 m and would read a
+   * steady lead as one braking at ~3.8 m/s² on the student's own brake onset.
+   * The trapezoid is exact for the piecewise-linear speed a constant pedal
+   * produces; measured against the positions in w71/w69's road records it
+   * agrees to 0.66 m over a whole drive. Read ONLY by the lead track.
+   */
+  leadOdoM: number;
+  /**
+   * The student's travel BY HIS POSITIONS, metres (round 5) — the distance his
+   * `position` moved each frame, or the trapezoid's increment on a frame where
+   * that displacement cannot be his motion (a teleport, a fixture that never
+   * moves him). Stored on each lead-track sample as `sM` and read ONLY by
+   * `leadClosingNowMps`: the trapezoid `leadOdoM` misses the peak of a speed
+   * that rises until the pedal and falls after it (up to 0.2 m on a 2.5 Hz frame),
+   * which the lead's position then carries as a step and a three-sample speed
+   * reads as the lead slowing by up to 0.8 m/s for the next 0.8 s.
+   */
+  leadPosOdoM: number;
+  /**
    * OV-07/OV-06 overtake tracker (audit H-5). Overtaking is a two-beat, LEFT-side
    * manoeuvre (ЗДвП чл. 42, ал. 2) and the two codes must grade the manoeuvre,
    * not the bare lane-id delta.
@@ -2289,6 +2359,19 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     speedWindow: [],
     crawlSpeedWindow: [],
     prevLeadGapM: null,
+    leadTrack: [],
+    leadMemory: {
+      enteredAt: null,
+      brakingAt: null,
+      demandAt: null,
+      heldCause: false,
+      nullSinceReading: false,
+      farEnteredAt: null,
+      farBrakingAt: null,
+      farClosingAt: null,
+    },
+    leadOdoM: 0,
+    leadPosOdoM: 0,
     lastLeadNearAt: null,
     overtakePullOutAt: null,
     lastLaneArrow: null,
@@ -2393,6 +2476,8 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     // so a shallow array copy keeps the reducer's no-input-mutation contract.
     speedWindow: [...s.speedWindow],
     crawlSpeedWindow: [...s.crawlSpeedWindow],
+    leadTrack: [...s.leadTrack],
+    leadMemory: { ...s.leadMemory },
     lastIndicatorOnAt: { ...s.lastIndicatorOnAt },
     lastGlanceAt: { ...s.lastGlanceAt },
     scanStopCreditSec: { ...s.scanStopCreditSec },
@@ -2761,6 +2846,24 @@ export function speedingBands(
 }
 
 /**
+ * THE TASK CAP'S BILL LINE — founder ruling 2026-10-03, «LIKE A SPEED SIGN»: a blown task cap is billed above the
+ * number the glass shows PLUS the same tolerance a posted limit gets, on every rung. So it is `speedingBands`' own
+ * graded line with the glass figure (`shownKmh`) in the place of the sign — `speedingGraceRatio` and
+ * `speedingGraceMaxKmh` read off the same config, never re-typed: «≤36» bills above 39,6, «≤80» above 85, «≤20» above 22.
+ * The comparison is the speeding gate's too (strictly above), so a speed EXACTLY on the line is the A12 tie and is not
+ * billed.
+ *
+ * WHAT IT REPLACED, AND WHY THAT IS GONE: rounds 2–14 billed above `capKmh + graceKmh` — the objective's compiled gate
+ * (the author's figure plus the RUNG's ladder grace) plus the objective's own slack. On L1 of `sc-follow-tailgater` the
+ * glass says «≤36» and that line was 36 + 5 + 5 = 46, ten km/h over the figure the student read, where a posted 36 would
+ * bill above 39,6. The ruling keeps the ladder grace for crediting the objective and for the coach's copy, NEVER for
+ * billing — so the gate and its slack are not inputs here at all.
+ */
+export function taskCapBillLineKmh(shownKmh: number, cfg: RuleEngineConfig): number {
+  return speedingBands(shownKmh, cfg).gradedAbove;
+}
+
+/**
  * THE RE-GRADE FOR A DRIVE THAT ENDS BEFORE THE RE-GRADE CLOCK DOES — the
  * fourth and last member of the family `SPEED_REGRADE_SEC` opens, and the
  * residual `signals-sweep161.test.ts` §7 recorded rather than closed
@@ -2914,7 +3017,7 @@ export function settleUnpaidTaskTeach(state: RuleEngineState, tick: KinSettleTic
   const act = state.taskAct;
   if (!act.named || act.charged) return null;
   const cap = tick.taskSpeedCap;
-  if (cap === undefined || !(Math.abs(tick.speedKmh) > cap.capKmh + cap.graceKmh)) return null;
+  if (cap === undefined || !(Math.abs(tick.speedKmh) > taskCapBillLineKmh(cap.shownKmh, state.config))) return null;
   if (!state.taskCap.emitted || state.taskCapRegrade.activeSince === null || state.taskCapRegrade.emitted) return null;
   return { ...makeViolation("TASK_SPEED_CAP_EXCEEDED", tick.t), regrade: true };
 }
@@ -2998,6 +3101,451 @@ function stepSpeedWindow(
   const anchor = w.length > 0 ? w[0] : null;
   w.push({ t, speedKmh });
   return anchor;
+}
+
+/**
+ * THE LEAD TRACK'S WINDOW, seconds — the span every lead quantity the
+ * harsh-brake cause ledger reads is measured over (`sc-follow-tailgater:f42dce4f`).
+ *
+ * WHY A WINDOW AT ALL. The ledger used to read `gapOpeningMps`, the gap's change
+ * over ONE frame divided by that frame. On the first frame of a stop that
+ * number is an average of the cruise before the pedal and the brake after it,
+ * weighted by where in the frame the pedal fell — so the same stop read 3.4 m/s
+ * on a 4 Hz phone, 2.9 on a 2.8 Hz one and 4.6 on the desktop, against a 3 m/s
+ * line. The act was graded by the frame rate.
+ *
+ * WHY THIS LENGTH. The reducer is never handed a frame longer than the physics
+ * integrates: `components/sim/lesson-ui/sessionClock.ts` advances `SimTick.t` by
+ * at most `PHYSICS_MAX_FRAME_DT` = 0.5 s (rapier's own clamp), and both phone
+ * road records the row was filed on measure exactly that as their longest frame.
+ * A window of that length therefore always has a real sample at or before its
+ * start, so the value at `t − W` is an interpolation between two readings the
+ * reducer actually holds, never an extrapolation, at EVERY rate the product can
+ * feed it. Restated, not imported — rules/ does not depend on a component file
+ * — and `lead-track-rate-free.test.ts` pins the two numbers together. A coarser
+ * feed (the 1 Hz fixture batteries) degrades exactly as `accelWindowSec` does:
+ * the window then holds one prior frame and the value is the old per-frame one.
+ */
+export const LEAD_TRACK_WINDOW_SEC = 0.5;
+
+/**
+ * A driver's reaction time, seconds — the product's ONE reaction time,
+ * `runtime/worldRuntime.ts` AMBER_REACTION_SEC (the C3 comfortable-stop model,
+ * also the merge census oracle's T_R). Restated for the same dependency reason
+ * as the window above and pinned to it by the same test.
+ */
+export const LEAD_REACTION_SEC = 1.0;
+
+/**
+ * THIS FILE'S OWN LINE BETWEEN BRAKING AND NOT BRAKING, m/s² — the deceleration
+ * at which the harsh-brake ledger opens an episode at all (`accelMps2 <= -2`)
+ * and at which a released pedal re-arms it. The cause ledger now asks the same
+ * question of the LEAD («is it braking?») and of the GAP («does it make you
+ * brake?»), so it is named once and read everywhere the ledger asks it.
+ */
+const BRAKING_LINE_MPS2 = 2;
+
+/**
+ * THE DEMAND LINE, m/s² — the braking a closing must DEMAND before it is a reason
+ * to brake at all (round 2, integrator ruling R2-c). A closing the student can
+ * absorb by lifting off the throttle is no reason to brake, and lifting off is
+ * engine braking: ~0.5–1 m/s². So the line sits at the BOTTOM of that band — a
+ * closing that needs even the gentlest lift counts, which is the A12 side of
+ * every doubt. Round 1 used the braking line (2 m/s²) here and convicted a stamp
+ * for a stopped queue 65–200 m ahead at 50 км/ч (verifier C1); at 0.5 a queue is
+ * a cause from 207 m in at 50 км/ч, and the drill's steady `FTG_LEAD` (closing
+ * 4.6 m/s from 75–90 m, demand 0.13–0.15) still is not.
+ */
+export const LEAD_DEMAND_LINE_MPS2 = 0.5;
+
+/**
+ * How long a lead whose OWN READINGS said «cause» stays one after they last did,
+ * seconds (R2-b). Two readings carry it:
+ *  - BRAKING (the ruling's own case): the windowed reading needs
+ *    `2 × LEAD_TRACK_WINDOW_SEC` of continuous track before it can say it, and a
+ *    lead that has just said it is still a reason to stamp a second later even if
+ *    the corridor lost it — a ±2.5° weave of the student's own heading drops a
+ *    car 100 m ahead out of the 4 m corridor for ~0.8 s (verifier R1, H);
+ *  - DEMAND: the closing on the student's first braking frame already contains
+ *    his own braking. Measured on a stopped queue 200 m ahead at 50 км/ч: demand
+ *    0.52 at the pedal, 0.41 on a 2.5 Hz phone's first braking frame 0.4 s later
+ *    — acquitted on the desktop, convicted on the phone, the row's own split. The
+ *    closing the driver REACTED to is the one before the pedal.
+ * Equal to `LEAD_REACTION_SEC`: the driver is still reacting to what he saw.
+ */
+export const LEAD_CAUSE_MEMORY_SEC = 1.0;
+
+/**
+ * How long a lead that newly ENTERED the corridor stays a cause, seconds
+ * (R2-b): a car pulling out ahead is a plausible surprise. Two reaction times —
+ * one to see it, one to answer it — and longer than the `2 × W` the readings
+ * need, so a lead is never judged on readings it has not had time to build.
+ */
+export const LEAD_ENTRY_MEMORY_SEC = 2.0;
+
+/**
+ * THE ENTRY MARGIN, metres (round 3, integrator ruling F2). A reading NEARER
+ * than the gap the track predicts for this instant by more than this is a car
+ * that pulled in (an entry); FARTHER by more than this, the lead left and the
+ * next car is a new track (a restart). A FIXED distance, never a speed times
+ * the frame: round 2 used (student speed + 50 m/s)·Δt + 5 m, which is 6.1 m at
+ * 60 Hz and 30.6 m at 2.5 Hz, so one cut-in was an entry on a desktop and
+ * invisible on a phone (verifier F2).
+ *
+ * WHY THIS SIZE. The prediction (`leadGapPredicted`) carries the lead on at the
+ * mean speed of its last window. A lead braking (or accelerating) at up to a
+ * departs from that by at most a·Δt·(W + Δt)/2 — half a window of lag in the
+ * speed estimate, then the frame — which for a 10 m/s² emergency stop over the
+ * longest frame the product feeds (`LEAD_TRACK_WINDOW_SEC`, 0.5 s — see the
+ * window's own comment) is 2.5 m. The student's own trapezoid odometer adds at
+ * most a·dt²/8 on a frame his pedal falls inside, 0.3 m for a 9.4 m/s² stamp on
+ * a 0.5 s frame. 2.5 + 0.3 → 3 m. Measured against it on the 181 recorded
+ * w69/w71 replays (own frames, 2.5–120 Hz, jitter): every prediction of a
+ * continuing track was within +1.36 / −1.29 m of the reading, the traffic
+ * system's path-end step (0.02–1.13 m there) included.
+ *
+ * BOTH ERRORS ARE ACQUITTALS OR NOTHING. A false entry (a lead braking harder
+ * than any car can) makes a lead within the reach a cause for 2 s; a false
+ * restart makes a lead within the reach unread (a cause) for 1 s and costs a
+ * far lead nothing it was not already without. What the margin cannot see — a
+ * car cutting in less than 3 m nearer than the old lead — is recorded (verifier
+ * C4): an exact entry needs a lead identity on SimTick, a product change with
+ * its own ruling.
+ */
+export const LEAD_ENTRY_MARGIN_M = 3;
+
+/**
+ * The fallback for a track with ONE sample (seen for a single frame), where no
+ * speed of the lead can be read yet and so nothing can be predicted: the gap
+ * cannot change faster than the student's own speed plus the fastest a car
+ * ahead plausibly moves (`LEAD_MAX_SPEED_MPS`, 180 км/ч), plus `restagedJump`'s
+ * own 5 m slack — round 2's bound, now asked only on the second frame of a
+ * track. (The track that frame continues was itself just started as an entry
+ * or a restart, so what this bound can miss is a SECOND car within one frame.)
+ */
+const LEAD_MAX_SPEED_MPS = 50;
+const LEAD_GAP_JUMP_M = 5;
+
+/**
+ * The gap the lead track PREDICTS for time `t` given the student's odometer
+ * `odoM` then (round 3, ruling F2): the lead carried on from its last sample at
+ * the mean speed of the last `LEAD_TRACK_WINDOW_SEC` of its track (of the whole
+ * track while it is shorter than that). Null when the track has fewer than two
+ * samples. (No floor at zero: a mutant that let the lead «reverse» survived
+ * every act — a window's mean speed goes negative only by measurement noise of
+ * centimetres, far inside the margin — so the floor was a predicate nothing
+ * could flip.)
+ *
+ * WHY NO DECELERATION TERM. The ruling's example predicts from the closing AND
+ * the lead's deceleration. Built that way, a mutant that zeroed the
+ * deceleration survived every act: a lead whose deceleration is anything up
+ * to 10 m/s² — steady or changing — is at most a·Δt·(W + Δt)/2 = 2.5 m from
+ * THIS prediction at Δt = W = 0.5 s, which is exactly what
+ * `LEAD_ENTRY_MARGIN_M` is sized to absorb, so the term could decide no entry
+ * and no restart a car can produce. A predicate nothing can make true or false
+ * is not kept. Constant speed also keeps a position step's effect on the next
+ * prediction to at most the step itself (δ·Δt/W), where a deceleration read
+ * across the step would double it.
+ */
+function leadGapPredicted(
+  track: ReadonlyArray<{ t: number; odoM: number; gapM: number }>,
+  t: number,
+  odoM: number,
+): number | null {
+  const n = track.length;
+  if (n < 2) return null;
+  const last = track[n - 1];
+  const dtp = t - last.t;
+  if (!(dtp > 0)) return null;
+  const W = LEAD_TRACK_WINDOW_SEC;
+  const p1 = last.odoM + last.gapM;
+  const ago = leadTrackAt(track, last.t - W);
+  const span = ago !== null ? W : last.t - track[0].t;
+  if (!(span > 0)) return null;
+  const p0 = ago !== null ? ago.odoM + ago.gapM : track[0].odoM + track[0].gapM;
+  return p1 + ((p1 - p0) / span) * dtp - odoM;
+}
+
+/**
+ * Record this frame on the lead track and trim it (see `RuleEngineState.leadTrack`).
+ * Returns how the frame STARTED a track, if it did: "entry" (first sight, back
+ * after a silence longer than the window, or a nearer car in place of the old
+ * one), "restart" (the world re-staged the car, or a farther car replaced the
+ * lead), or null (the track continues, or nobody is in the channel).
+ *  - `gapM === null`: a BLINK IS NOT AN ABSENCE. The track is kept while the
+ *    silence is no longer than `LEAD_TRACK_WINDOW_SEC` since the last reading,
+ *    and emptied once it is longer.
+ *  - a READING after a silence longer than the window (`nullSinceReading` and
+ *    more than W since the last reading) starts a fresh track as an entry —
+ *    the silence is measured on every frame, not only on null ones (round 3,
+ *    verifier C1: a null frame exactly W after the last reading kept the track,
+ *    and the reading after a 0.99 s hole interpolated across it). Two
+ *    consecutive READINGS a long frame apart (a 1 Hz fixture feed) are not a
+ *    silence and continue the track.
+ *  - otherwise the reading is compared with the gap the track predicts
+ *    (`leadGapPredicted`): nearer by more than `LEAD_ENTRY_MARGIN_M` is an entry,
+ *    farther by more than it a restart — the same distance at every frame rate.
+ *  - `restaged`: the car was moved by the world; the gap before it is another road.
+ */
+function stepLeadTrack(
+  track: Array<{ t: number; odoM: number; gapM: number; sM?: number }>,
+  t: number,
+  odoM: number,
+  gapM: number | null,
+  speedMps: number,
+  restaged: boolean,
+  nullSinceReading: boolean,
+  horizonSec: number,
+  sM: number,
+): "entry" | "restart" | null {
+  if (restaged) track.length = 0;
+  const last = track.length > 0 ? track[track.length - 1] : null;
+  if (gapM === null) {
+    if (last !== null && t - last.t > LEAD_TRACK_WINDOW_SEC) track.length = 0;
+    return null;
+  }
+  let started: "entry" | "restart" | null = null;
+  if (restaged) started = "restart";
+  else if (last === null) started = "entry";
+  else if (nullSinceReading && t - last.t > LEAD_TRACK_WINDOW_SEC) started = "entry";
+  else {
+    const predicted = leadGapPredicted(track, t, odoM);
+    if (predicted !== null) {
+      if (predicted - gapM > LEAD_ENTRY_MARGIN_M) started = "entry";
+      else if (gapM - predicted > LEAD_ENTRY_MARGIN_M) started = "restart";
+    } else {
+      const bound = (speedMps + LEAD_MAX_SPEED_MPS) * Math.max(0, t - last.t) + LEAD_GAP_JUMP_M;
+      if (last.gapM - gapM > bound) started = "entry";
+      else if (gapM - last.gapM > bound) started = "restart";
+    }
+  }
+  if (started !== null) track.length = 0;
+  track.push({ t, odoM, gapM, sM });
+  while (track.length >= 2 && track[1].t <= t - horizonSec) track.shift();
+  return started;
+}
+
+/**
+ * The lead track at time `tau`, linearly interpolated between the two samples
+ * that bracket it; null when the track does not reach back that far (the lead
+ * has not been seen continuously for that long). Linear interpolation of the
+ * gap and of the trapezoid odometer is exact for a constant-speed lead and a
+ * constant pedal, which is the case the ledger has to get right.
+ */
+function leadTrackAt(
+  track: ReadonlyArray<{ t: number; odoM: number; gapM: number }>,
+  tau: number,
+): { odoM: number; gapM: number } | null {
+  if (track.length === 0 || track[0].t > tau) return null;
+  for (let i = track.length - 1; i >= 0; i--) {
+    const a = track[i];
+    if (a.t > tau) continue;
+    const b = track[i + 1];
+    if (b === undefined || b.t <= a.t) return { odoM: a.odoM, gapM: a.gapM };
+    const f = (tau - a.t) / (b.t - a.t);
+    return { odoM: a.odoM + f * (b.odoM - a.odoM), gapM: a.gapM + f * (b.gapM - a.gapM) };
+  }
+  return null;
+}
+
+/**
+ * How many windows of track the FAR deceleration reading needs (round 3): two
+ * for «now», three for «before» — see `leadCauseReadings`. The track is kept
+ * this long (`LEAD_FAR_WINDOWS × LEAD_TRACK_WINDOW_SEC`, 2.5 s).
+ */
+export const LEAD_FAR_WINDOWS = 5;
+
+/**
+ * The lead quantities the harsh-brake cause ledger reads, all measured over
+ * `LEAD_TRACK_WINDOW_SEC` and therefore the same at every frame rate:
+ *  - `closingMps`: how fast the gap shrank over the last window (null = the
+ *    lead has not been seen that long);
+ *  - `demandMps2`: the deceleration a driver who reacts after
+ *    `LEAD_REACTION_SEC` needs to stop that closing before the gap is gone —
+ *    c² / 2(gap − c·T_R), Infinity when the reaction alone eats the gap, 0 when
+ *    the gap is not shrinking (the merge census oracle's `demanded`, written
+ *    from the same kinematics);
+ *  - `leadDecelMps2`: how fast the LEAD ITSELF is slowing — the drop between
+ *    its mean speed over the window before last and over the last window,
+ *    divided by the window. Its position along the road is the student's own
+ *    odometer plus the gap, so this is the lead's speed and not the closing:
+ *    a student who is merely faster than a steady lead reads 0 here.
+ *  - `leadDecelFarMps2` (round 3, ruling F1): the same question asked so that
+ *    ONE STEP in the lead's position cannot answer it. The quick reading above
+ *    takes a two-window difference, and a position step δ inside it reads as
+ *    −δ/W² for one window and +δ/W² for the next: measured through the lesson
+ *    session, the traffic system finishes an actor at the end of its path with
+ *    a one-frame forward step of up to one frame of its motion
+ *    (`traffic/staged.ts`, the FR-B5-EXIT retirement run starts from the
+ *    clamped `s`) — 0.52 m at 10 Hz read as ±2.08 m/s², and the student's own
+ *    odometer steps by up to a·dt²/8 at his brake onset. So this reading takes
+ *    the mean speeds v₀…v₄ of the last five windows (v₀ the newest) and asks
+ *    whether the lead is slower NOW (the faster of v₀, v₁) than BEFORE (the
+ *    slowest of v₂, v₃, v₄), by the braking line per window:
+ *        (min(v₂, v₃, v₄) − max(v₀, v₁)) / W.
+ *    A lead braking steadily at a reads exactly a (min picks v₂, max picks v₁,
+ *    one window apart). A forward step inflates at most two ADJACENT windows
+ *    (the frame it falls in, interpolated across a window edge): inside «now»
+ *    that only lowers the reading, inside «before» the min takes the third
+ *    window — a forward step of ANY size cannot raise it. A backward step can
+ *    raise it only by straddling the v₀/v₁ edge, by at most |δ|/2W² (2|δ| m/s²
+ *    at W = 0.5): under the line for any |δ| < 1 m, and the backward steps the
+ *    product makes are the odometer's ≤ 0.3 m. A step larger than
+ *    `LEAD_ENTRY_MARGIN_M` never reaches the track at all — it starts a new one.
+ *    The price is lag: a 6 m/s² lead reads 2 after 0.91 s of braking (the quick
+ *    reading: 0.41 s), and the reading needs 2.5 s of continuous track. Null
+ *    while the track is shorter than that.
+ */
+export function leadCauseReadings(
+  track: ReadonlyArray<{ t: number; odoM: number; gapM: number }>,
+  t: number,
+  odoM: number,
+  gapM: number | null,
+): { closingMps: number | null; demandMps2: number; leadDecelMps2: number | null; leadDecelFarMps2: number | null } {
+  const W = LEAD_TRACK_WINDOW_SEC;
+  if (gapM === null) return { closingMps: null, demandMps2: 0, leadDecelMps2: null, leadDecelFarMps2: null };
+  const ago = leadTrackAt(track, t - W);
+  if (ago === null) return { closingMps: null, demandMps2: 0, leadDecelMps2: null, leadDecelFarMps2: null };
+  const closingMps = (ago.gapM - gapM) / W;
+  const room = gapM - closingMps * LEAD_REACTION_SEC;
+  const demandMps2 =
+    closingMps <= 0 ? 0 : room <= 0 ? Infinity : (closingMps * closingMps) / (2 * room);
+  const ago2 = leadTrackAt(track, t - 2 * W);
+  const leadDecelMps2 =
+    ago2 === null
+      ? null
+      : ((ago.odoM + ago.gapM - (ago2.odoM + ago2.gapM)) / W - (odoM + gapM - (ago.odoM + ago.gapM)) / W) / W;
+  // positions at t, t − W, …, t − 5W; v[k] = mean speed over [t − (k+1)W, t − kW]
+  const pos: number[] = [odoM + gapM];
+  for (let k = 1; k <= LEAD_FAR_WINDOWS; k++) {
+    const at = leadTrackAt(track, t - k * W);
+    if (at === null) break;
+    pos.push(at.odoM + at.gapM);
+  }
+  let leadDecelFarMps2: number | null = null;
+  if (pos.length === LEAD_FAR_WINDOWS + 1) {
+    const v = pos.slice(1).map((p, k) => (pos[k] - p) / W);
+    leadDecelFarMps2 = (Math.min(v[2], v[3], v[4]) - Math.max(v[0], v[1])) / W;
+  }
+  return { closingMps, demandMps2, leadDecelMps2, leadDecelFarMps2 };
+}
+
+/**
+ * How far a frame's displacement may differ from the trapezoid of its two speeds
+ * and still be the student's own motion, as m/s² × Δt² (round 5, `leadPosOdoM`).
+ * The trapezoid is exact for a constant pedal; it misses by at most
+ * (|a₁| + |a₂|)·Δt²/8 when the pedal changes inside the frame — 2.5·Δt² for two
+ * 10 m/s² accelerations. (A curve's chord is shorter than its arc by L³/24R², 3 cm
+ * for a 2.5 Hz frame on a 20 m radius: inside the slack. A per-cent term for it and
+ * a 1 cm rounding term were built and removed — no act could flip either.) A
+ * displacement outside that (a re-stage, a fixture that never moves the car) is
+ * not the student's motion, and the trapezoid's increment is used instead — the
+ * round-4 track's own odometer, never a step the motion cannot explain.
+ */
+const LEAD_POSITION_SLACK_MPS2 = 2.5;
+
+/**
+ * The span of lead track the LAG-FREE lead speed is read over, seconds (round 5,
+ * ruling N2) — one window. The quadratic through three of the track's own samples
+ * is exact for a lead whose deceleration has been constant over the span, so a
+ * shorter span reads a lead that has JUST begun to brake sooner; but it also reads
+ * a step in the lead's position as speed — 3δ/span on the newest sample — and the
+ * traffic system makes such steps (its path-end finish, 0.06 m in the drill, the
+ * reason round 4 pinned «a ±0.15 m step must not acquit a steady far lead closed at
+ * 1.8 m/s», lead-cause-far-and-entry.test.ts). Measured against that pin and
+ * against base on exact traces (a lead braking 1–4 m/s² from 0.05–0.5 s before a
+ * 9.4 m/s² stamp, the real closing at the pedal 3.02–3.5 m/s, 7 rates × 12
+ * phases/jitters, 280 acts × 84 cells):
+ *   span 0.25 s: the pin FAILS (a −0.15 m step acquits at 4–120 Hz); 128 cells in
+ *                25 acts billed that base acquitted (onset ≤ 0.2 s before);
+ *   span 0.4 s:  the pin FAILS (−0.15 m, 1 test); 516 cells in 57 acts (≤ 0.3 s);
+ *   span 0.5 s:  the pin holds; 869 cells in 84 acts — 829 of them a lead that
+ *                began braking at most 0.25 s before the pedal, and none more than
+ *                0.3 m/s over the line at the pedal.
+ * Those are leads the student, a reaction time away, could not have been
+ * answering — the closing before that braking was under the line — so the span
+ * is the one the step pin allows. A per-frame gap jitter of σ moves the reading
+ * by ~2.5σ/span: on the round-4 verifier's noisy steady leads (closing 2–2.8 m/s,
+ * ±0.5–2 cm per frame, 1,512 cells) it acquitted 76 — acquittals, never a bill.
+ */
+export const LEAD_SPEED_NOW_SPAN_SEC = LEAD_TRACK_WINDOW_SEC;
+
+/**
+ * THE CLOSING NOW, m/s (round 5, integrator ruling N2 — the ONE closing the far
+ * ledger stamps `farClosingAt` from). The 0.5 s windowed closing
+ * (`leadCauseReadings().closingMps`) is a mean, so it runs W/2 = 0.25 s behind a
+ * closing that is still RISING: a student speeding up toward a steady lead
+ * 125–200 m ahead (real closing 3.3–3.5 m/s at the pedal read as 2.55–2.88), or a
+ * lead slowing 1.5–1.9 m/s² under the braking line, was billed where base, which
+ * read the closing frame by frame, acquitted (round-4 verifier F1, acts Q1/Q2).
+ * So this closing has no averaging lag of its own:
+ *  - the STUDENT side is his exact speed on this tick;
+ *  - the LEAD side is its current speed: the derivative, at `t`, of the quadratic
+ *    through three of the track's own samples — this frame, the newest sample at
+ *    least `LEAD_SPEED_NOW_SPAN_SEC` older with at least one between, and the one
+ *    between nearest their midpoint. Exact for a lead whose deceleration is
+ *    constant over the span, at ANY frame rate and phase (real samples, never an
+ *    interpolation, whose chord error at 2.5 Hz would read a braking lead
+ *    ~0.15·a m/s fast). The lead's position is the student's travel BY HIS
+ *    POSITIONS plus the gap (`leadPosOdoM`, sample `sM`), not the trapezoid
+ *    odometer, whose miss at the pedal frame read a steady lead as slowing by up
+ *    to 0.8 m/s for the next 0.8 s and acquitted stops at 2.5–4 Hz whose closing
+ *    never reached the line (66 of 1,134 asserted cells on the verifier's Q1).
+ *    The ruling's own estimate (the window's mean speed carried forward by the
+ *    quick deceleration × W/2) was built first and measured: it lags a lead
+ *    that began slowing less than 2 W before (by a·W/4 at 0.5 s) and billed 27
+ *    of 84 cells base acquitted on a lead slowing 1.5 m/s² from 0.5 s before the
+ *    pedal at 3.1 m/s. It was then kept as a fallback for a track too sparse for
+ *    three samples, and removed: at 2 Hz and over a track 2 W long always holds
+ *    three, so the fallback was reachable only on frames a second or more apart,
+ *    and a 1 Hz stamp from 58 км/ч to rest is billed by no build of this ledger
+ *    (base included — measured), so it could decide nothing.
+ *  - and THE PEDAL BETWEEN TWO FRAMES. A closing that rises until the pedal and
+ *    then falls peaks BETWEEN frames, so both endpoint readings can sit under the
+ *    line while the frame's MEAN — which is what base read — is over it (at 4 Hz
+ *    a student speeding up 3 m/s² toward a lead at 3.3 m/s, pedal 0.17 s after the
+ *    previous frame). So the closing is also read over the last frame: the
+ *    student's mean speed across it (his displacement over Δt, `studentFrameMeanMps`)
+ *    minus the lead's speed at its midpoint. The larger of the two is the closing:
+ *    A12, in doubt the reading that acquits.
+ * Null when the lead is not in the channel or the track is shorter than 2 W (the
+ * ledger then treats the lead as UNREAD — a cause — anyway).
+ */
+export function leadClosingNowMps(
+  track: ReadonlyArray<{ t: number; odoM: number; gapM: number; sM?: number }>,
+  t: number,
+  sM: number,
+  gapM: number | null,
+  studentSpeedMps: number,
+  studentFrameMeanMps: number | null,
+  dt: number,
+): number | null {
+  if (gapM === null) return null;
+  if (leadTrackAt(track, t - 2 * LEAD_TRACK_WINDOW_SEC) === null) return null;
+  const n = track.length;
+  let i2 = -1;
+  for (let i = n - 3; i >= 0; i--) {
+    if (track[i].t <= t - LEAD_SPEED_NOW_SPAN_SEC) {
+      i2 = i;
+      break;
+    }
+  }
+  if (i2 < 0) return null;
+  const mid = (t + track[i2].t) / 2;
+  let i1 = i2 + 1;
+  for (let i = i2 + 2; i < n - 1; i++) if (Math.abs(track[i].t - mid) < Math.abs(track[i1].t - mid)) i1 = i;
+  const t1 = track[i1].t;
+  const t2 = track[i2].t;
+  const p0 = sM + gapM;
+  const p1 = (track[i1].sM ?? track[i1].odoM) + track[i1].gapM;
+  const p2 = (track[i2].sM ?? track[i2].odoM) + track[i2].gapM;
+  const f01 = (p0 - p1) / (t - t1);
+  const f12 = (p1 - p2) / (t1 - t2);
+  const f012 = (f01 - f12) / (t - t2);
+  const leadSpeedAt = (tau: number) => f01 + f012 * (tau - t1 + (tau - t));
+  const atTick = studentSpeedMps - leadSpeedAt(t);
+  if (studentFrameMeanMps === null || !(dt > 0)) return atTick;
+  return Math.max(atTick, studentFrameMeanMps - leadSpeedAt(t - dt / 2));
 }
 
 // ---------------------------------------------------------------------------
@@ -3194,6 +3742,45 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     leadGapM !== null && s.prevLeadGapM !== null && dt > 0
       ? (leadGapM - s.prevLeadGapM) / dt
       : 0;
+  // THE LEAD TRACK (read only by the harsh-brake cause ledger — see
+  // `LEAD_TRACK_WINDOW_SEC`). The per-frame `gapOpeningMps` above is left
+  // exactly as it was for the detectors that read it; it is the ledger that no
+  // longer does. A car the WORLD moved (`restagedJump`) starts a fresh track:
+  // the gap across a re-stage is two different roads.
+  /** This frame's step of `leadPosOdoM`, m (null on the first frame); read by the far closing's frame mean. */
+  let posStepM: number | null = null;
+  if (s.prevSpeedKmh !== null && dt > 0) {
+    const trapezoidM = ((Math.abs(s.prevSpeedKmh) + Math.abs(speed)) / 2 / 3.6) * Math.min(dt, 2);
+    s.leadOdoM += trapezoidM;
+    const movedM =
+      s.prevPosition !== null ? Math.hypot(tick.position.x - s.prevPosition.x, tick.position.y - s.prevPosition.y) : NaN;
+    posStepM = Math.abs(movedM - trapezoidM) <= LEAD_POSITION_SLACK_MPS2 * dt * dt ? movedM : trapezoidM;
+    s.leadPosOdoM += posStepM;
+  }
+  const leadTrackStarted = stepLeadTrack(
+    s.leadTrack,
+    t,
+    s.leadOdoM,
+    leadGapM,
+    Math.abs(speed) / 3.6,
+    restagedJump(s.prevPosition, tick, dt, speed),
+    s.leadMemory.nullSinceReading,
+    LEAD_FAR_WINDOWS * LEAD_TRACK_WINDOW_SEC,
+    s.leadPosOdoM,
+  );
+  s.leadMemory.nullSinceReading = leadGapM === null;
+  /** The student's mean speed over this frame, m/s — his position step over Δt (`leadPosOdoM`'s step). */
+  const studentFrameMeanMps = posStepM !== null ? posStepM / dt : null;
+  if (leadTrackStarted === "entry" && leadGapM !== null && leadGapM <= cfg.harshBrakeSignalCauseM) {
+    s.leadMemory.enteredAt = t;
+  }
+  // Round 4: an entry at ANY range is remembered on its own stamp, which only the
+  // far ledger reads (see `leadMemory`). No range test: an entry within the reach
+  // is already remembered by `enteredAt`, which is read everywhere, so stamping it
+  // here too can change no verdict (mutation: equivalent).
+  if (leadTrackStarted === "entry" && leadGapM !== null) {
+    s.leadMemory.farEnteredAt = t;
+  }
   /** Reverse-gear maneuvering (parking) — flow/lane detectors do not apply. */
   const forwardGear = tick.gear >= 0;
 
@@ -4086,9 +4673,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * THE NUMBERS. `SimTick.taskSpeedCap` is stamped ONLY by `lessons/engine.ts` (see the type), only once the student has
    * gone THROUGH the task's mark over it (`approachCap === "blown"`), and only over the stretch that cap governs (the mark
    * to the end of the feature its task names — `lessons/finish.ts taskCapStretch`; founder ruling 2, «only the named
-   * stretch»). It bills above `capKmh + graceKmh` — the gate plus the objective's own slack, the number the mark itself
-   * was blown at. A return to `shownKmh`, the number the glass printed, is the correction that ends the episode. Between
-   * the two the episode neither accrues nor ends: the SPEEDING_OVER_LIMIT shape.
+   * stretch»). It bills above `taskCapBillLineKmh(shownKmh)` — the number the glass printed PLUS the tolerance a posted
+   * limit gets (founder ruling 2026-10-03 «LIKE A SPEED SIGN»: «≤36» bills above 39,6), on every rung; the objective's
+   * gate and its slack (the rung's ladder grace) credit the objective and word the coach's copy, and bill nothing. A
+   * return to `shownKmh` is the correction that ends the episode. Between the two the episode neither accrues nor ends:
+   * the SPEEDING_OVER_LIMIT shape.
    *
    * THE CLOCK IS THE CONDITIONS DUTY'S, because the duty is (ЗДвП чл. 20, ал. 2, the lawRef the ruling cites): the
    * sustain is `conditionsSpeedSustainSec` and the continuing breach re-grades on `SPEED_REGRADE_SEC` — two bills per
@@ -4097,7 +4686,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * only on a correction held `speedingRearmSec` (M-16).
    *
    * WHAT IT CANNOT DO: bill a lesson that never stamped a cap (every recorder, replay and exam rung), bill a stopped car
-   * (`moving`), or bill a right leg held at or under the gate plus its slack.
+   * (`moving`), or bill a leg held at or under the glass figure plus the sign's tolerance.
    *
    * ROUND 14 — THE CAP LEDGER. FOUNDER RULING 2026-10-03, verbatim: «Cap adds, never removes. The task cap is an extra
    * rule on top. Its bill stands on its own; the bend/weather bills are charged exactly as they would be in a lesson with
@@ -4144,7 +4733,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     // ROUND 6: a new blow is a new act — the old latch's kept act is never resumed by it.
     s.taskArrival = null;
   }
-  const overTaskCap = taskCap !== undefined && moving && speed > taskCap.capKmh + taskCap.graceKmh;
+  const overTaskCap = taskCap !== undefined && moving && speed > taskCapBillLineKmh(taskCap.shownKmh, cfg);
   /*
    * ROUND 6 — THE ARRIVAL'S ACT, KEPT WITH ITS LATCH (founder ruling 4 in the integrator's reading: the arrival «is one
    * act with any sustained over-cap stretch that follows on the named feature»). The act ends by the plain rule — the
@@ -4163,14 +4752,16 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * ROUND 5 — THE ARRIVAL IS THE OFFENCE (founder ruling 2026-09-26, «Bill the arrival», ruling 4 of register item 17):
    * «passing the mark over the cap IS the offence. It is billed as ONE EVENT at the blow: a teach card the first time
    * (per-topic grace), a point on a repeat.» So: ONE first bill of this code, on the frame the lesson latches the blow
-   * (the arrival rides only that frame), once per latch, and only above the blow line — `capKmh + graceKmh`, re-checked
-   * here against the measured arrival so no stamp can bill a speed its evaluator would not have refused.
+   * (the arrival rides only that frame), once per latch, and only above the bill line — `taskCapBillLineKmh(shownKmh)`
+   * (ruling 2026-10-03 «LIKE A SPEED SIGN»), re-checked here against the measured arrival so no stamp can bill a speed
+   * that line does not refuse. The arrival is the speed at which the car CROSSED the mark (`lessons/engine.ts`
+   * `stepTaskCapLatch`, interpolated between the two frames that straddle it).
    */
   const arrivalOver =
     taskLatchFresh &&
     taskArrival !== undefined &&
     taskArrival.blownAtSec === taskLatchName &&
-    Math.abs(taskArrival.arrivalKmh) > taskArrival.capKmh + taskArrival.graceKmh;
+    Math.abs(taskArrival.arrivalKmh) > taskCapBillLineKmh(taskArrival.shownKmh, cfg);
   /*
    * ROUND 7 / 8 / 12 — THE SIGN-BOUND ARRIVAL, inside the cap ledger (round 14). A mark whose cap the glass showed AT or
    * ABOVE the sign on the blow frame (`signBound`) is blown while the car is over the sign too. Rounds 7–13 let its one
@@ -5732,17 +6323,210 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    is a response, not a phantom;
   //  - a lead gap CLOSING fast is a cause at any distance — a lead braking
   //    hard 50 m ahead is exactly what must be responded to.
+  //
+  // ── 2026-10-03 · THE CLOSING CAUSE, RE-ASKED (`sc-follow-tailgater:63c0c28c`
+  // C2a and `:f42dce4f`) ──────────────────────────────────────────────────────
+  // MEASURED, through the lesson's own session at 2.5 / 2.8 / 4 / 10 / 30 / 60 /
+  // 120 Hz: the drill's brake check — 58 км/ч, the лепка 5–7 m behind, a 9.4
+  // m/s² stamp to rest — was acquitted by THIS clause and by nothing else
+  // (knocked out, all seven rates convict). The vehicle it read was the FRONT
+  // lead, `FTG_LEAD`, a constant 11.5 m/s cruiser 80–90 m ahead; the student
+  // closes on it at ~4.6 m/s only because he is faster than it. Two defects:
+  //  1. «closing ≥ 3 m/s at any distance» calls a car 86 m ahead that nobody
+  //     has to brake for a reason to brake as hard as the car can. Closing on a
+  //     steady lead at 4.6 m/s from 86 m needs 0.13 m/s² — a lift of the pedal.
+  //     The founding example was a lead that BRAKES; this clause could not tell
+  //     it from a student who is simply quicker than the car in front.
+  //  2. it read `gapOpeningMps`, a one-frame difference, and froze it with the
+  //     sticky `causeSeen`, so the same stop was acquitted at 10–120 Hz and
+  //     convicted at 2.5–4 Hz whenever the brake fell late in the frame.
+  // ROUND 1 MADE THE LEAD A CAUSE BEYOND `harshBrakeClearLeadGapM` IN TWO WAYS
+  // (round 2 below adds three and moves the demand line), each measured over
+  // `LEAD_TRACK_WINDOW_SEC` (`leadCauseReadings`):
+  //  - IT IS BRAKING: its own speed falling at `BRAKING_LINE_MPS2` or more,
+  //    within `harshBrakeSignalCauseM` — the reach this ledger already gives a
+  //    visible forbidding light. That is the founding example, kept at a range
+  //    the old clause also covered, and it is the lead's speed, not the gap's:
+  //    a student merely faster than a steady car reads 0.
+  //  - THE CLOSING MAKES YOU BRAKE: a driver reacting after `LEAD_REACTION_SEC`
+  //    would need braking to stop it before the gap is gone (round 1 drew that
+  //    line at 2 m/s²; round 2 draws it at `LEAD_DEMAND_LINE_MPS2`). Inside 45 m
+  //    nothing changes — the distance clause acquits first, as it always did.
+  // A car BEHIND is in neither: `leadGapFor` only looks forward.
+  //
+  // ── ROUND 2 · WHEN THE LEDGER CANNOT SEE THE LEAD, THE LEAD IS A CAUSE
+  // (verifier R1, integrator rulings R2-a…R2-d) ──────────────────────────────
+  // Round 1 emptied the track on any null frame, so for 0.5 s (closing) and
+  // 1.0 s (the lead's own deceleration) after a blink the lead read as no
+  // cause — and a lawful hard stop for a lead braking 6 m/s² 67–103 m ahead was
+  // billed 35/35 after ONE null frame or a ±2.5° weave of the student's heading.
+  // A12 says an unknown is spent on the acquittal, so the lead is now a cause
+  // beyond 45 m whenever ANY of these holds:
+  //  - R2-a, A BLINK IS NOT AN ABSENCE: a null frame within
+  //    `LEAD_TRACK_WINDOW_SEC` of the last reading is bridged — the lead counts
+  //    at its last gap with the verdict it last had (`leadMemory.heldCause`);
+  //  - R2-a, UNREAD: a lead within `harshBrakeSignalCauseM` whose windowed
+  //    readings are not built yet (a track starting or re-starting);
+  //  - R2-b, MEMORY: a lead seen braking — or whose closing was seen demanding
+  //    the line (the closing before the pedal, see the constant) — within
+  //    `LEAD_CAUSE_MEMORY_SEC`, or one
+  //    that ENTERED the corridor within `LEAD_ENTRY_MEMORY_SEC` — a car pulling
+  //    out ahead is a plausible surprise;
+  //  - R2-c, DEMAND: its closing demands `LEAD_DEMAND_LINE_MPS2` (0.5 — a lift of
+  //    the throttle) or more. The old closing FLOOR (`harshBrakeClosingLeadMps`,
+  //    3 m/s) is gone from the ledger: beyond 45 m the demand line implies a
+  //    closing of at least 6.2 m/s (c² + c·T_R·2·0.5 ≥ 2·0.5·45), so the floor
+  //    could never decide a verdict (verifier survivor V1) — a predicate nothing
+  //    can make true or false is not kept (round 4 brings the line back, windowed,
+  //    for a lead BEYOND the reach only, where it does decide — see below);
+  //  - IT IS BRAKING: its own speed falling at `BRAKING_LINE_MPS2` or more. R2-d
+  //    pins the line: a lead braking 2.5 m/s² beyond 45 m acquits at every rate.
+  //
+  // ── ROUND 3 · A LEAD BRAKING HARD IS A CAUSE AT ANY RANGE (verifier F1,
+  // integrator ruling) ─────────────────────────────────────────────────────────
+  // Rounds 1–2 asked «is it braking?» only within `harshBrakeSignalCauseM`, so
+  // beyond 120 m the only lead cause left was the CURRENT closing's demand,
+  // which lags a braking lead: a lead braking 6–8 m/s² 125–200 m ahead was billed
+  // in up to 42/42 cells where base billed none. Base's own words were «a lead
+  // braking hard 50 m ahead is exactly what must be responded to», and it
+  // acquitted at any distance. The reach had also been hiding noise (verifier
+  // C2): the drill's steady `FTG_LEAD` read ≥ 2 m/s² 130–140 m ahead at 2.8 and
+  // 10 Hz — measured, the one-frame position step the traffic system makes when
+  // it finishes an actor at its path end (see `leadCauseReadings`). So the lead
+  // is braking when EITHER
+  //  - the FAR reading (`leadDecelFarMps2`, which no single forward position
+  //    step can raise) is at the line — at ANY range the lead channel reports;
+  //  - or the QUICK reading (`leadDecelMps2`, 0.5 s sooner) is, within the reach
+  //    (as in rounds 1–2), and beyond it only until the far reading exists — a
+  //    track younger than its 2.5 s (from 1.0 s on, when the quick reading
+  //    exists). Without that, a lead first seen 1.7 s before it was stamped for,
+  //    braking 6 m/s² 150 m ahead, acquitted on a phone (whose late bill let
+  //    the far reading arrive first) and convicted on a desktop: this row's own
+  //    split. The quick reading's step noise acquits: the A12 side.
+  // The braking MEMORY is stamped from the same verdict, so it reaches past
+  // 120 m too.
+  //
+  // ── ROUND 4 · BEYOND 120 m, BASE-LIKE ACQUITTAL (round-3 verifier R1/R2,
+  // integrator ruling) ─────────────────────────────────────────────────────────
+  // Round 3 kept UNREAD and ENTRY inside the reach, so beyond it a braking lead
+  // was a cause only once its track was long and unbroken (quick reading 1.0 s,
+  // far 2.5 s). One dropped frame on a 2.5–2.8 Hz phone (C1 restarts the track)
+  // or a mild heading weave (in the corridor in stretches under a second) then
+  // billed a lawful stop for a lead braking 6 m/s² 125–200 m ahead, where base
+  // acquitted; and the far reading's lag billed a 2.5 m/s² lead at a 0.75 s
+  // reaction on desktops only. The row needs a conviction only INSIDE the reach
+  // (the drill's `FTG_LEAD` sits at 74–95 m), so inside it everything above
+  // stands exactly, and BEYOND it a lead in the channel is a cause when ANY of:
+  //  - its closing is `harshBrakeClosingLeadMps` (3 m/s) or more — base's own
+  //    line, now measured from the lead track instead of a frame (round 4 over
+  //    `LEAD_TRACK_WINDOW_SEC`; round 5 with no averaging lag — see below);
+  //  - its deceleration reading is at the braking line (the ruling says quick OR
+  //    far; the far reading could decide nothing here and is not asked — see the
+  //    code — and the quick reading's step noise acquits: the A12 side);
+  //  - its readings are not built yet — a young track, after a restart or an
+  //    entry (a blink within the window is bridged with the verdict it last had);
+  //  - the memories: an entry within `LEAD_ENTRY_MEMORY_SEC`, a braking or a
+  //    closing reading within `LEAD_CAUSE_MEMORY_SEC` — the closing the driver
+  //    reacted to is the one before the pedal, exactly as round 2's demand: a
+  //    9.4 m/s² stamp takes 1.5 m/s off a 4.6 m/s closing's window within 0.4 s,
+  //    and a phone whose first braking frame lands late would read it under the
+  //    line. They are read only while the ledger's lead is beyond the reach or
+  //    gone (`leadMemory`), so none reaches in.
+  // ROUND 5 (round-4 verifier F1, integrator ruling N2): the closing that sets
+  // `farClosingAt` is the closing NOW (`leadClosingNowMps`) — the student's speed
+  // on this tick minus the lead's current speed, and over the last frame his mean
+  // speed minus the lead's at its midpoint — not the window's mean, which ran
+  // 0.25 s behind a closing that was still rising (a student speeding up toward a
+  // steady far lead, or a far lead slowing under the braking line) and billed
+  // stops base acquitted. Same 3 m/s line, same 1.0 s memory.
+  // Beyond 120 m nothing convicts that base acquitted. This acquits a brake
+  // check whose only lead is beyond 120 m and closing fast — on the recorded
+  // w71/w69 wrong legs that is stops 2 AND 3 (`FTG_LEAD` 130–140 m ahead,
+  // closing 4.6 m/s; stop 1, at the tailgater, has it 70–77 m ahead and is
+  // graded) — the same verdict at every rate.
+  // ROUND 3's OWN BEYOND-THE-REACH CLAUSES in `leadBraking` below (the far
+  // reading at any range, the quick reading while the far one is young, the
+  // braking memory stamped past the reach) are kept as round 3 has them, but
+  // this block subsumes them beyond the reach: mutating any of them now moves
+  // no verdict (recorded in the round-4 report).
+  // What still convicts beyond 45 m is a lead INSIDE the reach that has been in
+  // the corridor for more than 2 s, is read, is not braking and has not braked
+  // for a second, and whose closing a lift of the throttle absorbs — the drill's
+  // `FTG_LEAD` — or one beyond it that is read, steady, not new and closing under
+  // 3 m/s.
   const signalAheadForbids =
     tick.nextStopLineControl === "trafficLight" &&
     tick.nextStopLineState !== undefined &&
     tick.nextStopLineState !== "green" &&
     tick.nextStopLineM !== undefined &&
     tick.nextStopLineM <= cfg.harshBrakeSignalCauseM;
-  const leadClosingFast =
-    leadGapM !== null && gapOpeningMps <= -cfg.harshBrakeClosingLeadMps;
+  const leadBridged = leadGapM === null && s.leadTrack.length > 0;
+  const ledgerLeadGapM = leadBridged ? s.leadTrack[s.leadTrack.length - 1].gapM : leadGapM;
+  let leadIsCause = false;
+  if (leadGapM !== null) {
+    const leadReadings = leadCauseReadings(s.leadTrack, t, s.leadOdoM, leadGapM);
+    const leadInReach = leadGapM <= cfg.harshBrakeSignalCauseM;
+    const leadUnread =
+      leadInReach && (leadReadings.closingMps === null || leadReadings.leadDecelMps2 === null);
+    const leadClosingDemands = leadReadings.demandMps2 >= LEAD_DEMAND_LINE_MPS2;
+    const leadBraking =
+      (leadReadings.leadDecelFarMps2 !== null && leadReadings.leadDecelFarMps2 >= BRAKING_LINE_MPS2) ||
+      ((leadInReach || leadReadings.leadDecelFarMps2 === null) &&
+        leadReadings.leadDecelMps2 !== null &&
+        leadReadings.leadDecelMps2 >= BRAKING_LINE_MPS2);
+    if (leadBraking) s.leadMemory.brakingAt = t;
+    if (leadClosingDemands) s.leadMemory.demandAt = t;
+    // Round 4, beyond the reach (see above). The closing and the braking verdicts
+    // speak through their memories, stamped HERE and read below on this same frame
+    // (`memoryAskedAt` ≤ t, and `farMemoryApplies` holds for a lead beyond the
+    // reach) — so a live arm beside each stamp would decide nothing the stamp does
+    // not (mutation: removing it failed no test, and the batteries and replays grade
+    // identically without it). Only UNREAD, which
+    // has no memory, is a live verdict, and the one a bridged blink holds.
+    // The braking reading here is the QUICK one only. The ruling names «quick OR
+    // far»; the far reading was built and removed: it crosses the line 0.5 s after
+    // the quick one on every braking profile (it reads the same drop one window
+    // later) and the braking memory spans 1.0 s, so it could decide no verdict
+    // beyond the reach (mutation: off, 0 of 297 target tests failed; built with
+    // and without it, the three verifier batteries — 1,680 acts × 42 cells — and the
+    // 181 recorded replays grade identically).
+    let farLeadIsCause = false;
+    if (!leadInReach) {
+      const farUnread = leadReadings.closingMps === null || leadReadings.leadDecelMps2 === null;
+      if (leadReadings.leadDecelMps2 !== null && leadReadings.leadDecelMps2 >= BRAKING_LINE_MPS2) s.leadMemory.farBrakingAt = t;
+      const farClosingNowMps = leadClosingNowMps(s.leadTrack, t, s.leadPosOdoM, leadGapM, Math.abs(speed) / 3.6, studentFrameMeanMps, dt);
+      if (farClosingNowMps !== null && farClosingNowMps >= cfg.harshBrakeClosingLeadMps) s.leadMemory.farClosingAt = t;
+      farLeadIsCause = farUnread;
+    }
+    leadIsCause = leadUnread || leadClosingDemands || leadBraking || farLeadIsCause;
+    s.leadMemory.heldCause = leadIsCause;
+  } else if (leadBridged) {
+    leadIsCause = s.leadMemory.heldCause;
+  }
+  // The memory is asked at the START of this frame's span, not its end: the pedal
+  // fell somewhere inside the frame and the reducer cannot know where, so a frame
+  // any part of which lies inside the memory is covered — at 2.5 Hz a stamp one
+  // second after the lead was last seen braking would otherwise first be judged
+  // 1.4 s after it, and acquitted only on a desktop. Clamped at the window, so a
+  // resume after a pause does not stretch the memory back over the pause.
+  const memoryAskedAt = t - Math.min(Math.max(dt, 0), LEAD_TRACK_WINDOW_SEC);
+  const leadRemembered =
+    (s.leadMemory.brakingAt !== null && memoryAskedAt - s.leadMemory.brakingAt <= LEAD_CAUSE_MEMORY_SEC) ||
+    (s.leadMemory.demandAt !== null && memoryAskedAt - s.leadMemory.demandAt <= LEAD_CAUSE_MEMORY_SEC) ||
+    (s.leadMemory.enteredAt !== null && memoryAskedAt - s.leadMemory.enteredAt <= LEAD_ENTRY_MEMORY_SEC);
+  // Round 4: the far memories speak only while the ledger's lead (read or
+  // bridged) is beyond the reach, or nobody is in the channel at all.
+  const farMemoryApplies = ledgerLeadGapM === null || ledgerLeadGapM > cfg.harshBrakeSignalCauseM;
+  const farLeadRemembered =
+    farMemoryApplies &&
+    ((s.leadMemory.farEnteredAt !== null && memoryAskedAt - s.leadMemory.farEnteredAt <= LEAD_ENTRY_MEMORY_SEC) ||
+      (s.leadMemory.farBrakingAt !== null && memoryAskedAt - s.leadMemory.farBrakingAt <= LEAD_CAUSE_MEMORY_SEC) ||
+      (s.leadMemory.farClosingAt !== null && memoryAskedAt - s.leadMemory.farClosingAt <= LEAD_CAUSE_MEMORY_SEC));
   const noBrakeCause =
-    (leadGapM === null || leadGapM > cfg.harshBrakeClearLeadGapM) &&
-    !leadClosingFast &&
+    (ledgerLeadGapM === null || ledgerLeadGapM > cfg.harshBrakeClearLeadGapM) &&
+    !leadIsCause &&
+    !leadRemembered &&
+    !farLeadRemembered &&
     !signalAheadForbids &&
     s.crossing === null &&
     (tick.nextStopLineM === undefined || tick.nextStopLineM > cfg.harshBrakeStopLineClearM) &&
@@ -5756,7 +6540,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // braking episode (pedal never released) exempts the whole episode — a lead
   // that brake-checks and then floors it must not convert the tail of the
   // justified stop into a phantom. Resets on pedal release.
-  if (accelMps2 <= -2 && !noBrakeCause) {
+  if (accelMps2 <= -BRAKING_LINE_MPS2 && !noBrakeCause) {
     s.harshBrake.causeSeen = true;
   }
   // THE SUSTAIN IS NOT A RUN OF FRAMES — TWO GATES, AND EACH COVERS THE OTHER'S
@@ -5828,7 +6612,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // rule and not by a rounding mode: 7.00 acquits, 7.01 convicts, at every rate
   // and every wobble. `__tests__/false-positives.test.ts` is the contract and is
   // unmoved, and so are the 247 rules/orchestrator/traces files around it.
-  const causelessBraking = accelMps2 <= -2 && noBrakeCause && !s.harshBrake.causeSeen;
+  const causelessBraking = accelMps2 <= -BRAKING_LINE_MPS2 && noBrakeCause && !s.harshBrake.causeSeen;
   if (causelessBraking) {
     const openWindow = s.harshBrake.activeSince;
     const heldSec = openWindow === null ? 0 : t - openWindow;
@@ -5879,11 +6663,32 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       // IT — `min(t - lastQualAt, dt)`. Consecutive frames credit wall time, so
       // a coarse replay bills on the second qualifying frame exactly as the
       // shipped consecutive-frame sustain did; a frame standing alone after a
-      // dip credits one frame and not the dip. The first frame of a window
-      // credits nothing, which is what makes an isolated spike worthless.
+      // dip credits one frame and not the dip.
+      //
+      // THE FIRST QUALIFYING FRAME IS WORTH THE SPAN ITS OWN READING COVERS
+      // (2026-10-03, `sc-follow-tailgater:f42dce4f`). It used to credit nothing,
+      // which made an isolated spike worthless — and made the first whole FRAME
+      // of an emergency stop on a phone worthless too. Measured through the
+      // lesson's session, the drill's brake check (a 9.4 m/s² stamp held 0.6 s,
+      // then 5.8 to rest) at 2.8 Hz: the pedal lands inside a 0.357 s frame
+      // whose reading is still −8.1, the next reads −8.75 and the rest −5.8 —
+      // a full 0.714 s of frames at emergency grade, of which the old rule
+      // credited 0.357 against the 0.4 s sustain. Acquitted at 2.8 Hz, convicted
+      // at 10–120 Hz: the same act graded by the frame rate. A qualifying
+      // reading IS the mean deceleration over [accelAnchor.t, t], so that span is
+      // time the car genuinely spent at emergency grade, at any rate. At render
+      // rates it is `accelWindowSec` (0.04 s) — a lone spike is still worth a
+      // tenth of the sustain and nothing more; on a coarse feed it is the frame.
+      // Nothing is billed off it alone: the MEAN gate (heldSec ≥ the sustain,
+      // the mean over the open window emergency-grade) still has the last word,
+      // which is why the 1 s fixture «88 → 87 → 57 → 53» — one 8.3 m/s² second,
+      // then 2.2 — stays acquitted: its window opens on the 57 frame and the
+      // mean it must hold from there is 2.2.
       s.harshBrake.qualifiedSec +=
         s.harshBrake.lastQualAt === null
-          ? 0
+          ? accelAnchor === null
+            ? 0
+            : Math.max(0, Math.min(t - accelAnchor.t, 2))
           : Math.max(0, Math.min(t - s.harshBrake.lastQualAt, Math.min(dt, 2)));
       s.harshBrake.lastQualAt = t;
     }
@@ -5896,7 +6701,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       s.harshBrake.emitted = true;
       events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
     }
-  } else if (accelMps2 > -2) {
+  } else if (accelMps2 > -BRAKING_LINE_MPS2) {
     // Pedal released (or a cause appeared and braking eased) — re-arm.
     s.harshBrake.activeSince = null;
     s.harshBrake.emitted = false;

@@ -1003,7 +1003,13 @@ describe("wave-2 bot completion — sc-sp-limit-end at L3", () => {
     // session.events — the student is taught the scope rule before he is docked.
     // The §9 code assert lives on the trace gate, where the recorder's own
     // engine grades every encounter: traces/__tests__/sc-sp-limit-end-traces.
-    expect(taught).toEqual(["SPEEDING_OVER_LIMIT"]);
+    //
+    // ROUND 15 OF THE TASK CAP (founder ruling 2026-10-03 «LIKE A SPEED SIGN»; `sc-follow-tailgater:4b342eee`): the
+    // same leg then passes the «≤40» junction mark at 47,9 on the posted 40. Through round 14 nothing billed it — the
+    // approach had been honoured on the way in, and that verdict was kept through the mark; the arrival is now decided
+    // where the car CROSSES the mark, over the glass figure plus the sign's tolerance (44), so the cap's own first
+    // commission is taught too (a sign-bound arrival: its card lands on the held correction, 33,53 s).
+    expect(taught).toEqual(["SPEEDING_OVER_LIMIT", "TASK_SPEED_CAP_EXCEEDED"]);
     // …AND THEN HE IS DOCKED, because he is still over the limit ten driving
     // seconds after the card (w11 · SPEED_REGRADE_SEC). This assertion used to
     // read `toEqual([])` — taught once, charged nothing, for the whole overspeed

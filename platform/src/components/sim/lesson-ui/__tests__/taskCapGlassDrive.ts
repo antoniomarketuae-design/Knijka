@@ -97,7 +97,7 @@ export interface Tap {
    * 2026-10-03), compared with the drive that has it by the census's link F.
    */
   strip?: boolean;
-  calls: Array<{ tick: SimTick; events: RuleEvent[] }>;
+  calls: Array<{ tick: SimTick; events: RuleEvent[]; raw?: SimTick }>;
 }
 
 /** One committed capped objective of one non-exam rung. */
@@ -144,10 +144,18 @@ export interface PlanCtx {
   tick: SimTick;
   /** The capped objective is the active one. */
   active: boolean;
+  /** Round 15: the objective was credited short of its mark and the car has yet to cross it (`taskCapMarkWatch`). */
+  watched: boolean;
   /** Within 30 m / 3 m of the mark's acceptance. */
   win: boolean;
   near: boolean;
   gate: number;
+  /**
+   * ROUND 15 — THE BILL LINE the strip's figure implies (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): the last figure
+   * the strip printed for this objective plus the tolerance a posted limit gets, off the session's own rule config.
+   * Undefined until the strip has printed one.
+   */
+  line: number | undefined;
   /** The evaluator has already judged the mark blown. */
   approachBlown: boolean;
   /** The blow, once the lesson has latched it (the frame the latch appeared). */
@@ -161,19 +169,25 @@ export type SpeedPlan = (c: PlanCtx) => number | undefined;
 /** The sign's own grace band, half a km/h under its bill line: over the sign, never a SPEEDING bill. */
 export const graceBand = (posted: number) => posted + Math.min(posted * 0.1, 5) - 0.5;
 
+/**
+ * ROUND 15 — every plan reads the BILL LINE (`PlanCtx.line`: the glass figure plus the sign's tolerance, founder ruling
+ * 2026-10-03 «LIKE A SPEED SIGN»), never the gate plus its slack, which through round 14 was the line. A plan that
+ * means «over the line» is undefined until the strip has printed the figure.
+ */
+const over = (c: PlanCtx, by: number): number | undefined => (c.line === undefined ? undefined : c.line + by);
 export const PLANS: Record<string, SpeedPlan> = {
-  /** EXACTLY on the blow line (gate + slack): the evaluator refuses only strictly above it — never blown. */
-  line: (c) => (c.active && c.win && c.blow === null ? c.gate + SLACK : undefined),
+  /** EXACTLY on the bill line (the glass figure + the sign's tolerance): billed only strictly above it — never blown. */
+  line: (c) => ((c.active || c.watched) && c.win && c.blow === null ? over(c, 0) : undefined),
   /** A late blow, 0.2 over the line, and the recorder's own driving after it. */
-  late: (c) => (c.blow === null && c.active && c.near && !c.approachBlown ? c.gate + SLACK + 0.2 : undefined),
-  /** A late blow, then 14 s held 8 km/h over the higher of the gate and the sign's graded line, then the recorder's own. */
+  late: (c) => (c.blow === null && (c.active || c.watched) && c.near && !c.approachBlown ? over(c, 0.2) : undefined),
+  /** A late blow, then 14 s held 3 km/h over the higher of the bill line and the sign, then the recorder's own. */
   hold: (c) => {
-    if (c.blow === null) return c.active && c.near && !c.approachBlown ? c.gate + SLACK + 0.2 : undefined;
-    return c.dt < 14 ? Math.max(c.gate + SLACK, c.tick.maxSpeedKmh) + 3 : undefined;
+    if (c.blow === null) return (c.active || c.watched) && c.near && !c.approachBlown ? over(c, 0.2) : undefined;
+    return c.dt < 14 ? Math.max(c.line ?? 0, c.tick.maxSpeedKmh) + 3 : undefined;
   },
   /** A late blow, then the sign's grace band for 12 s (over the sign, no speeding bill, never a correction). */
   grace: (c) => {
-    if (c.blow === null) return c.active && c.near && !c.approachBlown ? c.gate + SLACK + 0.2 : undefined;
+    if (c.blow === null) return (c.active || c.watched) && c.near && !c.approachBlown ? over(c, 0.2) : undefined;
     return c.dt < 12 ? graceBand(c.tick.maxSpeedKmh) : undefined;
   },
   /**
@@ -185,7 +199,7 @@ export const PLANS: Record<string, SpeedPlan> = {
   wet: (c) => {
     const env = envelopeOfTick(c.tick);
     if (env === null) return undefined;
-    if (c.blow === null) return c.active && c.near && !c.approachBlown && env + 0.3 > c.gate + SLACK ? env + 0.3 : undefined;
+    if (c.blow === null) return (c.active || c.watched) && c.near && !c.approachBlown && c.line !== undefined && env + 0.3 > c.line ? env + 0.3 : undefined;
     return c.dt < 14 ? env + 0.3 : undefined;
   },
 };
@@ -213,8 +227,16 @@ export interface GlassDrive {
   err: string | null;
   /** The figure the strip printed on the last frame before the blow while the objective was active. */
   glassBeforeBlow: number | undefined;
-  /** The blow: the frame the latch appeared, the sign on it, the speed the evaluator judged (the frame before). */
+  /**
+   * The blow: the frame the reducer was handed this mark's arrival (round 15: the frame the car CROSSED the mark, or the
+   * frame it crossed the mark after its objective was credited short of it — `taskCapMarkWatch`), the sign on it, the
+   * arrival's own speed (read off the tapped tick; NaN without the tap) and the latch name it carries.
+   */
   blow: { t: number; sign: number; arrivalKmh: number; latch: number } | null;
+  /** Round 15: was the capped objective ACTIVE after each tapped frame (index-aligned with `tap`)? */
+  active: boolean[];
+  /** Round 15: does each tapped frame belong to this row — its objective active at the frame's start, or its credited mark still watched (`taskCapMarkWatch`)? */
+  owned: boolean[];
   /** Latches created during the drive (`blownAtSec`), in order. */
   latches: number[];
   /** Every tick the lesson handed the reducer while this drive ran, with the events it answered. */
@@ -244,9 +266,10 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
   let glassBeforeBlow: number | undefined;
   let blow: GlassDrive["blow"] = null;
   let lastT = 0;
-  let lastSpeed = 0;
   let latches: number[] = [];
   let glass: Array<number | undefined> = [];
+  let active: boolean[] = [];
+  let owned: boolean[] = [];
   let cards: Card[] = [];
   let toasts: GlassDrive["toasts"] = [];
   let tapFrom = tap.calls.length;
@@ -256,9 +279,10 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
     glassBeforeBlow = undefined;
     blow = null;
     lastT = 0;
-    lastSpeed = 0;
     latches = [];
     glass = [];
+    active = [];
+    owned = [];
     cards = [];
     toasts = [];
     tapFrom = tap.calls.length;
@@ -267,18 +291,23 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
     if (s.phase !== "driving" && s.phase !== "preDrive") return;
     const st = s.evalStates[row.k] as { approachCap?: string } | undefined;
     const d = Math.hypot(tick.position.x - p.x, tick.position.y - p.y);
+    const cfg = s.rules.config;
     const forced = plan({
       tick,
       active: s.currentObjectiveIndex === row.k,
+      watched: s.taskCapMarkWatch?.objectiveIndex === row.k,
       win: d <= p.radiusM + REACH_ZONE_GRACE_M + 30,
       near: d <= p.radiusM + REACH_ZONE_GRACE_M + 3,
       gate: row.gate,
+      line: glassBeforeBlow === undefined ? undefined : glassBeforeBlow + Math.min(glassBeforeBlow * cfg.speedingGraceRatio, cfg.speedingGraceMaxKmh),
       approachBlown: st?.approachCap === "blown",
       blow: blow === null ? null : { t: blow.t, sign: blow.sign },
       dt: blow === null ? 0 : tick.t - blow.t,
     });
     const tk = forced === undefined ? tick : { ...tick, speedKmh: forced };
     const prevLatch = (s.taskCapLatch as { blownAtSec: number } | undefined)?.blownAtSec;
+    // Round 15: the mark's arrival may come from the active objective's crossing OR from its crediting on the last frame.
+    const ours = s.currentObjectiveIndex === row.k || s.taskCapMarkWatch?.objectiveIndex === row.k;
     const before = tap.calls.length;
     tap.armed = true;
     const r = applyTick(s, tk);
@@ -287,7 +316,11 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
     const snap = snapshotOf(s, tk, null, prevSnap);
     prevSnap = snap;
     // one glass reading per tapped frame (the lesson calls the reducer once per live frame)
-    for (let i = before; i < tap.calls.length; i++) glass.push(snap.taskCapKmh);
+    for (let i = before; i < tap.calls.length; i++) {
+      glass.push(snap.taskCapKmh);
+      active.push(s.currentObjectiveIndex === row.k);
+      owned.push(ours);
+    }
     for (const m of (r as { teachMoments?: Array<{ code: string; t: number; charged?: boolean; explanationBg: string }> }).teachMoments ?? []) {
       cards.push({ code: m.code, t: r2(m.t), charged: m.charged === true, text: m.explanationBg });
     }
@@ -295,13 +328,15 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
       if ((h.kind === "violation" || h.kind === "lesson") && h.explanationBg !== undefined) toasts.push({ kind: h.kind, titleBg: h.titleBg ?? "", text: h.explanationBg, t: r2(tick.t) });
     }
     const latch = (s.taskCapLatch as { objectiveIndex: number; blownAtSec: number } | undefined);
-    if (latch !== undefined && latch.blownAtSec !== prevLatch) {
-      latches.push(latch.blownAtSec);
-      if (blow === null && latch.objectiveIndex === row.k) blow = { t: tick.t, sign: tk.maxSpeedKmh, arrivalKmh: Math.abs(lastSpeed), latch: latch.blownAtSec };
+    if (latch !== undefined && latch.blownAtSec !== prevLatch) latches.push(latch.blownAtSec);
+    // The blow is read off what the LESSON handed the reducer (`raw`: the same with or without link F's strip), never off
+    // the reducer's own state — so the drive, and every plan keyed on the blow, is identical in both runs.
+    const handed = tap.calls.slice(before).map((c) => (c.raw ?? c.tick).taskCapArrival).find((a) => a !== undefined);
+    if (blow === null && ours && handed !== undefined) {
+      blow = { t: tick.t, sign: tk.maxSpeedKmh, arrivalKmh: Math.abs(handed.arrivalKmh), latch: handed.blownAtSec };
     }
     if (blow === null && s.currentObjectiveIndex === row.k && snap.taskCapKmh !== undefined) glassBeforeBlow = snap.taskCapKmh;
     lastT = tick.t;
-    lastSpeed = tk.speedKmh;
   };
   let err: string | null = null;
   try {
@@ -334,6 +369,8 @@ export function glassDrive(row: CappedRow, plan: SpeedPlan, tap: Tap): GlassDriv
     latches,
     tap: tap.calls.slice(tapFrom),
     glass,
+    active,
+    owned,
     cards,
     toasts,
     ended,

@@ -297,6 +297,9 @@ export {
   settleUnpaidAdaptationTeach,
   // Round 7 — a drive that ends inside a sign-bound arrival's act settles its one bill.
   settlePendingTaskArrival,
+  // Founder ruling 2026-10-03 «LIKE A SPEED SIGN»: the one bill line of a task cap — the glass figure plus the
+  // tolerance a posted limit gets. The lesson reads it to decide whether the mark was crossed over it.
+  taskCapBillLineKmh,
   conditionsSpeedEnvelope,
   type AdaptationSettleTick,
   type ConditionsCause,

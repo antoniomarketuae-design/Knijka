@@ -43,11 +43,19 @@
  * mutant it names (`scratchpad/cap/r13/red-on-r12-*.txt`).
  *
  * RUNTIME (one worker, this machine): about 75 s per plan, 5 minutes in all.
+ *
+ * ROUND 15 — founder ruling 2026-10-03 «LIKE A SPEED SIGN», and «the arrival is decided at the mark». The BILL LINE is
+ * the glass figure plus the tolerance a posted limit gets (`lineOf`), on every rung — no longer the gate plus its slack —
+ * and every plan reads it (`taskCapGlassDrive.ts PlanCtx.line`). The arrival is the CROSSING of the mark, its speed
+ * interpolated between the two frames that straddle it (so it lies between their two speeds), or — for an objective
+ * the evaluator credits short of its mark — the frame the car then crosses it (`taskCapMarkWatch`), the same
+ * interpolation. «The glass stops when the grading stops» is read while the capped
+ * objective is still the active one.
  */
 import { appendFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
-const tap = vi.hoisted(() => ({ armed: false, strip: false, calls: [] as Array<{ tick: unknown; events: unknown[] }> }));
+const tap = vi.hoisted(() => ({ armed: false, strip: false, calls: [] as Array<{ tick: unknown; events: unknown[]; raw?: unknown }> }));
 vi.mock("@/modules/sim/rules/engine", async (importOriginal) => {
   // INSTRUMENTATION ONLY: the real reducer runs and its result is returned untouched; while a census drive has the
   // tap armed, the tick it was handed and the events it answered are kept. Round 14: with `strip` set (link F's
@@ -62,7 +70,9 @@ vi.mock("@/modules/sim/rules/engine", async (importOriginal) => {
         handed = rest;
       }
       const r = m.reduceTick(s, handed);
-      if (tap.armed) tap.calls.push({ tick: handed, events: r.events });
+      // Round 15: `raw` is the tick as the LESSON handed it (before any strip), so a drive can read its own stamps
+      // identically whether or not the reducer is shown them.
+      if (tap.armed) tap.calls.push({ tick: handed, events: r.events, raw: t });
       return r;
     },
   };
@@ -82,6 +92,9 @@ const REFERENCE_CODES = new Set([...KIN, "SPEEDING_OVER_LIMIT", "SPEEDING_DANGER
 const TITLE = new Map([...KIN].map((c) => [c, makeViolation(c as ViolationCode, 0).titleBg]));
 
 const ROWS = committedCappedRows();
+/** The bill line of a glass figure, by the ruling: the figure plus min(figure × ratio, max) off the given rule config. */
+const lineOf = (glass: number, cfg: { speedingGraceRatio: number; speedingGraceMaxKmh: number }) =>
+  glass + Math.min(glass * cfg.speedingGraceRatio, cfg.speedingGraceMaxKmh);
 const tag = (r: CappedRow, plan: string) => `${r.id}@L${r.lv} ${r.objectiveId} ${plan}`;
 
 interface Tally {
@@ -125,8 +138,11 @@ interface Tally {
   /** Round 14 (R1 as a class): the objective's own speed toasts («не повече от N км/ч, а стигна дотук с M») read back. */
   objectiveSpeedToasts: number;
   envelopeClauses: number;
+  /** Round 15: marks crossed after their objective was credited short of them (`taskCapMarkWatch`), and while it was active. */
+  creditedArrivals: number;
+  crossingArrivals: number;
 }
-const tally = (): Tally => ({ drives: 0, noRecorder: 0, frames: 0, blown: 0, signBound: 0, graded: 0, gradedGateAtOrAboveSign: 0, glassUnderGate: 0, signBoundGlassUnderGate: 0, stampedFrames: 0, breachRows: 0, reversingFrames: 0, nightFrames: 0, snowFrames: 0, fogFrames: 0, rainFrames: 0, bendFrames: 0, referenceBills: 0, taskShown: 0, taskAbsorbed: 0, taskRegrades: 0, kinRows: 0, kinCharges: 0, kinPoints: 0, cardsChecked: 0, signBoundCards: 0, ownMistakeDrives: 0, glassWithoutStamp: 0, glassWithoutStampFirst: "", f1Drives: 0, capRaisedScore: 0, capPoints: 0, capAndKinDrives: 0, displaysChecked: 0, decimalThresholdDisplays: 0, objectiveSpeedToasts: 0, envelopeClauses: 0 });
+const tally = (): Tally => ({ drives: 0, noRecorder: 0, frames: 0, blown: 0, signBound: 0, graded: 0, gradedGateAtOrAboveSign: 0, glassUnderGate: 0, signBoundGlassUnderGate: 0, stampedFrames: 0, breachRows: 0, reversingFrames: 0, nightFrames: 0, snowFrames: 0, fogFrames: 0, rainFrames: 0, bendFrames: 0, referenceBills: 0, taskShown: 0, taskAbsorbed: 0, taskRegrades: 0, kinRows: 0, kinCharges: 0, kinPoints: 0, cardsChecked: 0, signBoundCards: 0, ownMistakeDrives: 0, glassWithoutStamp: 0, glassWithoutStampFirst: "", f1Drives: 0, capRaisedScore: 0, capPoints: 0, capAndKinDrives: 0, displaysChecked: 0, decimalThresholdDisplays: 0, objectiveSpeedToasts: 0, envelopeClauses: 0, creditedArrivals: 0, crossingArrivals: 0 });
 
 /** Every difference of one drive, each named by its link (A stamp / B events / C charged / D shown). */
 function examine(d: GlassDrive, plan: string, T: Tally): string[] {
@@ -144,9 +160,10 @@ function examine(d: GlassDrive, plan: string, T: Tally): string[] {
   const gate = d.row.gate;
 
   // ── A · THE STAMP against THE GLASS ─────────────────────────────────────────────────────────────────────────────
+  const cfg = d.ended.rules.config;
   if (plan === "line") {
-    // EXACTLY on the blow line: the evaluator refuses only strictly above gate + slack, so nothing is latched.
-    if (d.blow !== null || d.latches.length > 0) fail("A", `a mark passed exactly at gate + slack (${gate + SLACK}) was latched as blown`);
+    // EXACTLY on the bill line: billed only strictly above the glass figure plus the sign's tolerance, so nothing is latched.
+    if (d.blow !== null || d.latches.length > 0) fail("A", `a mark passed exactly on the bill line (${G === undefined ? "?" : lineOf(G, cfg)}) was latched as blown`);
     if (d.breaches.some((b) => b.startsWith(`${d.row.objectiveId}@`))) fail("A", "a breach row for a mark that was not blown");
   }
   let latch: number | null = null;
@@ -160,25 +177,39 @@ function examine(d: GlassDrive, plan: string, T: Tally): string[] {
     if (x.curveAdvisoryKmh !== undefined) T.bendFrames++;
     const a = x.taskCapArrival;
     const c = x.taskSpeedCap;
-    if (a !== undefined) {
+    // Round 15: only this row's own stamps (its objective active at the frame's start, or its mark still watched):
+    // a car held over the line through the NEXT capped mark now blows that one too, and its census row checks it.
+    if (a !== undefined && d.owned[i] === true) {
       latch = a.blownAtSec;
       const before = i > 0 && frames[i - 1].t < x.t ? Math.abs(frames[i - 1].speedKmh) : Math.abs(x.speedKmh);
-      const glassThen = i > 0 ? (d.glass[i - 1] ?? d.glass[i]) : d.glass[i];
+      // A mark crossed after its objective was credited short of it (round 15, `taskCapMarkWatch`): the strip has already
+      // moved on to the next objective, so the figure it quotes is the last one the strip printed for this objective.
+      const glassThen = i > 0 && d.active[i - 1] === false ? d.glassBeforeBlow : i > 0 ? (d.glass[i - 1] ?? d.glass[i]) : d.glass[i];
       if (a.capKmh !== gate) fail("A", `the arrival's gate ${a.capKmh} is not the compiled gate ${gate}`);
       if (a.shownKmh !== glassThen) fail("A", `the arrival's figure ${a.shownKmh} is not the figure on the glass (${glassThen}) at t=${x.t}`);
       if (a.graceKmh !== SLACK) fail("A", `the arrival's slack ${a.graceKmh}`);
       if (a.blownAtSec !== x.t) fail("A", `the arrival names latch ${a.blownAtSec} on frame ${x.t}`);
-      if (a.arrivalKmh !== before) fail("A", `the arrival quotes ${a.arrivalKmh}, the frame before the latch read ${before}`);
+      if (i > 0 && d.active[i - 1] === false) T.creditedArrivals++;
+      else T.crossingArrivals++;
+      {
+        // The crossing, interpolated between the two frames that straddle the mark: between their two speeds.
+        const now = Math.abs(x.speedKmh);
+        if (!(a.arrivalKmh >= Math.min(before, now) - 1e-9 && a.arrivalKmh <= Math.max(before, now) + 1e-9)) {
+          fail("A", `the crossing arrival quotes ${a.arrivalKmh}, outside the two straddling frames' ${before} … ${now}`);
+        }
+      }
     }
-    if (c !== undefined) {
+    if (c !== undefined && d.owned[i] === true) {
       T.stampedFrames++;
+      // The strip AFTER a frame on which the objective completed shows the next one; the stamp rode the frame before that.
+      const glassNow = d.active[i] === true ? d.glass[i] : d.glass[i - 1];
       if (c.capKmh !== gate) fail("A", `a stamp's gate ${c.capKmh} is not the compiled gate ${gate} at t=${x.t}`);
-      if (c.shownKmh !== d.glass[i]) fail("A", `a stamp's figure ${c.shownKmh} is not the figure on the glass (${d.glass[i]}) at t=${x.t}`);
+      if (c.shownKmh !== glassNow) fail("A", `a stamp's figure ${c.shownKmh} is not the figure on the glass (${glassNow}) at t=${x.t}`);
       if (c.graceKmh !== SLACK) fail("A", `a stamp's slack ${c.graceKmh}`);
       if (c.blownAtSec !== latch) fail("A", `a stamp names latch ${c.blownAtSec}, the latch is ${latch}, at t=${x.t}`);
       // RULING 2 reads the figure the student was shown: stamped only where the GLASS figure is under the sign.
       if (!(c.shownKmh < x.maxSpeedKmh)) fail("A", `a stamp (glass ${c.shownKmh}) on a frame whose sign is ${x.maxSpeedKmh} at t=${x.t}`);
-    } else if (latch !== null && a === undefined && d.glass[i] !== undefined && (d.glass[i] as number) < x.maxSpeedKmh) {
+    } else if (latch !== null && a === undefined && d.active[i] === true && d.glass[i] !== undefined && (d.glass[i] as number) < x.maxSpeedKmh) {
       // «THE GLASS STOPS WHEN THE GRADING STOPS», read the other way: after the blow, a frame on which the strip still
       // shows the cap under the sign is a frame the cap is graded on.
       T.glassWithoutStamp++;
@@ -206,7 +237,7 @@ function examine(d: GlassDrive, plan: string, T: Tally): string[] {
       const bi = frames.findIndex((x) => x.t === d.blow!.t);
       const arrival = bi >= 0 ? frames[bi].taskCapArrival : undefined;
       if (arrival === undefined) fail("A", "the blow frame carries no arrival");
-      else if (!(arrival.arrivalKmh > gate + SLACK)) fail("A", `a mark latched as blown at ${arrival.arrivalKmh}, not over gate + slack ${gate + SLACK}`);
+      else if (!(arrival.arrivalKmh > lineOf(G, cfg))) fail("A", `a mark latched as blown at ${arrival.arrivalKmh}, not over the bill line ${lineOf(G, cfg)}`);
     }
   }
 
@@ -364,10 +395,11 @@ const vHold = (): SpeedPlan => {
 
 describe("THE ROUND-12 VERIFIER'S WITNESSES, by name — through the real lesson session", () => {
   for (const [id, lv, obj, gate, glass, sign, kmhText] of [
-    ["sc-speed-creep", 2, "sc-crp-approach", 54.5, 50, 50, "59,7"],
-    ["sc-speed-creep", 3, "sc-crp-approach", 52, 50, 50, "57,2"],
-    ["sc-speed-creep", 5, "sc-crp-approach", 52, 50, 50, "57,2"],
-    ["sc-sp-curve", 1, "sc-spcv-approach", 92, 90, 90, "97,2"],
+    // Round 15: the late blow is 0,2 over the GLASS figure's line (50 + 5 = 55, 90 + 5 = 95), not the gate + slack.
+    ["sc-speed-creep", 2, "sc-crp-approach", 54.5, 50, 50, "55,2"],
+    ["sc-speed-creep", 3, "sc-crp-approach", 52, 50, 50, "55,2"],
+    ["sc-speed-creep", 5, "sc-crp-approach", 52, 50, 50, "55,2"],
+    ["sc-sp-curve", 1, "sc-spcv-approach", 92, 90, 90, "95,2"],
   ] as const) {
     it(`RED-ON-V16 · ${id} L${lv} ${obj} — the strip shows ≤${glass} over a compiled gate of ${gate} on a posted ${sign}; blown late at ${kmhText}, the card reads «при таван на задачата ${glass} км/ч» — the figure on the GLASS (under V16: ${Math.round(gate)})`, () => {
       const d = driveRow(row(id, lv, obj), PLANS.late);
@@ -402,7 +434,7 @@ describe("THE ROUND-12 VERIFIER'S WITNESSES, by name — through the real lesson
     expect(d.score).toBe(21);
     expect(examine(d, "hold", tally())).toEqual([]);
   });
-  it("RED-ON-UX14 · a mark passed EXACTLY at gate + slack is not blown (the evaluator refuses only strictly above it): sc-speed-creep L2 at 59,5 through its gate of 54,5 — no latch, no arrival, no breach row, no task card", () => {
+  it("RED-ON-UX14 (round 15: the line is the glass figure + the sign's tolerance) · a mark passed EXACTLY on the bill line is not blown (billed only strictly above it): sc-speed-creep L2 at 55 through «≤50» (gate 54,5) — no latch, no arrival, no breach row, no task card", () => {
     const d = driveRow(row("sc-speed-creep", 2, "sc-crp-approach"), PLANS.line);
     expect([d.blow, d.latches]).toEqual([null, []]);
     expect(d.tap.some((c) => (c.tick as SimTick).taskCapArrival !== undefined || (c.tick as SimTick).taskSpeedCap !== undefined)).toBe(false);
@@ -423,7 +455,7 @@ describe("THE COMMITTED DOMAIN — the capped objectives the census drives, deri
 });
 
 describe("THE LESSON CENSUS — every committed capped objective through the real lesson session: the stamp against the glass (A), the rule events against the reference ledger (B), the charged rows and points (C) and the cards' whole text (D)", () => {
-  it("line · EXACTLY on the blow line (gate + slack) — no mark is latched, no breach row, no task bill, on any of the 521", () => {
+  it("line · EXACTLY on the bill line (round 15: the glass figure + the sign's tolerance) — no mark is latched, no breach row, no task bill, on any of the 521", () => {
     const { problems, T } = runPlan("line");
     expect(said(problems)).toEqual(CLEAN);
     expect(T.drives).toBe(521);
@@ -439,16 +471,29 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
     expect(T.drives).toBe(521);
     // Three rows (one objective at three rungs) have no recorder that plays their route: pinned, so a recorder that stops playing a drive shrinks nothing silently.
     expect(T.noRecorder).toBe(3);
-    expect(T.blown).toBe(514);
-    expect(T.signBound).toBe(192);
-    expect(T.graded).toBe(322);
+    // Round 15: 513 blown marks (round 14: 514), 189 sign-bound (192), 324 graded (322). The plan now drives 0,2 over the
+    // GLASS line, which on the ladder rungs the gate credits a few metres short of the mark — and the mark is then decided
+    // where the car crosses it. On five rows the drive ENDS before that crossing (a terminal objective credited short of
+    // its mark: sc-park-parallel-exit L1/L2 sc-ppx-out, sc-park-bay-exit-rev L1/L2 sc-pbe-away, sc-speed-creep L1
+    // sc-crp-finish), so nothing is decided there; elsewhere marks the gate's old line let through are crossed over the new one.
+    expect(T.blown).toBe(513);
+    expect(T.signBound).toBe(189);
+    expect(T.graded).toBe(324);
+    // …every one decided at the crossing: while the objective is active, or after the ladder's gate credited it short of
+    // the mark at a speed it then carried over the line (`taskCapMarkWatch`, L1/L2).
+    expect(T.crossingArrivals).toBeGreaterThan(400);
+    expect(T.creditedArrivals).toBeGreaterThan(90);
     expect(T.glassUnderGate).toBeGreaterThan(300);
-    expect(T.signBoundGlassUnderGate).toBe(136);
+    expect(T.signBoundGlassUnderGate).toBe(133);
     expect(T.gradedGateAtOrAboveSign).toBe(3);
     expect(T.breachRows).toBe(T.graded);
     // «THE GLASS STOPS WHEN THE GRADING STOPS», both ways: no frame after a blow shows the cap under the sign without its stamp.
     expect(T.glassWithoutStamp).toBe(0);
-    expect(T.stampedFrames).toBeGreaterThan(140_000);
+    // Round 15: 7,460 stamped frames (round 14: 140,000+). A late blow at 0,2 over the GLASS line is under the gate on the
+    // ladder rungs, so the objective is credited and its mark arrives on the crediting frame with no stretch to stamp;
+    // and a crossing latch whose objective then completes is released with it. The stretch is still stamped in full
+    // wherever the mark is crossed over the gate too — the hold and grace plans below.
+    expect(T.stampedFrames).toBeGreaterThan(7000);
     expect(T.reversingFrames).toBeGreaterThan(3000);
     expect(T.nightFrames).toBeGreaterThan(50_000);
     expect(T.snowFrames).toBeGreaterThan(10_000);
@@ -463,23 +508,25 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
   it("hold · a late blow, then 14 s over the task's line and the sign — 0 differences; stamped stretches, re-grades and charged points arise in hundreds", () => {
     const { problems, T } = runPlan("hold");
     expect(said(problems)).toEqual(CLEAN);
-    expect(T.blown).toBe(514);
+    expect(T.blown).toBe(513);
     expect(T.glassWithoutStamp).toBe(0);
-    expect(T.stampedFrames).toBeGreaterThan(140_000);
-    expect(T.taskRegrades).toBeGreaterThan(120);
-    expect(T.taskAbsorbed).toBeGreaterThan(150);
-    expect(T.kinCharges).toBeGreaterThan(130);
+    // Round 15 (measured: 113,170 / 105 / 132 / 125): the held speed is 3 over the glass line, no longer over gate + slack.
+    expect(T.stampedFrames).toBeGreaterThan(100_000);
+    expect(T.taskRegrades).toBeGreaterThan(95);
+    expect(T.taskAbsorbed).toBeGreaterThan(120);
+    expect(T.kinCharges).toBeGreaterThan(115);
     expect(T.kinRows).toBeGreaterThan(320);
     expect(T.cardsChecked).toBeGreaterThan(450);
   }, 900_000);
   it("grace · a late blow, then 12 s in the sign's grace band — 0 differences; the sign-bound arrivals wait and bill on their held correction, each card quoting the glass figure and the sign of its blow", () => {
     const { problems, T } = runPlan("grace");
     expect(said(problems)).toEqual(CLEAN);
-    expect(T.blown).toBe(514);
+    expect(T.blown).toBe(513);
     expect(T.glassWithoutStamp).toBe(0);
     expect(T.signBoundCards).toBeGreaterThan(15);
     expect(T.kinRows).toBeGreaterThan(380);
-    expect(T.kinCharges).toBeGreaterThan(130);
+    // Round 15 (measured 124).
+    expect(T.kinCharges).toBeGreaterThan(115);
     expect(T.cardsChecked).toBeGreaterThan(480);
   }, 900_000);
   it("wet · ROUND 14 (R1) — wherever the weather reduces the sign, the mark passed 0,3 km/h over what it leaves of the sign and held there 14 s: 0 differences, and NO card or toast states a comparison its printed numbers do not bear out (round 13: «… с 42,8 км/ч … — и над 43 км/ч, които дъждът оставя от знака 50» on 13 objective × rung rows)", () => {

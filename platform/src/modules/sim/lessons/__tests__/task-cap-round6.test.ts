@@ -149,12 +149,39 @@ interface Ctx {
 }
 /** Honour every objective except the target: under its cap near its mark, stop on a halt mark, else 25. */
 function lawful(c: Ctx): number {
+  return Math.min(heldPrev(c), lawfulForCurrent(c));
+}
+/**
+ * ROUND 15 — a capped mark credited a few metres SHORT of itself is still decided where the car crosses it
+ * (`lessons/engine.ts stepTaskCapMarkWatch`), so every profile holds that figure through it (within its disc + 10 m)
+ * instead of flooring it the frame the tick appears and the next objective becomes current.
+ */
+function heldPrev(c: Ctx): number {
+  const prevObj = c.s.objectives[c.s.currentObjectiveIndex - 1];
+  const pp = prevObj?.params as { kind?: string; x?: number; y?: number; radiusM?: number; maxSpeedKmh?: number } | undefined;
+  if (prevObj === undefined || pp === undefined || pp.kind !== "reachZone" || pp.maxSpeedKmh === undefined || pp.maxSpeedKmh <= 8) return Infinity;
+  if (pp.x === undefined || pp.y === undefined || Math.hypot(c.x - pp.x, c.y - pp.y) > (pp.radiusM ?? 5) + 10) return Infinity;
+  // …only while that mark is still AHEAD on the axis its evaluator graded it on.
+  const from = (c.s.evalStates[c.s.currentObjectiveIndex - 1] as { approachFrom?: { x: number; y: number } | null } | undefined)?.approachFrom;
+  if (from === undefined || from === null) return Infinity;
+  const ax = pp.x - from.x;
+  const ay = pp.y - from.y;
+  const along = ((c.x - pp.x) * ax + (c.y - pp.y) * ay) / Math.max(1e-9, Math.hypot(ax, ay));
+  return along < 0 ? shownObjectiveCapKmh(prevObj.spec, pp.maxSpeedKmh, c.s.lesson.postedLimitKmh) : Infinity;
+}
+function lawfulForCurrent(c: Ctx): number {
   const cur = c.s.objectives[c.s.currentObjectiveIndex];
   const p = cur?.params as { kind?: string; x?: number; y?: number; radiusM?: number; maxSpeedKmh?: number } | undefined;
   if (!p || p.kind !== "reachZone" || p.x === undefined || p.y === undefined) return 25;
   const dist = Math.hypot(c.x - p.x, c.y - p.y);
   if (p.maxSpeedKmh !== undefined && p.maxSpeedKmh <= 8) return dist <= (p.radiusM ?? 4) * 0.5 ? 0 : dist < 25 ? 8 : 25;
-  if (p.maxSpeedKmh !== undefined) return dist < (p.radiusM ?? 5) + 40 ? Math.min(25, p.maxSpeedKmh - 3) : 25;
+  // ROUND 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): lawful means at or under the figure the GLASS shows — the
+  // cap bills above that figure plus the sign's tolerance on every rung. Rounds 6–14 drove the gate minus 3 here, which
+  // on an L1 rung with a low cap (gate 15 over «≤10») is over the glass figure's line (11) — a breach, not a lawful drive.
+  if (p.maxSpeedKmh !== undefined) {
+    const glass = shownObjectiveCapKmh(cur.spec, p.maxSpeedKmh, c.s.lesson.postedLimitKmh);
+    return dist < (p.radiusM ?? 5) + 40 ? Math.min(25, glass, p.maxSpeedKmh - 3) : 25;
+  }
   return 25;
 }
 
@@ -244,7 +271,7 @@ function shadowDrive(
     const [x0, y0] = at(d);
     const onTarget = isTarget(s);
     if (onTarget && targetK === null) targetK = s.currentObjectiveIndex;
-    const target = (onTarget ? speedAtTarget({ x: x0, y: y0, t, s, blownAt }) : lawful({ x: x0, y: y0, t, s })) / 3.6;
+    const target = (onTarget ? Math.min(heldPrev({ x: x0, y: y0, t, s }), speedAtTarget({ x: x0, y: y0, t, s, blownAt })) : lawful({ x: x0, y: y0, t, s })) / 3.6;
     const acc = o.accel ?? 20;
     const dec = o.decel ?? 20;
     v = v < target ? Math.min(target, v + acc * 0.1) : Math.max(target, v - dec * 0.1);
@@ -615,7 +642,10 @@ describe("C · on L1 a lower-class teach card never takes the pause slot from a 
       speed: blowAt116,
       events: redOnce((c) => c.sinceBlow >= 2),
     });
-    const task = d.teach.filter((m) => m.code === TASK);
+    // ROUND 15: the arrival card (the uncharged one). The latch is now created on the frame the car CROSSES the mark —
+    // one frame earlier than through round 14 — so the act's 9 accrued seconds over the line end on the last frame at
+    // 100 (25.2, y = 700) and its charged re-grade card lands there too; it is not the arrival.
+    const task = d.teach.filter((m) => m.code === TASK && m.charged !== true);
     const red = d.teach.filter((m) => m.code === "RED_LIGHT_CROSSED");
     expect(task).toHaveLength(1);
     expect(red).toHaveLength(1);
@@ -643,12 +673,13 @@ describe("C · on L1 a lower-class teach card never takes the pause slot from a 
 
   it("the same frame: the TASK arrival and a red light merge into one pause, the dangerous card FIRST (the reducer bills tick events before the kin ledger, so this frame arrives in that order)", () => {
     const second = redOnce((c) => c.sinceBlow >= 3);
-    const first = redOnce((c) => c.sinceBlow > 0.05);
+    // ROUND 15: the arrival is billed on the frame the car CROSSES the mark (y = 450 on this straight approach) — not,
+    // as through round 14, on the frame after the evaluator's blow; a second red light 3 s later finds the slot closed
+    // by the charged card.
+    const first = redOnce((c) => c.y >= 450);
     const d = spray({
       lv: 1,
       speed: blowAt116,
-      // The arrival is billed on the frame AFTER the evaluator's blow; a second
-      // red light 3 s later finds the slot closed by the charged card.
       events: (c) => [...first(c), ...second(c)],
     });
     const i = d.teach.findIndex((m) => m.code === "RED_LIGHT_CROSSED");
@@ -677,7 +708,8 @@ describe("C · on L1 a lower-class teach card never takes the pause slot from a 
       c.y > 700 ? 78 : !c.blown || c.sinceBlow < 1.5 ? 116 : 100;
     const probe = spray({ lv: 1, speed });
     expect(probe.blowFrameT).not.toBeNull();
-    const arrivalT = Math.round(((probe.blowFrameT as number) + 0.1) * 10) / 10;
+    // ROUND 15: the arrival is billed ON the crossing frame, which on this approach is the evaluator's blow frame.
+    const arrivalT = probe.blowFrameT as number;
     const enterT = Math.round((arrivalT - 1) * 10) / 10;
     let entered = false;
     const d = spray({

@@ -357,7 +357,10 @@ describe("ruling 2 · the zone — a mark swept faster than its zone is still a 
       maxT: 60,
       speed: () => 95,
     });
-    expect(stamped(o)).toEqual([]);
+    // ROUND 15: the latch is created on the frame the car CROSSES the mark (not, as through round 14, on the frame
+    // after the evaluator's verdict), so that crossing frame — still inside the 2.7 m disc — may carry the one stamp;
+    // nothing after it does.
+    expect(stamped(o).length).toBeLessThanOrEqual(1);
     expect(o.breaches).toBe(1);
     expect(taskBills(o).length).toBe(1);
     expect(o.charged.filter((b) => b.code === TASK)).toEqual([]);

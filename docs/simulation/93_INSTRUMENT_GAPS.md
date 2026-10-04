@@ -661,3 +661,11 @@ New, owed: the emergency pace profile held 3/3 in round 1 and 0/3 in round 2 (ru
 encounter — the conviction still lands at t≈16 s, so rows 155903c1/4056508c are judgeable); the impact burst and the fault-card
 text/clipping capture (H2 item 5, designed in the round-1 builder's owed list); survivors V12 (30.0° boundary) and V14 (provenance
 text at cap == target) are on inputs no drive produced.
+
+## COND-BC1 — harsh-brake cause beyond 120 m: a lead whose braking began < 0.25 s before the stamp — **ACCEPTED 2026-10-04**
+
+Landed with the brake-check repair (88 §«Brake check at a tailgater»). The lead-speed estimate beyond the reach is a three-sample quadratic
+over 0.5 s (shorter spans read a ±0.15 m position step as up to 1.8 m/s); it lags a lead whose braking began less than ~0.25 s ago, so an act
+with the true closing 3.05–3.3 m/s at the pedal can read under the 3 m/s line and be billed where base acquits (round-5 verifier: 136 cells in
+23 synthetic acts). Accepted because the onset precedes the stamp by less than any human reaction time, base itself splits these acts by rate,
+round 5 strictly improves on round 4, and no committed lesson produces the shape. Revisit only if a live drive shows it.

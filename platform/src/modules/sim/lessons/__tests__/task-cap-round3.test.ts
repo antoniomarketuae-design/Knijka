@@ -857,7 +857,9 @@ describe("guards — lawful corrections before a hand-end are never settled (A4)
     ["back to 80, end 0.5 s later", 80, 0.5, { 1: 0, 3: 0 }],
     ["back to 84, end 3 s later", 84, 3, { 1: 0, 3: 0 }],
     ["back to 79, end 10 s later", 79, 10, { 1: 0, 3: 0 }],
-    ["still at 88, end 3 s later (inside L1's widened line, over L3's 85)", 88, 3, { 1: 0, 3: 1 }],
+    // ROUND 15 (founder ruling 2026-10-03 «LIKE A SPEED SIGN»): 88 is over BOTH rungs' line now — the glass figure (80)
+    // plus the sign's tolerance (5) on every rung; L1's widened gate (85 + 5 = 90) no longer moves the bill line.
+    ["still at 88, end 3 s later (over the glass figure's line, 85, on every rung)", 88, 3, { 1: 1, 3: 1 }],
   ];
   for (const lv of [1, 3] as ScenarioLevel[]) {
     for (const [label, backTo, holdAfter, want] of cases) {

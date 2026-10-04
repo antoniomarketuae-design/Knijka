@@ -26,7 +26,7 @@
  */
 
 import type { LessonObjective, ParkingBaySpec, StagedEventOutcome } from "../contracts";
-import type { SimTick } from "../rules";
+import type { SimTick, Vec2 } from "../rules";
 import type {
   ObjectiveDetail,
   ObjectiveEvalState,
@@ -4234,6 +4234,131 @@ export function stepObjective(
  * nothing happens» was never a tolerance problem — it was an invisible speed
  * contract, and the silence is the part that has to go.
  */
+/**
+ * A JOURNEY DEMAND THAT WITHHOLDS THE TICK FOR A REASON SLOWING DOWN CANNOT UNDO — round 15 of the task cap
+ * (`sc-follow-tailgater:5a56612e`). `stepReachZone`'s arrival conjunction (`arrivalHonoured`) carries, OUTSIDE the
+ * `capMet` latch, eleven arms that read a fact about the JOURNEY rather than the car's state at the mark:
+ *
+ *   vruUntouched    requireVruUntouched     the waited-for person was struck (`vruWaitHonoured`)
+ *   noContact       requireNoContact        something was struck on the way (`noContactHonoured`)
+ *   railClear       requireRailClear        the car entered a barred crossing (`railClearHonoured`)
+ *   yieldClean      requireYieldClean       a yield was billed inside this objective's window (`yieldCleanHonoured`)
+ *   haltForVru      requireHaltForVru       a person was struck (`haltForVruHonoured`)
+ *   restClean       requireRestClean        the car rested in the stretch it promised not to (`restCleanHonoured`)
+ *   solidLineClean  requireSolidLineClean   the М1 was crossed (`solidLineCleanHonoured`)
+ *   stopSignRoll    requireFullStop         the Б2 was rolled since this gate opened (`stopSignRollClean`)
+ *   speedClean      requireSpeedClean       a speed fault was reported (`speedCleanHonoured`)
+ *   brakingClean    requireBrakingClean     a slam or a dead stop without cause (`brakingCleanHonoured`)
+ *   greenStartClean requireGreenStartClean  a freeze at the green (`greenStartCleanHonoured`)
+ *
+ * Every one is session-monotone (or monotone inside its window): no speed the car can take from here on makes it true
+ * again. `requireFullStop`'s OTHER half — the standstill itself (`fullStopHonoured` at the mark) — is NOT here: coming
+ * to rest on the mark is exactly what slowing down does. Read by `lessons/engine.ts objectiveNotice`, so the «Стигна
+ * точката, но твърде бързо» card never tells a student that the speed is why the tick is withheld, and «Намали СЕГА»
+ * would earn it, when it would not. Returns the first refusing arm in the conjunction's own order; null when none
+ * refuses. Computed from the same `…Honoured` predicates the conjunction calls, so the two cannot disagree.
+ */
+export type ReachZoneJourneyRefusal =
+  | "vruUntouched"
+  | "noContact"
+  | "railClear"
+  | "yieldClean"
+  | "haltForVru"
+  | "restClean"
+  | "solidLineClean"
+  | "stopSignRoll"
+  | "speedClean"
+  | "brakingClean"
+  | "greenStartClean";
+
+export function reachZoneJourneyRefusal(
+  params: WitnessedReachZoneParams,
+  ctx: ObjectiveContext,
+): ReachZoneJourneyRefusal | null {
+  if (params.requireVruUntouched === true && !vruWaitHonoured(ctx)) return "vruUntouched";
+  if (params.requireNoContact === true && !noContactHonoured(ctx)) return "noContact";
+  if (params.requireRailClear === true && !railClearHonoured(ctx)) return "railClear";
+  if (params.requireYieldClean !== undefined && !yieldCleanHonoured(params.requireYieldClean, ctx)) return "yieldClean";
+  if (params.requireHaltForVru === true && !haltForVruHonoured(ctx)) return "haltForVru";
+  if (params.requireRestClean !== undefined && !restCleanHonoured(params.requireRestClean, ctx)) return "restClean";
+  if (params.requireSolidLineClean === true && !solidLineCleanHonoured(ctx)) return "solidLineClean";
+  if (params.requireFullStop === true && !stopSignRollClean(ctx)) return "stopSignRoll";
+  if (params.requireSpeedClean === true && !speedCleanHonoured(ctx)) return "speedClean";
+  if (params.requireBrakingClean === true && !brakingCleanHonoured(ctx)) return "brakingClean";
+  if (params.requireGreenStartClean === true && !greenStartCleanHonoured(ctx)) return "greenStartClean";
+  return null;
+}
+
+/** The approach axis of a reachZone after one frame — see `reachZoneApproachAxis`. */
+export interface ReachZoneApproachAxis {
+  /** Where the student came from (the position on the frame before he entered the proximity ring); null = unknown. */
+  approachFrom: Vec2 | null;
+  /** This frame is a fresh approach (the ring-entry edge, the direction guard passed). */
+  freshApproach: boolean;
+}
+
+/**
+ * THE AXIS THE MARK IS GRADED ON, AFTER THIS FRAME — the ring-entry re-latch of `stepReachZone`, verbatim (its block
+ * comment, „Which way the student came from", carries the design and the direction guard). Lifted out in round 15 of
+ * the task cap so that `lessons/engine.ts stepTaskCapLatch`, which runs BEFORE the evaluator on the same frame (the
+ * reducer's tick has to carry the arrival), finds where the car crosses the mark on exactly this axis — including the
+ * frame on which the axis is latched, which at motorway speed is the frame the car jumps the whole capsule.
+ */
+export function reachZoneApproachAxis(
+  params: Pick<ReachZoneParams, "x" | "y" | "radiusM" | "maxSpeedKmh" | "acceptBeforeMarkM">,
+  prevPos: Vec2 | null,
+  approachFrom: Vec2 | null,
+  here: Vec2,
+): ReachZoneApproachAxis {
+  const ring = params.radiusM + REACH_ZONE_GRACE_M;
+  const inGraceRing =
+    (params.maxSpeedKmh !== undefined || params.acceptBeforeMarkM !== undefined) &&
+    dist(here.x, here.y, params.x, params.y) <= ring;
+  const prevInGraceRing = prevPos !== null && dist(prevPos.x, prevPos.y, params.x, params.y) <= ring;
+  if (!inGraceRing || prevInGraceRing) return { approachFrom, freshApproach: false };
+  const entryFrom = prevPos ?? here;
+  if (approachFrom === null) return { approachFrom: entryFrom, freshApproach: true };
+  const oldX = params.x - approachFrom.x;
+  const oldY = params.y - approachFrom.y;
+  const newX = params.x - entryFrom.x;
+  const newY = params.y - entryFrom.y;
+  if (oldX * newX + oldY * newY > 0) return { approachFrom: entryFrom, freshApproach: true };
+  return { approachFrom, freshApproach: false };
+}
+
+/**
+ * WHERE THE CAR CROSSED THE MARK, IF IT DID ON THIS SEGMENT — round 15 of the task cap (the arrival is decided AT the
+ * mark). The mark is the zone's own (x, y); „crossed" is the student's approach axis going from short of it
+ * (`along < 0`) to at or past it (`along >= 0`) between two positions — the same sign convention `alongMark` uses for
+ * `approachBlown` — at a point inside the authored disc (a car that passes the mark's line ten metres to one side has
+ * not passed the mark). Returns the fraction of the segment at which the crossing happened (0 < f ≤ 1), so the caller
+ * can interpolate the speed there; null when the axis is unknown (unknown is never a crossing), when the segment does
+ * not cross, or across a teleport.
+ */
+export function reachZoneMarkCrossing(
+  params: Pick<ReachZoneParams, "x" | "y" | "radiusM">,
+  approachFrom: Vec2 | null,
+  from: Vec2,
+  to: Vec2,
+): number | null {
+  if (approachFrom === null) return null;
+  const ax = params.x - approachFrom.x;
+  const ay = params.y - approachFrom.y;
+  const m = Math.hypot(ax, ay);
+  if (m < 1e-6) return null;
+  if (dist(from.x, from.y, to.x, to.y) >= TELEPORT_JUMP_M) return null;
+  const ux = ax / m;
+  const uy = ay / m;
+  const a0 = (from.x - params.x) * ux + (from.y - params.y) * uy;
+  const a1 = (to.x - params.x) * ux + (to.y - params.y) * uy;
+  if (!(a0 < 0 && a1 >= 0)) return null;
+  const f = -a0 / (a1 - a0);
+  const px = from.x + f * (to.x - from.x);
+  const py = from.y + f * (to.y - from.y);
+  if (dist(px, py, params.x, params.y) > params.radiusM) return null;
+  return f;
+}
+
 function stepReachZone(
   params: WitnessedReachZoneParams,
   prev: ObjectiveEvalState,
@@ -4352,31 +4477,15 @@ function stepReachZone(
   // acceptance half-plane can only rotate toward the honest approach; it can
   // never flip.
   const here = { x: tick.position.x, y: tick.position.y };
-  const prevInGraceRing =
-    st.prevPos !== null &&
-    dist(st.prevPos.x, st.prevPos.y, params.x, params.y) <= params.radiusM + REACH_ZONE_GRACE_M;
-  let approachFrom = st.approachFrom;
   // A FRESH APPROACH IS THE ONE WAY BACK, and it is exactly the edge the axis
   // re-latches on — the same event, the same direction guard, so the two can
   // never disagree about whether the student is „coming at it again". Consumed
-  // by `approachBlown` below; the axis itself is unchanged.
-  let freshApproach = false;
-  if (inGraceRing && !prevInGraceRing) {
-    const entryFrom = st.prevPos ?? here;
-    if (approachFrom === null) {
-      approachFrom = entryFrom;
-      freshApproach = true;
-    } else {
-      const oldX = params.x - approachFrom.x;
-      const oldY = params.y - approachFrom.y;
-      const newX = params.x - entryFrom.x;
-      const newY = params.y - entryFrom.y;
-      if (oldX * newX + oldY * newY > 0) {
-        approachFrom = entryFrom;
-        freshApproach = true;
-      }
-    }
-  }
+  // by `approachBlown` below; the axis itself is unchanged. (Round 15: the
+  // re-latch is `reachZoneApproachAxis`, so the lesson engine finds where the
+  // car CROSSES the mark on the very axis this evaluator grades with.)
+  const axis = reachZoneApproachAxis(params, st.prevPos, st.approachFrom, here);
+  const approachFrom = axis.approachFrom;
+  const freshApproach = axis.freshApproach;
   let inApproachGrace = false;
   let beyondMark = false;
   // AT OR PAST THE MARK ON THE STUDENT'S OWN APPROACH AXIS — the one thing

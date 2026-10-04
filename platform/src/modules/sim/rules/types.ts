@@ -498,16 +498,19 @@ export interface EdgeAlignment {
  * rung's grace, never above the sign). `shownKmh <= capKmh` always (the
  * advisor's closing `Math.min`); on L3+ the two are equal.
  *
- * `graceKmh` — ROUND 2 (verifier C1). Only a speed above `capKmh + graceKmh`
- * bills. Round 1 billed above `capKmh` itself, i.e. with 0 km/h of slack,
- * while the objective blows its own mark only above `capKmh +
- * REACH_ZONE_CAP_SLACK_KMH` and a posted limit bills only above
- * `limit + min(10 %, 5)` (`speedingBands`): 83 after crossing an ≤80 mark cost
- * a point that 83 against a posted 80 never does. The only producer
- * (`lessons/engine.ts activeTaskSpeedCap`) stamps the objective's own slack
- * here, so the mark and the ceiling refuse at the same speed and the sheet is
- * never stricter than the gate that armed it. It travels ON the stamp because
- * the rules module may not import a lesson constant (doc 05).
+ * THE BILL LINE IS NEITHER OF THE OTHER TWO NUMBERS — founder ruling
+ * 2026-10-03, «LIKE A SPEED SIGN»: a blown task cap is billed above the figure
+ * the glass shows (`shownKmh`) plus the same tolerance a posted limit gets
+ * (`rules/engine.ts taskCapBillLineKmh` = `speedingBands(shownKmh).gradedAbove`),
+ * on every rung — «≤36» bills above 39,6. Rounds 2–14 billed above
+ * `capKmh + graceKmh` (the gate with the rung's ladder grace, plus the
+ * objective's slack): 46 under a «≤36» on L1. The ruling keeps the ladder grace
+ * for crediting the objective and for the coach's copy, NEVER for billing.
+ *
+ * `capKmh` and `graceKmh` therefore travel on the stamp as the OBJECTIVE's
+ * numbers (its compiled gate and its slack, `REACH_ZONE_CAP_SLACK_KMH`) and are
+ * not read by the reducer; they stay because the stamp states the objective it
+ * came from, and the lesson census checks them against the compiled lesson.
  */
 export interface TaskSpeedCap {
   capKmh: number;
@@ -544,12 +547,15 @@ export interface TaskSpeedCap {
  * `RuleEngineState.taskArrival`). The lesson engine writes this on the
  * one frame its latch is created (`lessons/engine.ts stepTaskCapLatch`); the
  * reducer bills TASK_SPEED_CAP_EXCEEDED once per latch (`blownAtSec`, the name
- * `TaskSpeedCap` also carries) and only above `capKmh + graceKmh` — the line
- * the objective itself blows the mark at, re-checked here so a stamp can never
- * bill a speed its own evaluator would not have refused.
+ * `TaskSpeedCap` also carries) and only above the bill line — `shownKmh` plus
+ * the tolerance a posted limit gets (founder ruling 2026-10-03 «LIKE A SPEED
+ * SIGN», `rules/engine.ts taskCapBillLineKmh`), re-checked there.
  *
- * `arrivalKmh` is the speed on the frame the evaluator judged the mark blown —
- * the figure the card prints beside `shownKmh` (the cap the student read).
+ * `arrivalKmh` is the speed at which the car CROSSED the mark — interpolated
+ * between the last frame short of it and the first frame at or past it
+ * (`lessons/engine.ts stepTaskCapLatch`, round 15: «the arrival is decided at
+ * the mark», not by an approach verdict earned metres before it) — the figure
+ * the card prints beside `shownKmh` (the cap the student read).
  * Absent on every other frame, and on every recorder, replay, exam rung and
  * drive that never blows such a mark, so their rule streams are unchanged.
  */
@@ -1838,10 +1844,16 @@ export interface RuleEngineConfig {
    * response, not a phantom (FP case: "amber flip at 70 m", just outside the
    * 60 m stop-line gate). Matches the runtime's line watch window. */
   harshBrakeSignalCauseM: number;
-  /** C3: a lead gap CLOSING at/above this rate (m/s) is a plausible cause at
-   * any distance — a lead braking hard 50 m ahead at speed closes fast and
-   * is exactly what the driver must respond to (FP case: "amber flip + lead
-   * brake coincide, each just outside its gate"). */
+  /** C3: a lead gap CLOSING at/above this rate (m/s) is a plausible cause — a
+   * lead braking hard at speed closes fast and is exactly what the driver must
+   * respond to (FP case: "amber flip + lead brake coincide, each just outside
+   * its gate"). Since `sc-follow-tailgater:63c0c28c` round 4 (2026-10-04) it is
+   * read only for a lead BEYOND `harshBrakeSignalCauseM`, and measured from the
+   * engine's lead track instead of one frame (round 5: with no averaging lag —
+   * the student's speed on the tick minus the lead's current speed, see
+   * `leadClosingNowMps`), so it is the same at every frame rate; inside that reach the closing is judged by
+   * the braking it DEMANDS (`LEAD_DEMAND_LINE_MPS2`), so a student merely
+   * faster than a steady lead 86 m ahead is not given a reason to brake. */
   harshBrakeClosingLeadMps: number;
   /** Any hazard-shaped tick event (crossing zone, priority situation,
    * collision) within this many seconds exempts hard braking, s. */
@@ -2488,7 +2500,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   harshBrakeStopLineClearM: 60,
   harshBrakeJunctionClearM: 35,
   harshBrakeSignalCauseM: 120, // C3: any visible yellow/red ahead is a cause
-  harshBrakeClosingLeadMps: 3, // C3: fast-closing lead = cause at any distance
+  harshBrakeClosingLeadMps: 3, // C3: fast-closing lead = cause (beyond harshBrakeSignalCauseM, lag-free)
   harshBrakeHazardCooldownSec: 6,
   hesitationSustainSec: 5, // DVSA marks ~3 s; we grade only a clear freeze
   hesitationMaxLineDistM: 12,
