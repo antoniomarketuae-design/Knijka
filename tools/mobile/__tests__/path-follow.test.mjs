@@ -3344,9 +3344,19 @@ describe("T9.h the terminal heading law", () => {
  * 9.88° with revKappaScale 0.90), so a browser leg can fall either side of it. The authored plan
  * itself ends the reverse at −6.4°; the margin cannot grow past that without re-planning.
  */
+// The project's own `@/` alias (tsconfig paths `@/*` → `src/*`) is resolved too: on 2026-10-04 objectives.ts
+// took a VALUE import from ../rules (DEFAULT_RULE_CONFIG, the Б2 stop-at-line dwell), so Node now loads the rules
+// index, whose consequences.ts imports `@/lib/content/money` — and a relative-only hook failed T9.k with
+// ERR_MODULE_NOT_FOUND although nothing in the evaluator had changed. The base is taken from the importing file's
+// own URL, so the hook still needs no repo path.
 const PLATFORM_RESOLVE_HOOK = [
   "export async function resolve(specifier, context, next) {",
-  "  if ((specifier.startsWith('./') || specifier.startsWith('../')) && String(context.parentURL).includes('/platform/src/') && !/\\.[cm]?[jt]sx?$/.test(specifier)) {",
+  "  const parent = String(context.parentURL);",
+  "  if (specifier.startsWith('@/') && parent.includes('/platform/src/')) {",
+  "    const base = parent.slice(0, parent.indexOf('/platform/src/') + '/platform/src/'.length);",
+  "    for (const ext of ['', '.ts', '/index.ts']) { try { return await next(base + specifier.slice(2) + ext, context); } catch { /* the next form */ } }",
+  "  }",
+  "  if ((specifier.startsWith('./') || specifier.startsWith('../')) && parent.includes('/platform/src/') && !/\\.[cm]?[jt]sx?$/.test(specifier)) {",
   "    for (const ext of ['.ts', '/index.ts']) { try { return await next(specifier + ext, context); } catch { /* the next form */ } }",
   "  }",
   "  return next(specifier, context);",

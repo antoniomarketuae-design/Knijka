@@ -1210,6 +1210,44 @@ function objectiveNotice(
       peekBg: "Спирай по-рано и твърдо.",
     };
   }
+  // ── A FULL STOP SHORT OF THE LINE DID NOT COUNT, AND THE STUDENT IS TOLD SO
+  //    (sc-merge-from-property:64fd365e — `objectives.ts FULL_STOP_AT_LINE_M`
+  //    carries the founder ruling and the frame) ─────────────────────────────
+  //
+  // `requireStopAtLine` withdraws a tick the capsule used to hand out — a full
+  // stop up to ~6.5 m short of the line — so it owes the sentence THEO-4
+  // demands: what was observed (a full stop, and how far back), what the task
+  // wants (the stop AT the line) and what to do (make it again there). Without
+  // it the student sits motionless on the green and nothing ticks, the
+  // founder's «стоя върху точката и нищо не става» in exactly the form he
+  // meant it.
+  //
+  // ONE CARD, ON THE LATCHING FRAME, AND THE LATCH IS THE STATE: `shortStopM`
+  // is written once, on the frame that short standstill becomes a full stop
+  // the rule engine agrees is one. The figure is the car centre's distance
+  // behind the mark, the frame the ruling is measured in.
+  //
+  // EVERY SENTENCE STAYS TRUE FOR THE CARD'S WHOLE LIFE. «това спиране не
+  // отчита задачата» is about the stop already made, so a student who obeys
+  // the card and earns the tick at the line does not make it false; nothing
+  // here says the task is STILL open. And it is skipped when a journey demand
+  // has already refused the task (`reachZoneJourneyRefusal`), because then a
+  // stop at the line cannot earn it either and the advice would not work.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    after.shortStopM !== undefined &&
+    (before.type !== "reachZone" || before.shortStopM === undefined) &&
+    reachZoneJourneyRefusal(params, ctx) === null
+  ) {
+    return {
+      kind: "lesson",
+      titleBg: "Спря, но преди линията",
+      explanationBg: `Задачата иска пълното спиране да е ДО самата линия, а колата спря напълно на ${after.shortStopM.toFixed(1)} м преди мястото на спирането — затова това спиране не отчита задачата. Спреш ли по-рано — за пешеходец или зад друга кола — спирането по знака се прави още веднъж: стигни бавно до линията и спри там докрай, с неподвижни колела.`,
+      // The phone card's one line: the act the paragraph closes on.
+      peekBg: "Спри пак — до линията.",
+    };
+  }
   // ── THE OTHER HALF OF THE ARRIVAL CONTRACT FINALLY SPEAKS (round 12,
   //    2026-08-27 — `objectives.ts reachZoneStateRefusal` carries the census,
   //    the frame and the year the silence lasted) ─────────────────────────────

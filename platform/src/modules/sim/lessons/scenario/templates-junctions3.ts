@@ -529,7 +529,12 @@ export const SC_JX_PRIO_WAITING_CAR: PriorityFromRightSpec = {
   // изпитния лист — задръж това ниво». Its beats were replayed through
   // `reduceTick` with THIS lesson's compiled `ruleConfig`, smooth and chopped:
   //
-  //   · STOPPED_WITHOUT_CAUSE — armed below, correctly wired, NOT dead, and
+  //   · STOPPED_WITHOUT_CAUSE — [BOTH REASONS BELOW REPAIRED 2026-10-04, founder
+  //     ruling «Add stops together»: the two `ruleConfig` keys on the spec
+  //     drop the junction radius from this lesson's excuses and add the rests
+  //     up across stops; see rules/engine.ts and
+  //     jx-priority-confidence-add-stops.test.ts. Kept as the measurement.]
+  //     Armed below, correctly wired, NOT dead, and
   //     silent for TWO reasons. This bullet used to name only the smaller one,
   //     and it sent the next lane at the wrong lever. Re-measured 2026-09-14
   //     at 3c1e1c6 by driving `recordScriptedDrive` → `applyTick` on the
@@ -841,8 +846,27 @@ export const SC_JX_PRIORITY_CONFIDENCE: ScenarioSpec = {
    * Set on the TEMPLATE, not on a rung, deliberately: the fault is the same
    * fault at L1 and at L5, and doc 86 D7's per-rung `ruleConfig` is for
    * detectors a lower rung has not taught yet. This one is the lesson.
+   *
+   * FOUNDER RULING 2026-10-04 «Add stops together» — the two keys beside it,
+   * also on the template, so `compile.ts` sees no rung difference and never
+   * tells a student «Оценява се по-строго» (see the waiter's note above for
+   * why per-rung values would lie):
+   *  · `needlessStopJunctionExcuse: false` — the header above proves tj-n-c
+   *    obliges this driver to nothing, so a stop within 25 m of it is no
+   *    longer acquitted by the junction's radius. The L5 creeper and the
+   *    waiter's pull-out stay excused by what replaces it in rules/engine.ts:
+   *    a body seen in the corridor within 45 m, plus a 6 s settle after it.
+   *  · `needlessStopPerStop: false` — causeless rest is ADDED UP across
+   *    separate stops against the same 6 s, paused by excused frames and
+   *    zeroed only by a held recovery. Fourteen 3 s halts now bill.
+   * The first commission is this lesson's own mistake (ADR-009, Ruling A):
+   * no exam points, the lesson is not taken, named in «Грешката на този урок».
    */
-  ruleConfig: { needlessStopEnabled: true },
+  ruleConfig: {
+    needlessStopEnabled: true,
+    needlessStopJunctionExcuse: false,
+    needlessStopPerStop: false,
+  },
   shadow: { path: "content/traces/sc-jx-priority-confidence/shadow-correct.trace.json" },
   mistakes: [
     {

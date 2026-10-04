@@ -167,6 +167,26 @@ function creepToTheLine(speedKmh: number): SimTick[] {
   return ticks;
 }
 
+/** The same creep, standing still for `haltSec` at the first sample at or past `haltX`, then creeping on. */
+function creepWithHalt(speedKmh: number, haltX: number, haltSec: number): SimTick[] {
+  const ticks: SimTick[] = [];
+  let t = 0;
+  let halted = false;
+  for (let x = 36; x >= 26; x -= 0.5) {
+    if (!halted && x <= haltX) {
+      halted = true;
+      for (let h = 0; h <= haltSec + 1e-9; h += 0.1) {
+        ticks.push(makeTick({ t, speedKmh: 0, maxSpeedKmh: 20, position: { x, y: EXIT_Y } }));
+        t += 0.1;
+      }
+      continue;
+    }
+    ticks.push(makeTick({ t, speedKmh, maxSpeedKmh: 20, position: { x, y: EXIT_Y } }));
+    t += 0.5;
+  }
+  return ticks;
+}
+
 function run(params: ObjectiveParams, ticks: SimTick[], ctx: ObjectiveContext): boolean {
   let evalState: ObjectiveEvalState = createEvalState(params);
   for (const tick of ticks) {
@@ -188,12 +208,26 @@ describe("«Спри напълно на Б2 на изхода» is refused on t
     expect(run(gate, roll, { ...base, qualifyingStopCurrent: false })).toBe(false);
   });
 
-  it("GRANTED: the engine says a full stop is current, and the tick arrives", () => {
-    expect(run(gate, roll, { ...base, qualifyingStopCurrent: true })).toBe(true);
+  // …AND THE STANDSTILL IS MADE AT THE LINE (requireStopAtLine, founder ruling 2026-10-04 — sc-merge-from-property:
+  // 64fd365e). These two cases used to grant the tick to the 2.5 км/ч ROLL whenever the engine held (or could not
+  // report) a stop — which is the w50 drive's own shape: the stop the engine is holding was made somewhere else. The
+  // gate now times its own standstill inside the line window (FULL_STOP_AT_LINE_M behind the mark), so the roll is
+  // refused whatever the engine answers, and the engine's answer is honoured — or its silence is never a refusal — on
+  // the drive that actually stands at the line. `mfp-stop-line-near-side.test.ts` drives the same through applyTick.
+  const haltAtTheMark = creepWithHalt(2.5, 29, 1);
+
+  it("GRANTED: the car stands at the line and the engine says a full stop is current — the tick arrives", () => {
+    expect(run(gate, haltAtTheMark, { ...base, qualifyingStopCurrent: true })).toBe(true);
   });
 
-  it("UNKNOWN IS NEVER A REFUSAL — a context that cannot answer keeps the old tick", () => {
-    expect(run(gate, roll, base)).toBe(true);
+  it("…but the ROLL is not granted on an engine stop made elsewhere — the standstill must be at the line", () => {
+    expect(run(gate, roll, { ...base, qualifyingStopCurrent: true })).toBe(false);
+  });
+
+  it("UNKNOWN IS NEVER A REFUSAL — a context that cannot answer keeps the tick for the stop at the line", () => {
+    expect(run(gate, haltAtTheMark, base)).toBe(true);
+    // the position witness is the gate's own, not the engine's, so silence does not hand the roll a tick either
+    expect(run(gate, roll, base)).toBe(false);
   });
 });
 

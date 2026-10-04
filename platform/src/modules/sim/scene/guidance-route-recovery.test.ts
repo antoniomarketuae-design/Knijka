@@ -70,6 +70,8 @@ import {
   type RouteGraph,
   type RouteHead,
 } from "./guidanceRoute";
+import { parseDistrict } from "../runtime/district";
+import { DistrictIndex, makeEdgeHit } from "../runtime/spatial";
 
 const LESSON_ID = "sc-ed-d2-city-run@L1";
 /** The segment authors its own pose (templates-exam.ts `start`). */
@@ -443,6 +445,239 @@ describe("route loss — it must not fire on a student who is following the line
 });
 
 // ---------------------------------------------------------------------------
+// WITNESS — sc-ed-d2-city-run:a0bdad4b (critical): «The route puts the car onto
+// a pedestrian plaza … the blue guidance line runs off to the left.»
+// ---------------------------------------------------------------------------
+//
+// A WITNESS, NOT A CLOSURE. Every live leg filed against this row was
+// route-refused (w45-w47: 82% of moving samples beyond 8 m, TRACKING BLIND), so
+// no photograph can say whether the ROUTE leaves the road or the HARNESS leaves
+// the route. The geometry claim is decidable in process, on the product's own
+// derivation, and that is all this block does:
+//
+//   1. the committed SHADOW drive (the correct drive the lesson ships) is
+//      replayed through RouteGuidance's derivation schedule — spawn, every
+//      objective change, and the route-loss re-derivation — on the real d2-v1
+//      graph and the real compiled lesson at every rung that draws a ribbon;
+//   2. EVERY painted sample of EVERY route it is shown is measured against the
+//      runtime's own carriageway model (`DistrictIndex`, the same half-width
+//      `lanesPerDir × 2 × LANE_WIDTH_M / 2` the off-road banner and the lane
+//      codes read): it must lie inside the carriageway of one of the eight
+//      authored legs of бул. Драган Цанков (traces/scEdD2CityRun.ts `LEGS`);
+//   3. where the runtime's own nearest-edge ranking names a NON-route edge, the
+//      sample must be inside that edge's junction mouth (outside its painted
+//      [paintFromM, paintToM] window — the world builder's junction trim), i.e.
+//      in a junction box of the boulevard, never along a side street;
+//   4. no ribbon sample comes near the plaza tableau of the row (the car's rest
+//      at (772, −141), w41/w45 pc t087 · mobile t101) or the three side streets
+//      the recorded wrong leg drove into (e157729633 · e157729616 · e157729590).
+//
+// The KILL-CHECKS this block was mutation-tested with (each reddens §2/§3):
+//   · `scene/guidanceRoute.ts` buildRouteGraph — drop the reverse arc of two-way
+//     edges (`if (!raw.oneway) arc(raw.to, …)` → never): two legs are driven
+//     against their geometry, the search detours through side streets;
+//   · `scene/guidanceRoute.ts` alignRawToGoalLane — triple the lane shift
+//     (`offset * w` → `offset * w * 3`): the ribbon is pushed off the asphalt.
+
+/** traces/scEdD2CityRun.ts `LEGS` — the authored route, edge ids only. */
+const CITY_RUN_LEGS = [
+  "e601140178.0",
+  "e29435479.0",
+  "e601140177.0",
+  "e435203751.0",
+  "e435203752.0",
+  "e1233248921.0",
+  "e171919144.0",
+  "e1131622979.0",
+] as const;
+/** The side streets the recorded wrong leg left the boulevard by (triage, w41 poses). */
+const CITY_RUN_SIDE_STREETS = ["e157729633.0", "e157729616.0", "e157729590.0"] as const;
+/** Where the recorded wrong leg came to rest on the paving — the row's tableau. */
+const CITY_RUN_PLAZA = { x: 772, y: -141 };
+/** Measured 2026-10-04 at tree b8269ed6: the nearest ribbon sample of any rung is 133.3 m from the plaza rest. */
+const PLAZA_CLEARANCE_M = 100;
+/** Measured likewise: no ribbon sample is closer than 21.8 m OUTSIDE the carriageway of any of the three side streets. */
+const SIDE_STREET_CLEARANCE_M = 15;
+
+interface ShownRibbon {
+  t: number;
+  objectiveIndex: number;
+  why: "spawn" | "objective" | "loss";
+  route: DerivedRoute | null;
+}
+
+function cityRunShadowRibbons(level: 1 | 2 | 3 | 5): {
+  ribbons: ShownRibbon[];
+  poses: { x: number; y: number }[];
+} {
+  const raw = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../../../public/world/d2-v1.json"), "utf8"),
+  ) as RouteDistrictLike;
+  const graph = buildRouteGraph(raw);
+  const stopLines = stopLinesForGuidance(raw);
+  const lesson = scenarioLessonById(`sc-ed-d2-city-run@L${level}`);
+  if (!lesson) throw new Error(`missing lesson sc-ed-d2-city-run@L${level}`);
+  const goalAt = (i: number, from: { x: number; y: number }) =>
+    guidanceGoalFor(lesson, i, { stopLines, from });
+  const chainFor = (i: number, goal: GuidanceGoal | null, from: { x: number; y: number }) => {
+    if (!goal) return [];
+    const out: GuidanceGoal[] = [];
+    let f = goal.kind === "point" ? { x: goal.x, y: goal.y } : from;
+    for (let k = 1; k <= LOOKAHEAD_MAX_LEGS; k += 1) {
+      const next = goalAt(i + k, f);
+      if (!next || next.kind !== "point") break;
+      out.push(next);
+      f = { x: next.x, y: next.y };
+    }
+    return out;
+  };
+  const trace = JSON.parse(
+    fs.readFileSync(
+      path.resolve(
+        __dirname,
+        "../../../../../content/traces/sc-ed-d2-city-run/shadow-correct.trace.json",
+      ),
+      "utf8",
+    ),
+  ) as { samples: { tSec: number; x: number; y: number; headingDeg: number; speedKmh: number }[] };
+  const samples = trace.samples;
+  const s0 = samples[0];
+  const ribbons: ShownRibbon[] = [];
+  const head: RouteHead = { s: 0, latM: 0 };
+  const watch = createRouteFollowWatch();
+  let oi = 0;
+  let goal = goalAt(0, s0);
+  let route = deriveGuidanceRoute(graph, { x: s0.x, y: s0.y, headingDeg: s0.headingDeg }, goal, {
+    lookahead: chainFor(0, goal, s0),
+  });
+  ribbons.push({ t: 0, objectiveIndex: 0, why: "spawn", route });
+  noteRouteDerived(watch, route ? nearestOnRoute(route, s0.x, s0.y, head).latM : null, s0.x, s0.y, 0);
+  const objs = lesson.objectives.map((o) => o.params as { x?: number; y?: number; radiusM?: number });
+  const derive = (s: (typeof samples)[number], why: ShownRibbon["why"]) => {
+    goal = goalAt(oi, s);
+    // Every build after the first starts from the CAR (RouteGuidance `firstBuildRef`).
+    route = deriveGuidanceRoute(graph, { x: s.x, y: s.y, headingDeg: s.headingDeg }, goal, {
+      lookahead: chainFor(oi, goal, s),
+    });
+    ribbons.push({ t: s.tSec, objectiveIndex: oi, why, route });
+    noteRouteDerived(watch, route ? nearestOnRoute(route, s.x, s.y, head).latM : null, s.x, s.y, s.tSec);
+  };
+  for (const s of samples) {
+    const p = objs[oi];
+    if (p?.x !== undefined && p.y !== undefined && Math.hypot(s.x - p.x, s.y - p.y) <= (p.radiusM ?? 12)) {
+      oi += 1;
+      derive(s, "objective");
+      continue;
+    }
+    if (oi >= objs.length) break;
+    if (!routeLossApplies(goal)) continue;
+    const lat = route ? nearestOnRoute(route, s.x, s.y, head).latM : null;
+    if (rerouteDue(watch, lat, s.x, s.y, s.speedKmh, s.tSec)) derive(s, "loss");
+  }
+  return { ribbons, poses: samples.map((s) => ({ x: s.x, y: s.y })) };
+}
+
+describe("WITNESS sc-ed-d2-city-run:a0bdad4b — every ribbon the correct drive is shown lies on the boulevard's carriageway", () => {
+  const rawDistrict = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../../../public/world/d2-v1.json"), "utf8"),
+  ) as unknown;
+  const index = new DistrictIndex(parseDistrict(rawDistrict));
+  const legIdx = CITY_RUN_LEGS.map((id) => {
+    const rt = index.edgeRtById(id);
+    if (!rt) throw new Error(`d2-v1 lost route leg ${id}`);
+    return rt.idx;
+  });
+  const legSet = new Set<string>(CITY_RUN_LEGS);
+  const legNodes = new Set<string>(
+    legIdx.flatMap((i) => [index.edgeRt(i).edge.from, index.edgeRt(i).edge.to]),
+  );
+
+  /** Carriageway exceedance against the UNION of the route legs (0 = on the asphalt). */
+  const outsideRouteLegs = (x: number, y: number): number => {
+    let best = Infinity;
+    const h = makeEdgeHit();
+    for (const i of legIdx) best = Math.min(best, index.projectOnEdge(i, x, y, h).outsideM);
+    return best;
+  };
+
+  for (const level of [1, 2, 3, 5] as const) {
+    it(`L${level}: spawn + every objective ribbon is on a route leg's carriageway, never along a side street, never near the plaza`, () => {
+      const { ribbons, poses } = cityRunShadowRibbons(level);
+      // EVERY route the drive is shown — whatever schedule produced it — is
+      // measured first; the schedule is pinned after the geometry, so a route
+      // that leaves the boulevard is reported as WHERE it left, not as a count.
+      const drawn = ribbons.filter((r) => r.route !== null);
+
+      const hit = makeEdgeHit();
+      let checked = 0;
+      let inJunctionMouth = 0;
+      let nearestPlazaM = Infinity;
+      let nearestSideStreetOutsideM = Infinity;
+      for (const { t, route } of drawn) {
+        const r = route!;
+        expect(r.count, `ribbon @${t}s is a real line`).toBeGreaterThan(100);
+        for (let i = 0; i < r.count; i++) {
+          const x = r.pts[i * 2];
+          const y = r.pts[i * 2 + 1];
+          checked += 1;
+          // §2 — on the asphalt of the authored route.
+          expect(outsideRouteLegs(x, y), `ribbon @${t}s sample ${i} (${x.toFixed(1)}, ${y.toFixed(1)}) is off the route carriageway`).toBe(0);
+          // §3 — the runtime's own nearest-edge ranking.
+          expect(index.nearestEdge(x, y, 80, hit), `sample ${i} has no road`).toBe(true);
+          expect(hit.outsideM).toBe(0);
+          const rt = index.edgeRt(hit.edgeIdx);
+          if (!legSet.has(rt.edge.id)) {
+            // A cross street may win the ranking only inside the junction box it
+            // shares with the boulevard: outside its painted window (the world
+            // builder's junction trim) and touching a route node.
+            const sharesNode = legNodes.has(rt.edge.from) || legNodes.has(rt.edge.to);
+            const inMouth = hit.sM < rt.paintFromM || hit.sM > rt.paintToM;
+            expect(
+              sharesNode && inMouth,
+              `ribbon @${t}s sample ${i} (${x.toFixed(1)}, ${y.toFixed(1)}) runs ALONG ${rt.edge.id} (${rt.edge.name ?? rt.edge.class}) at s=${hit.sM.toFixed(1)} of [${rt.paintFromM.toFixed(1)}, ${rt.paintToM.toFixed(1)}]`,
+            ).toBe(true);
+            inJunctionMouth += 1;
+          }
+          // §4 — the tableau and the side streets.
+          nearestPlazaM = Math.min(nearestPlazaM, Math.hypot(x - CITY_RUN_PLAZA.x, y - CITY_RUN_PLAZA.y));
+          for (const id of CITY_RUN_SIDE_STREETS) {
+            const side = index.edgeRtById(id)!;
+            nearestSideStreetOutsideM = Math.min(
+              nearestSideStreetOutsideM,
+              index.projectOnEdge(side.idx, x, y, makeEdgeHit()).outsideM,
+            );
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(500);
+      // Junction-box samples are a handful at most — the line runs along the
+      // boulevard, it does not live in its mouths.
+      expect(inJunctionMouth).toBeLessThan(checked * 0.02);
+      expect(nearestPlazaM).toBeGreaterThan(PLAZA_CLEARANCE_M);
+      expect(nearestSideStreetOutsideM).toBeGreaterThan(SIDE_STREET_CLEARANCE_M);
+
+      // The schedule the correct drive actually gets: the spawn ribbon, one per
+      // objective it completes (4 of 4), and NO route-loss re-derivation — the
+      // correct drive never leaves its line (the no-false-positive bar above).
+      expect(ribbons.map((r) => r.why)).toEqual(["spawn", "objective", "objective", "objective", "objective"]);
+      // The last derivation is the finish: nothing left to route to, the ribbon
+      // stands down by design. The four before it are real, drawn routes.
+      expect(ribbons[4].route).toBeNull();
+      expect(drawn).toHaveLength(4);
+
+      // …and the correct drive the ribbons were derived from is itself on the
+      // boulevard's asphalt the whole way (never on paving, never near the plaza).
+      let worstPoseOutside = 0;
+      let poseNearestPlazaM = Infinity;
+      for (const p of poses) {
+        worstPoseOutside = Math.max(worstPoseOutside, outsideRouteLegs(p.x, p.y));
+        poseNearestPlazaM = Math.min(poseNearestPlazaM, Math.hypot(p.x - CITY_RUN_PLAZA.x, p.y - CITY_RUN_PLAZA.y));
+      }
+      expect(worstPoseOutside).toBe(0);
+      expect(poseNearestPlazaM).toBeGreaterThan(PLAZA_CLEARANCE_M);
+    });
+  }
+});
 
 describe("route loss — the latch itself", () => {
   it("a STATIONARY car never arms it, however far off it is", () => {

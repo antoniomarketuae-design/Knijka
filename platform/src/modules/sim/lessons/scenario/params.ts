@@ -307,6 +307,15 @@ export function serializeObjectiveParams(
       // stop keep the tick would teach exactly the thing the sign forbids, and
       // would do it while the same sheet bills him ten points for it.
       if (p.requireFullStop === true) params.requireFullStop = true;
+      // …AND ITS PLACE (`requireStopAtLine`, founder ruling 2026-10-04), on this
+      // whitelist for the measured reason every key here is — a term not named
+      // on this line never reaches the session — and NOT LADDERED for the
+      // reason the line above gives, sharpened: the ruling's «within ~1 m» is
+      // `FULL_STOP_AT_LINE_M`, one constant, and a rung that widened it would
+      // put a second distance on the same sign. The disc this gate is graded on
+      // is already pinned to the authored radius at every rung (compile.ts
+      // `radiusWidenBudget`), so L1 and L5 grade the same window.
+      if (p.requireStopAtLine === true) params.requireStopAtLine = true;
       // …AND THE ONE TERM HERE THAT REFUSES NOTHING (`reportOncomingGapSec`).
       // It is on this whitelist for the same measured reason as its three
       // neighbours — a key not named here never reaches the session — and NOT

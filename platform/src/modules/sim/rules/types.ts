@@ -2308,6 +2308,42 @@ export interface RuleEngineConfig {
    * so neither drive changes shape.
    */
   needlessStopSustainSec: number;
+  /**
+   * Does a junction within `townCrawlClearAheadM` excuse the standstill?
+   * `true` (the default) is what every lesson had before 2026-10-04, and it is
+   * right on a generic route: the reducer cannot see who owes way at a node, so
+   * a car resting at a junction mouth may be waiting for its own turn.
+   *
+   * `false` is an AUTHOR'S STATEMENT ABOUT THE ROUTE, exactly as
+   * `needlessStopEnabled` is: „the junctions on this route never oblige this
+   * driver to stop — he is on the priority road". Only then is the
+   * `nextJunctionM` arm dropped from the standstill's reasons. The stop line,
+   * pedestrian, crossing, rail, curve, narrow-meeting, 25 m queue, signal,
+   * ban-zone, weather and hazard excuses all stay. The moving crawl's
+   * `townReasonAhead` is not touched either way.
+   *
+   * Why it exists (audit sc-jx-priority-confidence:9c987e7b): `nextJunctionM`
+   * is a RADIUS, so every stop within 25 m of tj-n-c was acquitted, and that
+   * band is where this drill's fault happens. Set on that template only.
+   */
+  needlessStopJunctionExcuse: boolean;
+  /**
+   * One stop is one act (`true`, the default): the sustain must be held
+   * CONSECUTIVELY, and driving on above `movingSpeedKmh` re-arms it. That is
+   * what every lesson had before 2026-10-04, and `sc-follow-tailgater` keeps it.
+   *
+   * `false` follows FOUNDER RULING 2026-10-04 «Add stops together», for the
+   * lesson it names (sc-jx-priority-confidence). Causeless standstill seconds
+   * are ADDED UP across separate stops against the same
+   * `needlessStopSustainSec`. A frame with a reason (any excuse above, or a
+   * frame in motion) PAUSES the sum and never zeroes it. Only a GENUINE
+   * recovery zeroes it: back up to the town crawl's recovery speed and HELD
+   * there (`TOWN_CRAWL_RECOVERY_HELD_SEC`, the same „gone back to driving"
+   * test the crawl uses), or leaving the through road. Fourteen 3-second
+   * stops at 18 км/ч used to bill nothing; they now bill once the rests add
+   * up to six seconds.
+   */
+  needlessStopPerStop: boolean;
 
   /**
    * Чл. 58, т. 4 „да се движи… в лентата за принудително спиране" — seconds of
@@ -2602,6 +2638,8 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   townCrawlSustainSec: 20,
   needlessStopEnabled: false, // armed per lesson — see the field's own note
   needlessStopSustainSec: 6,
+  needlessStopJunctionExcuse: true, // today's reading — false only where the author states it
+  needlessStopPerStop: true, // one stop, one act — false only where the founder ruled it (2026-10-04)
   // 3 s: an accidental clip of the lane edge can never hold it; the shortest
   // deliberate undertake does (≈ 90+ m at motorway speed).
   emergencyLaneSustainSec: 3,

@@ -2519,6 +2519,17 @@ export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
         maxSpeedKmh: 3,
         acceptBeforeMarkM: -1.275,
         requireFullStop: true,
+        // …AND THE FULL STOP IS MADE AT THE LINE (sc-merge-from-property:
+        // 64fd365e, founder ruling 2026-10-04 «Within ~1 m»). Without it the
+        // grace capsule credited a standstill anywhere in x ∈ [27.73, ~35.7]:
+        // w50 mobile-right halted at x 32.92, 3.88 m short, and the banner
+        // moved on to «Задача 3/4» before the car reached the line. Now the
+        // stop counts only inside the disc, not past the paint, and within
+        // FULL_STOP_AT_LINE_M (objectives.ts) behind this mark — car centre
+        // against mark, the frame both recordings rest in (x 29.04). A stop
+        // further back is told why it did not count and how to make it again
+        // at the line (lessons/engine.ts «Спря, но преди линията»).
+        requireStopAtLine: true,
       },
     },
     {

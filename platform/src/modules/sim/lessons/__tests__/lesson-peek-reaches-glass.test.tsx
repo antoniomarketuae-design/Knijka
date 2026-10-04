@@ -688,8 +688,9 @@ describe("census — every lesson card engine.ts writes either carries a summary
       })
       .filter((x): x is { line: number; peek: string; title: string | undefined } => x !== null);
 
-    it("finds all seven objective cards", () => {
-      expect(authored).toHaveLength(7);
+    // EIGHT since «Спря, но преди линията» (requireStopAtLine, sc-merge-from-property:64fd365e).
+    it("finds all eight objective cards", () => {
+      expect(authored).toHaveLength(8);
       for (const a of authored) expect(a.title, `engine.ts:${a.line}`).toBeDefined();
     });
 

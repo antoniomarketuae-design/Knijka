@@ -637,6 +637,17 @@ function radiusWidenBudget(spec: ScenarioSpec): number[] {
      45 km/h approach; or the certificate deferred until the line is behind the
      car. All three are objectives.ts, and none is guessable from here.
 
+     CLOSED ON sc-mfp-stop-line BY THE FIRST (2026-10-04, founder ruling
+     «Within ~1 m», sc-merge-from-property:64fd365e): `requireStopAtLine`
+     refuses the capsule and times the standstill inside the disc, not past the
+     paint and within `FULL_STOP_AT_LINE_M` (objectives.ts) of the mark. OPT-IN,
+     on measurement: forcing it onto all seven full-stop gates left 95 of 105
+     committed legs identical and took every rung of `sc-ed-d2-priority-run`'s
+     shadow-correct from passed to failed — that gate authors its mark ON the
+     paint and its shadow rests 4.56 m behind it, so the mark is not the line
+     pose there and its own recording would have to move first. The other four
+     banners promise a stop BEFORE something, where further back is no fault.
+
      AND THE SAME MEASUREMENT INDICTS THE NEIGHBOUR, which this clamp does NOT
      cover: `sc-mfp-walk-yield` is a halt gate by params.ts's own definition
      (cap 5 ≤ REACH_ZONE_HALT_CAP_KMH 8 — „a halt demand is never widened"),

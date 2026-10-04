@@ -10471,3 +10471,45 @@ the open list, not a claim that every open row was re-driven.
 Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
 its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
 a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-10-04
+
+This run retired 2 row(s). Their evidence frames were driven at `982d0ea730e0` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`982d0ea730e0`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 33 |
+
+**Open list: 46 → 44**, out of 1528 filed across the whole programme (1482 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## The Б2 stop must be made at the line — landed 2026-10-04 (sc-merge-from-property:64fd365e; founder ruling 2026-10-04 «Within ~1 m»)
+
+repairs-l1-l3 lane L1 (wf_7428a427-f2c), SIGNED OFF WITH CONDITIONS. A full-stop reachZone gate with the new opt-in `requireStopAtLine`
+(authored on sc-mfp-stop-line only — a forced census over all 7 full-stop gates showed sc-ed-d2-priority-run's shadow resting 4.56 m behind
+its mark) ticks only for a full stop with the car centre within `FULL_STOP_AT_LINE_M` = 1 m of the mark, held for the rule engine's own
+dwell; the grace capsule no longer admits it. A short stop gets the card «Спря, но преди линията» (no law cited). Live-like w50 profile
+(halt 4 m short, roll over the paint) is refused at L1–L5; 0.98 m ticks, 1.02 m does not. Correct legs change only in a 0.6 s later tick.
+Conditions: the engine's ★ «Правилно спиране на знак Б2» still commends on recency (filed as sc-merge-from-property:a401e4a7);
+sc-edpr-b2 needs its shadow re-recorded before it can opt in; survivor mutants on uncommitted inputs.
+
+## Needless stops add up on the priority road — landed 2026-10-04 (sc-jx-priority-confidence:9c987e7b; founder ruling 2026-10-04)
+
+repairs-l1-l3 lane L3, SIGNED OFF WITH CONDITIONS. Behind per-lesson keys (defaults reproduce today; templates-following grades
+byte-identically): the junction-radius excuse is dropped for this lesson, and causeless standstill ACCUMULATES across stops against the
+existing 6 s, reset by a held recovery (4 s at ≥20 km/h on a 50 road), excused frames pausing the sum. Fourteen 3-second stops are now
+the lesson's own mistake (Ruling A: not taken, named in «Грешката на този урок»); the verifier's 126 stop-and-go drives all billed; the
+authored-tape census (2,434) identical. Conditions: about 50 m of brisk driving between halts resets the sum; an 8 s defensive wait for
+the L5 creeper is now excused (acquittal direction).

@@ -76,6 +76,7 @@ import {
   JUNCTION_SCAN_CONTROL_STOP,
   makeCommendation,
   makeViolation,
+  NEEDLESS_STOP_ACT_PRIORITY_ROAD,
   WRONG_WAY_ROAD_MOTORWAY,
 } from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
@@ -777,8 +778,11 @@ export interface RuleEngineState {
   // -- THE STOP THAT HAD NO REASON (STOPPED_WITHOUT_CAUSE) -------------------
   /**
    * A standstill HELD in a live lane on an open through road with nothing to
-   * stop for. Consecutive, not accrued: one stop is one act, and driving on
+   * stop for. Consecutive by default: one stop is one act, and driving on
    * (v > movingSpeedKmh) re-arms it, so two needless stops cost two bills.
+   * Under `needlessStopPerStop: false` (founder ruling 2026-10-04) its
+   * `qualifiedSec` is the ADDED-UP causeless rest across stops instead, zeroed
+   * only by a held recovery — see the detector in reduceTick.
    */
   needlessStop: EpisodeState;
   /** THE SECOND BILL of one long needless stop — same condition, same reset,
@@ -787,6 +791,14 @@ export interface RuleEngineState {
    *  re-grades: the first bill is spent on the teach-first card, and without
    *  this a single 60-second freeze costs the student nothing. */
   needlessStopRegrade: EpisodeState;
+  /**
+   * When a body was last seen in the corridor within `harshBrakeClearLeadGapM`
+   * ahead, seconds — or null. Stamped on every frame, read ONLY where a lesson
+   * has dropped the junction excuse (`needlessStopJunctionExcuse: false`): it is
+   * the staged-conflict reason that replaces it. See `needlessStopConflictAhead`
+   * in reduceTick.
+   */
+  needlessStopConflictAt: number | null;
   /**
    * Sustained DRIVING in the лента за принудително спиране (laneId 0 inside
    * an authored emergencyLane span). One bill per excursion; re-arms on
@@ -2459,6 +2471,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     townCrawlRecoverySec: 0,
     needlessStop: { ...IDLE_EPISODE },
     needlessStopRegrade: { ...IDLE_EPISODE },
+    needlessStopConflictAt: null,
     emergencyLane: { ...IDLE_EPISODE },
     offCarriageway: { ...IDLE_EPISODE },
     offCarriagewayRegrade: { ...IDLE_EPISODE },
@@ -5577,9 +5590,53 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // answers to nothing. The moving-car reading above is untouched — the crawl
   // still reads `townReasonAhead` whole, at any distance.
   const leadQueueAhead = leadGapM !== null && leadGapM <= cfg.townCrawlClearAheadM;
+  // ── FOUNDER RULING 2026-10-04 «Add stops together» — the junction arm and the
+  // conflict that replaces it (audit sc-jx-priority-confidence:9c987e7b).
+  //
+  // THE JUNCTION ARM IS A RADIUS. `tick.nextJunctionM` is `Math.hypot` to the
+  // nearest node, so `townReasonAheadExceptLead` acquitted every stop within
+  // 25 m of tj-n-c on either side, and that band is where this drill's fault
+  // happens. On a generic route the arm is right, because the reducer cannot see
+  // who owes way at a node. Where the author states that the route's junctions
+  // oblige this driver to nothing (`needlessStopJunctionExcuse: false`, the
+  // priority road), the standstill reads the same list WITHOUT that one term.
+  // `townReasonAheadExceptLead` and the crawl's `townReasonAhead` are untouched.
+  //
+  // WHAT THE JUNCTION ARM WAS ALSO DOING, and must still be done. On L5 a
+  // creeper crosses the priority driver's path at the node, and the defensive
+  // student who stops for it must not be billed for the seconds it takes to
+  // clear. The reducer cannot see a crossing car as a junction obligation; it
+  // CAN see it in its own corridor, as `leadGapM`. Measured on L5 (stop at
+  // x = −12): the creeper is 24 → 13 m ahead while the student brakes, gone
+  // 0.7 s before he is at rest, and the waiter then crosses 12 m ahead for
+  // 1.8 s. Neither is inside the 25 m queue band long enough to matter, so a
+  // stop made FOR them would be billed on the seconds after they leave.
+  // So where the junction arm is dropped, a body seen in the corridor within
+  // `harshBrakeClearLeadGapM` (45 m — the reach at which the harsh-brake ledger
+  // already treats a lead as a cause of braking) excuses the standstill, and
+  // keeps excusing it for `harshBrakeHazardCooldownSec` (6 s — the settle every
+  // hazard-shaped event already earns) after it was last seen. Nothing reads
+  // this where the junction arm is kept, so every other lesson is untouched.
+  const needlessStopJunctionAware = !cfg.needlessStopJunctionExcuse;
+  if (needlessStopJunctionAware && leadGapM !== null && leadGapM <= cfg.harshBrakeClearLeadGapM) {
+    s.needlessStopConflictAt = t;
+  }
+  const needlessStopConflictAhead =
+    needlessStopJunctionAware &&
+    s.needlessStopConflictAt !== null &&
+    t - s.needlessStopConflictAt <= cfg.harshBrakeHazardCooldownSec;
+  const needlessStopReasonAhead = cfg.needlessStopJunctionExcuse
+    ? townReasonAheadExceptLead
+    : (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.townCrawlClearAheadM) ||
+      (tick.vruAheadM !== undefined && tick.vruAheadM <= cfg.townCrawlClearAheadM) ||
+      s.crossing !== null ||
+      tick.railCrossing !== undefined ||
+      tick.curveAdvisoryKmh !== undefined ||
+      tick.narrowTwoWay === true ||
+      needlessStopConflictAhead;
   const needlessStopReason =
     leadQueueAhead ||
-    townReasonAheadExceptLead ||
+    needlessStopReasonAhead ||
     needlessStopSignal ||
     tick.noStopZone === true ||
     tick.fog === true ||
@@ -5593,26 +5650,82 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     tick.stalled !== true &&
     !needlessStopReason &&
     (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec);
-  // Re-armed by driving on, or by leaving the through road — one bill per stop,
-  // and a driver who stops needlessly twice is billed twice because those are
-  // two acts. (Consecutive, not accrued: unlike a crawl, a stop is one event
-  // with a beginning and an end.)
-  const needlessStopReset = !townThroughRoad || speed > cfg.movingSpeedKmh;
-  if (
-    stepEpisode(s.needlessStop, needlessStop, needlessStopReset, t, cfg.needlessStopSustainSec)
-  ) {
-    events.push(makeViolation("STOPPED_WITHOUT_CAUSE", t));
-  }
-  if (
-    stepEpisode(
+  // By default re-armed by driving on, or by leaving the through road — one bill
+  // per stop, and a driver who stops needlessly twice is billed twice because
+  // those are two acts. (Consecutive, not accrued: a stop is one event with a
+  // beginning and an end.)
+  //
+  // FOUNDER RULING 2026-10-04 «Add stops together» (`needlessStopPerStop:
+  // false`, sc-jx-priority-confidence only). The per-stop reading let fourteen
+  // 3-second halts at 18 км/ч — 97 s against a 40 s par — bill nothing, because
+  // every halt was shorter than the 6 s sustain and each one started the clock
+  // over. Under the ruling the causeless seconds are ADDED UP across stops
+  // (`stepAccruedEpisode`, the town crawl's own accrual, ledger kept in the
+  // episode's `qualifiedSec`). A frame with a reason, or in motion, PAUSES the
+  // sum and never zeroes it. Only a genuine recovery zeroes it: the town
+  // crawl's `townReset` — back to the crawl's recovery speed and HELD there for
+  // `TOWN_CRAWL_RECOVERY_HELD_SEC`, or off the through road — the same „gone
+  // back to driving" test, so the two speed-envelope codes agree on what a
+  // clean drive is. One bill per accrued episode, plus the same re-grade.
+  //
+  // THE CARD. Where the author has also dropped the junction arm (the priority
+  // road), the bill carries `NEEDLESS_STOP_ACT_PRIORITY_ROAD`, whose copy says
+  // why stopping there is the fault and that short stops add up. The pooled
+  // row's «нито кръстовище» would be false on a stop beside tj-n-c.
+  const needlessStopDetail =
+    !cfg.needlessStopPerStop && !cfg.needlessStopJunctionExcuse
+      ? NEEDLESS_STOP_ACT_PRIORITY_ROAD
+      : undefined;
+  let needlessStopFired: boolean;
+  let needlessStopRegradeFired: boolean;
+  if (cfg.needlessStopPerStop) {
+    const needlessStopReset = !townThroughRoad || speed > cfg.movingSpeedKmh;
+    needlessStopFired = stepEpisode(
+      s.needlessStop,
+      needlessStop,
+      needlessStopReset,
+      t,
+      cfg.needlessStopSustainSec,
+    );
+    needlessStopRegradeFired = stepEpisode(
       s.needlessStopRegrade,
       needlessStop,
       needlessStopReset,
       t,
       cfg.needlessStopSustainSec + NEEDLESS_STOP_REGRADE_SEC,
-    )
-  ) {
-    events.push({ ...makeViolation("STOPPED_WITHOUT_CAUSE", t), regrade: true });
+    );
+  } else {
+    const first = stepAccruedEpisode(
+      s.needlessStop,
+      s.needlessStop.qualifiedSec,
+      needlessStop,
+      townReset,
+      t,
+      dt,
+      cfg.needlessStopSustainSec,
+    );
+    s.needlessStop.qualifiedSec = first.accruedSec;
+    needlessStopFired = first.fired;
+    const second = stepAccruedEpisode(
+      s.needlessStopRegrade,
+      s.needlessStopRegrade.qualifiedSec,
+      needlessStop,
+      townReset,
+      t,
+      dt,
+      cfg.needlessStopSustainSec + NEEDLESS_STOP_REGRADE_SEC,
+    );
+    s.needlessStopRegrade.qualifiedSec = second.accruedSec;
+    needlessStopRegradeFired = second.fired;
+  }
+  if (needlessStopFired) {
+    events.push(makeViolation("STOPPED_WITHOUT_CAUSE", t, { detail: needlessStopDetail }));
+  }
+  if (needlessStopRegradeFired) {
+    events.push({
+      ...makeViolation("STOPPED_WITHOUT_CAUSE", t, { detail: needlessStopDetail }),
+      regrade: true,
+    });
   }
 
   // Emergency-lane driving (чл. 58, т. 4 „да се движи… в лентата за принудително

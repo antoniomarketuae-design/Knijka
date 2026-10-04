@@ -26,7 +26,7 @@
  */
 
 import type { LessonObjective, ParkingBaySpec, StagedEventOutcome } from "../contracts";
-import type { SimTick, Vec2 } from "../rules";
+import { DEFAULT_RULE_CONFIG, type SimTick, type Vec2 } from "../rules";
 import type {
   ObjectiveDetail,
   ObjectiveEvalState,
@@ -415,6 +415,35 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         out.requireFullStop = true;
       } else if (deriveFullStopDemand(objective.titleBg)) {
         out.requireFullStop = true;
+      }
+      // «…НА САМАТА ЛИНИЯ» (`ReachZoneParams.requireStopAtLine` — founder ruling
+      // 2026-10-04, sc-merge-from-property:64fd365e). AUTHORED ONLY, and it
+      // throws rather than falling back, because each refusal names a gate that
+      // could not mean what its author wrote: the key places a FULL STOP, so a
+      // gate without one (authored or derived just above) has no stop to place;
+      // and the near bound is measured on the approach axis, which only arms on
+      // a gate carrying a cap or a paint cut (`inGraceRing` in `stepReachZone`).
+      if (p.requireStopAtLine !== undefined) {
+        if (p.requireStopAtLine !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireStopAtLine must be true");
+        }
+        if (out.requireFullStop !== true) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireStopAtLine needs a full-stop demand (requireFullStop, or «напълно» in the title)",
+          );
+        }
+        // The same two conditions under which `out` will carry the cap and the
+        // cut (the cut's own acceptance test is a few lines down).
+        const armsAxis =
+          out.maxSpeedKmh !== undefined || (num(p.acceptBeforeMarkM) && p.acceptBeforeMarkM <= p.radiusM);
+        if (!armsAxis) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireStopAtLine needs maxSpeedKmh or acceptBeforeMarkM (the approach axis the bound is measured on)",
+          );
+        }
+        out.requireStopAtLine = true;
       }
       // THE ONCOMING-GAP REPORT (see `ReachZoneWitnessDemands.
       // reportOncomingGapSec`). Authored only — a norm cannot be read off a
@@ -1115,6 +1144,30 @@ const STOPPED_SPEED_KMH = 1;
  * progression/correctness split documented at the top of this file.
  */
 export const REACH_ZONE_GRACE_M = 5;
+
+/**
+ * HOW FAR BEHIND THE MARK A «СПРИ НАПЪЛНО … НА ЛИНИЯТА» STANDSTILL MAY STAND, m
+ * — founder ruling 2026-10-04 «Within ~1 m» (sc-merge-from-property:64fd365e).
+ * THE ONE DIAL: loosening or tightening the ruling is an edit to this number
+ * and nothing else.
+ *
+ * Read only by gates that author `ReachZoneParams.requireStopAtLine`. On those,
+ * the full stop counts only when the car stood still (the rule engine's own
+ * `fullStopMaxSpeedKmh` for its own `fullStopMinDurationSec`) with its centre
+ * inside the authored disc, not past the paint, and no more than this far back
+ * from the mark along the student's approach. The grace capsule above does not
+ * count for it: «stopping short of a mark on the same line is stopping there»
+ * is true of a place to be, and false of a line the law says to stop AT.
+ *
+ * MEASURED IN THE GATE'S OWN FRAME — the car centre against the authored mark —
+ * and derived from where the taught drives actually stand, never from a bumper
+ * offset: `shadow-correct` and `mistake-signal-and-go` both rest at x 29.04
+ * against `sc-mfp-stop-line`'s mark at x 29, i.e. 0.04 m inside this bound's
+ * zero. `mfp-stop-line-near-side.test.ts` §2 re-measures that on every rung, so
+ * a re-recorded shadow that rests further back fails the build instead of
+ * quietly losing its tick.
+ */
+export const FULL_STOP_AT_LINE_M = 1;
 
 /**
  * The largest |laneOffsetM| the locator can EVER report, m — the authoring
@@ -5081,9 +5134,75 @@ function stepReachZone(
   // re-derived (guarded on the arrival, not on the frame) before the first such
   // gate is authored. `reach-zone-full-stop-derived.test.ts`'s census is what
   // notices one arriving.
+  //
+  // ── …AND, WHERE THE GATE SAYS SO, THE STOP IS MADE AT THE LINE
+  //    (requireStopAtLine — founder ruling 2026-10-04, sc-merge-from-property:
+  //    64fd365e) ─────────────────────────────────────────────────────────────
+  //
+  // THE RESIDUAL THE PARAGRAPHS ABOVE LEFT, and compile.ts named and measured:
+  // `inAcceptance || graceArmed` is the capsule, and the capsule is
+  // REACH_ZONE_GRACE_M plus the disc's half-chord BEHIND the acceptance — so a
+  // standstill anywhere in x ∈ [27.73, ~35.7] took «✓ Спри напълно на Б2 на
+  // изхода». w50 mobile-right is the drive: 0 км/ч at x 32.92, 3.88 m short of
+  // where the taught drive rests, and the banner was on «Задача 3/4» before the
+  // car ever reached the line. The product's own coaching says that stop is
+  // not the one the sign asks for and has to be made again at the line.
+  //
+  // So on a gate that authors the key, the standstill itself has to be made in
+  // the LINE WINDOW — inside the authored disc, not past the paint, and no more
+  // than FULL_STOP_AT_LINE_M behind the mark on the student's approach axis —
+  // and held there for the rule engine's own dwell at the rule engine's own
+  // speed (`stop.stoppedSince` in rules/engine.ts, verbatim: ≤
+  // `fullStopMaxSpeedKmh`, for ≥ `fullStopMinDurationSec`). The capsule does
+  // not count. `fullStopHonoured` stays a conjunct, so the engine still has to
+  // agree it is a full stop; what this adds is WHERE it was made, which the
+  // engine's recency read cannot say (its 6 MOVING seconds carry a stop made
+  // four metres back over the line — documented design there, the wait for a
+  // gap must not bill, and not this lane's to change).
+  //
+  // WHY A CLOCK OF ITS OWN AND NOT THE ENGINE'S FLAG ON A STILL FRAME. A car
+  // that stops short, creeps up under the 3 км/ч cap and dips to 1 км/ч for one
+  // frame at the line is still carrying the qualifying stop it made back there,
+  // so «at rest in the window AND the engine holds a stop» would credit it with
+  // a stop the wheels never made at the line. The clock below restarts the
+  // moment the car moves or leaves the window, so only a standstill MADE in the
+  // window can reach the dwell.
+  //
+  // THE TWO NUMBERS ARE `DEFAULT_RULE_CONFIG`'s, which no lesson overrides. A
+  // session that does override them still cannot be credited against its own
+  // engine: `fullStopHonoured` remains a conjunct, so a stricter engine (a
+  // longer dwell) is obeyed as it stands — `mfp-stop-line-near-side.test.ts`
+  // §3b drives exactly that.
+  //
+  // UNKNOWN IS STILL NEVER A REFUSAL: `alongMark` is null only while the axis is
+  // unknown, and then the window is the acceptance itself (the paint cut still
+  // applies through `inAcceptance`).
+  const lineDemand = params.requireFullStop === true && params.requireStopAtLine === true;
+  const standingStill = speedKmh <= DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh;
+  const inLineWindow = inAcceptance && (alongMark === null || alongMark >= -FULL_STOP_AT_LINE_M);
+  const lineRestSinceSec =
+    lineDemand && standingStill && inLineWindow ? (st.lineRestSinceSec ?? tick.t) : undefined;
+  const lineStopMade =
+    lineRestSinceSec !== undefined &&
+    tick.t - lineRestSinceSec >= DEFAULT_RULE_CONFIG.fullStopMinDurationSec;
+  // THE STOP THIS REFUSES, measured so it can be explained (THEO-4): the same
+  // dwell, made where the shipped gate WOULD have credited it — the acceptance
+  // or the armed capsule — but further back than the window. It certifies
+  // nothing; its first full stop latches `shortStopM`, and that edge is the one
+  // frame `lessons/engine.ts` says why the tick did not come.
+  const shortOfLine =
+    lineDemand && (inAcceptance || graceArmed) && alongMark !== null && alongMark < -FULL_STOP_AT_LINE_M;
+  const shortRestSinceSec = shortOfLine && standingStill ? (st.shortRestSinceSec ?? tick.t) : undefined;
+  const shortStopMade =
+    shortRestSinceSec !== undefined &&
+    tick.t - shortRestSinceSec >= DEFAULT_RULE_CONFIG.fullStopMinDurationSec &&
+    fullStopHonoured(ctx);
+  const shortStopM = st.shortStopM ?? (shortStopMade && alongMark !== null ? -alongMark : undefined);
   const stopOk =
     params.requireFullStop !== true ||
-    (fullStopHonoured(ctx) && (inAcceptance || graceArmed) && stopSignRollClean(ctx));
+    (fullStopHonoured(ctx) &&
+      (lineDemand ? lineStopMade : inAcceptance || graceArmed) &&
+      stopSignRollClean(ctx));
   // ── THE CEILING THE BANNER SAYS WAS HELD (requireSpeedClean) ──────────────
   // Ninth arm of the journey half and the ninth outside the `capMet` latch —
   // the stretch-shaped half of the ceiling claim, where `requireLawfulSpeed` is
@@ -5287,6 +5406,10 @@ function stepReachZone(
     everOutside,
     ...(approachCap !== undefined ? { approachCap } : {}),
     ...(haltVoided !== undefined ? { haltVoided } : {}),
+    // `requireStopAtLine` gates only — every other gate's state is unchanged.
+    ...(lineRestSinceSec !== undefined ? { lineRestSinceSec } : {}),
+    ...(shortRestSinceSec !== undefined ? { shortRestSinceSec } : {}),
+    ...(shortStopM !== undefined ? { shortStopM } : {}),
   };
   // THE MEASUREMENT THIS GATE REPORTS (`reportOncomingGapSec`). Never a
   // refusal: `done` above is computed without it. Emitted only once an

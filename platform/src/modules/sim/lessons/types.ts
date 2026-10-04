@@ -314,6 +314,41 @@ export interface ReachZoneParams {
    */
   requireFullStop?: true;
   /**
+   * …AND THAT FULL STOP IS MADE AT THE LINE — sc-merge-from-property:64fd365e
+   * (critical), founder ruling 2026-10-04 «Within ~1 m».
+   *
+   * WHAT IT MEANS. `true` = the standstill `requireFullStop` asks for counts
+   * only when the car stood still — at most `fullStopMaxSpeedKmh` for at least
+   * `fullStopMinDurationSec`, the rule engine's own numbers — with its centre
+   * inside the authored disc, not past the paint (`acceptBeforeMarkM`), and no
+   * more than `FULL_STOP_AT_LINE_M` (objectives.ts) behind the mark on the
+   * student's approach axis. The approach grace capsule does not count for it.
+   * Absent = `requireFullStop` keeps the capsule exactly as shipped.
+   *
+   * WHY. Without it the capsule (REACH_ZONE_GRACE_M plus the disc's half-chord)
+   * let a standstill up to ~6.5 m short of the line take «✓ Спри напълно на Б2
+   * на изхода»: w50 mobile-right halted 3.88 m short and the banner moved on.
+   * The product's own coaching says the opposite — «Мястото на това спиране е
+   * ДО самата линия: спреш ли по-рано … то се прави още веднъж, на линията»
+   * (advisor.ts) — and the tick now agrees with it.
+   *
+   * THE FRAME. The car CENTRE against the authored mark, which is the frame the
+   * whole gate is graded in: both committed recordings of the drill rest at
+   * x 29.04 against a mark at x 29, so the mark IS where the centre stands when
+   * the car is at the line. No bumper offset is assumed anywhere.
+   *
+   * AUTHORED ONLY and opt-in. Of the seven full-stop gates, the banners about a
+   * child, an obstacle, a zebra or a red lamp promise a stop BEFORE something,
+   * where stopping further back is not a fault; only a line gate promises a
+   * place — and an author may set it only where the mark IS the centre's line
+   * pose, checked against the gate's own recording: `sc-edpr-b2` authors its
+   * mark ON the paint and its shadow rests 4.56 m behind it, so the key there
+   * would refuse its own taught drive (measured: every rung). Requires a
+   * full-stop demand and an approach axis (a cap or a cut);
+   * `parseObjectiveParams` throws otherwise. NOT laddered (scenario/params.ts).
+   */
+  requireStopAtLine?: true;
+  /**
    * THE CEILING THE ROAD GAVE WAS HELD OVER THE STRETCH THE BANNER NAMES —
    * sc-sp-wet-limit-plate:d9fd3821 (critical), and the sixth term this file's
    * own templates route here rather than invent an instrument for.
@@ -1223,6 +1258,33 @@ export type ObjectiveEvalState =
        * existed) omits it and behaves exactly as shipped.
        */
       haltVoided?: "impact";
+      /**
+       * `requireStopAtLine` ONLY (sc-merge-from-property:64fd365e) — the
+       * session second the car's CURRENT standstill began, while it stands
+       * inside the line window (the disc, not past the paint, within
+       * `FULL_STOP_AT_LINE_M` of the mark). Absent while the car moves or
+       * stands anywhere else. The tick needs `t − lineRestSinceSec ≥
+       * fullStopMinDurationSec`: the qualifying stop made AT the line.
+       *
+       * Never written on any other gate, so every other eval state is
+       * byte-identical to shipped.
+       */
+      lineRestSinceSec?: number;
+      /**
+       * `requireStopAtLine` ONLY — the same clock for a standstill SHORT of the
+       * line window: on the approach side, inside the disc or the grace
+       * capsule, further back than `FULL_STOP_AT_LINE_M`. It certifies
+       * nothing; it is what decides when that standstill has become a full
+       * stop the student should be told did not count.
+       */
+      shortRestSinceSec?: number;
+      /**
+       * `requireStopAtLine` ONLY — how far behind the mark (m, car centre, on
+       * the approach axis) the car made its first full stop short of the line
+       * window. Latched once and never cleared: its rising edge is the one
+       * frame `lessons/engine.ts` speaks the «Спря, но преди линията» card on.
+       */
+      shortStopM?: number;
     }
   | {
       type: "passSignal";

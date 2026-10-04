@@ -3440,6 +3440,50 @@ export const SNOW_LIGHTS_ACT_COPY: Record<string, { titleBg: string; explanation
   },
 };
 
+/**
+ * STOPPED_WITHOUT_CAUSE on the PRIORITY ROAD, with the stops ADDED UP (founder
+ * ruling 2026-10-04 «Add stops together»; audit sc-jx-priority-confidence:
+ * 9c987e7b). `engine.ts` stamps this detail ONLY where the lesson has set BOTH
+ * `needlessStopJunctionExcuse: false` (the author's statement that this route's
+ * junctions oblige the driver to nothing) and `needlessStopPerStop: false` (the
+ * ruling). Today that is sc-jx-priority-confidence alone.
+ *
+ * WHY THE POOLED ROW CANNOT SAY IT. The pooled explanation tells the student
+ * that ahead of him there was «нито кръстовище». Once the junction arm is
+ * dropped, the bill can land at rest beside tj-n-c, and that clause is false on
+ * that frame. The card has to say the opposite and true thing: there IS a
+ * junction, and it obliges the OTHERS. It also has to say why a few short
+ * stops cost as much as one long one, since that is what the student did.
+ *
+ * Every sentence checked against the frames it can show on: it never claims a
+ * car is behind or a waiter is waiting (the лепка can have passed, the waiter
+ * can have gone), only what those drivers can and cannot expect. It never says
+ * «напред» about the junction, because the bill can land after the node. It
+ * never quotes a seconds figure, because the 6 s is a detection threshold and
+ * not law.
+ *
+ * LAW, RETRIEVED (ADR-002 — `content/law/acts/zdvp.json`):
+ *   чл. 50, ал. 1: „На кръстовище, на което единият от пътищата е сигнализиран
+ *   като път с предимство, водачите на пътни превозни средства от другите пътища
+ *   са длъжни да пропуснат пътните превозни средства, които се движат по пътя с
+ *   предимство."
+ *   чл. 24, ал. 2: the pooled row's own quote, unchanged.
+ * `peekBg` is left pooled: «Никой не го очаква.» is true here too.
+ */
+export const NEEDLESS_STOP_ACT_PRIORITY_ROAD = "priority-road";
+
+export const NEEDLESS_STOP_ACT_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string; lawRef: string }
+> = {
+  [NEEDLESS_STOP_ACT_PRIORITY_ROAD]: {
+    titleBg: "Спиране без причина по пътя с предимство",
+    explanationBg:
+      "Спря в лентата си на пътя с предимство, без нищо да те задължава: пред теб нямаше кола, пешеходец или светофар, на които да отговаряш. Кръстовището също не е причина — то задължава другите, не теб: „водачите на пътни превозни средства от другите пътища са длъжни да пропуснат пътните превозни средства, които се движат по пътя с предимство“ (ЗДвП чл. 50, ал. 1). Затова спирането на предимство не е предпазливост: чакащите отстрани вече не знаят дали да тръгнат, а идващите зад теб не очакват спиране там, където пътят е свободен. Няколко кратки спирания затрудняват другите колкото едно дълго, и затова тук престоите се събират. Законът иска обратното: преди да намали значително скоростта, „водачът е длъжен да се убеди, че няма да създаде опасност за останалите участници в движението и че няма да затрудни излишно тяхното движение“ (ЗДвП чл. 24, ал. 2).",
+    lawRef: "ЗДвП чл. 24, ал. 2; чл. 50, ал. 1",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
@@ -3460,6 +3504,8 @@ export const PER_ACT_COPY: Partial<
   // and no new student-facing sentence enters the product (ADR-002).
   JUNCTION_SCAN_INCOMPLETE: JUNCTION_SCAN_CONTROL_COPY,
   HEADLIGHTS_OFF_IN_RAIN: SNOW_LIGHTS_ACT_COPY,
+  // Founder ruling 2026-10-04 — the priority-road needless stop, stops added up.
+  STOPPED_WITHOUT_CAUSE: NEEDLESS_STOP_ACT_COPY,
 };
 
 /**

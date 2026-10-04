@@ -318,7 +318,10 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
     ).toEqual([]);
     // The 11 keys the 167 templates actually author (doc 92 §3.3 meta.ruleConfigKeysAuthored),
     // plus laneEntryForcedBrakingEnabled (founder ruling 2026-09-30; sc-merge-lane-end
-    // and sc-merge-roadworks-shift) — 12.
+    // and sc-merge-roadworks-shift) — 12, plus needlessStopJunctionExcuse and
+    // needlessStopPerStop (founder ruling 2026-10-04 «Add stops together»;
+    // sc-jx-priority-confidence, both default true, authored false: they TUNE
+    // the armed STOPPED_WITHOUT_CAUSE and arm nothing) — 14.
     expect([...authored.keys()].sort()).toEqual([
       "conditionSpeedNightFactor",
       "followMinSpeedKmh",
@@ -331,6 +334,8 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
       "leadClosingEnabled",
       "moveOffObservationEnabled",
       "needlessStopEnabled",
+      "needlessStopJunctionExcuse",
+      "needlessStopPerStop",
       "townCrawlEnabled",
     ]);
   });
@@ -449,6 +454,7 @@ const DEMAND_CODES: Record<string, readonly string[] | null> = {
   requireRailClear: null, // the rail band's own staged outcome
   requireRedMet: null, // which signal phase the approach met
   requireKerbwardM: null, // a distance to the kerb
+  requireStopAtLine: null, // WHERE the full stop stood (a position + the engine's own dwell), no code
 };
 
 const REST_CLEAN_CODES: Record<string, string> = {
@@ -495,7 +501,7 @@ describe("T8d — every objective demand's codes are already ADR-009 targets", (
         "DEMAND_CODES with the codes its honoured-helper in lessons/objectives.ts actually reads, or with null " +
         "and the reason it reads no code at all.",
     ).toEqual([]);
-    // The ten keys today's 167 templates author. A shrinking list is as
+    // The eleven keys today's 167 templates author. A shrinking list is as
     // interesting as a growing one: it means a demand stopped being authored.
     const seen = new Set<string>();
     for (const byKey of demandsByLesson.values()) for (const k of byKey.keys()) seen.add(k);
@@ -510,6 +516,7 @@ describe("T8d — every objective demand's codes are already ADR-009 targets", (
       "requireRestClean",
       "requireSolidLineClean",
       "requireSpeedClean",
+      "requireStopAtLine",
     ]);
   });
 

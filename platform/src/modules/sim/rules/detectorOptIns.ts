@@ -109,6 +109,13 @@ export const NON_ARMING_RULE_CONFIG_KEYS: ReadonlySet<keyof RuleEngineConfig> = 
   "conditionSpeedNightFactor",
   "harshBrakeDecelMps2",
   "hesitationClearGapM",
+  // Founder ruling 2026-10-04 «Add stops together» (sc-jx-priority-confidence).
+  // Both default `true` and are authored `false`: they TUNE the already-armed
+  // STOPPED_WITHOUT_CAUSE (drop the junction radius from its excuses; add the
+  // rests up across stops). Neither arms anything on its own — without
+  // `needlessStopEnabled` the detector they tune is off.
+  "needlessStopJunctionExcuse",
+  "needlessStopPerStop",
 ]);
 
 /**
