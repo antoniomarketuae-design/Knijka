@@ -10552,3 +10552,36 @@ repairs-wave-b lane rbentry, SIGNED OFF WITH CONDITIONS. The L5 `vehicleCount: 4
 (6a09323, August) that the roundabout family stays at 0 ambient cars because a mini ring gridlocks; L5 now follows the rule, and its
 shadow-correct drive passes the live chain with 0 т. and no contact. Conditions: the witness harness runs dry and unlit (rain rungs judged
 without rain); a catalogue-wide rain-line ordering quirk older than this change.
+
+## Wave C verdicts — 2026-10-04
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`0ec7aa22e81d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 17 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 21 |
+
+**Open list: 40 → 39**, out of 1531 filed across the whole programme (1491 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## The Б2 star follows the gate that says where the stop is made — landed 2026-10-05 (sc-merge-from-property:a401e4a7)
+
+b2commend rounds 1–2 (wf_b16eaf94-b2d, wf_b13a65a9-ab0), SIGNED OFF WITH CONDITIONS. `rules/engine.ts` commends FULL_STOP_AT_STOP_SIGN on recency
+alone; on the lesson whose gate requires the stop at the line (`requireStopAtLine`) a stop ~4 m short then a roll over the paint earned «★
+Правилно спиране на знак Б2» beside the task's «–» and «Спря, но преди линията». The lesson layer (`lessons/engine.ts applyTick`) now withdraws
+that star — from the ledger and the toast — only when the stop-line gate was the ACTIVE objective coming into the crossing frame and is still
+undone after it (it measured the approach and refused it). Nothing is billed; a gate that never ran never costs a star (a lawful at-line stop on
+a stalled chain keeps it). Authored-tape census identical (2,434). Conditions: on a stalled chain a SHORT stop also keeps the recency star; a
+self-correction by reversing back to the mark ticks ✓ with no star; one equivalent conjunct and the toast filter are unpinned.
