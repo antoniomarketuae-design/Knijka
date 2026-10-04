@@ -649,7 +649,29 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
       level: 4,
       vehicleStart: "cold",
     },
-      { level: 5, traffic: { vehicleCount: 4 } }, // L5: живо кръгово
+    {
+      // L5: дъжд — the roundabout family's own L5 delta, and NO ambient fleet.
+      //
+      // This rung used to author `traffic: { vehicleCount: 4 }` («живо
+      // кръгово», 179b1f2, 2026-07-16). That number predates the measurement
+      // compile.ts records as the family rule («WHY THE ROUNDABOUT FAMILY IS
+      // DELIBERATELY ZERO», 2026-08-02): on rb-mini-v1 two ambient cars
+      // already spend 68–75% of their time stopped — the mini ring gridlocks
+      // rather than circulates. A rung count is never clamped by the compiler,
+      // so the unmeasured 4 outlived the measurement that refuted it, and the
+      // ladder told the student «Улицата вече не е празна» over a jam: through
+      // the live chain the lesson's own careful drive hit the staged circulator
+      // (the fleet held it up into the player's entry) and overlapped an
+      // ambient car (sc-roundabout-entry:60592587). Every sibling on this ring
+      // adds L5 difficulty as rain (+ a staged car), never ambient traffic; this
+      // one now does the same. Physics stays dry (the authored ghost envelope
+      // is dry-tuned — ADR-006 opt-in discipline), and the ladder's stored rain
+      // line announces the change. Ambient traffic returns to this family only
+      // with the mini-ring reservation fix compile.ts names, and a measurement.
+      // Gate: __tests__/rb-entry-l5-no-ambient.test.ts.
+      level: 5,
+      conditions: { weather: "rain" },
+    },
   ],
   staged: [RB_CIRCULATING],
   conditions: { weather: "dry" },

@@ -1067,6 +1067,45 @@ export function sameDirVehicleNearFor(
  * already on the ring reaches your entry from the LEFT. True when a moving
  * vehicle sits within the ring band AND to the driver's left — the driver must
  * give way to it.
+ *
+ * THE QUESTION IT USED NOT TO ASK: HAS THAT CAR ALREADY GONE PAST MY ENTRY.
+ *
+ * Presence on the left is not priority. The left half-plane ROTATES with the
+ * driver's heading, so as an entry chord turns towards the direction of
+ * circulation the cars he is FOLLOWING — cars that have already passed his
+ * mouth and are pulling away round the ring — swing into it. MEASURED on
+ * sc-rb-busy-gap (the full live chain, L1): a driver who waits 11, 12, 14 or
+ * 15 s at the line — one to five seconds longer than the lesson's own shadow —
+ * and merges BEHIND the platoon was billed FAILED_TO_YIELD («опасна», 10 т.,
+ * НЕИЗДЪРЖАН) while every circulating car was 46°–108° of ring DOWNSTREAM of
+ * him and nothing was upstream. Waiting a little longer cost him the lesson —
+ * the founder's «scoring punishes patience», word for word. A car that has
+ * passed the point where he joins can never be made to slow by his joining
+ * (ЗДвП чл. 50, ал. 1 is a duty not to force the priority driver to change
+ * speed or direction); following it is a following-distance matter, which
+ * this predicate does not grade.
+ *
+ * So the sibling's clause (5) of `conflictFromRightFor`, on the ring:
+ *
+ *  (R) DEPARTING AND CLEAR. The conflict point is the place on the car's OWN
+ *      circle at the driver's azimuth about the centre — where his entry meets
+ *      that car's path. A car whose angular motion about the centre has
+ *      already carried it PAST that azimuth (less than half a lap past, in its
+ *      own direction of travel — i.e. it will not reach his entry again until
+ *      it has driven round the island) AND whose centre is more than
+ *      CONFLICT_CLEARED_M (straight line) beyond that point has left the
+ *      conflict point. Below that distance a car straddling his mouth still
+ *      counts, exactly as on the junction twin.
+ *
+ *  Every car still APPROACHING his azimuth from upstream is untouched — the
+ *  short gap (entering between the lead and the follower) is still billed by
+ *  the follower behind him. A car whose motion is purely radial (no angular
+ *  direction to read), or a driver standing on the centre, keeps the old
+ *  presence-only behaviour. The clause can only ever REMOVE a conviction.
+ *
+ * There is deliberately NO arrival-time clause (the sibling's (6)): the query
+ * is given no driver speed, and an ETA comparison is the clause that can
+ * acquit an UPSTREAM car — the short-gap conviction this lesson teaches.
  */
 export function circulatingConflictFor(
   vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
@@ -1082,6 +1121,10 @@ export function circulatingConflictFor(
   const lx = -Math.cos(rad);
   const ly = Math.sin(rad);
   const r2 = bandRadiusM * bandRadiusM;
+  // The driver's azimuth about the ring centre — where his entry meets the ring.
+  const pcx = px - cx;
+  const pcy = py - cy;
+  const pRadM = Math.hypot(pcx, pcy);
   for (const v of vehicles) {
     const cdx = v.x - cx;
     const cdy = v.y - cy;
@@ -1094,9 +1137,42 @@ export function circulatingConflictFor(
     const pdy = v.y - py;
     if (pdx * pdx + pdy * pdy > CIRCULATING_REACH_M * CIRCULATING_REACH_M) continue;
     if (pdx * lx + pdy * ly < RIGHT_MIN_M) continue; // not on the left
+    if (departedPastEntry(cdx, cdy, v.dirX, v.dirY, pcx, pcy, pRadM)) continue; // (R)
     return true;
   }
   return false;
+}
+
+/**
+ * Clause (R) of `circulatingConflictFor`: has this circulating car already
+ * gone PAST the driver's entry and cleared it? All vectors are relative to the
+ * ring centre. False (= keep counting it) whenever the geometry cannot answer.
+ */
+function departedPastEntry(
+  cdx: number,
+  cdy: number,
+  dirX: number,
+  dirY: number,
+  pcx: number,
+  pcy: number,
+  pRadM: number,
+): boolean {
+  const vRadM = Math.hypot(cdx, cdy);
+  if (pRadM < 1e-6 || vRadM < 1e-6) return false;
+  // Its angular direction about the centre: +1 counter-clockwise, −1 clockwise.
+  const cross = cdx * dirY - cdy * dirX;
+  if (Math.abs(cross) < 1e-9) return false; // purely radial: no direction to read
+  const sense = cross > 0 ? 1 : -1;
+  // Signed angle FROM the driver's azimuth TO the car, in the car's own
+  // direction of travel: (0, π) = it is already past his azimuth (downstream),
+  // (−π, 0) = it is still coming (upstream).
+  const pastRad = sense * Math.atan2(pcx * cdy - pcy * cdx, pcx * cdx + pcy * cdy);
+  if (!(pastRad > 0)) return false; // upstream (or level): still a conflict
+  // The conflict point on the car's own circle at his azimuth, and how far the
+  // car's centre already is beyond it (straight line, like clause (5)).
+  const ex = (pcx / pRadM) * vRadM;
+  const ey = (pcy / pRadM) * vRadM;
+  return Math.hypot(cdx - ex, cdy - ey) > CONFLICT_CLEARED_M;
 }
 
 /**

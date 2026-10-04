@@ -30,8 +30,10 @@
  * billed — measured below), so at L5 the PATIENT act is to wait the third car
  * out too: 25 s, the middle of the measured clean window (18–32.5 s).
  *
- * ── PRODUCT DEFECT FOUND, written as a RED SPECIFICATION (see the last block) ──
- * Patience IS punished, in one band: a driver who waits 1–5 s LONGER than the
+ * ── PRODUCT DEFECT FOUND by witness-a, REPAIRED (rbgap lane; see the last block) ──
+ * The repair is `circulatingConflictFor` clause (R) DEPARTING AND CLEAR; what
+ * follows is the defect as witness-a measured it before that clause existed.
+ * Patience WAS punished, in one band: a driver who waits 1–5 s LONGER than the
  * shadow (11, 12, 14, 15 s at L1) and then merges BEHIND the platoon is billed
  * FAILED_TO_YIELD (опасна, 10 т., НЕИЗДЪРЖАН) — against cars that are already
  * 46°–108° of ring DOWNSTREAM of him, with nothing upstream.
@@ -233,64 +235,77 @@ describe("sc-rb-busy-gap — the lesson's own wrong acts are billed at every run
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RED SPECIFICATION — PRODUCT_DEFECT (witness-a, 2026-10-04). Adopt by flipping
-// `RED_SPEC` to `it` (or run with WITNESS_RED=1 to see it red today).
-//
-// `it.fails` keeps the shared gate green while the defect stands and turns RED
-// the day a repair lands — so the repair lane cannot forget to adopt it.
+// REPAIRED (rbgap lane, 2026-10-04) — was the witness-a RED SPECIFICATION.
+// `traffic/system.ts circulatingConflictFor` clause (R) DEPARTING AND CLEAR: a
+// circulating car already past the driver's entry azimuth, and more than
+// CONFLICT_CLEARED_M beyond it, is no longer a car he owes way to.
 // ─────────────────────────────────────────────────────────────────────────────
-const RED_SPEC = process.env.WITNESS_RED === "1" ? it : it.fails;
-/** Waits at L1 that merge BEHIND the platoon and are convicted today (measured). */
+/** Waits at L1 that merge BEHIND the platoon (measured: billed before the repair). */
 const MERGE_BEHIND_WAITS = [11, 12, 14, 15] as const;
-
-interface Conviction {
-  playerPhi: number;
-  ahead: Array<{ id: string; aheadDeg: number }>;
-}
+/** rb-mini-v1's ring: centre (0, 0), R = 18; the runtime's band (R + 9) and commit reach (R + 12). */
+const RING_BAND_M = 18 + 9;
+const COMMIT_REACH_M = 18 + 12;
 
 /** Circulation angle φ (deg from the SOUTH node, CCW through EAST) — scRbBusyGap.ts's own convention. */
 const phiDeg = (x: number, y: number): number => ((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360;
 
-describe("sc-rb-busy-gap — PRODUCT DEFECT: a driver who waits a little longer and merges BEHIND the platoon is convicted (8f50287b · a6f83f6b)", () => {
+describe("sc-rb-busy-gap — a driver who waits a little longer and merges BEHIND the platoon is not convicted (8f50287b · a6f83f6b)", () => {
   const runs = MERGE_BEHIND_WAITS.map((w) => {
-    const box: { at: Conviction | null } = { at: null };
-    const out = drive(1, shadowWaiting(w), ({ t, tick, traffic, step }) => {
-      if (box.at !== null) return;
-      const fty = step.state.events.some((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD" && Math.abs(e.t - t) < 1e-6);
-      if (!fty) return;
-      const p = phiDeg(tick.position.x, tick.position.y);
-      const ahead = ["sc-rbg-lead", "sc-rbg-follower"].map((id) => {
+    // Every platoon car the OLD presence-only test (in the band, within 26 m of
+    // him, ≥ 1.5 m on his left) saw while he was moving inside the commit reach
+    // AFTER the wait at the line (his first standstill of ≥ 5 s; the approach
+    // before it is a different act, and he stops for it) — the frames on which
+    // that test convicted him — with its ring angle ahead of him in the
+    // direction of circulation.
+    const seen: Array<{ t: number; id: string; aheadDeg: number }> = [];
+    const clock = { stoppedSince: null as number | null, waited: false };
+    const out = drive(1, shadowWaiting(w), ({ t, tick, traffic }) => {
+      const { x: px, y: py } = tick.position;
+      if (tick.speedKmh < 0.5) {
+        clock.stoppedSince ??= t;
+        if (t - clock.stoppedSince >= 5) clock.waited = true;
+      } else clock.stoppedSince = null;
+      if (!clock.waited) return;
+      if (tick.speedKmh <= 3 || Math.hypot(px, py) > COMMIT_REACH_M) return;
+      const rad = (tick.headingDeg * Math.PI) / 180;
+      const lx = -Math.cos(rad);
+      const ly = Math.sin(rad);
+      const p = phiDeg(px, py);
+      for (const id of ["sc-rbg-lead", "sc-rbg-follower"]) {
         const a = traffic.staged(id) as unknown as { x: number; y: number };
-        return { id, aheadDeg: (phiDeg(a.x, a.y) - p + 360) % 360 };
-      });
-      box.at = { playerPhi: p, ahead };
+        if (Math.hypot(a.x, a.y) > RING_BAND_M) continue;
+        if (Math.hypot(a.x - px, a.y - py) > 26) continue;
+        if ((a.x - px) * lx + (a.y - py) * ly < 1.5) continue;
+        seen.push({ t, id, aheadDeg: (phiDeg(a.x, a.y) - p + 360) % 360 });
+      }
     });
-    return { w, out, at: box.at };
+    return { w, out, seen };
   });
 
-  it("MEASURED (green today): each of these drives is billed FAILED_TO_YIELD, and at the billed frame EVERY circulating car is 40°–120° of ring DOWNSTREAM of the driver", () => {
-    for (const { w, out, at } of runs) {
+  // Measured on the repaired tree: first sighting 74–85° ahead; over the whole
+  // merge and the ring run behind the platoon 25.4°–93.1°, never upstream.
+  it("MEASURED: the presence-only test DOES see platoon cars on his left after the wait — the first one 40°–120° of ring DOWNSTREAM of him, and not one, on any frame, upstream (cars he is FOLLOWING)", () => {
+    for (const { w, seen } of runs) {
       const label = `L1 wait ${w}s`;
-      expect(out.violationCodes, label).toContain("FAILED_TO_YIELD");
-      expect(out.result.passed, label).toBe(false);
-      expect(at, label).not.toBeNull();
-      for (const a of at!.ahead) {
-        // Ahead of him in the direction of circulation, i.e. cars he is FOLLOWING.
-        expect(a.aheadDeg, `${label} ${a.id}`).toBeGreaterThan(40);
-        expect(a.aheadDeg, `${label} ${a.id}`).toBeLessThan(120);
+      expect(seen.length, label).toBeGreaterThan(0);
+      expect(seen[0].aheadDeg, `${label} first sighting ${seen[0].id}`).toBeGreaterThan(40);
+      expect(seen[0].aheadDeg, `${label} first sighting ${seen[0].id}`).toBeLessThan(120);
+      for (const s of seen) {
+        expect(s.aheadDeg, `${label} ${s.id} t=${s.t.toFixed(2)}`).toBeGreaterThan(20);
+        expect(s.aheadDeg, `${label} ${s.id} t=${s.t.toFixed(2)}`).toBeLessThan(120);
       }
     }
   });
 
-  RED_SPEC(
-    "SPEC: merging behind every circulating car forces nobody to slow (ЗДвП чл. 50, ал. 1 — the lesson's own text), so it is NOT a failure to yield: 0 т., ИЗДЪРЖАН",
-    () => {
-      for (const { w, out } of runs) {
-        const label = `L1 wait ${w}s`;
-        expect(out.violationCodes, label).not.toContain("FAILED_TO_YIELD");
-        expect(out.result.score, label).toBe(0);
-        expect(out.result.passed, label).toBe(true);
-      }
-    },
-  );
+  it("merging behind every circulating car forces nobody to slow (ЗДвП чл. 50, ал. 1 — the lesson's own text), so it is NOT a failure to yield: 0 т., ИЗДЪРЖАН, YIELDED_TO_PRIORITY, 3★", () => {
+    for (const { w, out } of runs) {
+      const label = `L1 wait ${w}s`;
+      expect(out.violationCodes, label).not.toContain("FAILED_TO_YIELD");
+      expect(out.violationCodes, label).toEqual([]);
+      expect(out.result.score, label).toBe(0);
+      expect(out.result.passed, label).toBe(true);
+      expect(out.commendationCodes, label).toContain("YIELDED_TO_PRIORITY");
+      expect(scoreRubric(out.result, SC_RB_BUSY_GAP.rubric!).stars, label).toBe(3);
+    }
+  });
 });

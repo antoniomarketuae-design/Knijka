@@ -10513,3 +10513,42 @@ existing 6 s, reset by a held recovery (4 s at ≥20 km/h on a 50 road), excused
 the lesson's own mistake (Ruling A: not taken, named in «Грешката на този урок»); the verifier's 126 stop-and-go drives all billed; the
 authored-tape census (2,434) identical. Conditions: about 50 m of brisk driving between halts resets the sum; an 8 s defensive wait for
 the L5 creeper is now excused (acquittal direction).
+
+## Wave C verdicts — 2026-10-04
+
+This run retired 7 row(s). Their evidence frames were driven at MIXED:7648edf72bce+1ca91558076e+13692e3298af+54c02a86d253 (+2 unattributable) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1988426c1a35`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 7 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 15 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 24 |
+
+**Open list: 47 → 40**, out of 1531 filed across the whole programme (1484 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## The busy roundabout no longer punishes patience — landed 2026-10-04 (sc-rb-busy-gap:a6f83f6b, :8f50287b)
+
+repairs-wave-b lane rbgap (wf_b16eaf94-b2d), SIGNED OFF WITH CONDITIONS; found by the in-process witness (witness-r1). traffic/system.ts
+circulatingConflictFor counted every moving car in the ring band within 26 m on the driver's left, so a driver who waited 11–15 s and merged
+BEHIND the platoon was convicted «Влизане без пропускане» for the cars he was following. A DEPARTING-AND-CLEAR clause (a car already past the
+driver's azimuth in its own direction AND more than CONFLICT_CLEARED_M beyond the conflict point) now drops only those; it runs after every
+existing filter, so it can only remove a conviction. Barge and short gap stay FAILED_TO_YIELD at every rung; the 87-leg roundabout census is
+byte-identical; the measured clean window at L1 is 10–32.5 s. Conditions: unit cases for the 5–10 m cleared band and a 35–40° upstream car.
+
+## Roundabout entry L5 back to the family's zero ambient traffic — landed 2026-10-04 (sc-roundabout-entry:60592587)
+
+repairs-wave-b lane rbentry, SIGNED OFF WITH CONDITIONS. The L5 `vehicleCount: 4` (179b1f2, July) predates the measured rule in compile.ts
+(6a09323, August) that the roundabout family stays at 0 ambient cars because a mini ring gridlocks; L5 now follows the rule, and its
+shadow-correct drive passes the live chain with 0 т. and no contact. Conditions: the witness harness runs dry and unlit (rain rungs judged
+without rain); a catalogue-wide rain-line ordering quirk older than this change.

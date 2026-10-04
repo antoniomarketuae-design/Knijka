@@ -203,14 +203,22 @@ function ringAndExitSteps(): DriveScript["steps"] {
  *     radius. (The wall moves with RING_KMH, which is the other half of the same
  *     closing-rate story: at 12 km/h it sits at 32°.)
  *   · φ_lead > 65° ⇒ FAILED_TO_YIELD, i.e. φ_follower > 38° at this platoon
- *     offset. Nothing to do with the follower: it is the LEAD, 60° up the ring
- *     and long gone, swinging into the driver's ROTATING left half-plane as the
- *     chord turns north-east — and convicting before the azimuth sweep reaches
- *     the 35° ring-priority stand-down.
+ *     offset — a wall that NO LONGER EXISTS (2026-10-04). Nothing to do with the
+ *     follower: it was the LEAD, 60° up the ring and long gone, swinging into
+ *     the driver's ROTATING left half-plane as the chord turns north-east — and
+ *     convicting before the azimuth sweep reaches the 35° ring-priority
+ *     stand-down. It billed a driver who waited 11–15 s, merged BEHIND the whole
+ *     platoon and forced nobody to slow (sc-rb-busy-gap:a6f83f6b / 8f50287b,
+ *     «the scoring punishes patience»). `circulatingConflictFor` clause (R)
+ *     DEPARTING AND CLEAR now drops a car that has already passed his entry, so
+ *     the clean L1 window runs from the 10 s wait to the platoon's next lap
+ *     (measured 10–32.5 s on the live chain; 33 s+ is the ring coming round
+ *     again, honestly billed).
  *
- * Clean run measured at φ_follower ∈ [28°, 38°]; 33° is its centre, ≈ 0.6 s of
- * margin either way. Also short enough to stay a decision rather than a vigil —
- * the „без вечно колебание" half of the objective, coached by parTimeSec 60.
+ * The 10 s wait sits at the bottom of that window — the collision wall above is
+ * the one still standing — and it stays short enough to be a decision rather
+ * than a vigil: the „без вечно колебание" half of the objective, coached by
+ * parTimeSec 60.
  */
 const SHADOW_WAIT_SEC = 10;
 

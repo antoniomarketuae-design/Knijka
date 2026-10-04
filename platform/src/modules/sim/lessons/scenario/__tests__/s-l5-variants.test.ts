@@ -49,7 +49,14 @@ const WAVE: Expectation[] = [
   },
   {
     spec: SC_ROUNDABOUT_ENTRY,
-    check: (l) => expect(l.traffic?.vehicleCount).toBe(4),
+    // Was `vehicleCount 4` (live ambient traffic). The roundabout family is
+    // deliberately 0 ambient on rb-mini-v1 (compile.ts: the mini ring
+    // gridlocks), so L5 now adds rain like every sibling on that ring —
+    // sc-roundabout-entry:60592587, rb-entry-l5-no-ambient.test.ts.
+    check: (l) => {
+      expect(l.environment?.rain).toBe(true);
+      expect(l.traffic?.vehicleCount ?? 0).toBe(0);
+    },
   },
   {
     spec: SC_LANE_CHANGE,
