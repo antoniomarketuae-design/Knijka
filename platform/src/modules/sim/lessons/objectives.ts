@@ -4412,6 +4412,67 @@ export function reachZoneMarkCrossing(
   return f;
 }
 
+/**
+ * THE LINE WINDOW OF A `requireStopAtLine` GATE — where its «спри напълно … на линията» standstill has to be made
+ * (founder ruling 2026-10-04 «Within ~1 m»): the car centre inside the authored disc, not past the paint the gate
+ * declared (`acceptBeforeMarkM`), and no more than `FULL_STOP_AT_LINE_M` behind the mark on the student's approach
+ * axis. With the axis unknown the window is the disc (unknown is never a refusal).
+ *
+ * ONE IMPLEMENTATION, TWO READERS: `stepReachZone` (the task's ✓, through `stepLineStandstill`) and
+ * `lessons/engine.ts` (the «★ Правилно спиране на знак Б2» on that line, which is decided by where the standstill was
+ * made whatever the chain was doing — sc-merge-from-property:a401e4a7 round 3). The arithmetic is the evaluator's own,
+ * operation for operation (`along = rx·ux + ry·uy`, the cut `along > −acceptBeforeMarkM`), so the two cannot differ by
+ * a rounding either.
+ */
+export function reachZoneInLineWindow(
+  params: Pick<ReachZoneParams, "x" | "y" | "radiusM" | "acceptBeforeMarkM">,
+  approachFrom: Vec2 | null,
+  pos: Vec2,
+): boolean {
+  if (dist(pos.x, pos.y, params.x, params.y) > params.radiusM) return false;
+  if (approachFrom === null) return true;
+  const ax = params.x - approachFrom.x;
+  const ay = params.y - approachFrom.y;
+  const m = Math.hypot(ax, ay);
+  if (m < 1e-6) return true;
+  const ux = ax / m;
+  const uy = ay / m;
+  const along = (pos.x - params.x) * ux + (pos.y - params.y) * uy; // + = beyond the mark
+  const bound = params.acceptBeforeMarkM;
+  if (bound !== undefined && along > -bound) return false; // past the paint
+  return along >= -FULL_STOP_AT_LINE_M;
+}
+
+/** One frame of the line window's standstill clock — see `stepLineStandstill`. */
+export interface LineStandstill {
+  /** Session second the CURRENT standstill inside the line window began; undefined while moving or anywhere else. */
+  restSinceSec: number | undefined;
+  /** That standstill has lasted the rule engine's own dwell: a full stop MADE at the line. */
+  made: boolean;
+}
+
+/**
+ * THE STANDSTILL MADE AT THE LINE, ONE FRAME — the clock `stepReachZone`'s «…AND, WHERE THE GATE SAYS SO, THE STOP IS
+ * MADE AT THE LINE» block describes, lifted out verbatim so that it has one implementation: at the rule engine's own
+ * speed (`fullStopMaxSpeedKmh`) inside `reachZoneInLineWindow`, for the rule engine's own dwell
+ * (`fullStopMinDurationSec`); it restarts the moment the car moves or leaves the window, so only a standstill MADE in
+ * the window reaches the dwell. The caller carries `restSinceSec` between frames.
+ */
+export function stepLineStandstill(
+  params: Pick<ReachZoneParams, "x" | "y" | "radiusM" | "acceptBeforeMarkM">,
+  approachFrom: Vec2 | null,
+  tick: Pick<SimTick, "t" | "speedKmh" | "position">,
+  restSinceSec: number | undefined,
+): LineStandstill {
+  const standingStill = Math.abs(tick.speedKmh) <= DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh;
+  const since =
+    standingStill && reachZoneInLineWindow(params, approachFrom, tick.position) ? (restSinceSec ?? tick.t) : undefined;
+  return {
+    restSinceSec: since,
+    made: since !== undefined && tick.t - since >= DEFAULT_RULE_CONFIG.fullStopMinDurationSec,
+  };
+}
+
 function stepReachZone(
   params: WitnessedReachZoneParams,
   prev: ObjectiveEvalState,
@@ -5179,12 +5240,13 @@ function stepReachZone(
   // applies through `inAcceptance`).
   const lineDemand = params.requireFullStop === true && params.requireStopAtLine === true;
   const standingStill = speedKmh <= DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh;
-  const inLineWindow = inAcceptance && (alongMark === null || alongMark >= -FULL_STOP_AT_LINE_M);
-  const lineRestSinceSec =
-    lineDemand && standingStill && inLineWindow ? (st.lineRestSinceSec ?? tick.t) : undefined;
-  const lineStopMade =
-    lineRestSinceSec !== undefined &&
-    tick.t - lineRestSinceSec >= DEFAULT_RULE_CONFIG.fullStopMinDurationSec;
+  //
+  // ONE IMPLEMENTATION (a401e4a7 round 3): the window and its clock are `stepLineStandstill`, which `lessons/engine.ts`
+  // also runs — in every chain state — to decide the Б2 ★ on this line, so the task and the praise cannot disagree
+  // about where «на линията» is.
+  const lineRest = lineDemand ? stepLineStandstill(params, approachFrom, tick, st.lineRestSinceSec) : undefined;
+  const lineRestSinceSec = lineRest?.restSinceSec;
+  const lineStopMade = lineRest?.made === true;
   // THE STOP THIS REFUSES, measured so it can be explained (THEO-4): the same
   // dwell, made where the shipped gate WOULD have credited it — the acceptance
   // or the armed capsule — but further back than the window. It certifies

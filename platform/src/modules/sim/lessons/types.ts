@@ -1921,6 +1921,17 @@ export interface LessonSessionState {
    */
   taskCapMarkWatch?: TaskCapMarkWatch;
   /**
+   * WHERE THE FULL STOP WAS MADE AT A `requireStopAtLine` GATE'S LINE, WATCHED WHATEVER THE CHAIN IS DOING
+   * (sc-merge-from-property:a401e4a7 round 3). The gate's own evaluator answers that only while the gate is the active
+   * objective; a chain stalled before it leaves the gate pending for the whole drive, and the rule engine's «★
+   * Правилно спиране на знак Б2» — commended on recency, wherever the stop was made — then praised a stop 4 m short
+   * of the line on the sheet that lists the task undone. One entry per such gate, keyed by objective index, stepped
+   * on every frame from the first posed one by `lessons/engine.ts stepStopLineWatch` with the gate's own
+   * window and clock (`objectives.ts stepLineStandstill`). Read on the frame a FULL_STOP_AT_STOP_SIGN is minted.
+   * Absent on every lesson with no such gate, so every other session state is byte-identical.
+   */
+  stopLineWatch?: Record<number, StopLineWatch>;
+  /**
    * EVERY TASK CEILING THIS DRIVE BLEW AND WAS GRADED FOR — round 3 (verifier
    * R4). One row per latch, written on the latch's first STAMPED frame (so a cap
    * at or above the sign, the halt band and exam rungs never write one) — or,
@@ -2270,6 +2281,22 @@ export interface TaskCapMarkWatch {
   objectiveIndex: number;
   /** The approach axis its evaluator graded it on (`approachFrom` on its final eval state). */
   approachFrom: { x: number; y: number };
+}
+
+/** One `requireStopAtLine` gate's line, watched in every chain state — see `LessonSessionState.stopLineWatch`. */
+export interface StopLineWatch {
+  /** The car's position on the previous watched frame (the ring-entry edge is read off it); null before the first. */
+  prevPos: { x: number; y: number } | null;
+  /** The approach axis, latched and re-latched exactly as the gate's evaluator does (`reachZoneApproachAxis`). */
+  approachFrom: { x: number; y: number } | null;
+  /** `stepLineStandstill`'s clock: when the current standstill inside the line window began. */
+  lineRestSinceSec?: number;
+  /**
+   * A full stop was MADE inside the line window on this visit to the mark. Set when the clock reaches the dwell;
+   * cleared when the car leaves the mark's neighbourhood (the disc plus `REACH_ZONE_GRACE_M`), so each approach is
+   * judged on its own standstill.
+   */
+  stoodAtLine: boolean;
 }
 
 /** The task ceiling's latch — see `LessonSessionState.taskCapLatch`. */

@@ -78,6 +78,7 @@ import {
   restFaultVoidsObjective,
   solidLineFaultVoidsObjective,
   speedFaultVoidsObjective,
+  stepLineStandstill,
   stepObjective,
   stopSignRollVoidsObjective,
   yieldFailedVoidsObjective,
@@ -124,6 +125,7 @@ import type {
   ObjectiveOutcome,
   SessionNearMiss,
   SpeedingSettleTick,
+  StopLineWatch,
   TaskCapBreach,
   TaskCapLatch,
   TaskCapMarkWatch,
@@ -732,6 +734,44 @@ function taskCapMarkWatchOnCompletion(
   const along = alongMarkOf(params, evalState.approachFrom, tick.position);
   if (along === null || !(along < 0)) return undefined;
   return { objectiveIndex, approachFrom: { x: evalState.approachFrom.x, y: evalState.approachFrom.y } };
+}
+
+/**
+ * WHERE THE FULL STOP AT A `requireStopAtLine` LINE WAS MADE, ONE FRAME — in every chain state
+ * (`LessonSessionState.stopLineWatch`, sc-merge-from-property:a401e4a7 round 3).
+ *
+ * For each gate that authors the key, whatever its status (pending, active, done): the approach axis is latched on the
+ * ring-entry edge by the evaluator's own `reachZoneApproachAxis`, and the standstill is timed by the evaluator's own
+ * `stepLineStandstill` — the gate's window (the disc, not past the paint, within `FULL_STOP_AT_LINE_M` of the mark),
+ * the rule engine's speed and dwell. No second window and no second number: this is the function the gate's ✓ runs.
+ *
+ * `stoodAtLine` is the answer: a full stop was MADE in the window on this visit to the mark. It is set on the frame
+ * the dwell is reached and it holds while the car stays in the mark's neighbourhood — the disc plus
+ * `REACH_ZONE_GRACE_M`, the ring the axis is latched on — so that it is still there when the car crosses the paint
+ * (a stop at the line followed by a creep over it is a stop at the line), and it is cleared when the car leaves that
+ * ring, so that a second approach is judged on its own standstill and not on one made minutes earlier.
+ *
+ * The caller steps it only once the car is posed (`posedAtSec`): the scene's placeholder frames at the district
+ * origin are not a stop anyone made.
+ */
+function stepStopLineWatch(prev: LessonSessionState, tick: SimTick): Record<number, StopLineWatch> | undefined {
+  let next: Record<number, StopLineWatch> | undefined;
+  for (let i = 0; i < prev.objectives.length; i++) {
+    const p = prev.objectives[i].params;
+    if (p.kind !== "reachZone" || p.requireStopAtLine !== true) continue;
+    const w = prev.stopLineWatch?.[i];
+    const here = { x: tick.position.x, y: tick.position.y };
+    const approachFrom = reachZoneApproachAxis(p, w?.prevPos ?? null, w?.approachFrom ?? null, here).approachFrom;
+    const rest = stepLineStandstill(p, approachFrom, tick, w?.lineRestSinceSec);
+    const atTheMark = Math.hypot(here.x - p.x, here.y - p.y) <= p.radiusM + REACH_ZONE_GRACE_M;
+    (next ??= {})[i] = {
+      prevPos: here,
+      approachFrom,
+      ...(rest.restSinceSec !== undefined ? { lineRestSinceSec: rest.restSinceSec } : {}),
+      stoodAtLine: atTheMark && (w?.stoodAtLine === true || rest.made),
+    };
+  }
+  return next;
 }
 
 function stepTaskCapLatch(
@@ -3152,49 +3192,59 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   }
 
   /*
-   * THE Б2 STAR FOLLOWS THE GATE THAT SAYS WHERE THE STOP IS MADE (sc-merge-from-property:a401e4a7, founder ruling
-   * 2026-10-04 «Within ~1 m»).
+   * THE Б2 STAR FOLLOWS WHERE THE FULL STOP WAS MADE (sc-merge-from-property:a401e4a7, founder ruling 2026-10-04
+   * «Within ~1 m»).
    *
    * `rules/engine.ts` commends FULL_STOP_AT_STOP_SIGN on RECENCY alone — a qualifying full stop within
    * `stopRecencySec` MOVING seconds of the paint, wherever it was made — and that is its documented design: Б2 is stop
    * AND give way, and the wait for a gap must not bill. A gate that authors `requireStopAtLine` asks a narrower
-   * question, and asks it in the only frame that can answer it (the car centre against the authored mark, within
-   * `FULL_STOP_AT_LINE_M`, objectives.ts). On that lesson the two disagreed on one sheet: a full stop ~4 m short, then
-   * a roll over the line, printed «★ Правилно спиране на знак Б2 — Спря напълно на стоп-линията…» beside the gate's
-   * own «Спря, но преди линията» and an undone «Спри напълно на Б2 на изхода».
+   * question, in the only frame that can answer it: the car centre against the authored mark, inside the line window
+   * (`objectives.ts reachZoneInLineWindow`, `FULL_STOP_AT_LINE_M`). On that lesson the two disagreed on one sheet: a
+   * full stop ~4 m short, then a roll over the line, printed «★ Правилно спиране на знак Б2 — Спря напълно на
+   * стоп-линията…» beside an undone «Спри напълно на Б2 на изхода».
    *
-   * WHY HERE AND NOT IN THE ENGINE. The engine has no mark and no approach axis; a position window there would be a
-   * second implementation of «at the line» in a second frame (the tick's `nextStopLineM` is measured to the paint, the
-   * gate to its mark 1.3 m behind it), and two implementations of «пълно спиране» is the defect this file keeps
-   * removing (`qualifyingStopCurrent`). The gate's verdict is read instead — ONE authority — off this frame's settled
-   * state. (On every reachable drive the gate cannot tick ON the crossing frame: the runtime fires the crossing with
-   * the car centre already past the paint, which is the gate's acceptance cut — measured on shadow-correct, x 27.689
-   * against paint 27.73. Reading the settled state keeps it true if that ever changes.)
+   * WHY HERE AND NOT IN THE RULE ENGINE. It has no mark and no approach axis; a position window there would be a second
+   * implementation of «at the line» in a second frame (the tick's `nextStopLineM` is measured to the paint, the gate to
+   * its mark 1.3 m behind it), and two implementations of «пълно спиране» is the defect this file keeps removing
+   * (`qualifyingStopCurrent`). So the gate's own window and clock are run instead — `stepStopLineWatch`, ONE function
+   * with the gate's ✓.
+   *
+   * THE RULE IS POSITION, NOT CHAIN STATUS (round 3, the w77 judge). Round 2 read the gate's verdict and withdrew the
+   * star only where the gate had been the ACTIVE objective and refused the stop — so on a chain stalled before it (the
+   * walker task missed, «Спри напълно на Б2 на изхода» pending for the rest of the drive) the identical short stop
+   * kept the star, on the sheet that lists the task undone, with nothing to explain either. The gate's status says
+   * whether the TASK was being measured; it says nothing about where the car stood. The watch measures that on every
+   * frame, whatever the gate is doing, so:
+   *   · a full stop made INSIDE the window keeps the star whether the gate is pending, active or done (a lawful stop
+   *     at the line on a stalled chain keeps it — verifier Act B);
+   *   · a stop SHORT of the window loses it whether the gate is pending, active or done.
    *
    * WHAT IT WITHDRAWS, AND ONLY THAT. A FULL_STOP_AT_STOP_SIGN minted on this frame is dropped — from the scored ledger
-   * and from the glass, the CLEAN_DRIVING withdrawal's own mechanics above — only when a `requireStopAtLine` gate
-   * covering this line (the crossing within its radius plus REACH_ZONE_GRACE_M of its mark, the reach of the capsule
-   * the gate measures in) ACTUALLY MEASURED THE APPROACH AND REFUSED IT: it was the active objective coming into this
-   * frame and it is still not done after it. The line's paint is the gate's acceptance cut, so once the car crosses it
-   * with the gate active and undone the gate can no longer tick: the task has refused the stop, and the star would say
-   * the opposite. Nothing is BILLED: the engine accepted the stop and STOP_SIGN_NO_FULL_STOP is untouched — only the
-   * praise goes. A lesson with no such gate never enters the loop, so every other stop-sign lesson is byte-identical.
+   * and from the glass, the CLEAN_DRIVING withdrawal's own mechanics above — when a `requireStopAtLine` gate covers
+   * this line (the crossing within its radius plus REACH_ZONE_GRACE_M of its mark, the reach of the capsule the gate
+   * measures stops in) and no full stop was made in its window on this visit to the mark. Nothing is BILLED: the rule
+   * engine accepted the stop and STOP_SIGN_NO_FULL_STOP is untouched — only the praise goes. A lesson with no such gate
+   * has no watch and never enters the loop, so every other stop-sign lesson is byte-identical. A gate whose watch has
+   * no entry yet (no posed frame) is not read: unknown is never a refusal.
    *
-   * A GATE THAT NEVER RAN NEVER COSTS A STAR (round 2, verifier V-B1). On a chain that stalled before the gate — the
-   * walker task missed, so «Спри напълно на Б2 на изхода» stays pending — the gate measured nothing and refused
-   * nothing, and a lawful full stop at the line keeps the engine's star even though the row prints undone. The same
-   * holds for a gate activated ON the crossing frame: its one evaluation is a frame on which it cannot accept, so the
-   * pre-frame status is the one that says whether it was watching. The disclosed cost: a stop short of the line on a
-   * stalled chain also keeps the engine's recency star, because nothing that measures «at the line» was running.
+   * WHAT IT DOES NOT DO: mint. The star is the rule engine's or nobody's. A student who rolls the paint after a short
+   * stop, reverses back to the mark, stands there and goes gets the gate's ✓ and no star — the engine's one-act-one-bill
+   * latch (`ACT_REVERSE_REOPEN_M`) treats the second crossing as the same act and mints nothing for it, and the one it
+   * minted on the first crossing was for the short stop. Where the engine does mint one for the stop at the line (the
+   * act re-opened by 20 m of reverse), it is kept.
    */
-  if (scoredEvents.some((e) => e.kind === "commendation" && e.code === "FULL_STOP_AT_STOP_SIGN")) {
-    const refusedHere = objectives.some((o, i) => {
+  const stopLineWatch = posedAtSec !== undefined ? stepStopLineWatch(prev, tick) : prev.stopLineWatch;
+  if (
+    stopLineWatch !== undefined &&
+    scoredEvents.some((e) => e.kind === "commendation" && e.code === "FULL_STOP_AT_STOP_SIGN")
+  ) {
+    const madeShortOfLine = objectives.some((o, i) => {
       const p = o.params;
       if (p.kind !== "reachZone" || p.requireStopAtLine !== true) return false;
-      if (prev.objectives[i]?.status !== "active" || o.status !== "active") return false;
-      return Math.hypot(tick.position.x - p.x, tick.position.y - p.y) <= p.radiusM + REACH_ZONE_GRACE_M;
+      if (Math.hypot(tick.position.x - p.x, tick.position.y - p.y) > p.radiusM + REACH_ZONE_GRACE_M) return false;
+      return stopLineWatch[i]?.stoodAtLine === false;
     });
-    if (refusedHere) {
+    if (madeShortOfLine) {
       for (let i = scoredEvents.length - 1; i >= 0; i--) {
         const e = scoredEvents[i];
         if (e.kind !== "commendation" || e.code !== "FULL_STOP_AT_STOP_SIGN") continue;
@@ -4051,6 +4101,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // Round 15: the capped mark a completed objective has yet to cross — set on the completing frame, carried by
       // `stepTaskCapMarkWatch` until it is crossed or left; written only when present or being cleared.
       ...(nextMarkWatch !== undefined || prev.taskCapMarkWatch !== undefined ? { taskCapMarkWatch: nextMarkWatch } : {}),
+      // a401e4a7 round 3: where the full stop was made at each `requireStopAtLine` line — only lessons that author one.
+      ...(stopLineWatch !== undefined ? { stopLineWatch } : {}),
       ...(capStep.breach !== undefined
         ? { taskCapBreaches: [...(prev.taskCapBreaches ?? []), capStep.breach] }
         : {}),

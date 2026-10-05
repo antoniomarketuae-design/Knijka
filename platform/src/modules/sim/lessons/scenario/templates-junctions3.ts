@@ -677,10 +677,12 @@ export const SC_JX_PRIO_TAILGATER: RearTailgaterSpec = {
  * standstill). With lineDistM 0 (the waiter's honest value) the commit lands at
  * d = 22, i.e. 1.7 s, and NO creep speed can make the conflict; the field's
  * arithmetic is the only seam the runner offers for "decides to go while the
- * player is still far out", and nothing else reads it here (the sync branch is
- * unreachable — carDist 20 <= 28 pins the car at 0 until the commit — and
- * sawYield needs speedKmh <= 8, which a defensive L5 student at ~31 km/h never
- * reaches). Documented, not smuggled.
+ * player is still far out", and the sync branch does not read it here (it is
+ * unreachable — carDist 20 <= 28 pins the car at 0 until the commit).
+ * Documented, not smuggled.
+ *
+ * ONE MORE THING READS IT, and this note used to say nothing did: the runner's
+ * yield pose. See `junctionControl` below.
  *
  * Tuned against the blind-priority demo until the crash is EMERGENT: measured
  * closest approach 0.3 m, so the runner's own contact test (VEHICLE_CONTACT_M
@@ -698,7 +700,44 @@ export const SC_JX_PRIO_CREEPER: PriorityFromRightSpec = {
   kind: "priorityFromRight",
   libraryEventId: "JU-04",
   junction: { nodeId: "tj-n-c", x: 0, y: 0 },
-  junctionControl: "stopLine",
+  // ── THE SAME KEY, THE SAME DEFECT, ONE RUNG UP ─────────────────────────────
+  // (audit sc-jx-priority-confidence:9c987e7b, the commendation clause;
+  // measured 2026-10-04 at 1988426 through compileScenario(L5) →
+  // createLessonSession → recordScriptedDrive → applyTick → buildDebrief.)
+  //
+  // The waiter's note above moved ITS key off "stopLine" and left this one,
+  // under a docblock asserting that `sawYield` „needs speedKmh <= 8, which a
+  // defensive L5 student at ~31 km/h never reaches". True of that student. The
+  // runner's yield pose is `playerLineDist <= 14` with `playerLineDist =
+  // max(0, d − lineDistM)`, so `lineDistM: 34` below — a commit-distance dial,
+  // not a line — moves the pose to 32–48 m from the node, and ANY car at
+  // ≤ 8 км/ч for one second in that band while this car crosses was handed
+  // {prioritySituation, give-way, yielded}:
+  //
+  //   the add-stops tape (12 × 3 s halts, 18 км/ч) … praise at t = 51.77, on a
+  //       drive the same debrief refuses for STOPPED_WITHOUT_CAUSE
+  //   one 6 s stop at x = −45 ………………………………… praised AND refused, one halt
+  //   one 2 s stop at x = −40 ………………………………… praised
+  //   a 6 км/ч crawl, no halt at all ……………………… praised
+  //
+  // WHY NONE OF THEM IS A YIELD. The card reads «Пропусна превозното средство
+  // с предимство». This car drives the stem, and the built world's only sign
+  // line at tj-n-c is the Б2 on that edge: it is the one obliged to give way,
+  // and running its sign does not hand it the priority. A student who waits
+  // with this car in his corridor has done something sensible, and the
+  // needless-stop detector does not bill that wait (a body within 45 m,
+  // rules/engine.ts; measured unbilled at x = −40, −36, −30 and −12) — but he
+  // has not „отстъпил предимство", and instruction 2 of this very lesson tells
+  // him not to. So the runner may not mint that sentence for this car either.
+  //
+  // WHAT DOES NOT MOVE. The outcome label is `sawYield ? "yielded" : "clear"`
+  // whatever this key says, the crossing and the contact test are untouched,
+  // and the three authored drives never reach the pose (the trace gate's zero
+  // prioritySituation events). `yield-praise-needs-a-priority-vehicle.test.ts`
+  // holds the class: every staged priority car in the catalogue is read
+  // against debugStopLines(), and one that approaches behind its own Б2/Б1 may
+  // not be "stopLine".
+  junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["tj-n-s", "tj-n-c", "tj-n-w"],
     hold: { nodeIndex: 1, offsetM: -20 }, // already 7.7 m over the Б2
@@ -909,6 +948,32 @@ export const SC_JX_PRIORITY_CONFIDENCE: ScenarioSpec = {
       level: 5,
       conditions: { weather: "rain" },
       stagedAdd: [SC_JX_PRIO_CREEPER],
+      // THE RUNG'S OWN WORDS, because the ladder's were false here (audit
+      // sc-jx-priority-confidence:9c987e7b). Left to compose the line itself,
+      // compile.ts names a `priorityFromRight` actor with its stored phrase for
+      // the kind — a car from the right that HAS priority — and this is the
+      // one rung in the catalogue that phrase reached (measured: 1 of 1). On
+      // this map the added car is the creeper, behind a Б2: the briefing told
+      // the student to expect a priority he does not owe, on the lesson whose
+      // instruction 2 is not to give it.
+      //
+      // `adds` and `titleBg` are exactly what the compiler measures and writes
+      // for this rung, and the rain sentence is the ladder's reviewed copy
+      // verbatim (it carries the lamp duty the rung grades). Only the tail is
+      // new — the ladder's own tail with the false clause replaced, two short
+      // sentences because this line is also what the overlay holds the
+      // session on — and it cites what it claims: чл. 50, ал. 1 for „длъжна
+      // да те пропусне", чл. 20, ал. 2 for slowing when the danger appears,
+      // both retrieved from content/law/acts/zdvp.json, the Б2 face from
+      // content/signs/signs.json. „Предимството ти не я спира" is the teach
+      // block's own whyBg.
+      complication: {
+        adds: ["weather", "traffic", "actor"],
+        titleBg: "В дъжд + Още един участник",
+        coachBg:
+          "Вече вали: включи чистачките и късите светлини — в дъжд светлините са колкото за да виждаш, толкова и за да те виждат. Карай по-бавно, отколкото на сухо, и остави повече място отпред: мократа настилка удължава спирачния път още преди да си усетил, че се хлъзга. Освен това се появява кола отдясно, която е длъжна да те пропусне на своя знак Б2 „Спри!“, но потегля пред теб. Предимството ти не я спира — гледай по-далеч напред и намали навреме.",
+        lawRef: "ЗДвП чл. 70; чл. 20, ал. 2; чл. 50, ал. 1",
+      },
     },
   ],
   staged: [SC_JX_PRIO_WAITING_CAR, SC_JX_PRIO_TAILGATER],

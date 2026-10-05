@@ -1091,6 +1091,15 @@ export interface PriorityFromRightSpec extends StagedEventBase {
    * stop-line give-way check needs the orchestrator to emit the yielded
    * commendation itself; the uncontrolled right-hand-rule tracker emits its
    * own on leaving the junction.
+   *
+   * "stopLine" is therefore a CLAIM ABOUT THE CAR: it has priority over the
+   * student, and waiting for it is «отстъпено предимство». Author it only
+   * where the built world agrees — no Б2/Б1 line on the car's own approach,
+   * one on another. A car staged BEHIND its own sign (the student rides the
+   * priority road) takes "uncontrolled": the runner still stages, crosses and
+   * labels the outcome, and never commends a yield nobody owed.
+   * `yield-praise-needs-a-priority-vehicle.test.ts` reads every spec against
+   * `debugStopLines()` and fails on one that says otherwise.
    */
   junctionControl?: "stopLine" | "uncontrolled";
   actor: StagedActorPathSpec;

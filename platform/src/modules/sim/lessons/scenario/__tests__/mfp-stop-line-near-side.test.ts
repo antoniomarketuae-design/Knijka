@@ -15,6 +15,10 @@
  * which is where both committed recordings come to rest. The distance is the one
  * constant `FULL_STOP_AT_LINE_M` in objectives.ts.
  *
+ * THE PRAISE FOLLOWS THE SAME LINE (sc-merge-from-property:a401e4a7, §5–§6). The rule engine's «★ Правилно спиране
+ * на знак Б2» is commended on recency, wherever the stop was made; on this lesson it is kept only when a full stop
+ * was made inside the gate's line window — whether the gate was pending, active or done — and nothing is billed.
+ *
  * Everything here is driven through the production chain the student plays:
  * compileScenario(L1..L5) → createLessonSession → applyTick on every recorder
  * frame → buildLessonResult. The tapes are the recorder's own kinematic car on
@@ -33,7 +37,7 @@ import { recordScriptedDrive, type DriveScript, type DriveStep } from "../../../
 import { COMMENDATIONS } from "../../../rules";
 import { buildDebrief } from "../../debrief";
 import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
-import { FULL_STOP_AT_LINE_M, REACH_ZONE_GRACE_M, parseObjectiveParams } from "../../objectives";
+import { FULL_STOP_AT_LINE_M, REACH_ZONE_GRACE_M, parseObjectiveParams, reachZoneInLineWindow } from "../../objectives";
 import type { LessonObjective } from "../../../contracts";
 import { compileScenario } from "../compile";
 import type { ScenarioLevel } from "../types";
@@ -73,6 +77,15 @@ const MARK_X = (() => {
   const o = SC_MERGE_FROM_PROPERTY.success.find((s) => s.id === GATE)!;
   if (o.params.kind !== "reachZone") throw new Error("sc-mfp-stop-line is not a reachZone");
   return o.params.x;
+})();
+/**
+ * Where the gate's acceptance ends — its authored paint cut (`acceptBeforeMarkM`, signed from the mark), read from
+ * the template. The exit runs westbound along y = 4.06, so the cut is the x at which the car centre is past the line.
+ */
+const X_CUT = (() => {
+  const o = SC_MERGE_FROM_PROPERTY.success.find((s) => s.id === GATE)!;
+  if (o.params.kind !== "reachZone" || o.params.acceptBeforeMarkM === undefined) throw new Error("sc-mfp-stop-line has no paint cut");
+  return o.params.x + o.params.acceptBeforeMarkM;
 })();
 
 /**
@@ -138,6 +151,11 @@ interface Drive {
   /** The walker task the Б2 gate follows in the chain. */
   walkYieldDone: boolean;
   walkYieldAtSec: number | null;
+  /** The gate's status coming into, and going out of, every frame on which the car centre passed the paint westbound. */
+  gateOverLine: Array<{ t: number; before: string; after: string }>;
+  /** The approach axis the gate's own evaluator graded on, and the one the chain-independent watch holds (round 3). */
+  gateAxis: unknown;
+  watchAxis: unknown;
 }
 
 /** A compiled-lesson edit, for the controls that need the gate moved or its key withdrawn. */
@@ -156,10 +174,17 @@ function drive(
   const cards: Drive["cards"] = [];
   const toasts: Drive["toasts"] = [];
   let gateEverActive = false;
+  const gateOverLine: Drive["gateOverLine"] = [];
+  const gateIndex = lesson.objectives.findIndex((o) => o.id === GATE);
   record((tick) => {
+    const last = ticks[ticks.length - 1];
     ticks.push(tick);
+    const before = session.objectives[gateIndex].status;
     const step = applyTick(session, tick);
     session = step.state;
+    if (last !== undefined && last.position.x > X_CUT && tick.position.x <= X_CUT) {
+      gateOverLine.push({ t: tick.t, before, after: session.objectives[gateIndex].status });
+    }
     if (session.objectives.some((o) => o.spec.id === GATE && o.status === "active")) gateEverActive = true;
     for (const e of step.hudEvents) {
       if (e.kind === "lesson") cards.push({ t: tick.t, titleBg: e.titleBg, explanationBg: e.explanationBg, peekBg: e.peekBg });
@@ -181,6 +206,9 @@ function drive(
     gateEverActive,
     walkYieldDone: result.objectives.find((o) => o.id === WALK_GATE)!.done,
     walkYieldAtSec: result.objectives.find((o) => o.id === WALK_GATE)!.completedAtSec,
+    gateOverLine,
+    gateAxis: (session.evalStates[gateIndex] as { approachFrom?: unknown }).approachFrom ?? null,
+    watchAxis: session.stopLineWatch?.[gateIndex]?.approachFrom ?? null,
   };
 }
 
@@ -276,8 +304,9 @@ describe("§1 a full stop ~3.9 m short of the line (w50 mobile-right) does not t
     // sc-merge-from-property:a401e4a7. `rules/engine.ts` Б2 branch commends on recency alone (a qualifying stop whose
     // MOVING seconds since are ≤ stopRecencySec 6), and this tape spends ~2 s moving between the halt and the paint —
     // so until the repair the engine's star praised exactly the stop the task above refuses. The praise is withdrawn
-    // where the task's verdict is known; the BILL is untouched (the engine accepted this stop and still does: only the
-    // praise goes, never a new −10 — the wait for a gap must not bill).
+    // because no full stop was made in the gate's line window (round 3: by position, whatever the chain was doing — §6);
+    // the BILL is untouched (the engine accepted this stop and still does: only the praise goes, never a new −10 — the
+    // wait for a gap must not bill).
     for (const { level, d } of runs) {
       expect(d.violations, `L${level}`).not.toContain("STOP_SIGN_NO_FULL_STOP");
       expect(d.commendations, `L${level}`).not.toContain("FULL_STOP_AT_STOP_SIGN");
@@ -421,7 +450,7 @@ describe("§3b the qualifying standstill is made AT the line, and the rule engin
 });
 
 // ---------------------------------------------------------------------------
-// §5 — THE Б2 STAR FOLLOWS THE GATE (sc-merge-from-property:a401e4a7)
+// §5 — THE Б2 STAR FOLLOWS THE GATE'S LINE (sc-merge-from-property:a401e4a7; rounds 1–2, the position rule is §6)
 // ---------------------------------------------------------------------------
 
 /** The compiled lesson with this gate's `requireStopAtLine` withdrawn — every other gate in the catalogue's shape. */
@@ -526,9 +555,9 @@ describe("§5 the engine's «★ Правилно спиране на знак �
     }
   });
 
-  // A GATE THAT NEVER RAN NEVER COSTS A STAR (round 2, verifier V-B1/V-B2). The star is withdrawn only where the
-  // stop-line gate actually measured the approach and refused the stop — never because its row prints undone on a
-  // chain that stalled before it.
+  // A LAWFUL STOP AT THE LINE KEEPS ITS STAR ON A STALLED CHAIN (round 2, verifier V-B1/V-B2; pinned through round 3).
+  // The star is never withdrawn because the gate's row prints undone on a chain that stalled before it: it follows
+  // where the full stop was made (§6), and this one was made inside the line window.
   it("Act B (verifier, round 1): the walker task missed, so the chain stalls and the Б2 gate never runs — a lawful full stop AT the line, zero bills, keeps its ★ on the sheet, the glass and the debrief", () => {
     // The verifier's own tape: wait for the walker 10.5 m behind the walk-yield mark, glance both ways, cross the
     // cleared тротоар at 10 km/h with no second stop (over the walk-yield's 5 km/h cap, so that task is missed and the
@@ -570,45 +599,416 @@ describe("§5 the engine's «★ Правилно спиране на знак �
     }
   });
 
-  it("…and a gate that only becomes active ON the crossing frame measured nothing either: the ★ minted on that frame stays", () => {
+  it("…and the frame the gate became active on decides nothing (round 3): activated ON the crossing frame, a stop made only for the walker still loses the ★ and a full stop AT the line still keeps it", () => {
     // The walker task moved (in the test only) so its disc is entered on the very frame the engine mints the star —
     // the crossing of the paint, where the car centre is already past the Б2 gate's acceptance cut. The Б2 gate is
-    // activated and evaluated once, on a frame on which it cannot accept anything, so it has refused nothing.
-    const tape = scripted(rollOut(X_WALK_REST, 13));
-    for (const level of [1, 5] as const) {
-      const probe = drive(level, tape, undefined, withoutLineKey);
+    // pending for the whole approach and is evaluated once, on a frame on which it cannot accept anything. Round 2
+    // read that as «it refused nothing, so the ★ stays» for ANY stop; the star now follows where the standstill was
+    // made, so the gate's status on that frame is not consulted at all.
+    const walkerOnly = scripted(rollOut(X_WALK_REST, 13));
+    const atLine = scripted([...restAt(MARK_X, 2), ...rollOut(MARK_X, 13)]);
+    const R = 3;
+    /** The walker task re-authored as a disc whose near edge lies between the two frames the star is minted across. */
+    const walkOnTheCrossing = (probe: Drive, level: number): { edit: LessonEdit; starT: number } => {
       const star = probe.commendationTimes.find((c) => c.code === "FULL_STOP_AT_STOP_SIGN")!;
       expect(star, `L${level}`).toBeDefined();
       const k = probe.ticks.findIndex((t) => t.t === star.t);
       expect(k, `L${level}`).toBeGreaterThan(0);
       const [xBefore, xAt] = [probe.ticks[k - 1].position.x, probe.ticks[k].position.x];
       expect(xAt, `L${level}`).toBeLessThan(xBefore);
-      const R = 3;
-      const walkOnTheCrossing: LessonEdit = (lesson) => ({
-        ...lesson,
-        objectives: lesson.objectives.map((o) =>
-          o.id !== WALK_GATE
-            ? o
-            : ({ ...o, params: { kind: "reachZone", x: (xBefore + xAt) / 2 - R, y: Y_EXIT, radiusM: R, maxSpeedKmh: 20 } } as typeof o),
-        ),
-      });
-      const d = drive(level, tape, undefined, walkOnTheCrossing);
-      // the act: the walker task completes on the star's own frame, so the Б2 gate's first frame is the crossing
-      expect({ level, walkYieldAtSec: d.walkYieldAtSec }).toEqual({ level, walkYieldAtSec: star.t });
-      expect({ level, gateEverActive: d.gateEverActive, done: d.done }).toEqual({ level, gateEverActive: true, done: false });
-      // the ★ the engine minted on that frame is kept
-      expect(d.commendations.filter((c) => c === "FULL_STOP_AT_STOP_SIGN").length, `L${level}`).toBe(1);
-      expect(d.toasts.filter((x) => x.titleBg === B2_STAR_TITLE).length, `L${level}`).toBe(1);
-      // the same edit with the Б2 gate made the first objective instead (active from the start, so it measured the
-      // whole approach) withdraws it — the frame of activation is the only difference
-      const measured = drive(level, tape, undefined, (l) => {
-        const e = walkOnTheCrossing(l);
-        const gate = e.objectives.find((o) => o.id === GATE)!;
-        return { ...e, objectives: [gate, ...e.objectives.filter((o) => o.id !== GATE)] };
-      });
-      expect({ level, gateEverActive: measured.gateEverActive, done: measured.done }).toEqual({ level, gateEverActive: true, done: false });
+      return {
+        starT: star.t,
+        edit: (lesson) => ({
+          ...lesson,
+          objectives: lesson.objectives.map((o) =>
+            o.id !== WALK_GATE
+              ? o
+              : ({ ...o, params: { kind: "reachZone", x: (xBefore + xAt) / 2 - R, y: Y_EXIT, radiusM: R, maxSpeedKmh: 20 } } as typeof o),
+          ),
+        }),
+      };
+    };
+    /** The same edit with the Б2 gate made the first objective instead — active from the spawn. */
+    const gateFirst = (edit: LessonEdit): LessonEdit => (l) => {
+      const e = edit(l);
+      const gate = e.objectives.find((o) => o.id === GATE)!;
+      return { ...e, objectives: [gate, ...e.objectives.filter((o) => o.id !== GATE)] };
+    };
+    const overLine = (d: Drive) => d.gateOverLine.map((g) => `${g.before}>${g.after}`);
+    for (const level of [1, 5] as const) {
+      // (a) a stop made only for the walker, ~8.5 m short of the mark: no ★, whenever the gate became active
+      const a = walkOnTheCrossing(drive(level, walkerOnly, undefined, withoutLineKey), level);
+      const d = drive(level, walkerOnly, undefined, a.edit);
+      // the act: the walker task completes on the star's own frame, so the Б2 gate is pending up to and into the
+      // crossing frame and its first evaluation is that frame
+      expect({ level, walkYieldAtSec: d.walkYieldAtSec }).toEqual({ level, walkYieldAtSec: a.starT });
+      expect({ level, overLine: overLine(d), gateEverActive: d.gateEverActive, done: d.done }).toEqual({ level, overLine: ["pending>active"], gateEverActive: true, done: false });
+      expect(d.commendations, `L${level}`).not.toContain("FULL_STOP_AT_STOP_SIGN");
+      expect(d.toasts.map((x) => x.titleBg), `L${level}`).not.toContain(B2_STAR_TITLE);
+      expect(d.debrief, `L${level}`).not.toContain(B2_STAR_TITLE);
+      // …and the same with the Б2 gate active for the whole approach
+      const measured = drive(level, walkerOnly, undefined, gateFirst(a.edit));
+      expect({ level, overLine: overLine(measured), done: measured.done }).toEqual({ level, overLine: ["active>active"], done: false });
       expect(measured.commendations, `L${level}`).not.toContain("FULL_STOP_AT_STOP_SIGN");
+
+      // (b) a full stop AT the line on the same two chains: the ★ stays in both
+      const b = walkOnTheCrossing(drive(level, atLine, undefined, withoutLineKey), level);
+      const late = drive(level, atLine, undefined, b.edit);
+      expect({ level, walkYieldAtSec: late.walkYieldAtSec }).toEqual({ level, walkYieldAtSec: b.starT });
+      // pending for the whole approach, first evaluated on a frame it cannot accept — its row stays undone, as in Act B
+      expect({ level, overLine: overLine(late), done: late.done }).toEqual({ level, overLine: ["pending>active"], done: false });
+      expect(late.commendations.filter((c) => c === "FULL_STOP_AT_STOP_SIGN").length, `L${level}`).toBe(1);
+      expect(late.toasts.filter((x) => x.titleBg === B2_STAR_TITLE).length, `L${level}`).toBe(1);
+      expect(late.debrief, `L${level}`).toContain(B2_STAR_TITLE);
+      const first = drive(level, atLine, undefined, gateFirst(b.edit));
+      expect({ level, overLine: overLine(first), done: first.done }).toEqual({ level, overLine: ["done>done"], done: true });
+      expect(first.commendations.filter((c) => c === "FULL_STOP_AT_STOP_SIGN").length, `L${level}`).toBe(1);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §6 — THE Б2 STAR FOLLOWS WHERE THE STANDSTILL WAS MADE, IN EVERY CHAIN STATE (a401e4a7 round 3, the w77 judge)
+// ---------------------------------------------------------------------------
+
+/**
+ * A chain STALLED at the walker task, the w77 judge's and the round-1 verifier's opening: wait for the walker 10.5 m
+ * behind the walk-yield mark, then cross the cleared тротоар at 10 km/h with no second stop — over that task's 5 km/h
+ * cap, so it is missed and «Спри напълно на Б2 на изхода» stays pending for the rest of the drive. Ends at rest at `x`.
+ */
+function stalledTo(x: number, sec: number): DriveStep[] {
+  return [
+    { kind: "glance", mirror: "left" },
+    { kind: "glance", mirror: "right" },
+    { kind: "drive", points: [[X_SPAWN, Y_EXIT], [48, Y_EXIT]], targetKmh: 18, stopAtEnd: true },
+    { kind: "pause", sec: 16, brake: true },
+    { kind: "glance", mirror: "right" },
+    { kind: "glance", mirror: "left" },
+    { kind: "drive", points: [[48, Y_EXIT], [x, Y_EXIT]], targetKmh: 10, stopAtEnd: true },
+    { kind: "pause", sec, brake: true },
+    { kind: "glance", mirror: "left" },
+    { kind: "glance", mirror: "right" },
+  ];
+}
+const hold = (sec: number): DriveStep => ({ kind: "pause", sec, brake: true });
+/** `rollOut` for a car already standing PAST the paint: straight on round the corner (no point back at the line). */
+function rollOutPastLine(x: number, kmh: number): DriveStep[] {
+  return [
+    { kind: "indicator", setting: "right" },
+    { kind: "drive", points: [[x, Y_EXIT], ...TURN_ARC], targetKmh: kmh, stopAtEnd: false },
+    { kind: "indicator", setting: "off" },
+    { kind: "drive", points: [[X_LANE, 22], [X_LANE, 70], [X_LANE, 120]], targetKmh: 45 },
+    { kind: "pause", sec: 1.5, brake: true },
+  ];
+}
+const forwardTo = (from: number, to: number): DriveStep => ({ kind: "drive", points: [[from, Y_EXIT], [to, Y_EXIT]], targetKmh: 10, stopAtEnd: true });
+const reverseTo = (from: number, to: number, kmh = 5): DriveStep => ({ kind: "drive", points: [[from, Y_EXIT], [to, Y_EXIT]], targetKmh: kmh, reverse: true, stopAtEnd: true });
+
+const stars = (d: Drive) => d.commendationTimes.filter((c) => c.code === "FULL_STOP_AT_STOP_SIGN");
+const starToasts = (d: Drive) => d.toasts.filter((x) => x.titleBg === B2_STAR_TITLE);
+/** Every standstill of at least the rule engine's dwell (≤ 1 km/h for ≥ 0.5 s): where it began and when. */
+function standstills(ticks: SimTick[]): Array<{ x: number; from: number; to: number }> {
+  const out: Array<{ x: number; from: number; to: number }> = [];
+  let run: SimTick[] = [];
+  const flush = () => {
+    if (run.length > 0 && run[run.length - 1].t - run[0].t >= 0.5) out.push({ x: run[0].position.x, from: run[0].t, to: run[run.length - 1].t });
+    run = [];
+  };
+  for (const t of ticks) {
+    if (Math.abs(t.speedKmh) <= 1) run.push(t);
+    else flush();
+  }
+  flush();
+  return out;
+}
+const GATE_TITLE = SC_MERGE_FROM_PROPERTY.success.find((s) => s.id === GATE)!.titleBg;
+
+describe("§6 the ★ follows WHERE the full stop was made — the gate's own line window — whatever the chain was doing", () => {
+  it("THE w77 JUDGE'S ACT: the walker task missed (chain stalled, gate pending before and after the paint), a full stop 4.0 m short, a 13 km/h roll over the line — no ★ on the sheet, the glass or the debrief, at L1/L3/L5, and nothing billed", () => {
+    const SHORT_X = 32.92;
+    const tape = scriptedFromSpawn([...stalledTo(SHORT_X, 2.5), ...rollOut(SHORT_X, 13)]);
+    for (const level of [1, 3, 5] as const) {
+      const shipped = drive(level, tape);
+      const keyless = drive(level, tape, undefined, withoutLineKey);
+      // the act is what it claims: the walker task missed, the Б2 gate pending coming into and going out of the crossing…
+      expect({ level, walkYieldDone: shipped.walkYieldDone, gateEverActive: shipped.gateEverActive, done: shipped.done }).toEqual({ level, walkYieldDone: false, gateEverActive: false, done: false });
+      expect(shipped.gateOverLine.map((g) => `${g.before}>${g.after}`), `L${level}`).toEqual(["pending>pending"]);
+      // …one full stop, ~4 m behind the mark and outside the line window, held 2.5 s, and a roll over the paint
+      const xs = restXs(shipped.ticks);
+      expect(xs.length, `L${level}`).toBeGreaterThan(0);
+      for (const x of xs) {
+        expect(Math.abs(x - SHORT_X), `L${level} rest x ${x}`).toBeLessThan(0.3);
+        expect(x - MARK_X, `L${level}`).toBeGreaterThan(FULL_STOP_AT_LINE_M);
+      }
+      const rest = shipped.ticks.filter((t) => Math.abs(t.speedKmh) <= 1 && Math.abs(t.position.x - SHORT_X) < 0.3);
+      expect(rest[rest.length - 1].t - rest[0].t, `L${level}`).toBeGreaterThanOrEqual(2.4);
+      expect(speedOverLine(shipped.ticks), `L${level}`).toBeGreaterThan(10);
+      expect(speedOverLine(shipped.ticks), `L${level}`).toBeLessThan(15);
+      // the engine commends it on recency (the key-less precondition: the ★ is its, on the crossing frame)…
+      expect(stars(keyless).map((c) => c.t), `L${level}`).toEqual([shipped.gateOverLine[0].t]);
+      expect(starToasts(keyless).length, `L${level}`).toBe(1);
+      // …and the lesson whose gate says the stop is made AT the line does not praise it, in any channel
+      expect(stars(shipped), `L${level}`).toEqual([]);
+      expect(starToasts(shipped), `L${level}`).toEqual([]);
+      expect(shipped.debrief, `L${level}`).not.toContain(B2_STAR_TITLE);
+      // the sheet still names the task as undone; it no longer prints the ★ beside it
+      expect(shipped.debrief, `L${level}`).toContain(GATE_TITLE);
+      // only praise is withdrawn — nothing is billed, with or without the key
+      expect(shipped.violations, `L${level}`).toEqual([]);
+      expect(keyless.violations, `L${level}`).toEqual([]);
+      // every other commendation of the drive is untouched
+      expect(shipped.commendations, `L${level}`).toEqual(keyless.commendations.filter((c) => c !== "FULL_STOP_AT_STOP_SIGN"));
+      expect(shipped.toasts.map((x) => x.titleBg), `L${level}`).toEqual(keyless.toasts.map((x) => x.titleBg).filter((x) => x !== B2_STAR_TITLE));
+    }
+  });
+
+  it(`ONE WINDOW, ONE CONSTANT, EVERY CHAIN STATE: a full stop up to FULL_STOP_AT_LINE_M (${FULL_STOP_AT_LINE_M} m) behind the mark keeps the ★ and one just beyond it loses it — the same on a stalled chain as on a running one, where it is exactly the gate's ✓`, () => {
+    // aim 8 cm past the wanted rest: the recorder settles ~0.04 m short of its target
+    const cases = [
+      { shortBy: 0.5, inWindow: true },
+      { shortBy: FULL_STOP_AT_LINE_M, inWindow: true },
+      { shortBy: FULL_STOP_AT_LINE_M + 0.23, inWindow: false },
+      { shortBy: FULL_STOP_AT_LINE_M + 0.58, inWindow: false },
+    ];
+    for (const { shortBy, inWindow } of cases) for (const level of [1, 5] as const) {
+      const x = MARK_X + shortBy - 0.08;
+      const label = `short ${shortBy} L${level}`;
+      const running = drive(level, scripted([...restAt(x, 2), ...rollOut(x, 13)]));
+      const stalled = drive(level, scriptedFromSpawn([...stalledTo(x, 2.5), ...rollOut(x, 13)]));
+      const keyless = drive(level, scriptedFromSpawn([...stalledTo(x, 2.5), ...rollOut(x, 13)]), undefined, withoutLineKey);
+      for (const d of [running, stalled]) for (const rx of restXs(d.ticks)) {
+        if (inWindow) expect(rx - MARK_X, label).toBeLessThanOrEqual(FULL_STOP_AT_LINE_M);
+        else expect(rx - MARK_X, label).toBeGreaterThan(FULL_STOP_AT_LINE_M);
+      }
+      // the engine mints the star for every one of these stops — it has no window
+      expect(stars(keyless).length, label).toBe(1);
+      // running chain: the gate was the active objective, and the ★ is its ✓
+      expect({ label, walkYieldDone: running.walkYieldDone, done: running.done }).toEqual({ label, walkYieldDone: true, done: inWindow });
+      expect({ label, stars: stars(running).length, toasts: starToasts(running).length, debrief: running.debrief.includes(B2_STAR_TITLE) }).toEqual({ label, stars: inWindow ? 1 : 0, toasts: inWindow ? 1 : 0, debrief: inWindow });
+      // …measured on ONE axis: the chain-independent watch latched the approach the gate's evaluator graded on
+      expect(running.watchAxis, label).not.toBeNull();
+      expect(running.watchAxis, label).toEqual(running.gateAxis);
+      // stalled chain: the gate never ran (pending over the paint) and the answer is the same
+      expect({ label, walkYieldDone: stalled.walkYieldDone, gateEverActive: stalled.gateEverActive }).toEqual({ label, walkYieldDone: false, gateEverActive: false });
+      expect({ label, stars: stars(stalled).length, toasts: starToasts(stalled).length, debrief: stalled.debrief.includes(B2_STAR_TITLE) }).toEqual({ label, stars: inWindow ? 1 : 0, toasts: inWindow ? 1 : 0, debrief: inWindow });
+      expect(stalled.violations, label).toEqual(keyless.violations);
+    }
+  });
+
+  it("the ★ is kept for a stop at the line that then CREEPS over the paint under 1 km/h (still «stopped» to the rule engine on the crossing frame, and by then past the window)", () => {
+    for (const level of [1, 5] as const) {
+      const tape = scriptedFromSpawn([
+        ...stalledTo(MARK_X, 2.5),
+        { kind: "drive", points: [[MARK_X, Y_EXIT], [27.2, Y_EXIT]], targetKmh: 0.9, stopAtEnd: false },
+        ...rollOutPastLine(27.2, 13),
+      ]);
+      const d = drive(level, tape);
+      expect(speedOverLine(d.ticks), `L${level}`).toBeLessThanOrEqual(1);
+      expect(d.gateOverLine.map((g) => `${g.before}>${g.after}`), `L${level}`).toEqual(["pending>pending"]);
+      expect(stars(d).length, `L${level}`).toBe(1);
+      expect(starToasts(d).length, `L${level}`).toBe(1);
+    }
+  });
+
+  it("V2-K2, WITH EVIDENCE — stop short, roll the paint, reverse back to the mark, stand in the window, go: the only ★ the rule engine mints on that drive is the FIRST crossing's, for the short stop, so it is withdrawn; it mints none for the second crossing, so there is none to keep (✓ where the gate ran, no ★)", () => {
+    const SHORT_X = 32.92;
+    const correction: DriveStep[] = [forwardTo(SHORT_X, 26.6), hold(1), reverseTo(26.6, MARK_X), hold(2), ...rollOut(MARK_X, 13)];
+    const chains = [
+      { chain: "running", tape: scripted([...restAt(SHORT_X, 2), ...correction]), status: ["active>active", "done>done"], done: true },
+      { chain: "stalled", tape: scriptedFromSpawn([...stalledTo(SHORT_X, 2.5), ...correction]), status: ["pending>pending", "pending>pending"], done: false },
+    ];
+    for (const { chain, tape, status, done } of chains) for (const level of [1, 5] as const) {
+      const label = `${chain} L${level}`;
+      const shipped = drive(level, tape);
+      const keyless = drive(level, tape, undefined, withoutLineKey);
+      // the act: two crossings of the paint, and between them a ≥ 2 s standstill inside the line window
+      expect(shipped.gateOverLine.map((g) => `${g.before}>${g.after}`), label).toEqual(status);
+      const [first, second] = shipped.gateOverLine.map((g) => g.t);
+      const atLine = standstills(shipped.ticks).filter((r) => r.from > first && r.x > X_LINE && r.x - MARK_X <= FULL_STOP_AT_LINE_M);
+      expect(atLine.length, label).toBe(1);
+      expect(atLine[0].to - atLine[0].from, label).toBeGreaterThanOrEqual(1.9);
+      expect(atLine[0].to, label).toBeLessThan(second);
+      // THE EVIDENCE: without the key the engine mints exactly ONE star on the whole drive, on the first crossing —
+      // before the standstill at the line existed. The second crossing is the same act to its one-act-one-bill latch
+      // (rules/engine.ts billAct: only ACT_REVERSE_REOPEN_M = 20 m of reverse re-opens it), so nothing is minted there.
+      expect(stars(keyless).map((c) => c.t), label).toEqual([first]);
+      expect(stars(keyless)[0].t, label).toBeLessThan(atLine[0].from);
+      // that one star praises the SHORT stop, so the shipped lesson withdraws it; the gate, where it ran, ticks on the
+      // standstill at the line; and no star is invented for it
+      expect({ label, done: shipped.done }).toEqual({ label, done });
+      expect(stars(shipped), label).toEqual([]);
+      expect(starToasts(shipped), label).toEqual([]);
+      expect(shipped.debrief, label).not.toContain(B2_STAR_TITLE);
+      expect(shipped.violations, label).toEqual(keyless.violations);
+      expect(shipped.violations, label).not.toContain("STOP_SIGN_NO_FULL_STOP");
+    }
+  });
+
+  it("…and where the rule engine DOES mint one for the stop at the line it is kept: the same correction with the reverse taken past 20 m re-opens the act, the engine mints a second ★ on the second crossing, and the shipped lesson shows exactly that one", () => {
+    const SHORT_X = 32.92;
+    const far = 52;
+    const again: DriveStep[] = [forwardTo(SHORT_X, 26.6), hold(1), reverseTo(26.6, far, 10), hold(1), ...restAt(MARK_X, 2, far), ...rollOut(MARK_X, 13)];
+    const chains = [
+      { chain: "running", tape: scripted([...restAt(SHORT_X, 2), ...again]) },
+      { chain: "stalled", tape: scriptedFromSpawn([...stalledTo(SHORT_X, 2.5), ...again]) },
+    ];
+    for (const { chain, tape } of chains) for (const level of [1, 5] as const) {
+      const label = `${chain} L${level}`;
+      const shipped = drive(level, tape);
+      const keyless = drive(level, tape, undefined, withoutLineKey);
+      expect(shipped.gateOverLine.length, label).toBe(2);
+      const [first, second] = shipped.gateOverLine.map((g) => g.t);
+      // the engine: one star per crossing — the short stop's, then the at-line stop's
+      expect(stars(keyless).length, label).toBe(2);
+      expect(stars(keyless)[0].t, label).toBe(first);
+      expect(stars(keyless)[1].t, label).toBeGreaterThanOrEqual(second);
+      // the lesson: the short stop's is withdrawn, the at-line stop's is kept
+      expect(stars(shipped).map((c) => c.t), label).toEqual([stars(keyless)[1].t]);
+      expect(starToasts(shipped).length, label).toBe(1);
+      expect(shipped.debrief, label).toContain(B2_STAR_TITLE);
+      expect(shipped.violations, label).toEqual(keyless.violations);
+    }
+  });
+
+  it("EVERY APPROACH IS JUDGED ON ITS OWN STANDSTILL: a full stop at the line and a crossing (★), then back up the drive, a stop 4 m short and a roll — the engine commends both crossings, the lesson only the first, even with «Спри напълно на Б2» already ✓", () => {
+    const SHORT_X = 32.92;
+    const far = 52;
+    const second: DriveStep[] = [forwardTo(MARK_X, 26.6), hold(1), reverseTo(26.6, far, 10), hold(1), ...restAt(SHORT_X, 2, far), ...rollOut(SHORT_X, 13)];
+    const chains = [
+      { chain: "running", tape: scripted([...restAt(MARK_X, 2), ...second]), status: ["done>done", "done>done"] },
+      { chain: "stalled", tape: scriptedFromSpawn([...stalledTo(MARK_X, 2.5), ...second]), status: ["pending>pending", "pending>pending"] },
+    ];
+    for (const { chain, tape, status } of chains) for (const level of [1, 5] as const) {
+      const label = `${chain} L${level}`;
+      const shipped = drive(level, tape);
+      const keyless = drive(level, tape, undefined, withoutLineKey);
+      expect(shipped.gateOverLine.map((g) => `${g.before}>${g.after}`), label).toEqual(status);
+      const [first, secondT] = shipped.gateOverLine.map((g) => g.t);
+      expect(stars(keyless).length, label).toBe(2);
+      expect(stars(keyless)[1].t, label).toBe(secondT);
+      // the first approach's ★ stands; the second approach made no standstill at the line, and the one made at the
+      // line 20-odd seconds and 50 m of driving earlier does not answer for it
+      expect(stars(shipped).map((c) => c.t), label).toEqual([stars(keyless)[0].t]);
+      expect(stars(shipped)[0].t, label).toBeGreaterThanOrEqual(first);
+      expect(stars(shipped)[0].t, label).toBeLessThan(secondT);
+      expect(starToasts(shipped).length, label).toBe(1);
+      expect(shipped.violations, label).toEqual(keyless.violations);
+    }
+  });
+
+  it("…but ON one approach a full stop made at the line is not unmade by a second one further back: at the line, back off 4.5 m, stop, roll — the ★ stays, as the gate's own ✓ does", () => {
+    const backOff: DriveStep[] = [reverseTo(MARK_X, 33.5), hold(2), ...rollOut(33.5, 13)];
+    const chains = [
+      { chain: "running", tape: scripted([...restAt(MARK_X, 2), ...backOff]), done: true },
+      { chain: "stalled", tape: scriptedFromSpawn([...stalledTo(MARK_X, 2.5), ...backOff]), done: false },
+    ];
+    for (const { chain, tape, done } of chains) for (const level of [1, 5] as const) {
+      const label = `${chain} L${level}`;
+      const d = drive(level, tape);
+      // the act: a standstill in the window, then one ~4.5 m behind the mark, then one crossing
+      const rests = standstills(d.ticks).filter((r) => r.x < X_WALK_REST - 1 && r.x > X_LINE);
+      expect(rests.length, label).toBe(2);
+      expect(rests[0].x - MARK_X, label).toBeLessThanOrEqual(FULL_STOP_AT_LINE_M);
+      expect(rests[1].x - MARK_X, label).toBeGreaterThan(4);
+      expect(d.gateOverLine.length, label).toBe(1);
+      expect({ label, done: d.done }).toEqual({ label, done });
+      expect(stars(d).length, label).toBe(1);
+      expect(starToasts(d).length, label).toBe(1);
+    }
+  });
+
+  it("THE WINDOW ENDS AT THE PAINT, for the ✓ and the ★ alike: a stop 1.5 m short, a creep over the line and a full stop made just PAST it — the task is not ticked and nothing is praised", () => {
+    const back = MARK_X + 1.5;
+    const past = X_CUT - 0.4;
+    for (const level of [1, 5] as const) {
+      const tape = scripted([
+        ...restAt(back, 2),
+        { kind: "drive", points: [[back, Y_EXIT], [past, Y_EXIT]], targetKmh: 2.5, stopAtEnd: true },
+        hold(2),
+        ...rollOutPastLine(past, 13),
+      ]);
+      const shipped = drive(level, tape);
+      const keyless = drive(level, tape, undefined, withoutLineKey);
+      // the act: a full stop past the gate's paint cut and still inside its disc, reached under the 3 km/h cap
+      const beyond = standstills(shipped.ticks).filter((r) => r.x < X_CUT && r.x > MARK_X - 3);
+      expect(beyond.length, `L${level}`).toBe(1);
+      expect(beyond[0].to - beyond[0].from, `L${level}`).toBeGreaterThanOrEqual(1.9);
+      expect(shipped.ticks.filter((t) => t.position.x < back - 0.2 && t.position.x > past + 0.2).every((t) => Math.abs(t.speedKmh) <= 3), `L${level}`).toBe(true);
+      // the rule engine commends the creep (its stop 1.5 m back is recent), on the crossing frame — before the second stop
+      expect(stars(keyless).map((c) => c.t), `L${level}`).toEqual([shipped.gateOverLine[0].t]);
+      expect(stars(keyless)[0].t, `L${level}`).toBeLessThan(beyond[0].from);
+      expect({ level, done: shipped.done }).toEqual({ level, done: false });
+      expect(stars(shipped), `L${level}`).toEqual([]);
+      expect(starToasts(shipped), `L${level}`).toEqual([]);
+      expect(shipped.violations, `L${level}`).toEqual(keyless.violations);
+    }
+  });
+
+  it("REVERSING THROUGH THE WINDOW IS NOT STANDING IN IT (speed is read unsigned): over the paint, back through the window at 2.5 km/h without stopping, a stop 4 m short, a roll — no ✓ and no ★", () => {
+    const SHORT_X = 32.92;
+    for (const level of [1, 5] as const) {
+      const tape = scripted([
+        ...restAt(SHORT_X, 2),
+        forwardTo(SHORT_X, 26.6),
+        hold(1),
+        reverseTo(26.6, SHORT_X, 2.5),
+        hold(2),
+        ...rollOut(SHORT_X, 13),
+      ]);
+      const d = drive(level, tape);
+      // the act: more than the dwell spent inside the window while reversing, at a signed speed below the standstill
+      // threshold and an unsigned one above it — and no standstill there
+      const inWindow = d.ticks.filter((t) => t.speedKmh < -1 && t.position.x > X_CUT && t.position.x - MARK_X <= FULL_STOP_AT_LINE_M);
+      expect(inWindow.length, `L${level}`).toBeGreaterThan(0);
+      expect(inWindow[inWindow.length - 1].t - inWindow[0].t, `L${level}`).toBeGreaterThan(1);
+      expect(standstills(d.ticks).filter((r) => r.x > X_CUT && r.x - MARK_X <= FULL_STOP_AT_LINE_M), `L${level}`).toEqual([]);
+      expect({ level, done: d.done }).toEqual({ level, done: false });
+      expect(stars(d), `L${level}`).toEqual([]);
+    }
+  });
+
+  it("the window itself, point by point — the one function the ✓ and the ★ both read: inside the disc, not past the paint, within FULL_STOP_AT_LINE_M of the mark; the whole disc while the axis is unknown", () => {
+    const o = SC_MERGE_FROM_PROPERTY.success.find((s) => s.id === GATE)!;
+    if (o.params.kind !== "reachZone") throw new Error("sc-mfp-stop-line is not a reachZone");
+    const p = o.params;
+    const from = { x: p.x + p.radiusM + REACH_ZONE_GRACE_M + 0.2, y: p.y }; // a ring entry straight down the exit
+    const at = (dx: number, dy = 0) => reachZoneInLineWindow(p, from, { x: p.x + dx, y: p.y + dy });
+    // along the approach (the car comes from +x): the mark, the near bound, just beyond it
+    expect([at(0), at(0.5), at(FULL_STOP_AT_LINE_M - 0.001), at(FULL_STOP_AT_LINE_M + 0.001), at(2)]).toEqual([true, true, true, false, false]);
+    // the far side ends at the paint cut, not at the disc's rim
+    expect([at(-0.5), at(X_CUT - p.x + 0.001), at(X_CUT - p.x - 0.001), at(-2)]).toEqual([true, true, false, false]);
+    // across the approach it is the disc: beside the mark inside the radius counts, outside it does not
+    expect([at(0.5, p.radiusM - 0.6), at(0.5, p.radiusM + 0.2), at(0.5, -(p.radiusM + 0.2))]).toEqual([true, false, false]);
+    // no axis yet (unknown is never a refusal): the disc, and nothing outside it
+    const blind = (dx: number) => reachZoneInLineWindow(p, null, { x: p.x + dx, y: p.y });
+    expect([blind(0), blind(p.radiusM - 0.01), blind(-(p.radiusM - 0.01)), blind(p.radiusM + 0.01)]).toEqual([true, true, true, false]);
+  });
+
+  it("the watch starts with the drive, not before it: frames before the car is posed (the scene's placeholder at the district origin) make no standstill at a line", () => {
+    // `sc-mfp-stop-line` re-authored (in the test only) on the district origin, where the scene parks its placeholder
+    // pose until the chassis publishes. A second of those frames is not a full stop anyone made.
+    const atOrigin: LessonEdit = (lesson) => ({
+      ...lesson,
+      objectives: lesson.objectives.map((o) =>
+        o.id !== GATE ? o : ({ ...o, params: { ...(o.params as Record<string, unknown>), x: 0, y: 0 } } as typeof o),
+      ),
+    });
+    const lesson = atOrigin(compileScenario(SC_MERGE_FROM_PROPERTY, 5));
+    const gateIndex = lesson.objectives.findIndex((o) => o.id === GATE);
+    const template = drive(5, recorded("shadow-correct")).ticks[0];
+    let session = createLessonSession(lesson);
+    for (let i = 0; i <= 20; i++) {
+      session = applyTick(session, { ...template, t: i * 0.05, speedKmh: 0, position: { x: 0, y: 0 }, events: [] }).state;
+    }
+    expect(session.posedAtSec).toBeUndefined();
+    expect(session.stopLineWatch?.[gateIndex]?.stoodAtLine ?? false).toBe(false);
+    // the control: the same frames once the car IS posed there (it rolled in) do make one
+    session = applyTick(session, { ...template, t: 1.1, speedKmh: 2, position: { x: 0.5, y: 0 }, events: [] }).state;
+    for (let i = 0; i <= 20; i++) {
+      session = applyTick(session, { ...template, t: 1.2 + i * 0.05, speedKmh: 0, position: { x: 0.4, y: 0 }, events: [] }).state;
+    }
+    expect(session.posedAtSec).toBeDefined();
+    expect(session.stopLineWatch?.[gateIndex]?.stoodAtLine).toBe(true);
   });
 });
 

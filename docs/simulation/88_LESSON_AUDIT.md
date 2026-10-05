@@ -10585,3 +10585,23 @@ that star — from the ledger and the toast — only when the stop-line gate was
 undone after it (it measured the approach and refused it). Nothing is billed; a gate that never ran never costs a star (a lawful at-line stop on
 a stalled chain keeps it). Authored-tape census identical (2,434). Conditions: on a stalled chain a SHORT stop also keeps the recency star; a
 self-correction by reversing back to the mark ticks ✓ with no star; one equivalent conjunct and the toast filter are unpinned.
+
+## No praise for yielding where the student has priority — landed 2026-10-05 (sc-jx-priority-confidence:9c987e7b, the commendation clause)
+
+repairs-wave-c1 lane prioritystar (wf_80e737d6-9b4), SIGNED OFF WITH CONDITIONS. On the priority-road lesson the product printed «✓ Правилно
+отстъпено предимство» on a drive it refused for needless stopping: at L5 the staged creeper (a car behind its own Б2 that pulls out anyway) was
+adjudicated as «a vehicle with priority» the student had yielded to. A yield commendation now needs a vehicle that actually had priority over the
+student; the L5 creeper wait earns no yield praise (the card's sentence «Пропусна превозното средство с предимство» was false there). Verifier:
+1,290 own drives, 0 praised-and-refused (base: 46). Shown text: the L5 briefing tail now says a car on the right «е длъжна да те пропусне на своя
+знак Б2 „Спри!“, но потегля пред теб. Предимството ти не я спира — гледай по-далеч напред и намали навреме» (new copy — founder read owed).
+Conditions: no live re-drive yet; a defensive wait for the creeper is now praised for nothing (a true «readiness» praise would be a new sentence).
+
+## The Б2 star is decided by where the stop was made — landed 2026-10-05 (sc-merge-from-property:a401e4a7, round 3)
+
+b2commend round 3 (wf_03f73865-67e), SIGNED OFF WITH CONDITIONS; answers the w77 judge (a short stop on a chain stalled at the walker task kept
+the ★ beside the undone task). The line window and its standstill clock are lifted out of the gate evaluator (`reachZoneInLineWindow`,
+`stepLineStandstill` — one window, one number) and a per-gate `stopLineWatch` runs on every frame whatever the gate status: a
+FULL_STOP_AT_STOP_SIGN minted inside the mark's ring is withdrawn iff no standstill was made in the window on this approach. Short stops lose
+the star in every chain state (stalled, pending, active, done), at-line stops keep it in every one; nothing is billed; the authored-tape census
+is identical (2,434). Conditions: the `stoodAtLine` latch survives in-ring manoeuvring after an at-line stop (a later short stop inside the
+ring keeps a star); the dwell at the watch site and the reset radius are pinned only by long excursions.
