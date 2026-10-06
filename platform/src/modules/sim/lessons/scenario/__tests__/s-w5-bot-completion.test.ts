@@ -943,10 +943,12 @@ describe("wave-5 bot completion — sc-park-bay-exit-rev at L3", () => {
   });
 
   it("the LIVE session agrees the slow, checked exit is innocent — no phantom bill", () => {
-    // Where a sloppy tune would surface: the arc crosses the aisle at x ≈ 2–5
-    // (acquitted only because reverse is exempt from the lane detectors, A12),
-    // and the drive-away rides x = 1.0, which is 3.06 m off the drawn lane
-    // centre — 0.19 m inside the 3.25 m arming threshold.
+    // Where a sloppy tune would surface: the reverse crosses the whole aisle
+    // to x ≈ −3.2 (acquitted only because reverse is exempt from the lane
+    // detectors, A12), the forward half crosses back, and the drive-away rides
+    // x ≈ 0.91, which is 3.15 m off the drawn lane centre — 0.10 m inside the
+    // 3.25 m arming threshold (sc-park-bay-exit-rev:49af2940 re-authored the
+    // drive as one the product car can perform).
     const codes = session.events.filter((e) => e.kind === "violation").map((e) => e.code);
     expect(codes).not.toContain("COLLISION");
     expect(codes).not.toContain("WRONG_WAY");

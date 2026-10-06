@@ -3039,23 +3039,47 @@ describe("T9 closed-loop benches", () => {
    * zone (r 2.5 m around (1.0, −3.03))», which reads the same rows without driving them.
    * The first assertion below is the tripwire: the day this lesson IS re-planned with a
    * screen, it goes red and this case has to go back to asserting the drive.
+   *
+   * AND IT WENT BACK TO THE DRIVE (2026-10-06). sc-park-bay-exit-rev:49af2940 re-authored
+   * the demo (the old reverse was a 3.03 m centre arc against the car's 4.17 m; the new one
+   * is ≥ 4.54 m) and moved Задача 1's zone to its end, (−3.21, −5.48) r 2.5. build-pathrefs
+   * re-planned it with the body screen (R0 body 0.459 m) and the emit gate wrote it. So the
+   * case asserts what it asserted before the refusal, against the moved zone: no refusal,
+   * the reverse comes to REST inside Задача 1's zone, and F1 holds ≤ 0.3 m after 10 m of
+   * acquisition. Measured on seeds 1–8 at landing: rest 0.086–0.118 m from the zone centre,
+   * F1 worst |ct| after 10 m 0.202–0.260 m, no refusal on any seed. The tripwire is turned
+   * round: a witness that loses its body screen goes red here again.
    */
-  it("T9.d sc-park-bay-exit-rev is REFUSED before it drives — its witnesses carry no body screen, and neither guard can be talked out of it", () => {
+  it("T9.d sc-park-bay-exit-rev drives: the reverse rests inside Задача 1's zone and F1 holds ≤ 0.3 m after 10 m, with no refusal", () => {
     const p = plan("sc-park-bay-exit-rev");
     for (const seg of p.segments) for (const w of seg.witnesses) {
-      assert.ok(!w.bodyClearance, `seg ${seg.k} witness ${w.startAlongM} now carries a body screen — this lesson has been re-planned, so this case must go back to asserting the drive`);
+      assert.equal(w.bodyClearance?.verdict, "clear", `seg ${seg.k} witness ${w.startAlongM} carries no clear body screen (${JSON.stringify(w.bodyClearance ?? null)}) — the follower would refuse it before it moves`);
     }
     for (const seed of [1, 2]) {
-      const r = bench("sc-park-bay-exit-rev", seed);
-      assert.deepEqual(r.state.refusals.map((x) => x.code), ["witness-body-unsafe"], `seed ${seed}: ${JSON.stringify(r.state.refusals)}`);
-      assert.match(r.state.refusals[0].why, /UNSCREENED against the lesson's bodies/);
-      assert.equal(r.books.follow.segments.length, 0, `seed ${seed}: it drove a segment after refusing`);
+      let lastPhase = null;
+      let restInRev = null;
+      let revEnd = null;
+      let s0 = null;
+      let worstAfter10 = 0;
+      const r = runBench({ plan: p, seed, onSubTick: ({ row, state, phase, plant }) => {
+        if (phase === "reverse") restInRev = { ...plantCentre(plant), kmh: plant.v * 3.6 };
+        if (lastPhase === "reverse" && phase !== "reverse") revEnd = restInRev;
+        lastPhase = phase;
+        if (state.segIndex === 1 && Number.isFinite(row?.s)) {
+          s0 ??= row.s;
+          if (row.s - s0 >= 10) worstAfter10 = Math.max(worstAfter10, Math.abs(row.ct));
+        }
+      } });
+      assert.deepEqual(r.state.refusals, [], `seed ${seed}: ${JSON.stringify(r.state.refusals)}`);
+      assert.ok(revEnd, `seed ${seed}: the reverse never handed over to the forward leg`);
+      assert.ok(Math.abs(revEnd.kmh) <= 0.5, `seed ${seed}: the reverse left its phase moving at ${revEnd.kmh} km/h`);
+      const d = Math.hypot(revEnd.x - -3.21, -revEnd.z - -5.48);
+      assert.ok(d <= 2.5, `seed ${seed}: the reverse rests ${d.toFixed(3)} m from Задача 1's centre (−3.21, −5.48), r 2.5`);
+      assert.ok(s0 !== null, `seed ${seed}: F1 was never followed`);
+      assert.ok(worstAfter10 <= 0.3, `seed ${seed}: F1 |ct| ${worstAfter10.toFixed(3)} m after 10 m of acquisition`);
+      const end = plantCentre(r.plant);
+      assert.ok(Math.hypot(end.x - 0, -end.z - 20) <= 6, `seed ${seed}: the drive ends at (${end.x.toFixed(2)}, ${(-end.z).toFixed(2)}), outside Задача 2's zone (0, 20) r 6`);
     }
-    // …and DECLARING the plan screen off does not make it drivable: the live guard then
-    // refuses on the clearance it measures, because this witness really does cross a body.
-    const off = { ...PATH_TUNE, witnessBody: { ...PATH_TUNE.witnessBody, refuseUnscreened: false } };
-    const loud = runBench({ plan: p, seed: 1, tune: off });
-    assert.deepEqual(loud.state.refusals.map((x) => x.code), ["body-clearance"], JSON.stringify(loud.state.refusals));
   });
 
   it("T9.e every gear change: no teleport in a witness, and the no-stop R→D switches get a stop at v = 0", () => {
@@ -3216,6 +3240,8 @@ describe("T9 closed-loop benches", () => {
  *     (gap-short 0/4, 45-rev 0/4, driveway 2/4 in the box);
  *   · the designed-negative exclusion dropped from the gate: T9.h.2 red. No DRIVEN plan carries one today
  *     (sc-park-bay-exit-rev is refused before it moves — T9.d), so only the synthetic case can see it.
+ *     [True when recorded. Since 2026-10-06 sc-park-bay-exit-rev DRIVES (T9.d) and its R0 is still
+ *     designed-negative, so a driven plan now carries one; this mutation record was not re-run.]
  *
  * RE-RUN WITH THE MICRO SQUARE-UP ALSO SHIPPED (SQ; 2026-09-21, scratch copy pcx-final, pattern «T9|SQ»):
  * the predicate removed now reddens T9.h.3 and SQD1 but NOT T9.c — the square-up alone still carries

@@ -1,0 +1,872 @@
+{
+  "limitM": 3.955,
+  "windowM": 1,
+  "measured": 503,
+  "unreadable": [],
+  "offenders": [
+    {
+      "lesson": "sc-animal-hazard",
+      "family": "hazards",
+      "demo": "mistake[0] mistake-swerve-oncoming",
+      "reverses": false,
+      "worstRadiusM": 3.846,
+      "atSec": 12.15
+    },
+    {
+      "lesson": "sc-animal-hazard",
+      "family": "hazards",
+      "demo": "mistake[1] mistake-cross-line",
+      "reverses": false,
+      "worstRadiusM": 2.192,
+      "atSec": 15.75
+    },
+    {
+      "lesson": "sc-ed-d2-priority-run",
+      "family": "exam-drills",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.619,
+      "atSec": 47.85
+    },
+    {
+      "lesson": "sc-ed-poligon-chain",
+      "family": "exam-drills",
+      "demo": "mistake[0] mistake-cone",
+      "reverses": true,
+      "worstRadiusM": 1.943,
+      "atSec": 15.95
+    },
+    {
+      "lesson": "sc-ed-poligon-chain",
+      "family": "exam-drills",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 1.202,
+      "atSec": 133.7
+    },
+    {
+      "lesson": "sc-ln-boulevard-discipline",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-no-mirror",
+      "reverses": false,
+      "worstRadiusM": 3.827,
+      "atSec": 17
+    },
+    {
+      "lesson": "sc-ln-boulevard-discipline",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-weaving",
+      "reverses": false,
+      "worstRadiusM": 1.725,
+      "atSec": 8.25
+    },
+    {
+      "lesson": "sc-ln-boulevard-discipline",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.827,
+      "atSec": 17
+    },
+    {
+      "lesson": "sc-ln-obstacle-meeting",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-pull-out",
+      "reverses": false,
+      "worstRadiusM": 1.72,
+      "atSec": 14.8
+    },
+    {
+      "lesson": "sc-ln-obstacle-meeting",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-squeeze",
+      "reverses": false,
+      "worstRadiusM": 3.511,
+      "atSec": 11.05
+    },
+    {
+      "lesson": "sc-ln-obstacle-meeting",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.779,
+      "atSec": 36.65
+    },
+    {
+      "lesson": "sc-ln-turn-lane-arrows",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-late-two-lanes",
+      "reverses": false,
+      "worstRadiusM": 2.414,
+      "atSec": 10.75
+    },
+    {
+      "lesson": "sc-maneuver-3point",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide",
+      "reverses": false,
+      "worstRadiusM": 1.879,
+      "atSec": 9.8
+    },
+    {
+      "lesson": "sc-maneuver-3point",
+      "family": "parking",
+      "demo": "mistake[1] mistake-shunt",
+      "reverses": true,
+      "worstRadiusM": 1.76,
+      "atSec": 4.05
+    },
+    {
+      "lesson": "sc-maneuver-3point",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 1.286,
+      "atSec": 38.2
+    },
+    {
+      "lesson": "sc-maneuver-uturn",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide",
+      "reverses": false,
+      "worstRadiusM": 0.819,
+      "atSec": 43.7
+    },
+    {
+      "lesson": "sc-maneuver-uturn",
+      "family": "parking",
+      "demo": "mistake[1] mistake-swing",
+      "reverses": false,
+      "worstRadiusM": 1.176,
+      "atSec": 18.05
+    },
+    {
+      "lesson": "sc-maneuver-uturn",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.557,
+      "atSec": 22.2
+    },
+    {
+      "lesson": "sc-merge-from-property",
+      "family": "merging",
+      "demo": "mistake[1] mistake-signal-and-go",
+      "reverses": false,
+      "worstRadiusM": 2.621,
+      "atSec": 27.45
+    },
+    {
+      "lesson": "sc-merge-from-property",
+      "family": "merging",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.54,
+      "atSec": 36.05
+    },
+    {
+      "lesson": "sc-mv-uturn-ban",
+      "family": "parking",
+      "demo": "mistake[1] mistake-into-stream",
+      "reverses": false,
+      "worstRadiusM": 3.67,
+      "atSec": 31.85
+    },
+    {
+      "lesson": "sc-ov-abort",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.454,
+      "atSec": 21.7
+    },
+    {
+      "lesson": "sc-ov-ban-overtake",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-overtake-in-zone",
+      "reverses": false,
+      "worstRadiusM": 3.748,
+      "atSec": 23.9
+    },
+    {
+      "lesson": "sc-ov-ban-overtake",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.916,
+      "atSec": 45.8
+    },
+    {
+      "lesson": "sc-ov-bus-lane",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-dip-in",
+      "reverses": false,
+      "worstRadiusM": 3.591,
+      "atSec": 16.15
+    },
+    {
+      "lesson": "sc-ov-crossing-overtake",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-overtake-in-zone",
+      "reverses": false,
+      "worstRadiusM": 2.269,
+      "atSec": 23.7
+    },
+    {
+      "lesson": "sc-ov-crossing-overtake",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-late-swerve",
+      "reverses": false,
+      "worstRadiusM": 1.708,
+      "atSec": 26
+    },
+    {
+      "lesson": "sc-ov-narrow",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-barge",
+      "reverses": false,
+      "worstRadiusM": 2.156,
+      "atSec": 20.55
+    },
+    {
+      "lesson": "sc-ov-narrow",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-force",
+      "reverses": false,
+      "worstRadiusM": 1.887,
+      "atSec": 23.65
+    },
+    {
+      "lesson": "sc-ov-narrow",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.772,
+      "atSec": 33.85
+    },
+    {
+      "lesson": "sc-ov-oneway",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-wrong-way",
+      "reverses": false,
+      "worstRadiusM": 1.977,
+      "atSec": 23.75
+    },
+    {
+      "lesson": "sc-ov-oneway",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-wrong-way-short",
+      "reverses": false,
+      "worstRadiusM": 2.341,
+      "atSec": 24.8
+    },
+    {
+      "lesson": "sc-ov-oneway",
+      "family": "lanes",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.939,
+      "atSec": 23.75
+    },
+    {
+      "lesson": "sc-ov-return-gap",
+      "family": "lanes",
+      "demo": "mistake[0] mistake-early-cut",
+      "reverses": false,
+      "worstRadiusM": 2.749,
+      "atSec": 11.95
+    },
+    {
+      "lesson": "sc-ov-return-gap",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-fast-cut",
+      "reverses": false,
+      "worstRadiusM": 2.749,
+      "atSec": 11.95
+    },
+    {
+      "lesson": "sc-ov-solid-return",
+      "family": "lanes",
+      "demo": "mistake[1] mistake-late-cut",
+      "reverses": false,
+      "worstRadiusM": 3.575,
+      "atSec": 26.6
+    },
+    {
+      "lesson": "sc-park-45",
+      "family": "parking",
+      "demo": "mistake[0] mistake-overshoot",
+      "reverses": false,
+      "worstRadiusM": 3.2,
+      "atSec": 26.9
+    },
+    {
+      "lesson": "sc-park-45",
+      "family": "parking",
+      "demo": "mistake[1] mistake-corner-cut",
+      "reverses": false,
+      "worstRadiusM": 3.233,
+      "atSec": 27.55
+    },
+    {
+      "lesson": "sc-park-45",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.2,
+      "atSec": 26.9
+    },
+    {
+      "lesson": "sc-park-45-rev",
+      "family": "parking",
+      "demo": "mistake[0] mistake-nose-in",
+      "reverses": false,
+      "worstRadiusM": 1.326,
+      "atSec": 24.85
+    },
+    {
+      "lesson": "sc-park-45-rev",
+      "family": "parking",
+      "demo": "mistake[1] mistake-shallow-swing",
+      "reverses": true,
+      "worstRadiusM": 3.82,
+      "atSec": 32.15
+    },
+    {
+      "lesson": "sc-park-45-rev",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.823,
+      "atSec": 32.05
+    },
+    {
+      "lesson": "sc-park-double",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide-run-up",
+      "reverses": false,
+      "worstRadiusM": 1.934,
+      "atSec": 24.95
+    },
+    {
+      "lesson": "sc-park-double",
+      "family": "parking",
+      "demo": "mistake[1] mistake-correct-backwards",
+      "reverses": true,
+      "worstRadiusM": 0.508,
+      "atSec": 34.75
+    },
+    {
+      "lesson": "sc-park-double",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.548,
+      "atSec": 35.3
+    },
+    {
+      "lesson": "sc-park-gap-short",
+      "family": "parking",
+      "demo": "mistake[0] mistake-shallow-angle",
+      "reverses": true,
+      "worstRadiusM": 3.635,
+      "atSec": 32.25
+    },
+    {
+      "lesson": "sc-park-gap-short",
+      "family": "parking",
+      "demo": "mistake[1] mistake-forward-hit",
+      "reverses": true,
+      "worstRadiusM": 1.618,
+      "atSec": 36
+    },
+    {
+      "lesson": "sc-park-gap-short",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.23,
+      "atSec": 31.5
+    },
+    {
+      "lesson": "sc-park-judge",
+      "family": "parking",
+      "demo": "mistake[0] mistake-try-short",
+      "reverses": true,
+      "worstRadiusM": 3.253,
+      "atSec": 35.9
+    },
+    {
+      "lesson": "sc-park-judge",
+      "family": "parking",
+      "demo": "mistake[1] mistake-short-forward",
+      "reverses": false,
+      "worstRadiusM": 0.781,
+      "atSec": 27.35
+    },
+    {
+      "lesson": "sc-park-judge",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.229,
+      "atSec": 39.45
+    },
+    {
+      "lesson": "sc-park-left",
+      "family": "parking",
+      "demo": "mistake[0] mistake-mirrored-habit",
+      "reverses": true,
+      "worstRadiusM": 2.567,
+      "atSec": 34.45
+    },
+    {
+      "lesson": "sc-park-left",
+      "family": "parking",
+      "demo": "mistake[1] mistake-cross-blind",
+      "reverses": false,
+      "worstRadiusM": 2.618,
+      "atSec": 18.9
+    },
+    {
+      "lesson": "sc-park-left",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.571,
+      "atSec": 37.05
+    },
+    {
+      "lesson": "sc-park-narrow",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide-swing",
+      "reverses": true,
+      "worstRadiusM": 2.571,
+      "atSec": 33.9
+    },
+    {
+      "lesson": "sc-park-narrow",
+      "family": "parking",
+      "demo": "mistake[1] mistake-no-observation",
+      "reverses": true,
+      "worstRadiusM": 3.125,
+      "atSec": 23.5
+    },
+    {
+      "lesson": "sc-park-narrow",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.571,
+      "atSec": 35.2
+    },
+    {
+      "lesson": "sc-park-night",
+      "family": "parking",
+      "demo": "mistake[0] mistake-no-lights",
+      "reverses": true,
+      "worstRadiusM": 3.447,
+      "atSec": 37.75
+    },
+    {
+      "lesson": "sc-park-night",
+      "family": "parking",
+      "demo": "mistake[1] mistake-too-deep",
+      "reverses": true,
+      "worstRadiusM": 3.447,
+      "atSec": 37.75
+    },
+    {
+      "lesson": "sc-park-night",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.447,
+      "atSec": 37.9
+    },
+    {
+      "lesson": "sc-park-parallel",
+      "family": "parking",
+      "demo": "mistake[0] mistake-far-from-lead",
+      "reverses": true,
+      "worstRadiusM": 3.249,
+      "atSec": 35.9
+    },
+    {
+      "lesson": "sc-park-parallel",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.249,
+      "atSec": 35.05
+    },
+    {
+      "lesson": "sc-park-perp-forward",
+      "family": "parking",
+      "demo": "mistake[0] mistake-early-turn",
+      "reverses": false,
+      "worstRadiusM": 2.181,
+      "atSec": 25.2
+    },
+    {
+      "lesson": "sc-park-perp-forward",
+      "family": "parking",
+      "demo": "mistake[1] mistake-blind-exit",
+      "reverses": true,
+      "worstRadiusM": 2.472,
+      "atSec": 22.5
+    },
+    {
+      "lesson": "sc-park-perp-forward",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.472,
+      "atSec": 22.5
+    },
+    {
+      "lesson": "sc-park-perp-rev",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide-approach",
+      "reverses": true,
+      "worstRadiusM": 1.295,
+      "atSec": 44
+    },
+    {
+      "lesson": "sc-park-perp-rev",
+      "family": "parking",
+      "demo": "mistake[1] mistake-no-observation",
+      "reverses": true,
+      "worstRadiusM": 3.125,
+      "atSec": 23.5
+    },
+    {
+      "lesson": "sc-park-perp-rev",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.59,
+      "atSec": 32.05
+    },
+    {
+      "lesson": "sc-park-van",
+      "family": "parking",
+      "demo": "mistake[0] mistake-early-turn",
+      "reverses": true,
+      "worstRadiusM": 2.567,
+      "atSec": 33.45
+    },
+    {
+      "lesson": "sc-park-van",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.571,
+      "atSec": 35.35
+    },
+    {
+      "lesson": "sc-park-wall",
+      "family": "parking",
+      "demo": "mistake[0] mistake-into-wall",
+      "reverses": false,
+      "worstRadiusM": 1.996,
+      "atSec": 27.85
+    },
+    {
+      "lesson": "sc-park-wall",
+      "family": "parking",
+      "demo": "mistake[1] mistake-clip-neighbour",
+      "reverses": true,
+      "worstRadiusM": 2.567,
+      "atSec": 39.5
+    },
+    {
+      "lesson": "sc-park-wall",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.548,
+      "atSec": 39.6
+    },
+    {
+      "lesson": "sc-park-zebra",
+      "family": "parking",
+      "demo": "mistake[0] mistake-park-after",
+      "reverses": false,
+      "worstRadiusM": 2.166,
+      "atSec": 25.6
+    },
+    {
+      "lesson": "sc-park-zebra",
+      "family": "parking",
+      "demo": "mistake[1] mistake-hidden-pedestrian",
+      "reverses": false,
+      "worstRadiusM": 1.04,
+      "atSec": 25.25
+    },
+    {
+      "lesson": "sc-park-zebra",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 3.447,
+      "atSec": 41.65
+    },
+    {
+      "lesson": "sc-pk-driveway",
+      "family": "parking",
+      "demo": "mistake[0] mistake-wide",
+      "reverses": true,
+      "worstRadiusM": 1.587,
+      "atSec": 12.7
+    },
+    {
+      "lesson": "sc-pk-driveway",
+      "family": "parking",
+      "demo": "mistake[1] mistake-deep",
+      "reverses": true,
+      "worstRadiusM": 2.571,
+      "atSec": 18.1
+    },
+    {
+      "lesson": "sc-pk-driveway",
+      "family": "parking",
+      "demo": "shadow",
+      "reverses": true,
+      "worstRadiusM": 2.59,
+      "atSec": 17.15
+    },
+    {
+      "lesson": "sc-rb-busy-gap",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-barge-lead",
+      "reverses": false,
+      "worstRadiusM": 2.417,
+      "atSec": 19.65
+    },
+    {
+      "lesson": "sc-rb-busy-gap",
+      "family": "roundabout",
+      "demo": "mistake[1] mistake-short-gap",
+      "reverses": false,
+      "worstRadiusM": 2.473,
+      "atSec": 11.9
+    },
+    {
+      "lesson": "sc-rb-busy-gap",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.928,
+      "atSec": 36.55
+    },
+    {
+      "lesson": "sc-rb-circulate-priority",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-panic-brake",
+      "reverses": false,
+      "worstRadiusM": 2.136,
+      "atSec": 28.15
+    },
+    {
+      "lesson": "sc-rb-circulate-priority",
+      "family": "roundabout",
+      "demo": "mistake[1] mistake-wandering-line",
+      "reverses": false,
+      "worstRadiusM": 1.108,
+      "atSec": 28.35
+    },
+    {
+      "lesson": "sc-rb-circulate-priority",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.133,
+      "atSec": 22.65
+    },
+    {
+      "lesson": "sc-rb-exit-signal",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-exit-no-signal",
+      "reverses": false,
+      "worstRadiusM": 2.476,
+      "atSec": 13.1
+    },
+    {
+      "lesson": "sc-rb-exit-signal",
+      "family": "roundabout",
+      "demo": "mistake[1] mistake-barge-entry",
+      "reverses": false,
+      "worstRadiusM": 2.49,
+      "atSec": 17.4
+    },
+    {
+      "lesson": "sc-rb-exit-signal",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.16,
+      "atSec": 45.45
+    },
+    {
+      "lesson": "sc-rb-lane-choice",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-outer-lane-far-exit",
+      "reverses": false,
+      "worstRadiusM": 1.11,
+      "atSec": 55.65
+    },
+    {
+      "lesson": "sc-rb-lane-choice",
+      "family": "roundabout",
+      "demo": "mistake[1] mistake-exit-across-outer",
+      "reverses": false,
+      "worstRadiusM": 1.961,
+      "atSec": 50.95
+    },
+    {
+      "lesson": "sc-rb-lane-choice",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 1.112,
+      "atSec": 53.75
+    },
+    {
+      "lesson": "sc-rb-ped-exit",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-exit-through-ped",
+      "reverses": false,
+      "worstRadiusM": 2.128,
+      "atSec": 35.1
+    },
+    {
+      "lesson": "sc-rb-ped-exit",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.128,
+      "atSec": 35.1
+    },
+    {
+      "lesson": "sc-roundabout-entry",
+      "family": "roundabout",
+      "demo": "mistake[0] mistake-barge-entry",
+      "reverses": false,
+      "worstRadiusM": 2.49,
+      "atSec": 17.4
+    },
+    {
+      "lesson": "sc-roundabout-entry",
+      "family": "roundabout",
+      "demo": "mistake[1] mistake-exit-no-signal",
+      "reverses": false,
+      "worstRadiusM": 2.476,
+      "atSec": 13.1
+    },
+    {
+      "lesson": "sc-roundabout-entry",
+      "family": "roundabout",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.461,
+      "atSec": 35.85
+    },
+    {
+      "lesson": "sc-rx-tram-left",
+      "family": "rail",
+      "demo": "mistake[0] mistake-cut-tram",
+      "reverses": false,
+      "worstRadiusM": 2.601,
+      "atSec": 14.15
+    },
+    {
+      "lesson": "sc-vu-bikelane-turn",
+      "family": "vru",
+      "demo": "mistake[0] mistake-only-behind",
+      "reverses": false,
+      "worstRadiusM": 1.863,
+      "atSec": 29.75
+    },
+    {
+      "lesson": "sc-vu-bikelane-turn",
+      "family": "vru",
+      "demo": "mistake[1] mistake-cut-path",
+      "reverses": false,
+      "worstRadiusM": 1.333,
+      "atSec": 17.95
+    },
+    {
+      "lesson": "sc-vu-bikelane-turn",
+      "family": "vru",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.096,
+      "atSec": 31.95
+    },
+    {
+      "lesson": "sc-vu-child-cyclist",
+      "family": "vru",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.456,
+      "atSec": 31.15
+    },
+    {
+      "lesson": "sc-vu-cyclist-group",
+      "family": "vru",
+      "demo": "mistake[1] mistake-cut-in",
+      "reverses": false,
+      "worstRadiusM": 3.214,
+      "atSec": 6.55
+    },
+    {
+      "lesson": "sc-vu-cyclist-group",
+      "family": "vru",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 3.214,
+      "atSec": 6.55
+    },
+    {
+      "lesson": "sc-vu-cyclist-hook",
+      "family": "vru",
+      "demo": "mistake[0] mistake-hook",
+      "reverses": false,
+      "worstRadiusM": 1.44,
+      "atSec": 16.35
+    },
+    {
+      "lesson": "sc-vu-cyclist-hook",
+      "family": "vru",
+      "demo": "mistake[1] mistake-no-look",
+      "reverses": false,
+      "worstRadiusM": 1.266,
+      "atSec": 16.35
+    },
+    {
+      "lesson": "sc-vu-cyclist-hook",
+      "family": "vru",
+      "demo": "mistake[2] mistake-forced-brake",
+      "reverses": false,
+      "worstRadiusM": 2.943,
+      "atSec": 11.3
+    },
+    {
+      "lesson": "sc-vu-cyclist-hook",
+      "family": "vru",
+      "demo": "shadow",
+      "reverses": false,
+      "worstRadiusM": 2.057,
+      "atSec": 29.25
+    },
+    {
+      "lesson": "sc-vu-door-zone",
+      "family": "vru",
+      "demo": "mistake[1] mistake-swerve",
+      "reverses": false,
+      "worstRadiusM": 2.734,
+      "atSec": 19.05
+    }
+  ]
+}

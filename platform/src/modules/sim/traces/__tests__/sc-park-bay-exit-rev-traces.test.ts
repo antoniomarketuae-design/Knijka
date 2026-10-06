@@ -87,9 +87,13 @@ describe("sc-park-bay-exit-rev — the shadow gate (doc 76 §5)", () => {
     expect(reversing.length).toBeGreaterThan(20);
     // Reverse starts in the bay…
     expect(reversing.some((s) => s.x > 4.0)).toBe(true);
-    // …and ends on the aisle exit line, nose north.
+    // …and ends where Задача 1 grades it, aligned with the aisle, nose north
+    // (the drivable reverse of sc-park-bay-exit-rev:49af2940 — its geometry is
+    // pinned in sc-park-bay-exit-rev-drivable.test.ts).
     const last = reversing[reversing.length - 1];
-    expect(Math.hypot(last.x - 1.0, last.y - -3.03)).toBeLessThan(0.4);
+    const out = SC_PARK_BAY_EXIT_REV.success[0].params;
+    if (out.kind !== "reachZone") throw new Error("sc-pbe-out must be a reachZone");
+    expect(Math.hypot(last.x - out.x, last.y - out.y)).toBeLessThan(0.4);
     expect(Math.min(Math.abs(last.headingDeg), 360 - Math.abs(last.headingDeg))).toBeLessThan(6);
   });
 

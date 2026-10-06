@@ -768,7 +768,20 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // 9 samples. `badgeUp` and `red` below are UNCHANGED by them, and that is
     // the check on this story rather than a coincidence: the dropped frames are
     // forward approach samples in the open aisle, nowhere near the car behind.
-    expect(samples).toBe(36366);
+    //
+    // 36 366 → 36 925 on 2026-10-06: `sc-park-bay-exit-rev` was RE-AUTHORED as a
+    // drive the product car can perform (sc-park-bay-exit-rev:49af2940) — its
+    // reverse had swung out on a 3.03 m car-centre arc, tighter than the car's
+    // 3.955 m full-lock circle. The new reverse is longer (straight 1 m, a
+    // gentle then a firm swing on ≥ 4.6 m, ending aligned), the forward half
+    // now crosses to the driving line, and the last bays are passed at a crawl:
+    // shadow 562 → 1008 samples, mistake-blind-reverse 97 → 153,
+    // mistake-swing-out 113 → 170 — exactly the +559. Every other recording in
+    // the corpus is byte-identical. `badgeUp` and `red` are UNCHANGED, and
+    // that is the check on this story: the lot has no static body behind a
+    // car backing out of lot-bay-3, before or after, so none of the new frames
+    // can raise the badge.
+    expect(samples).toBe(36925);
     // …and the badge is up for all eight of them (4 350 → 4 358): the beat is
     // a braked pause in the parallel slot with the car behind still inside the
     // cue's range, so the badge state does not change — only its duration.

@@ -188,8 +188,22 @@ export const REVERSE_POLICY = Object.freeze({
       band: band([-0.5, 0.3], 0.3, 3), witnessGrid: [0], expect: { "0": null },
       designedNegative: true,
       relaxedBox: { posM: 1.0, yawDeg: 15 },
-      replan: "reachZone sc-pbe-out r 2.5 m (templates-parking2.ts:887-888,994)",
+      replan: "reachZone sc-pbe-out r 2.5 m around (−3.21, −5.48) (templates-parking2.ts:929-930,1039)",
+      // HISTORICAL (Slice 0 §8, against the pre-2026-10-06 demo); nothing reads it.
       replannedTo: { x: 0.28, y: -2.4, psi: 14.97, devM: 0.77, src: "FEASIBILITY.md §8" },
+      // ── THE DEMO WAS RE-AUTHORED, AND THIS ROW IS NOW STALE (2026-10-06) ──
+      // sc-park-bay-exit-rev:49af2940 re-authored the shadow so the product car can
+      // drive it (reverse ≥ 4.54 m centre radius over 1 m against the car's 4.17 m), and moved
+      // Задача 1's zone to that reverse's end, (−3.21, −5.48). build-pathrefs was re-run
+      // on the new trace UNDER THIS ROW, unchanged: R0 grid 0 came back FEASIBLE-TRACK
+      // dev 0.357, end 0.356 m / 4.2° off the authored end (inside the strict 0.5 m /
+      // 10° BOX, not only the relaxed one), body 0.459 m; the emit gate wrote it. So
+      // `classAtAuthored: INFEASIBLE` / `expect: { "0": null }` / `designedNegative` no
+      // longer describe this trace. They are Slice 0 MEASUREMENTS and are left as they
+      // are until Slice 0 is re-measured for this lesson — and while the row stays
+      // designed-negative, two of the arm band's eight corners that fail the screen
+      // (−0.5/−0.3/+3: ENDPOSE 1.425; +0.3/−0.3/+3: body 0.136 m < the 0.15 m floor) are
+      // recorded as notes, not tightened away. A non-negative row would tighten them.
       // ── OPEN, AND IT IS A POLICY QUESTION, NOT A PLANNER ONE (2026-09-16) ──
       // This is the one lesson of the six the body screen refused that the clearance
       // objective (planner.mjs clearanceObjective) could NOT repair. Measured with
@@ -274,8 +288,8 @@ export const PRODUCT = Object.freeze({
   },
   "sc-park-bay-exit-rev": {
     zones: [
-      { name: "sc-pbe-out (Задача 1)", x: 1.0, y: -3.03, r: 2.5, src: "templates-parking2.ts:887-888,994" },
-      { name: "sc-pbe-away (Задача 2)", x: 0, y: 20, r: 6, src: "templates-parking2.ts:1002" },
+      { name: "sc-pbe-out (Задача 1)", x: -3.21, y: -5.48, r: 2.5, src: "templates-parking2.ts:929-930,1039" },
+      { name: "sc-pbe-away (Задача 2)", x: 0, y: 20, r: 6, src: "templates-parking2.ts:1047" },
     ],
   },
 });
@@ -288,7 +302,7 @@ export const CAVEATS = Object.freeze({
   "sc-park-45-rev": ["corridor: a credit refutes \"no success path\" only for the authored lane change; the parked row stands 2.53 / 2.34 m inside the spawn lane (parking3-success-path-and-corridor.test.ts:24-31)"],
   "sc-park-judge": ["dual wording: the \"guided line\" reading stays open for a -right leg"],
   "sc-pk-driveway": ["dual wording: the \"guided line\" reading stays open for a -right leg"],
-  "sc-park-bay-exit-rev": ["authored R end pose infeasible for this car (Slice 0 §8); re-planned to (0.28, −2.40, 15°) — graded only by Задача 1's zone"],
+  "sc-park-bay-exit-rev": ["demo re-authored 2026-10-06 (sc-park-bay-exit-rev:49af2940): the authored R end (−3.21, −5.48, 0°) is now drivable and is Задача 1's zone centre; the R0 policy row is still Slice 0's designed-negative one (pre-re-authoring) until Slice 0 is re-measured — the witness is held to the relaxed 1.0 m / 15° box and graded only by Задача 1's zone"],
 });
 
 /**
@@ -299,7 +313,7 @@ export const CAVEATS = Object.freeze({
  * silently releasing its codes.
  */
 export const STAGED_ACTORS = Object.freeze({
-  "sc-park-bay-exit-rev": [{ actor: "walker", seg: 1, arcM: 14.2, src: "FEASIBILITY.md §7.1 (authored 7.15 s wait at 14.2 m)" }],
+  "sc-park-bay-exit-rev": [{ actor: "walker", seg: 1, arcM: 23.7, src: "geom.mjs authoredStops on the 2026-10-06 shadow (authored 7.15 s wait at 23.74 m; was 14.2 m, FEASIBILITY.md §7.1, on the old demo)" }],
   "sc-pk-driveway": [{ actor: "walker", seg: null, arcM: null, src: "failure-census.md (w47 pc struck a pedestrian); no authored wait on the trace" }],
 });
 
@@ -351,8 +365,8 @@ export const COMMITTED = Object.freeze({
     1: { corridorM: 0.771, band: { alongM: [-0.5,1], latM: [-0.25,0.25], yawDeg: [-2.5,2.5] } },
   },
   "sc-park-bay-exit-rev": {
-    0: { corridorM: 1.412, band: { alongM: [-0.5,0.3], latM: [-0.3,0.3], yawDeg: [-3,3] } },
-    1: { corridorM: 1.287 },
+    0: { corridorM: 1.5, band: { alongM: [-0.5,0.3], latM: [-0.3,0.3], yawDeg: [-3,3] } },
+    1: { corridorM: 0.711 },
   },
   "sc-ed-poligon-chain": {
     0: { corridorM: 0.352 },

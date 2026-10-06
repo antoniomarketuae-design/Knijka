@@ -10755,3 +10755,115 @@ once at every rung (coached at L1–L3 and L5 under ruling 16 and named under Ru
 at 35 m were reworded (the reaction-time claim retrieved from c-reaction-time). Adversarially verified, including seeds 1–40 at every rung.
 Conditions: the lift point sits in a 4 cm window that sidesteps the recorder clamp (the clamp itself is owed); the «lesson not taken» assertion is
 vacuous for a demo that never completes its objectives.
+
+## Wave C verdicts — 2026-10-06
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2127d8ffe9f2`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 14 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 18 |
+
+**Open list: 34 → 33**, out of 1532 filed across the whole programme (1498 were already retired before this run).  2 CLOSED/REFUTED line(s) arrived without a frame and quote and were downgraded to UNJUDGED — they did not reduce the count.
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-10-06
+
+This run retired 2 row(s). **Correction by the integrator:** the tool first printed «driven at `70d8651bcf6e`» here. That was false. The two logs had been put under `.audit-frames/wave-c/`, so the ledger borrowed that folder’s old drive record. Both were measured in process at `2127d8ffe9f2`. Their in-process records are now `.audit-frames/w80-inprocess/*.json` (input.worktree head 2127d8f, productDirty false), and the two closure lines were corrected to match (backup `closures.jsonl.pre-w80-provenance`). The tool’s generic text follows. It speaks of frames: the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2127d8ffe9f2`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 14 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 16 |
+
+**Open list: 33 → 31**, out of 1532 filed across the whole programme (1499 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### What the w80 closures rest on (integrator note, 2026-10-06)
+
+Judge wave w80 (workflow `judge-w80-roundabout`, wf_b7e468b6-765) re-judged six rows at `2127d8f` after the roundabout entry repair (ADR-011, founder ruling 2026-10-05 «Bill forced braking») and the motorway demo re-authoring. **All three closures are in-process: no frame was photographed.** Each rests on the judge’s own tapes driven through the production grading chain (liveChainReplay), and each proposed CLOSED was attacked by an adversarial verifier, which returned refuted=false. An in-process proof can settle what the product GRADES. It cannot settle what the product RENDERS, and no row closed here makes a render claim.
+
+- **sc-rb-busy-gap:a6f83f6b (critical), CLOSED.** «The most careful drive scores worst.» At L1–L5 the patient stop, the two-stop creep and the long waits now pass at 0 points with both tasks done. A wait is billed FAILED_TO_YIELD only when the ring car actually loses speed to the entry. The live total of 21 was not re-driven after the repair.
+- **sc-rb-busy-gap:8f50287b, CLOSED.** The same patience claim, at the lesson’s live rungs. Log: `.audit-frames/w80-inprocess/sc-rb-busy-gap-8f50287b.json` (65 live-chain drives).
+- **sc-fo-motorway-gap:11e56254, CLOSED.** The «one second» mistake demo now holds 33.1–35.8 m (0.98–1.04 s) at 122 km/h at all 20 rung and cadence drives. That is 7–9.6 m inside the engine’s 42.73 m FOLLOWING_TOO_CLOSE line, and it bills once. Log: `.audit-frames/w80-inprocess/sc-fo-motorway-gap-11e56254.json`.
+- **sc-roundabout-entry:7b747c15, STILL — and this is a new, sharper cause.** The judge drove 8 tapes × L1–L5 × 6 frame cadences. Every drive with a time or space margin got the same sheet on every cadence. But a knife-edge entry behind the returning ring car (a line stop held 45 s) splits by cadence. On one phone cadence it is convicted of a COLLISION, and on 60 Hz it is credited «yielded». The staged ring car is released on a frame boundary, so a long phone frame starts its lap up to 0.5 s late. Contact with it is also sampled once per frame. **The grading chain therefore has a platform term, in the staged trigger and release timing (orchestrator/director) and in per-frame contact sampling.** The engine file named on the row is not the suspect. No ruling covers cadence-dependent grading, and the matched live pc/mobile pair is still owed.
+- **sc-rb-busy-gap:7bbdd45e and sc-roundabout-entry:08a0b701, PARTIAL.** Margin drives grade the same on every platform. The clauses about live legs the harness drove need frames.
+
+## Wave C verdicts — 2026-10-06
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2127d8ffe9f2`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 14 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 15 |
+
+**Open list: 31 → 30**, out of 1532 filed across the whole programme (1501 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### w81: the U-turn lesson photographed through the drive rig (integrator note, 2026-10-06)
+
+Workflow `capture-w81-uturn` (wf_1cc978ab-be6) photographed `sc-mv-uturn-ban` at `2127d8f`. A capture agent judged nothing:
+- The В23 plate on the approach, on the PC lens and the phone lens.
+- A scripted turn-round ACROSS the solid axis, inside the ban span, through `/dev/drive-rig`. The rig mounts the real `LessonPlayShell` (drive-rig-client.tsx:36) and drives with closed-loop pedals and constant steer, so this is real input through the product, not a replayed pose. It was shot at L3 and L1 on PC and at L3 on the phone.
+- A lawful turn at the gap, which completed the lesson by itself.
+
+Judges ruled on the frames, and an adversarial verifier attacked each CLOSED. Frames: `.audit-frames/w81-capture/`. The ledger records the retirement as «(unattributable)» because that folder carries no drive ledger. Every sidecar holds `healthCommit 2127d8ff…`.
+
+- **sc-mv-uturn-ban:6d60c160, CLOSED (verified).** The debrief corrective is no longer the overtaking text. It names «Обратен завой през непрекъсната осева линия», «знак В23 „Забранено е завиването в обратна посока“» and ЗДвП чл. 38, and it explains the act the student actually made. This was verified on PC L3, PC L1 and phone L3.
+- **sc-mv-uturn-ban:e98407b1, PARTIAL (the proposed closure was refuted).**
+  - Holds:
+    - The wrong drive is no longer convicted for a crash or a speed slip; no sidecar contains «сблъс».
+    - The debrief names the solid-axis U-turn and В23.
+    - The plate is in the built world, served byte-identical to the bank’s `v23.svg`.
+    - On the wrong side, the lesson’s own mistake is the ground (Ruling A).
+  - Open: on the RIGHT side, the passing debrief never says why the drive was right. It shows 0 т., ИЗДЪРЖАН, ★★★, a manoeuvre-quality line «Обратен завой в едно движение — чиста маневра» and two generic commendations. Nothing names turning where the axis is broken, past the В23 span. THEO-4 requires the lesson’s rule to explain the right decision too, so this is a repair (a lesson-specific commendation keyed on the turn-round act at the gap), not a frame.
+- Also seen: at the half-way frame on the PC lens, the ЗАДАЧА banner covers about 53 % of the В23 plate. On the phone at the start, the audio prompt (L1) and the legend card (L3) cover it. Each is uncovered at another pose. This is noted, not filed, until the founder answers how far one В23 reaches (V4).
+
+## Landed: the parking demo the car can actually drive (sc-park-bay-exit-rev:49af2940), and a census of the rest (2026-10-06)
+
+The correct demo of `sc-park-bay-exit-rev` reversed out of the bay on a 3.03 m arc, tighter than the product car’s 4.17 m minimum radius. That is why no leg ever completed the lesson (doc 93 GAP-4).
+- **The repair** (lane parkarc, wf_ca2357e1-5fe, adversarially signed off): the demo is re-authored through the recorder (`traces/scParkBayExitRev.ts`) so its whole drive stays within the car’s curvature. It keeps ≥ 0.25 m from the parked cars as the product boxes see them, and it ends in the product’s own Задача 1 zone.
+- **Integration** (wf_a58f351b-0eb, verified): the steering instrument’s pathref was re-planned with the project’s own builder and re-pinned with `repin-committed.mjs`. R0 is FEASIBLE-TRACK with body clearance 0.459 m; D1 is TRACK. No other pathref moved: 10 are byte-identical. No protected threshold or Slice 0 measurement changed.
+- **Tests:** tools 390/384, 0 fail; product 580/580. The dead `NOT_REPLANNED` entry for this lesson was removed (a tightening).
+- **Still owed:** a live re-drive of the row, a screened arm band (re-measure Slice 0) and a G7 rule for zone-graded ends (doc 93 GAP-4 update).
+
+**The census filed one systemic row, `catalogue-demo-curvature:dae908c7` (critical).** The lane’s catalogue test (`traces/__tests__/demo-curvature-census.test.ts` + `.json`) measured all 503 committed demos against the car’s limit (3.955 m over a 1 m window).
+- **36 lessons’ CORRECT demos** turn tighter than the car can. The worst are sc-rb-lane-choice at 1.11 m, sc-ed-poligon-chain at 1.20 m (reversing) and sc-maneuver-3point at 1.29 m (reversing). 17 of them are reversing parking demos.
+- **72 mistake demos** do the same.
+- **Why it matters:** a student copying the demo learns a path the car cannot follow, and any witness or harness that follows the demo cannot drive it either. Many of the 36 are lessons whose open rows say the correct drive is convicted or never credited.
+- **Handling:** the row is one finding, not 108. It is listed in `NO_SIMULATOR_ROUTE` (build-redrive.mjs) because no route drives it, and it moves lesson by lesson as each family’s demos are re-authored drivable through the same recipe.

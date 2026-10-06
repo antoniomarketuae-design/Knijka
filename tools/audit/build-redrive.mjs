@@ -475,6 +475,10 @@ export function legsInProse(what, { frameLeg = null, lesson = null } = {}) {
  */
 export const NO_SIMULATOR_ROUTE = new Map([
   ["app-login", "the /login form, not a lesson — there is no /simulator/app-login to drive"],
+  [
+    "catalogue-demo-curvature",
+    "a census over every committed demo trace, judged in process by platform/src/modules/sim/traces/__tests__/demo-curvature-census.test.ts — there is no /simulator/catalogue-demo-curvature to drive; it moves lesson by lesson as each demo is re-authored drivable",
+  ],
 ]);
 /**
  * THE pc-path LEG — ROUTED FROM A FILE, NEVER FROM PROSE (DESIGN-v2 §9).

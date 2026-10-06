@@ -847,8 +847,10 @@ export const SC_PK_DOUBLE_PARK: ScenarioSpec = {
  * THE GRADED CONTRACT IS A CORRIDOR, NOT A BAY. parkInBay grades a rect you
  * come to rest in; there is no such rect here — the whole point is leaving one.
  * So the success pair is two reachZone gates that bracket the maneuver:
- *   - sc-pbe-out   — the aisle exit point (1.0, −3.03), armed at maxSpeedKmh 8:
- *     the ONLY way through it is at пешеходна скорост, in the arc;
+ *   - sc-pbe-out   — where the reverse comes to rest aligned with the aisle
+ *     (−3.21, −5.48; see LOT_EXIT_X below), armed at maxSpeedKmh 8 and, by its
+ *     own banner, in reverse: the ONLY way through it is at пешеходна скорост,
+ *     backing out;
  *   - sc-pbe-away  — the checkpoint up the aisle (0, 20), past the whole row.
  * Consequently the rubric carries NO placement/economy component (both read the
  * parkInBay detail channel and would score `measured: false` — a silent lie);
@@ -908,11 +910,27 @@ const LOT_BAY_X = 5.03;
 const LOT_BAY_Y = 0;
 /** Nose-in heading: the bay axis (headingDeg 90), nose pointing east, deep. */
 const LOT_BAY_NOSE_DEG = 90;
-/** The aisle exit point the reverse arc lands on — see traces/scParkBayExitRev
- *  (straight back to x = 4.03, then a quarter arc of radius 3.03). Kept in the
- *  lane-detector-safe band: |x − 4.0625| = 3.06 < 3.25 (the P0's envelope note). */
-const LOT_EXIT_X = 1.0;
-const LOT_EXIT_Y = -3.03;
+/**
+ * Where the reverse out of the bay comes to rest, aligned with the aisle — the
+ * point Задача 1 is graded on. Pinned from traces/scParkBayExitRev
+ * PBE_REVERSE_END (−3.212, −5.479), the end of a reverse the product car can
+ * actually drive (sc-park-bay-exit-rev:49af2940), and held to it within 5 cm by
+ * traces/__tests__/sc-park-bay-exit-rev-drivable.test.ts.
+ *
+ * WHY IT MOVED from (1.0, −3.03). That was the end of a 3.03 m car-centre arc,
+ * tighter than this car turns (its full-lock centre radius is 3.955 m
+ * kinematically, ≈ 4.17 m on the physics car). No drivable reverse reaches a
+ * disc of 2.5 m around it with 0.25 m to the parked cars: the best a 40 000-path
+ * search over reverse curvature programmes found came within 2.484 m — inside
+ * by 16 mm, on the clearance floor (the ill-conditioning GAP-4 parked the
+ * pc-path planner on). Reverse gear is exempt from the lane detectors (A12),
+ * so the point may sit off the drawn lane.
+ */
+const LOT_EXIT_X = -3.21;
+const LOT_EXIT_Y = -5.48;
+/** The staged walkers' crossing line — the x of the aisle's driving line (no
+ *  zebra exists — see the header). Unchanged by the 2026-10-06 re-authoring. */
+const LOT_WALK_X = 1.0;
 /** The staged walker's aisle crossing point (no zebra exists — see the header). */
 const LOT_WALK_Y = 10;
 
@@ -924,7 +942,7 @@ const PBE_WALKER: PedestrianDartOutSpec = {
   // Names no district zone by design (lot-perp-v1 has no crossings): the id is
   // the occupancy key only, so this encounter grades on contact alone.
   crossingId: "lot-aisle-walk",
-  crossing: { x: LOT_EXIT_X, y: LOT_WALK_Y },
+  crossing: { x: LOT_WALK_X, y: LOT_WALK_Y },
   start: { x: -4.2, y: LOT_WALK_Y },
   dir: { x: 1, y: 0 },
   speedMps: 1.3,
@@ -946,7 +964,7 @@ const PBE_WALKER_LATE: PedestrianDartOutSpec = {
   kind: "pedestrianDartOut",
   libraryEventId: "ev-uturn-reverse",
   crossingId: "lot-aisle-walk-late",
-  crossing: { x: LOT_EXIT_X, y: 16 },
+  crossing: { x: LOT_WALK_X, y: 16 },
   start: { x: 4.6, y: 16 },
   dir: { x: -1, y: 0 },
   speedMps: 1.5,

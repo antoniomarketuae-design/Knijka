@@ -301,9 +301,10 @@ describe("§3 the sc-park-left witness the canary drove is refused", () => {
     // screen and refusing them all would have stopped the harness dead.
     // `PATH_TUNE.witnessBody.refuseUnscreened` has since been turned on, and the
     // pathrefs that matter now carry a clearance record, so the default is the safe
-    // one: a witness NOTHING screened is not a pass. It still bites exactly one
-    // lesson — sc-park-bay-exit-rev, whose plan the emit gate refuses to write, so
-    // its committed file is the pre-screen one and the follower will not drive it.
+    // one: a witness NOTHING screened is not a pass. It used to bite exactly one
+    // lesson — sc-park-bay-exit-rev, whose pre-screen file stood because the emit gate
+    // refused its re-plan. Since its demo was re-authored (2026-10-06,
+    // sc-park-bay-exit-rev:49af2940) and re-planned, no committed witness is unscreened.
     const seg = { k: 1, gear: -1 };
     const w = { startAlongM: 0 };
     assert.equal(PATH_TUNE.witnessBody.refuseUnscreened, true, "the default must refuse what nothing measured");
@@ -314,7 +315,7 @@ describe("§3 the sc-park-left witness the canary drove is refused", () => {
     assert.equal(witnessBodyGate(seg, w, lenient).book.state, "unscreened", "…without the booking changing");
   });
 
-  it("the whole committed corpus clears the floor — bar the ONE lesson a planner cannot fix", () => {
+  it("the whole committed corpus clears the floor — sc-park-bay-exit-rev included since its demo was re-authored", () => {
     // Six lessons were refused when the screen was written: sc-park-left −0.159 m,
     // van −0.092, gap-short −0.339, bay-exit-rev −0.200, zebra +0.030, wall +0.006.
     // Five were re-planned with clearance IN the objective and clear the floor.
@@ -327,12 +328,19 @@ describe("§3 the sc-park-left witness the canary drove is refused", () => {
     // no plan reaches the floor. The gate therefore refuses to emit it and its
     // previous pathref stands; see policy.mjs REVERSE_POLICY["sc-park-bay-exit-rev"].
     // Widening that box changes what the lesson teaches and is not a planner's call.
+    //
+    // THE DEMO CHANGED, NOT THE BOX (2026-10-06). sc-park-bay-exit-rev:49af2940
+    // re-authored the shadow: the old reverse was a 3.03 m centre arc, tighter than the
+    // car's 4.17 m, and the new one never turns tighter than 4.54 m and ends at Задача
+    // 1's (moved) zone centre. build-pathrefs, re-run on it under the SAME policy row
+    // and the same 0.15 m floor, planned R0 at body 0.459 m and the emit gate wrote it.
+    // No lesson is refused now; a lesson that comes back here is a regression.
     const refused = [];
     for (const lesson of ["sc-park-left", "sc-park-van", "sc-park-gap-short", "sc-park-bay-exit-rev", "sc-park-zebra", "sc-park-wall", "sc-park-judge", "sc-pk-driveway"]) {
       const g = screenPathrefSegments(lesson, refOf(lesson).segments);
       if (g.problems.length) refused.push(lesson);
     }
-    assert.deepEqual(refused, ["sc-park-bay-exit-rev"], "the set of lessons whose committed plan drives through a body has moved");
+    assert.deepEqual(refused, [], "the set of lessons whose committed plan drives through a body has moved");
   });
 
   it("a refusal is not the only output: a merely TIGHT witness caveats instead of blocking, and a pool-only penetration never blocks", () => {
@@ -528,10 +536,10 @@ describe("§5 clearance is IN the objective, not checked after it", () => {
     // and read here, so «the multi-start ran» is checkable from the artefact alone
     // rather than being a claim in a build log nobody keeps.
     let seen = 0;
-    // sc-park-bay-exit-rev is absent because the gate refuses to emit it at all: its
-    // committed file is the pre-screen one, and a witness nobody re-planned has no
-    // clearance plan to show. The test above is what pins that.
-    for (const lesson of ["sc-park-left", "sc-park-van", "sc-park-gap-short", "sc-park-zebra", "sc-park-wall"]) {
+    // sc-park-bay-exit-rev used to be absent because the gate refused to emit it: its
+    // committed file was the pre-screen one. Re-planned on its re-authored demo
+    // (2026-10-06), its R0 witness carries a clearance plan and is held here too.
+    for (const lesson of ["sc-park-left", "sc-park-van", "sc-park-gap-short", "sc-park-zebra", "sc-park-wall", "sc-park-bay-exit-rev"]) {
       for (const seg of refOf(lesson).segments) {
         if (seg.gear !== -1) continue;
         for (const w of seg.witnesses) {
@@ -544,7 +552,8 @@ describe("§5 clearance is IN the objective, not checked after it", () => {
         }
       }
     }
-    assert.ok(seen >= 6, `only ${seen} re-planned reverse witnesses carry a clearance plan`);
+    // 5 × 3 + sc-park-bay-exit-rev's 1 (2026-10-06): every one of them, not "at least six"
+    assert.ok(seen >= 16, `only ${seen} re-planned reverse witnesses carry a clearance plan`);
   });
 });
 

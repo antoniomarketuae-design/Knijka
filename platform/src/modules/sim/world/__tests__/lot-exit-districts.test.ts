@@ -14,7 +14,7 @@
  *      rect, with the clearance MEASURED (not just "no overlap"), so a future
  *      change to the hero footprint or the bay pitch fails here, loudly,
  *      instead of silently inside a re-recording;
- *   3. THE DRIVE-AWAY — x = 1.0 up the aisle is on lot-e-aisle, 20 km/h, never
+ *   3. THE DRIVE-AWAY — x ≈ 0.91 up the aisle is on lot-e-aisle, 20 km/h, never
  *      wrong-way, and clear of the whole bay row;
  *   4. THE LIVE ENCOUNTER — the staged walker's aisle path is stageable on an
  *      EMPTY lot (a pedestrian needs no lane graph), while the backlog's aisle
@@ -34,7 +34,11 @@ import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/type
 import { assertDistrict } from "../types";
 import { CHASSIS_HALF_EXTENTS } from "../../vehicle";
 import { obstacleRectsOverlap } from "../../traces/recorder";
-import { lotObstacleRects, recordScParkBayExitRevDrive } from "../../traces/scParkBayExitRev";
+import {
+  lotObstacleRects,
+  PBE_DRIVE_X,
+  recordScParkBayExitRevDrive,
+} from "../../traces/scParkBayExitRev";
 import { SC_PARK_BAY_EXIT_REV } from "../../lessons/scenario/templates-parking2";
 
 function repoRoot(): string {
@@ -182,22 +186,25 @@ describe("lot-perp-v1 as the sc-park-bay-exit-rev EXIT CORRIDOR", () => {
       }
     }
     // The authored envelope (see traces/scParkBayExitRev's header): straight
-    // back 1 m, then radius 3.03 — ~0.43 m at the tightest point. A single arc
-    // from the bay centre would leave ~0.08 m, which is why it is not used.
+    // back 1 m, a gentle then a firm swing (≥ 4.6 m, a radius the product car
+    // can drive — sc-park-bay-exit-rev:49af2940), ending aligned: ~0.79 m to
+    // these table rects at the tightest point. The live GLB boxes and the pose
+    // of a real car on the path are pinned at ≥ 0.25 m in
+    // traces/__tests__/sc-park-bay-exit-rev-drivable.test.ts.
     expect(minGap, `tightest at t=${worstT}`).toBeGreaterThan(0.3);
   });
 
-  it("the drive-away line (x = 1.0) rides lot-e-aisle at 20 km/h, never wrong-way", () => {
+  it("the drive-away line (x ≈ 0.91) rides lot-e-aisle at 20 km/h, never wrong-way", () => {
     const runtime: DistrictWorldRuntime = createWorldRuntime(loadLotRaw());
     runtime.update(1 / 60);
     let t = 0;
     for (let y = -3; y <= 21; y += 1.5) {
       t += 0.5;
-      const tick = runtime.sample(sample(1.0, y, 0, 12), t, false);
-      expect(runtime.locate({ x: 1.0, y }).edgeId).toBe("lot-e-aisle");
+      const tick = runtime.sample(sample(PBE_DRIVE_X, y, 0, 12), t, false);
+      expect(runtime.locate({ x: PBE_DRIVE_X, y }).edgeId).toBe("lot-e-aisle");
       expect(tick.maxSpeedKmh).toBe(20);
       // The P0's envelope note: lane detectors arm at |laneOffset| > 3.25 on
-      // this road. x = 1.0 sits at −3.06 — inside, with 0.19 m to spare.
+      // this road. x ≈ 0.91 sits at −3.15 — inside, with 0.10 m to spare.
       expect(Math.abs(tick.laneOffsetM)).toBeLessThan(3.25);
       expect(tick.wrongWay).toBe(false);
       expect(tick.events.filter((e) => e.kind === "stopLineCrossed")).toEqual([]);
@@ -207,7 +214,7 @@ describe("lot-perp-v1 as the sc-park-bay-exit-rev EXIT CORRIDOR", () => {
   it("the drive-away line is clear of the whole bay row (rects start at x = 2.78)", () => {
     const rects = lotObstacleRects(loadLotRaw());
     for (let y = -6; y <= 6; y += 0.5) {
-      const hero = heroAt(1.0, y, 0);
+      const hero = heroAt(PBE_DRIVE_X, y, 0);
       for (const r of rects) expect(obstacleRectsOverlap(hero, r), `y=${y}`).toBe(false);
     }
   });
@@ -216,7 +223,7 @@ describe("lot-perp-v1 as the sc-park-bay-exit-rev EXIT CORRIDOR", () => {
     const away = SC_PARK_BAY_EXIT_REV.success.find((o) => o.id === "sc-pbe-away")!;
     expect(away.params.kind).toBe("reachZone");
     if (away.params.kind !== "reachZone") return;
-    // Completes at y ≈ 14 on the x = 1.0 line — north of the bay row (±5.4) and
+    // Completes at y ≈ 14 on the drive-away line — north of the bay row (±5.4) and
     // north of the walker's crossing (y = 10), so the encounter cannot be
     // skipped by finishing the objective early.
     const completesAtY = away.params.y - Math.sqrt(away.params.radiusM ** 2 - 1);

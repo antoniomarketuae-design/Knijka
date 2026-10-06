@@ -374,6 +374,31 @@ end), then a plan with a clearance margin that survives GLB-vs-table extents (pl
 held), a screened arm band, and a G7 rule for zone-graded ends. The row
 `sc-park-bay-exit-rev:49af2940` stays open.
 
+**Update 2026-10-06: the cause is repaired, and the gap is narrowed but not closed.** The demo was re-authored drivable
+in lane parkarc (wf_ca2357e1-5fe, adversarially signed off) and landed with the integration in wf_a58f351b-0eb. The
+reverse now turns no tighter than the car can and ends at the product’s own Задача 1 zone centre (−3.21, −5.48). The
+authored end and the graded zone therefore coincide, which makes the target question moot: no founder decision is needed on it.
+The repo’s builder re-planned the lesson from the shipped GLBs, and the verifier reproduced it field for field:
+- R0 is FEASIBLE-TRACK, deviation 0.357 m, body clearance 0.459 m to `lot-bay-4` (≥ 0.25 m was asked for).
+- D1 is TRACK at 0.114 m.
+- `problems` and `emitBlocked` are both empty.
+- The body-screen refused set is now empty.
+
+**Still open:**
+- **(a) The arm band.** The R0 policy row is still Slice 0’s designed-negative row, so the band is emitted at full
+  width while 2 of its 8 corners fail their own screen: ENDPOSE 1.425 m, and body 0.136 m to `lot-bay-4` (it was 5 of 8).
+  The tools’ answer is to re-measure Slice 0 for this lesson, never to edit its measured fields.
+- **(b)** A G7 rule for zone-graded ends.
+- **(c)** A live pc-path canary drive and a browser re-drive of `sc-park-bay-exit-rev:49af2940`. A bench drive is not a browser leg.
+- **(d) A new note in the pathref**, «seg 0 R grid 0: the stop rule fell back — min end-pose norm (NO row was inside
+  both the acceptance box and the product park box)». This lesson has no product park box, so the note is a structural fallback,
+  not a plan without its objective: the clearance objective is set (rung 0.5, planned 0.459 m). The stop rule’s wording should
+  say so for zone-graded lessons.
+
+The same lane’s catalogue census (`platform/src/modules/sim/traces/__tests__/demo-curvature-census.json`) found the defect
+is not this lesson’s alone: 36 lessons’ correct demos and 72 mistake demos turn tighter than the car can. That is filed as
+`catalogue-demo-curvature` (see doc 88).
+
 ## GAP-5 — a source guard with a positional window cannot see an attribute
 
 **Found** 2026-09-23 by the adversarial verifier of lane F, as a sabotage of its own

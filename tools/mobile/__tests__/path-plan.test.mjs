@@ -214,7 +214,9 @@ describe("§2 every committed pathref, from the outside", () => {
        * A pathref with a reverse segment and NO recorded authority is not silently
        * passed: it must be one of the lessons named as built before the cap existed. */
       it("its reverse witnesses never ask for more wheel than the car has in reverse", () => {
-        const PLANNED_BEFORE_THE_CAP = ["sc-park-wall", "sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-short", "sc-park-bay-exit-rev"];
+        // sc-park-bay-exit-rev came off this list on 2026-10-06: re-planned on its
+        // re-authored demo (sc-park-bay-exit-rev:49af2940), it now records the cap.
+        const PLANNED_BEFORE_THE_CAP = ["sc-park-wall", "sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-short"];
         const reverse = ref.segments.filter((sg) => sg.gear === -1);
         if (!reverse.length) return; // nothing to cap: a lesson with no reverse segment
         const auth = ref.generator.reverseAuthority;
@@ -359,7 +361,8 @@ describe("§2 every committed pathref, from the outside", () => {
         // worse. Both are outside the 0.5 m the harness judges with, so that segment's
         // park is UNJUDGED either way and the 27 mm changes nothing; it is named here
         // so it cannot spread to a lesson that WAS re-planned without anyone noticing.
-        const NOT_REPLANNED = ["sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-long", "sc-park-bay-exit-rev"];
+        const NOT_REPLANNED = ["sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-long"];
+        // sc-park-bay-exit-rev left this list on 2026-10-06: its demo was re-authored drivable and re-planned WITH the clearance objective (pathref R0 rung 0.5, planned 0.459 m), so an entry here would only excuse a regression.
         for (const w of seg.witnesses) {
           const last = w.rows[gradedRow(w)];
           const q = at(last[1], -last[2], last[5]);
@@ -486,11 +489,18 @@ describe("§2 every committed pathref, from the outside", () => {
     assert.ok(onCap > 0, `${capped} pathref(s) record a reverse authority and not one reverse row stands on its cap — nothing shows the planner read it`);
   });
 
-  it("sc-park-bay-exit-rev R0's re-planned witness ends inside Задача 1's zone (r 2.5 m around (1.0, −3.03))", () => {
+  // THE ZONE MOVED WITH THE DEMO (2026-10-06). Задача 1 was reachZone(1.0, −3.03) — the
+  // end of a 3.03 m arc this car cannot turn. sc-park-bay-exit-rev:49af2940 re-authored
+  // the reverse and moved the zone to its end, templates-parking2.ts LOT_EXIT_X/Y
+  // (−3.21, −5.48), r 2.5 unchanged. The literal is the template's, not PRODUCT's, so a
+  // policy row that drifts from the product cannot agree with itself here.
+  it("sc-park-bay-exit-rev R0's re-planned witness ends inside Задача 1's zone (r 2.5 m around (−3.21, −5.48))", () => {
     const ref = REFS.find((r) => r.lesson === "sc-park-bay-exit-rev");
     const w = ref.segments[0].witnesses[0];
     const last = w.rows[w.rows.length - 1];
-    assert.ok(Math.hypot(last[1] - 1.0, -last[2] - -3.03) <= 2.5, `ends at ${last[1]}, ${-last[2]}`);
+    assert.ok(Math.hypot(last[1] - -3.21, -last[2] - -5.48) <= 2.5, `ends at ${last[1]}, ${-last[2]}`);
+    const z1 = PRODUCT["sc-park-bay-exit-rev"].zones[0];
+    assert.deepEqual([z1.x, z1.y, z1.r], [-3.21, -5.48, 2.5], "policy.mjs PRODUCT's Задача 1 zone is not the template's");
     assert.equal(ref.segments[0].designedNegative, true);
     assert.equal(TRACK, "FEASIBLE-TRACK");
   });
