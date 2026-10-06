@@ -38,9 +38,15 @@
  *    y = −35.5 is clean across the whole wait band with 5.94 m of clearance.
  *
  *  · THE WAIT IS 15 s AND IT IS CENTRED IN A MEASURED WINDOW. At y = −35.5 the
- *    sweep grades: wait 13 ⇒ FAILED_TO_YIELD (the car is still in the left
+ *    sweep graded: wait 13 ⇒ FAILED_TO_YIELD (the car is still in the left
  *    half-plane as the chord commits), wait 14/15/16 ⇒ ZERO violations +
  *    YIELDED_TO_PRIORITY. 15 is the centre — ~1 s of margin either way.
+ *    (RE-MEASURED 2026-10-05, after the founder ruling «bill forced braking»
+ *    took presence out of the entry conviction: the ENTRY is no longer billed
+ *    at any wait unless the outer-lane car has to brake for it or is touched.
+ *    A wait of 11–13 s still fails the drive — he comes in ahead of that car
+ *    and then crosses its lane at the exit, which the lane-change grading
+ *    bills — and still earns no yield commendation. 14–16 s is unchanged.)
  *
  *  · THE CAR PACE 4.0 m/s IS AN ANGULAR CHOICE, NOT A SPEED ONE. The sibling
  *    rb-mini drills all run 2.9 m/s; this ring is bigger and, more to the

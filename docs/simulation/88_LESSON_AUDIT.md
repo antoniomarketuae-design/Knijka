@@ -10661,3 +10661,60 @@ The short traffic-controller card held one apparent size from 11.5 to 54.6 m, an
   11.5–54.6 m band shows the line; the verifier estimates the answer ink clears the «Демонстрация» pill by about 3 CSS px there.
 - **Pre-existing, not changed**: a test-side replica of the frame loop's HUD-strip gate says the phone hides the регулировчик card inside
   about 25–26 m, before the stop-line pose. Identical for both widths; needs a frame, and its own row if the frame confirms it.
+
+## Wave C verdicts — 2026-10-06
+
+This run retired 4 row(s). Their evidence frames were driven at (unattributable: 4 of 4) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`8b5a7f2f62d3`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 4 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 16 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 17 |
+
+**Open list: 37 → 33**, out of 1531 filed across the whole programme (1494 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+**What the four w79 closures rest on (capture-w79b, HEAD `8b5a7f2`).** Positioned captures on the audited phone lens (852×393 CSS px, DPR 3,
+WebKit) of the surface each row is about — stills with a DOM sidecar, not completed drives — each closure attacked by an adversarial verifier
+who re-measured the pixels. Captures of the МЕНЮ and briefing surfaces were made at `e038493`; the two commits differ only in
+`traffic/TrafficLayer.tsx` and three traffic tests.
+- `sc-ed-reverse-line:d6fb0f3c` — with the phone МЕНЮ open the «Следвай синята линия» pill is not painted (0 accent pixels; 2,112 on the
+  frames before and after), the sim is frozen (0 m, 0 frames), and the panel is the popover the founder kept on 2026-10-04.
+- `sc-junction-gap:df95401c` — the ПРОЧЕТИ / РАЗБРАХ pair is 36 CSS px inside the card (ruling 2026-09-20 #4); the «Карай дотук» plaque and
+  the pair were photographed together for the first time and do not overlap.
+- `sc-sp-curve:2f4e0a54` — the billed curve-speed card prints its hook «Скоростта се сваля преди.» whole, with no fold counter; the full
+  explanation is one labelled «ЗАЩО» tap away and complete.
+- `sc-sig-controller-postures:ef0e821c` — the controller card's answer line measures 34–36 device px of capital (11.3–12 CSS px) at 49.4 m
+  and 33.4 m; citation 19 device px, unchanged; three lines, one accent.
+Still PARTIAL after the same pass: `sc-vu-emergency:2e634d4d` (the opted-in phone briefing peek shows step 1 of 5 and holds 17 lines behind
+«ПРОЧЕТИ ↓17» — the mid-sentence cut and the fade line are gone) and `sc-sig-controller-postures:f7e046c4` (the read sheet numbers 1–5; the
+peek's lead is still unnumbered with its body opening at «2.»; platform grading parity is unjudged).
+
+## Roundabout entry: billed by what happened at the mouth (founder ruling 2026-10-05; ADR-011) — `sc-rb-busy-gap:a6f83f6b` (critical), `:8f50287b`
+
+Rounds 3–5 of the `rbgap` lane, each adversarially verified; round 5 SIGNED OFF WITH CONDITIONS. The conviction no longer
+predicts: a circulating car that had not passed the student's entry point has to lose 0.3 m/s to him before its rear end clears
+the mouth, or be touched — moving or standing (ADR-011).
+- **Verified on independent oracles** that share no code with the product: round 4 on 15,102 drives, round 5 on 18,264
+  (nose-pokes 0.09–0.84 m deep with 10–90 s holds, rocking, reversing into the mouth, 1–3 км/ч creeps, three entry paths,
+  60 Hz / 30 Hz / phone cadence): every bill has a grounding event on the same frame; no grounding event goes unbilled.
+- **What changes for a student.** A careful two-stop creep to the line and a 33–38 s wait are clean; a driver who enters ahead
+  of a car and stops in its path is billed; a rear-end on a car he let pass is COLLISION only; a nose-poke wait followed by a
+  barge in front of a returning car is billed. The barge demos of sc-roundabout-entry and sc-rb-exit-signal were re-staged so
+  their car really has to brake; two «what went wrong» sentences changed to say so (manifest re-recorded on main).
+- **Integrator ratified:** «cleared» = the car's rear end past the mouth; «he has left the mouth» = his centre past it by more
+  than half his length along his own circle; a walking-pace creep that holds the mouth until the next car brakes is billed.
+- **Conditions recorded:** three surviving verifier mutants (hygiene, on uncommitted inputs); the voice line is held and then
+  dropped on 79 + 6 drives with no verdict change; the clip `sc-roundabout-entry__m0` needs re-capture; rungs with ambient
+  cars are outside the oracle; 14 commended drives have a car outside the set brake for his tail at the exit (same on r4).

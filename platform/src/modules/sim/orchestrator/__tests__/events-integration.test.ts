@@ -429,10 +429,12 @@ describe("L3 roundabout entry (integration)", () => {
   });
 
   it("yielding at the entry while the car circulates earns the commendation", () => {
-    // The runtime tracker arms 12 m beyond the ring (dCenter ≤ 31.8) and
-    // flags ANY >3 km/h inward movement while the circulator is on the left —
-    // so a correct student is already crawling when they enter that zone,
-    // registers the conflict at yield speed, and does not push in.
+    // A correct student is already crawling when he reaches the line, holds
+    // there while the circulator goes by on his left, and then drives in
+    // behind it. (Until 2026-10-05 this drive BACKED AWAY after the hold and
+    // was commended for it; the card says „пропусна … и продължи, когато беше
+    // безопасно", so the award now needs the entry it praises — founder ruling
+    // «bill forced braking», runtime/worldRuntime.ts roundaboutYieldEarned.)
     const stack = makeStack([spec]);
     const driver = new PolyDriver(path(), 0);
     const arcEntry = driver.arcOf(spec.entry.x, spec.entry.y);
@@ -447,10 +449,13 @@ describe("L3 roundabout entry (integration)", () => {
         if (waitedFrames <= Math.round(5 / DT)) {
           // Hold at the yield line while the circulator passes on the left.
           stepFrame(stack, driver.advance(DT, 0));
+        } else if (driver.s < driver.length) {
+          // It has gone by — enter behind it and ride the ring to the path's end.
+          stepFrame(stack, driver.advance(DT, 4));
         } else {
-          // Decide not to enter yet — back away from the ring; leaving the
-          // vicinity makes the runtime tracker adjudicate the yield.
-          stepFrame(stack, driver.retreat(DT, 3));
+          // …and leave the vicinity, which is where the tracker closes the
+          // visit and adjudicates the yield.
+          stepFrame(stack, { x: spec.center.x + 1000, y: spec.center.y + 1000, headingDeg: 0, speedKmh: 20, brakePedal: 0 });
         }
       }
     }

@@ -1405,9 +1405,11 @@ export const YIELD_VOICE_VERDICT_S = 4;
  * late each moves the conviction later by any amount, so there is no number of
  * seconds after departure that the verdict can wait and be true.
  *
- * WHAT THE ADJUDICATOR ITSELF STANDS DOWN ON is geometry: once the car has swept
- * RB_ON_RING_DEG = 35° about the island inside its commit radius it is
- * CIRCULATING, it holds ring priority, and no entry conviction can fire. So the
+ * WHAT THE ADJUDICATOR ITSELF STOOD DOWN ON, when this block was written, was
+ * geometry: once the car had swept RB_ON_RING_DEG = 35° about the island inside
+ * its commit radius it was CIRCULATING, it held ring priority, and no entry
+ * conviction could fire. (No longer the whole of it — see «AND THE ENTRY MUST
+ * BE CLOSED» below.) So the
  * verdict now waits for the car to be at least this far round the SAME island
  * from where it stood, and inside `enterRadiusM`: 45°, the objective's own
  * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG, imported rather than mirrored — the number
@@ -1423,6 +1425,35 @@ export const YIELD_VOICE_VERDICT_S = 4;
  * надясно…» — still arrives on the ring and before the first exit (70.5° on
  * rb-mini, the shortest passage in the census beside
  * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG in objectives.ts).
+ *
+ * AND THE ENTRY MUST BE CLOSED — founder ruling 2026-10-05 («bill forced
+ * braking»), round 4. The entry conviction no longer stands down at 35°: it is
+ * about ONE place, the mouth he entered by, and it stays open for as long as a
+ * car that had not passed that mouth when he entered has still not cleared it
+ * (worldRuntime.ts §4c) — the car he came on ahead of may be made to brake for
+ * his crawl, or for his stop in its lane, long after 45° of ring are behind
+ * him. MEASURED on the round-4 tree with only the arc to wait for: 2,304 live-
+ * chain drives, 12 of them «Интервалът беше добър» and then «Влизане без
+ * пропускане» 0.03–0.78 s later (a 7 км/ч entry ahead of the returning lead;
+ * a 12 км/ч entry slowing to a crawl on the ring). So the verdict ALSO waits
+ * until the adjudicator says no car is left that this entry could still be
+ * billed for — `SimTick.roundaboutEntryOpen`, handed in as `ringEntryOpen` —
+ * and the arc stays, as the test that «влезе» has happened at all. If he has
+ * left the ring by the time the last such car has gone by, the verdict is
+ * dropped unjudged like any other that outlived its place (the rule below):
+ * its last sentence is about an exit still ahead of him.
+ *
+ * AND NOBODY MAY HAVE PAID FOR IT — the same ruling, R4-3: «sub-threshold
+ * easing: not billed, not praised». An entry can be closed and unbilled and
+ * still not be one to call good: the car he came on ahead of eased off by
+ * less than the conviction's 0.3 m/s. The verdict's own words are «без
+ * движещият се в кръга да намалява заради теб». So a verdict whose entry the
+ * tracker reports as paid for (`SimTick.roundaboutEntryPaidFor`, handed in as
+ * `ringEntryPaidFor` — the expression the yield commendation is refused on)
+ * is dropped outright. MEASURED on the round-4 tree before it was: 7,862
+ * live-chain drives, 12 told their gap was good after a car with priority
+ * had eased 0.02–0.20 m/s for them, one more after touching a car at walking
+ * pace (no collision billed).
  *
  * SPEAK LATER, CORRECTLY — NOT SPEAK AND RETRACT. The teach channel has no way
  * to take a line back, and a retraction beside a −10 is the frame this row was
@@ -2600,6 +2631,31 @@ export interface YieldVoiceInput {
    * site, which is exactly the fold before this field existed.
    */
   site?: YieldVoiceSite;
+  /**
+   * The roundabout adjudicator can STILL BILL the entry he has made
+   * (`SimTick.roundaboutEntryOpen`: he still occupies his mouth, or a car
+   * with priority over the entry has not yet cleared it). While it is `true` a pending `roundaboutEntry`
+   * verdict that recorded where he stood is held — «при влизането не беше
+   * отчетено нарушение» is not yet a fact (YIELD_VOICE_RING_ENTRY_ARC_DEG,
+   * «AND THE ENTRY MUST BE CLOSED»). Optional, and absent or `false` means
+   * „nothing is waiting": the arc alone, exactly the fold before this field
+   * existed. It only ever DELAYS or drops a line; it speaks none.
+   */
+  ringEntryOpen?: boolean;
+  /**
+   * Somebody on the ring has PAID for the entry he has made
+   * (`SimTick.roundaboutEntryPaidFor`: a car with priority eased off for him
+   * before clearing his mouth — by any amount, the conviction's line or under
+   * it — or a circulating car had to brake for him on the ring, or he touched
+   * one). While it is `true` a pending `roundaboutEntry` verdict that recorded
+   * where he stood is DROPPED, not held: «Интервалът беше добър … без
+   * движещият се в кръга да намалява заради теб» can not become true of that
+   * entry later. Optional, and absent or `false` means „nothing of the kind
+   * has happened": exactly the fold before this field existed. It only ever
+   * silences a line; it speaks none, and it convicts nothing — the wait's own
+   * explanation and its card are untouched.
+   */
+  ringEntryPaidFor?: boolean;
 }
 
 /**
@@ -2748,8 +2804,9 @@ function say(
  *  · the wait lasts  → after YIELD_VOICE_SETTLE_S, say once that the waiting
  *    itself is the manoeuvre and is costing him nothing;
  *  · the wait ends and the wheels turn → after YIELD_VOICE_VERDICT_S (and, at a
- *    ring the caller can locate, once the car has actually entered it —
- *    YIELD_VOICE_RING_ENTRY_ARC_DEG), say whether the gap was right — unless
+ *    ring the caller can locate, once the car has actually entered it and the
+ *    entry can no longer be billed — YIELD_VOICE_RING_ENTRY_ARC_DEG), say
+ *    whether the gap was right — unless
  *    the graded channel already said it was not, in which case say nothing.
  *
  * Everything else is bookkeeping that keeps each of those to exactly once.
@@ -2829,6 +2886,17 @@ export function stepYieldVoice(
       // past its approach. No entry is coming, so «…и влезе» can never become
       // true: dropped unjudged, like a departure that never came.
       pending = null;
+    } else if (pending.ring !== undefined && input.ringEntryPaidFor === true) {
+      // SOMEBODY PAID FOR THE ENTRY (founder ruling 2026-10-05, round 4,
+      // R4-3 — «sub-threshold easing: not billed, not praised»). The verdict
+      // says the gap was good and that this is entering «без движещият се в
+      // кръга да намалява заради теб»; a car with priority that eased off
+      // for him by less than the conviction's line was not billed, and makes
+      // that sentence false all the same — as does a car that braked for him
+      // on the ring, or one he touched. MEASURED before this branch: 12 of
+      // 7,862 live-chain drives heard it after such an easing. Dropped, not
+      // held: nothing that happens later can make it true of this entry.
+      pending = null;
     } else if (pending.wentAtSec === null) {
       if (moving) pending = { ...pending, wentAtSec: t };
       else if (t - (endedAtSec ?? t) > YIELD_VOICE_DEPART_GRACE_S) pending = null;
@@ -2837,7 +2905,12 @@ export function stepYieldVoice(
       // sc-roundabout-entry:8be266cf — AND the entry it describes has happened,
       // past the point its adjudicator can still convict. Always true for a
       // verdict that recorded no stopping point; see YIELD_VOICE_RING_ENTRY_ARC_DEG.
-      ringEntryHappened(pending.ring, site)
+      ringEntryHappened(pending.ring, site) &&
+      // …AND IS CLOSED: no car is left that the adjudicator could still bill
+      // this entry for (round 4 — the conviction has no 35° stand-down any
+      // more). Held, not dropped: when the last such car has gone by and he is
+      // still on the ring, the line is true and is said.
+      !(pending.ring !== undefined && input.ringEntryOpen === true)
     ) {
       const copy = yieldVoiceCopyFor(pending.reason, railPriority);
       notices.push(

@@ -138,7 +138,7 @@ function buildCaptureStack(clipId: string): CaptureStack {
     traffic.conflictFromRight(jx, jy, px, py, h, r, s),
   );
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
-    traffic.circulatingConflict(cx, cy, px, py, h, r),
+    traffic.circulatingTraffic(cx, cy, px, py, h, r),
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));

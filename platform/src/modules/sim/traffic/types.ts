@@ -404,6 +404,77 @@ export interface SameDirVehicle {
   halfLengthM: number;
 }
 
+/**
+ * ONE VEHICLE IN A ROUNDABOUT'S BAND, as TrafficSystem.circulatingTraffic
+ * reports it (founder ruling 2026-10-05, «bill forced braking»). The
+ * SameDirVehicle idea on a ring: this is only what the TRAFFIC system knows —
+ * where the body is, how big it is, and what its own model has had to do
+ * because of the student. Whether he has entered, whether the vehicle was on
+ * the ring carriageway and had not passed his mouth when he did, and whether
+ * what it has shed since — before clearing that mouth — amounts to «forced to
+ * brake» are the RUNTIME's to decide on the road it knows
+ * (runtime/worldRuntime.ts §4c).
+ */
+export interface CirculatingVehicle {
+  /** The published vehicle state's id — stable for the life of the agent. */
+  id: number;
+  /** Centre, district space. */
+  x: number;
+  y: number;
+  /** Unit travel direction, district space. */
+  dirX: number;
+  dirY: number;
+  /** Its own speed along `dir`, m/s. */
+  speedMps: number;
+  /** Half its body length / width, m — vehicleHalfLengthM / vehicleHalfWidthM. */
+  halfLengthM: number;
+  halfWidthM: number;
+  /**
+   * PRESENCE, and only presence: this vehicle is one the driver would be
+   * looking at before entering — moving, within reach, on his left — and it
+   * has NOT yet gone past his azimuth. The entry COMMENDATION reads it («he
+   * held back while a car with priority was still coming»); no conviction
+   * does.
+   */
+  approaching: boolean;
+  /**
+   * GEOMETRY, and only geometry: its travel round the centre has already
+   * carried it PAST the driver's azimuth (by less than half a lap). With
+   * `approaching` on an earlier frame this is «the car he held back for has
+   * gone by» — the other half of the commendation. False when the geometry
+   * cannot say.
+   */
+  pastEntry: boolean;
+  /**
+   * Speed its own traffic model has shed BECAUSE OF THE STUDENT, m/s —
+   * cumulative and monotone for the agent's life (vehicles.ts
+   * `playerShedThisStep`: the ambient following law with his term binding, the
+   * staged player guard, or a hard clamp against his body). The roundabout
+   * conviction is the growth of this number from the frame he enters until
+   * the car has cleared his mouth.
+   */
+  playerShedMps: number;
+}
+
+/** What TrafficSystem.circulatingTraffic answers. */
+export interface CirculatingReport {
+  /**
+   * The PRESENCE answer — exactly `TrafficSystem.circulatingConflict` for the
+   * same arguments (see `circulatingConflictFor`): a moving vehicle within the
+   * band, within reach of the driver, on his left, that has not already gone
+   * past his entry and cleared it. It answers «is there a car I should be
+   * watching», which is what the yield commendation and the exam-bank bot's
+   * «wait at the line» both ask. It convicts nobody.
+   */
+  conflict: boolean;
+  /**
+   * EVERY vehicle within the band, moving or stopped, in state order. The
+   * array and its rows are REUSED by the next call — read them in the frame
+   * they were returned in and keep nothing.
+   */
+  vehicles: readonly CirculatingVehicle[];
+}
+
 // ---------------------------------------------------------------------------
 // Update context — what the integrator feeds the system each frame.
 // ---------------------------------------------------------------------------
@@ -985,6 +1056,11 @@ export interface TrafficSystem {
    * True when a moving vehicle already circulating a roundabout (centre cx,cy,
    * within `bandRadiusM`) is on the player's LEFT — the driver must give way
    * before entering. District space; headingDeg 0 = north, clockwise.
+   *
+   * PRESENCE ONLY, and no longer what the runtime is wired to (founder ruling
+   * 2026-10-05): it answers «is there a car to wait for», which is what a
+   * driver-bot deciding whether to hold at the line asks. A roundabout entry
+   * is CONVICTED on `circulatingTraffic`.
    */
   circulatingConflict(
     cx: number,
@@ -994,6 +1070,26 @@ export interface TrafficSystem {
     headingDeg: number,
     bandRadiusM: number,
   ): boolean;
+  /**
+   * The traffic around a roundabout (centre cx,cy, within `bandRadiusM`) as
+   * the driver at (px,py) meets it — see CirculatingReport. `conflict` is
+   * `circulatingConflict`'s presence answer; `vehicles` carries what each
+   * vehicle in the band has had to DO because of him, which is what a
+   * roundabout entry is convicted on (founder ruling 2026-10-05, «bill forced
+   * braking»). District space; headingDeg 0 = north, clockwise. THE RUNTIME'S
+   * CIRCULATING QUERY IS THIS METHOD: `runtime.setCirculatingQuery((cx, cy, px,
+   * py, h, r) => traffic.circulatingTraffic(cx, cy, px, py, h, r))`. A runtime
+   * handed the presence boolean instead refuses the frame out loud rather than
+   * grade a roundabout it cannot see.
+   */
+  circulatingTraffic(
+    cx: number,
+    cy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    bandRadiusM: number,
+  ): CirculatingReport;
   /**
    * The nearest SAME-DIRECTION cyclist proxy within `radiusM` of the player,
    * or null (VU-02 — the lateral-clearance duty; doc 72 §7). Only staged

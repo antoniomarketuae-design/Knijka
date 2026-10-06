@@ -1875,9 +1875,10 @@ export class RoundaboutEntryRunner implements EventRunner {
     const dCenter = dist(input.x, input.y, s.center.x, s.center.y);
 
     // The runtime's roundabout tracker adjudicates off the staged circulator
-    // (circulatingConflict sees it like any NPC) — and it can fire already on
-    // the APPROACH (its arm zone reaches 12 m beyond the ring), so listen in
-    // every live phase, not just after the lock.
+    // (the traffic system's circulating report carries it like any NPC). Since
+    // the founder ruling of 2026-10-05 a violation can only land once his nose
+    // is on the ring — but a visit can end and be commended in any live phase,
+    // so listen in every one, not just after the lock.
     for (const e of input.tickEvents) {
       if (e.kind === "prioritySituation" && e.situation === "roundabout") {
         if (e.violated) return this.resolve(input, false, "violation");

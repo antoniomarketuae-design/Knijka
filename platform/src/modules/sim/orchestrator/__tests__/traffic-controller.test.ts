@@ -58,7 +58,7 @@ function makeSxStackFor(event: TrafficControllerSpec, seed = 7): Stack {
     traffic.conflictFromRight(jx, jy, px, py, h, r, s),
   );
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
-    traffic.circulatingConflict(cx, cy, px, py, h, r),
+    traffic.circulatingTraffic(cx, cy, px, py, h, r),
   );
   const director = createScenarioDirector([event], traffic, {
     seed,

@@ -317,8 +317,10 @@ const TRAVEL_M = 23.45;
  * The staged CIRCULATING CAR on the rb-ped-v1 ring (CCW loop w → s → e → n →
  * w): the RoundaboutEntryRunner syncs it to sit `conflictLeadM` upstream of the
  * player's south entry at arrival — the "do I go or wait" moment — and the
- * runtime's own circulatingConflict tracker adjudicates the entry
- * (FAILED_TO_YIELD / yielded commendation).
+ * runtime's own roundabout tracker adjudicates the entry (FAILED_TO_YIELD when
+ * this car has to brake because of it, or is touched — founder ruling
+ * 2026-10-05; the yielded commendation when the driver held back and it went
+ * by).
  *
  * It is not scenery: it is the ATTENTION TAX that makes RB-05 the archetype it
  * is. The driver spends the entry and the whole east arc reading this car —

@@ -29,6 +29,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { ringReport, type StubCar } from "../../runtime/__tests__/circulatingStub";
 import { buildLaneGraph } from "../../traffic/graph";
 import { createTrafficSystem } from "../../traffic/system";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
@@ -388,7 +389,15 @@ describe("rb-2lane-v1 through the world runtime — circulatingConflict machiner
 
   it("a barging entry against circulating traffic grades prioritySituation roundabout/violated", () => {
     const rt = createWorldRuntime(loadRaw());
-    rt.setCirculatingQuery(() => true); // a car is always on the ring band
+    // A car is on the ring the whole time and has to brake for him as he comes
+    // onto it (founder ruling 2026-10-05, «bill forced braking»: the entry is
+    // convicted on what the circulating car HAD TO DO — the full table is
+    // runtime/__tests__/roundabout-forced-braking.test.ts).
+    const car: StubCar = { id: 1000, azDeg: 215, radiusM: 30.06, speedMps: 2.9, shedMps: 0 };
+    rt.setCirculatingQuery(() => {
+      car.shedMps += 0.5;
+      return ringReport({ x: 0, y: 0 }, [car]);
+    });
     const events: Array<{ situation: string; violated: boolean }> = [];
     let t = 0;
     // Constant 22 km/h straight at the south mouth — inward, fast, never

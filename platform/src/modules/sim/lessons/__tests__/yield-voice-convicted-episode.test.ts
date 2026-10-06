@@ -116,12 +116,30 @@ class Drive {
     this.y = PAINT_Y;
   }
 
+  /**
+   * Session time until which the runtime reports the entry OPEN TO CONVICTION
+   * (`SimTick.roundaboutEntryOpen` on every frame before it) — a car that had
+   * priority over the entry has not cleared his mouth yet. Null: never set.
+   */
+  entryOpenUntil: number | null = null;
+  /** From this session time on the tick carries `roundaboutEntryPaidFor` (null: never). */
+  entryPaidFrom: number | null = null;
+
   frame(y: number, speedKmh: number, events: SimTickEvent[] = [], x = LANE_X): void {
     const bill = this.billAt !== null && !this.billed && this.t >= this.billAt - 1e-9;
     if (bill) this.billed = true;
+    const open = this.entryOpenUntil !== null && this.t < this.entryOpenUntil - 1e-9;
+    const paid = this.entryPaidFrom !== null && this.t >= this.entryPaidFrom - 1e-9;
     const r = applyTick(
       this.s,
-      makeTick({ t: this.t, position: { x, y }, speedKmh, events: bill ? [...events, BARGE] : events }),
+      makeTick({
+        t: this.t,
+        position: { x, y },
+        speedKmh,
+        events: bill ? [...events, BARGE] : events,
+        ...(open ? { roundaboutEntryOpen: true } : {}),
+        ...(paid ? { roundaboutEntryPaidFor: true } : {}),
+      }),
     );
     this.s = r.state;
     this.poses.push({ t: this.t, x, y });
@@ -498,6 +516,302 @@ describe("[fold] the verdict gate", () => {
     expect(v.pending!.ring).toBeUndefined();
     const due = stepYieldVoice(v, { t: 5 + YIELD_VOICE_VERDICT_S, speedKmh: 12, wait: createYieldWait(), violations: [], site });
     expect(due.notices).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ROUND 4 of the forced-braking ruling — the verdict waits for the entry to be
+// CLOSED, not for 45° alone
+// ---------------------------------------------------------------------------
+
+describe("[fold] an entry the adjudicator can still bill holds the verdict (founder ruling 2026-10-05, round 4)", () => {
+  /** One frame on the ring at `azDeg`, with the adjudicator's word on the entry. */
+  const ringFrame = (v: YieldVoiceState, t: number, azDeg: number, open: boolean | undefined, violations: ViolationCode[] = []) =>
+    stepYieldVoice(v, {
+      t,
+      speedKmh: 8,
+      wait: createYieldWait(),
+      violations,
+      site: onTheRing(azDeg),
+      ...(open === undefined ? {} : { ringEntryOpen: open }),
+    });
+  const DUE_AZ = HOLD_AZ_DEG + YIELD_VOICE_RING_ENTRY_ARC_DEG + 5;
+
+  it("45° round and past four seconds, with a car still to clear his mouth: NOTHING is said, for as long as that lasts — and the frame it has gone by, still on the ring, it is said, once", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const said: string[] = [];
+    // The frame the arc alone would have spoken on, and forty more degrees of ring after it.
+    for (let i = 0; i <= 8; i++) {
+      const r = ringFrame(v, 30 + i, DUE_AZ + i * 5, true);
+      said.push(...r.notices.map((n) => n.titleBg));
+      v = r.state;
+      expect(v.pending, `held at ${DUE_AZ + i * 5}°`).not.toBeNull();
+    }
+    expect(said).toEqual([]);
+    const closed = ringFrame(v, 39, DUE_AZ + 45, undefined);
+    expect(closed.notices.map((n) => n.titleBg)).toEqual(["Интервалът беше добър"]);
+    expect(closed.state.pending).toBeNull();
+    // Once.
+    expect(ringFrame(closed.state, 40, DUE_AZ + 50, undefined).notices).toEqual([]);
+  });
+
+  it("THE ORDER THE HOLD EXISTS FOR: the car he came on ahead of brakes for him 60° round the ring — «Влизане без пропускане» lands on a verdict that was still held, and «Интервалът беше добър» is never said", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const said: string[] = [];
+    for (const [t, az, open, violations] of [
+      [30, DUE_AZ, true, []],
+      [31, DUE_AZ + 10, true, []],
+      [32, DUE_AZ + 15, false, ["FAILED_TO_YIELD"]], // billed: the runtime reports a billed entry as no longer open
+      [33, DUE_AZ + 20, false, []],
+      [40, DUE_AZ + 60, false, []],
+    ] as Array<[number, number, boolean, ViolationCode[]]>) {
+      const r = ringFrame(v, t, az, open, violations);
+      said.push(...r.notices.map((n) => n.titleBg));
+      v = r.state;
+    }
+    expect(said).toEqual([]);
+    expect(v.pending).toBeNull();
+  });
+
+  it("NEGATIVE CONTROL: the same frames with the hold taken out (the adjudicator never says «open») praise at the arc — two seconds before the bill", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const first = ringFrame(v, 30, DUE_AZ, undefined);
+    expect(first.notices.map((n) => n.titleBg)).toEqual(["Интервалът беше добър"]);
+    v = first.state;
+    expect(ringFrame(v, 32, DUE_AZ + 15, undefined, ["FAILED_TO_YIELD"]).notices).toEqual([]);
+  });
+
+  it("`false` is «nothing is waiting», the same as absent: the arc alone", () => {
+    const v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    expect(ringFrame(v, 30, DUE_AZ, false).notices.map((n) => n.titleBg)).toEqual(["Интервалът беше добър"]);
+  });
+
+  it("the hold does not stand in for the arc: an entry that is not open, one degree short of 45°, still says nothing", () => {
+    const v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    expect(ringFrame(v, 30, HOLD_AZ_DEG + YIELD_VOICE_RING_ENTRY_ARC_DEG - 1, undefined).notices).toEqual([]);
+  });
+
+  it("HELD PAST ITS PLACE IS DROPPED, NOT SPOKEN LATE: he has left the ring before the last car with priority has gone by — the entry closes off the ring and nobody is told «оттук нататък излизането…»", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    v = ringFrame(v, 30, DUE_AZ, true).state;
+    v = ringFrame(v, 36, 170, true).state;
+    expect(v.pending).not.toBeNull();
+    // Out by the north arm: outside the entry circle, still within the approach — and the entry closes there.
+    const exitY = ENTER_RADIUS_M + 6;
+    const out = stepYieldVoice(v, { t: 38, speedKmh: 12, wait: createYieldWait(), violations: [], site: siteAt(LANE_X, exitY) });
+    expect(out.notices).toEqual([]);
+    // …and beyond the approach the hold was defined over: gone for good.
+    const away = stepYieldVoice(out.state, {
+      t: 42,
+      speedKmh: 20,
+      wait: createYieldWait(),
+      violations: [],
+      site: siteAt(LANE_X, ENTER_RADIUS_M + YIELD_ROUNDABOUT_APPROACH_M + 1),
+    });
+    expect(away.notices).toEqual([]);
+    expect(away.state.pending).toBeNull();
+  });
+
+  it("ONLY THE RING VERDICT IS HELD: a give-way-line verdict (no stopping point recorded) is not delayed by a ring's open entry somewhere on the route", () => {
+    let v: YieldVoiceState = createYieldVoice();
+    const site = siteAt(LANE_X, PAINT_Y);
+    v = stepYieldVoice(v, { t: 1, speedKmh: 0, wait: held("giveWayLine", 0), violations: [], site }).state;
+    v = stepYieldVoice(v, { t: 3, speedKmh: 0, wait: held("giveWayLine", 0), violations: [], site }).state;
+    v = stepYieldVoice(v, { t: 5, speedKmh: 4, wait: createYieldWait(), violations: [], site }).state;
+    const due = stepYieldVoice(v, {
+      t: 5 + YIELD_VOICE_VERDICT_S,
+      speedKmh: 12,
+      wait: createYieldWait(),
+      violations: [],
+      site,
+      ringEntryOpen: true,
+    });
+    expect(due.notices).toHaveLength(1);
+  });
+});
+
+describe("[E1] the wiring — engine.ts hands the voice the adjudicator's «still open» (round 4)", () => {
+  /** 28 s at the line; off at 3 км/ч for 3 s; on at 10 км/ч into the ring and `untilAz`° round it. */
+  function entry(openForSec: number | null, untilAz = 150): { d: Drive; wentAt: number } {
+    const d = new Drive().stand(28);
+    const wentAt = +(d.t + 0.1).toFixed(1);
+    if (openForSec !== null) d.entryOpenUntil = wentAt + openForSec;
+    d.roll(3, 3);
+    d.intoTheRing(10, untilAz);
+    return { d, wentAt };
+  }
+
+  it("the premise: with nothing open the verdict speaks at the arc", () => {
+    const { d, wentAt } = entry(null);
+    expect(d.verdicts()).toHaveLength(1);
+    expect(enteredAt(d.poseAt(d.verdicts()[0].t), d.poseAt(wentAt))).toBe(true);
+    expect(enteredAt(d.poseAt(+(d.verdicts()[0].t - 0.1).toFixed(1)), d.poseAt(wentAt))).toBe(false);
+  });
+
+  it("`SimTick.roundaboutEntryOpen` on the tick holds it: open until 20 s after the wheels turned — the verdict lands on the first frame it is not, later than the arc, and still on the ring", () => {
+    const base = entry(null);
+    const { d, wentAt } = entry(20);
+    const verdicts = d.verdicts();
+    expect(verdicts, "engine.ts must pass `ringEntryOpen: tick.roundaboutEntryOpen`").toHaveLength(1);
+    expect(verdicts[0].t).toBeCloseTo(wentAt + 20, 6);
+    expect(verdicts[0].t).toBeGreaterThan(base.d.verdicts()[0].t + 5);
+    const p = d.poseAt(verdicts[0].t);
+    expect(Math.hypot(p.x, p.y)).toBeLessThanOrEqual(ENTER_RADIUS_M);
+  });
+
+  it("…and a bill inside that hold is the only thing he is told about the entry", () => {
+    const d = new Drive().stand(28);
+    const wentAt = +(d.t + 0.1).toFixed(1);
+    d.entryOpenUntil = wentAt + 60;
+    // Billed well past the arc.
+    d.billAt = wentAt + 14;
+    d.roll(3, 3);
+    d.intoTheRing(10, 150);
+    expect(d.faults()).toHaveLength(1);
+    expect(d.verdicts()).toEqual([]);
+    // The control: the same bill with the hold not wired reaches the student
+    // AFTER «Интервалът беше добър» — the order this field exists to prevent.
+    const c = new Drive().stand(28);
+    c.billAt = wentAt + 14;
+    c.roll(3, 3);
+    c.intoTheRing(10, 150);
+    expect(c.verdicts()).toHaveLength(1);
+    expect(c.faults()).toHaveLength(1);
+    expect(c.verdicts()[0].t).toBeLessThan(c.faults()[0].t);
+  });
+
+  it("an entry still open when he has driven out of the ring is never praised late", () => {
+    const d = new Drive().stand(28);
+    const wentAt = +(d.t + 0.1).toFixed(1);
+    d.entryOpenUntil = wentAt + 60;
+    d.roll(3, 3);
+    d.intoTheRing(10, 175);
+    // Out by the north arm and up it, the entry closing while he is on the arm.
+    d.entryOpenUntil = d.t + 2;
+    d.x = LANE_X;
+    d.y = RING_LANE_R;
+    d.roll(8, 20);
+    expect(d.verdicts()).toEqual([]);
+    expect(d.faults()).toEqual([]);
+  });
+});
+
+describe("[fold] an entry somebody paid for is never called good — R4-3, «sub-threshold easing: not billed, not praised» (founder ruling 2026-10-05, round 4)", () => {
+  /** One frame on the ring at `azDeg`, with the tracker's two words on the entry. */
+  const ringFrame = (
+    v: YieldVoiceState,
+    t: number,
+    azDeg: number,
+    facts: { open?: boolean; paid?: boolean } = {},
+    violations: ViolationCode[] = [],
+  ) =>
+    stepYieldVoice(v, {
+      t,
+      speedKmh: 8,
+      wait: createYieldWait(),
+      violations,
+      site: onTheRing(azDeg),
+      ...(facts.open === undefined ? {} : { ringEntryOpen: facts.open }),
+      ...(facts.paid === undefined ? {} : { ringEntryPaidFor: facts.paid }),
+    });
+  const DUE_AZ = HOLD_AZ_DEG + YIELD_VOICE_RING_ENTRY_ARC_DEG + 5;
+
+  it("THE DRIVE IT EXISTS FOR: the car he came on ahead of eases off for him (under the bill's line), then goes by his mouth — the entry closes unbilled, 45° are behind him, and «Интервалът беше добър … без движещият се в кръга да намалява заради теб» is NOT said, then or later", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const said: string[] = [];
+    for (const [t, az, facts] of [
+      [30, DUE_AZ, { open: true }], // held: the car has not cleared his mouth
+      [31, DUE_AZ + 5, { open: true, paid: true }], // it eases 0.1 m/s for him
+      [32, DUE_AZ + 10, { paid: true }], // it has gone by: closed, never billed
+      [33, DUE_AZ + 15, { paid: true }],
+      [40, DUE_AZ + 50, { paid: true }],
+    ] as Array<[number, number, { open?: boolean; paid?: boolean }]>) {
+      const r = ringFrame(v, t, az, facts);
+      said.push(...r.notices.map((n) => n.titleBg));
+      v = r.state;
+    }
+    expect(said).toEqual([]);
+    expect(v.pending).toBeNull();
+  });
+
+  it("NEGATIVE CONTROL: the same frames without the fact (the fold as it was) say it on the frame the entry closes — one second after the car eased", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    v = ringFrame(v, 30, DUE_AZ, { open: true }).state;
+    v = ringFrame(v, 31, DUE_AZ + 5, { open: true }).state;
+    expect(ringFrame(v, 32, DUE_AZ + 10).notices.map((n) => n.titleBg)).toEqual(["Интервалът беше добър"]);
+  });
+
+  it("DROPPED, NOT HELD: one paid-for frame is enough — the fact going absent again (he left the roundabout and came back round) does not bring the line back", () => {
+    let v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const dropped = ringFrame(v, 30, DUE_AZ - 20, { paid: true }); // before the arc, before four seconds: still dropped
+    expect(dropped.notices).toEqual([]);
+    expect(dropped.state.pending).toBeNull();
+    v = dropped.state;
+    expect(ringFrame(v, 36, DUE_AZ + 10).notices).toEqual([]);
+    expect(ringFrame(v, 40, DUE_AZ + 40).notices).toEqual([]);
+  });
+
+  it("`false` is «nothing of the kind has happened», the same as absent: the verdict is said at the arc", () => {
+    const v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    expect(ringFrame(v, 30, DUE_AZ, { paid: false }).notices.map((n) => n.titleBg)).toEqual(["Интервалът беше добър"]);
+  });
+
+  it("IT SILENCES A LINE AND CONVICTS NOTHING: the episode is not marked convicted, so the wait's own explanation at his next stop on that ring is untouched", () => {
+    const v = releasedWait(siteAt(LANE_X, PAINT_Y));
+    const r = ringFrame(v, 30, DUE_AZ, { paid: true });
+    expect(r.state.convicted ?? false).toBe(false);
+    expect(r.state.recentConvictions ?? []).toEqual([]);
+  });
+
+  it("ONLY THE RING VERDICT IS DROPPED: a give-way-line verdict (no stopping point recorded) is said whatever a ring's tracker reports", () => {
+    let v: YieldVoiceState = createYieldVoice();
+    const site = siteAt(LANE_X, PAINT_Y);
+    v = stepYieldVoice(v, { t: 1, speedKmh: 0, wait: held("giveWayLine", 0), violations: [], site }).state;
+    v = stepYieldVoice(v, { t: 3, speedKmh: 0, wait: held("giveWayLine", 0), violations: [], site }).state;
+    v = stepYieldVoice(v, { t: 5, speedKmh: 4, wait: createYieldWait(), violations: [], site, ringEntryPaidFor: true }).state;
+    expect(v.pending).not.toBeNull();
+    const due = stepYieldVoice(v, {
+      t: 5 + YIELD_VOICE_VERDICT_S,
+      speedKmh: 12,
+      wait: createYieldWait(),
+      violations: [],
+      site,
+      ringEntryPaidFor: true,
+    });
+    expect(due.notices).toHaveLength(1);
+  });
+});
+
+describe("[E1] the wiring — engine.ts hands the voice the tracker's «somebody paid for this entry» (round 4, R4-3)", () => {
+  /** 28 s at the line; off at 3 км/ч for 3 s; on at 10 км/ч into the ring and 150° round it. */
+  function entry(paidFromSec: number | null): { d: Drive; wentAt: number } {
+    const d = new Drive().stand(28);
+    const wentAt = +(d.t + 0.1).toFixed(1);
+    if (paidFromSec !== null) d.entryPaidFrom = wentAt + paidFromSec;
+    d.roll(3, 3);
+    d.intoTheRing(10, 150);
+    return { d, wentAt };
+  }
+
+  it("the premise: with nothing paid for the verdict speaks at the arc", () => {
+    expect(entry(null).d.verdicts()).toHaveLength(1);
+  });
+
+  it("`SimTick.roundaboutEntryPaidFor` on the tick, from one second before the verdict was due: nothing is said about the gap — and nothing is billed, so nothing is said at all", () => {
+    const base = entry(null);
+    const dueAt = base.d.verdicts()[0].t;
+    const { d, wentAt } = entry(dueAt - base.wentAt - 1);
+    expect(wentAt).toBe(base.wentAt);
+    expect(d.verdicts(), "engine.ts must pass `ringEntryPaidFor: tick.roundaboutEntryPaidFor`").toEqual([]);
+    expect(d.faults()).toEqual([]);
+  });
+
+  it("…while a cost that only comes AFTER the verdict was said takes nothing back: the line was true when it was spoken, and is spoken once", () => {
+    const base = entry(null);
+    const dueAt = base.d.verdicts()[0].t;
+    const { d } = entry(dueAt - base.wentAt + 1);
+    expect(d.verdicts()).toHaveLength(1);
+    expect(d.verdicts()[0].t).toBeCloseTo(dueAt, 6);
   });
 });
 

@@ -6,6 +6,7 @@ import { analyzeNetwork, STOP_LINE_BEYOND_CUT_M } from "../../world/builders/net
 import { assertDistrict } from "../../world/types";
 import type { VehicleSample } from "../../contracts";
 import type { SimTickEvent } from "../../rules/types";
+import { ringReport, type StubCar } from "./circulatingStub";
 
 /**
  * B15, THE HALF THAT WAS PHOTOGRAPHED FROM THE WRONG PLACE.
@@ -137,6 +138,7 @@ describe("a roundabout's give-way grader is armed where the give-way paint is", 
 // ---------------------------------------------------------------------------
 
 const DT = 0.05;
+const RING_CENTRE = { x: 0, y: 0 };
 /** The founder's stop point: the М8 give-way paint on rb-mini's south arm. */
 const PAINT = { x: 4.06, y: -36.92 };
 
@@ -168,7 +170,14 @@ interface RunResult {
 function stopWaitThenEnterOnAClearGap(waitSec: number): RunResult {
   const rt = createWorldRuntime(loadRuntimeDistrict("rb-mini-v1"));
   let ringBusy = true;
-  rt.setCirculatingQuery(() => ringBusy);
+  // The car he waits for: coming round on his left while the ring is busy, and
+  // gone by — past his entry, far round the ring — once it clears. It never has
+  // to brake for him (founder ruling 2026-10-05: the conviction reads what the
+  // car HAD TO DO, the commendation reads «he held back for it and it went by»
+  // — see roundabout-forced-braking.test.ts).
+  const coming: StubCar = { id: 1000, azDeg: 215, radiusM: 18, speedMps: 2.9, shedMps: 0, approaching: true };
+  const gone: StubCar = { ...coming, azDeg: 300, approaching: false, pastEntry: true };
+  rt.setCirculatingQuery(() => ringReport(RING_CENTRE, [ringBusy ? coming : gone]));
   rt.setRightConflictQuery(() => false);
 
   let t = 0;
@@ -224,9 +233,16 @@ describe("B15's own drive: stop on the paint, wait, enter on a clear gap", () =>
 });
 
 describe("the mirror image: a real barge still convicts, and no earlier than before", () => {
-  it("a steady 20 km/h entry into a busy ring is billed inside the commit radius", () => {
+  it("a steady 20 km/h entry that makes a circulating car brake is billed inside the commit radius", () => {
     const rt = createWorldRuntime(loadRuntimeDistrict("rb-mini-v1"));
-    rt.setCirculatingQuery(() => true); // a car is on the ring the whole time
+    // A car is on the ring the whole time, braking for him from the moment the
+    // instrument can see him — 60 m out. None of that is his ENTRY until his
+    // nose is on the ring.
+    const car: StubCar = { id: 1000, azDeg: 215, radiusM: 18, speedMps: 2.9, shedMps: 0 };
+    rt.setCirculatingQuery(() => {
+      car.shedMps += 0.5;
+      return ringReport(RING_CENTRE, [car]);
+    });
     rt.setRightConflictQuery(() => false);
     const commit = rt.debugRoundaboutZones()[0]!.commitReachM;
     let t = 0;
@@ -244,17 +260,22 @@ describe("the mirror image: a real barge still convicts, and no earlier than bef
     }
     expect(convictedAtM).not.toBeNull();
     // Never out at the paint: the widened field of view is for WATCHING. A
-    // driver can still only be billed once he is committed to the entry, and
-    // the sustain window he gets there is the same one he always got.
+    // driver can only be billed once he has ENTERED — his nose on the ring
+    // carriageway, which in this lane is the centre 24.05 m out.
     expect(convictedAtM!).toBeLessThan(commit);
-    expect(convictedAtM!).toBeGreaterThan(18); // and not inside the ring itself
+    expect(convictedAtM!).toBeLessThan(24.1);
+    expect(convictedAtM!).toBeGreaterThan(23.7); // and not inside the ring itself
   });
 
   it("a driver who never commits is never billed, however long the ring is busy", () => {
     // Creeping up the arm and stopping short of the commit radius: the tracker
     // sees him for the whole approach now, and says nothing.
     const rt = createWorldRuntime(loadRuntimeDistrict("rb-mini-v1"));
-    rt.setCirculatingQuery(() => true);
+    const car: StubCar = { id: 1000, azDeg: 215, radiusM: 18, speedMps: 2.9, shedMps: 0, approaching: true };
+    rt.setCirculatingQuery(() => {
+      car.shedMps += 0.5; // and it brakes «for him» on every frame of it
+      return ringReport(RING_CENTRE, [car]);
+    });
     rt.setRightConflictQuery(() => false);
     let t = 0;
     let convicted = false;

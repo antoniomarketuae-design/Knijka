@@ -860,6 +860,67 @@ export interface SimTick {
    * instructor can name and the rubric can credit.
    */
   oncomingVehicleGapSec?: number;
+  /**
+   * A ROUNDABOUT ENTRY OF HIS IS STILL OPEN TO CONVICTION — founder ruling
+   * 2026-10-05 («bill forced braking»), rounds 4 and 5.
+   *
+   * He has entered a ring (his nose came onto its carriageway from outside),
+   * and EITHER he still occupies the mouth he entered by — his own rear end
+   * has not passed it and his nose is not back off the ring, so a car that
+   * comes round to that mouth now would have priority over him too — OR at
+   * least one vehicle with priority over that entry (circulating, and short
+   * of his mouth on the frame he entered or on a later frame he still sat in
+   * it) has still not cleared the mouth, nor left the ring — and he himself
+   * has not yet left the roundabout (the tracker's commit reach), which
+   * finishes the entry. Until then the runtime's roundabout tracker can still
+   * bill the entry FAILED_TO_YIELD (a car of that set brakes for him, or is
+   * touched). After it, no conviction for THIS entry can come.
+   *
+   * Published `true` on those frames and ABSENT on every other — additive,
+   * like the gap seconds above, so every tick away from a ring is
+   * byte-identical to before. Absent does NOT mean «he entered safely»; it
+   * means no entry of his is waiting on anything (he has not entered; he has
+   * left his mouth and nobody had priority over the entry, or they have all
+   * gone by — or the entry has already been billed, which the violation
+   * itself says).
+   *
+   * MEASUREMENT ONLY — nothing graded reads it and none may. Its one reader is
+   * the instructor's voice (`lessons/advisor.ts stepYieldVoice`): «Интервалът
+   * беше добър … при влизането не беше отчетено нарушение на предимството» is
+   * a sentence about an entry whose adjudication is OVER, so it is held while
+   * this is set — round 3's conviction stood down at 35° of ring and the voice
+   * waited for 45°; with the window gone the voice needs the fact itself.
+   */
+  roundaboutEntryOpen?: boolean;
+  /**
+   * SOMEBODY ON THE RING HAS PAID FOR HIS ENTRY — founder ruling 2026-10-05
+   * («bill forced braking»), round 4, R4-3: «sub-threshold easing: not billed,
+   * not praised».
+   *
+   * On this visit to a roundabout, since his nose came onto the ring: a
+   * vehicle with priority over an entry of his lost ANY speed because of him
+   * before it had cleared his mouth (an easing under the conviction's line
+   * included), or a circulating vehicle had to brake for him with his nose on
+   * the ring, or his body touched one. It is the roundabout tracker's own
+   * «когато беше безопасно» turned round — the one expression the yield
+   * commendation is refused on (`worldRuntime.ts roundaboutEntryPaidFor`) —
+   * and it latches for the visit.
+   *
+   * Published `true` from the frame it becomes a fact until he leaves the
+   * roundabout's vicinity, and ABSENT on every other frame — additive, like
+   * `roundaboutEntryOpen` above. Absent does NOT mean «the entry was safe»:
+   * it means nothing of the kind has happened so far.
+   *
+   * MEASUREMENT ONLY — nothing graded reads it and none may: the conviction
+   * is the violation event, the commendation is its own event. Its one reader
+   * is the instructor's voice (`lessons/advisor.ts stepYieldVoice`), which
+   * DROPS a pending «Интервалът беше добър … без движещият се в кръга да
+   * намалява заради теб» while this is set: MEASURED on the round-4 tree
+   * without it, 12 of 7,862 live-chain drives were told exactly that after a
+   * car with priority had eased 0.02–0.20 m/s for them, and one after
+   * touching a circulating car at walking pace. It can only silence a line.
+   */
+  roundaboutEntryPaidFor?: boolean;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
   /**

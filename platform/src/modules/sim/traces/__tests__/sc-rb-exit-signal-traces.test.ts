@@ -27,6 +27,11 @@ import { SC_RB_EXIT_SIGNAL } from "../../lessons/scenario/templates-roundabout";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScRbExitSignalDrive, type ScRbExitSignalTraceName } from "../scRbExitSignal";
 import type { RecordedDrive } from "../recorder";
+import type { StagedEventSpec } from "../../contracts";
+import { carStory, noseOnRingAtSec, replayWithStagedCars } from "./stagedTwin";
+
+/** rb-mini-v1: ring radius 18 + half its 8.125 m lane — where an entry begins. */
+const RING_EDGE_M = 22.0625;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
@@ -65,6 +70,23 @@ describe("sc-rb-exit-signal — the shadow gate (doc 76 §5)", () => {
     expect(outcome).toBeDefined();
     expect(outcome!.success).toBe(true);
     expect(outcome!.detail).toBe("yielded");
+  });
+
+  it("costs nobody anything: no car on the ring loses any speed because of the shadow", () => {
+    // The other half of the ruling — „Patient or careful entries are never
+    // billed" — measured the same way the barge is: every staged car, every
+    // frame, against the same car in a world that never saw him.
+    const frames = replayWithStagedCars(
+      district,
+      [...(SC_RB_EXIT_SIGNAL.staged ?? [])] as StagedEventSpec[],
+      ["sc-rbx-circulating"],
+      (onTick) => recordScRbExitSignalDrive(district, "shadow-correct", { onTick }),
+    );
+    for (const id of ["sc-rbx-circulating"]) {
+      const story = carStory(frames, id);
+      expect(story.lostToHimMps, id).toBe(0);
+      expect(story.nearestM, id).toBeGreaterThan(4.5);
+    }
   });
 
   it("stays SILENT past the first two spokes, then signals RIGHT before the third exit", () => {
@@ -123,6 +145,45 @@ describe("sc-rb-exit-signal — mistake demos grade their exact codes (doc 76 §
     expect(drive.outcomes.find((o) => o.eventId === "sc-rbx-circulating")?.detail).toBe("violation");
     // The barger signals its intended exit — the ONLY graded fault is priority.
     expect(drive.trace.events.find((e) => e.kind === "signal-on")?.detail).toBe("right");
+    // „…но нашата не спира": it rolls over the give-way line — never at rest
+    // anywhere between the arm and the ring.
+    for (const s of drive.trace.samples.filter((p) => p.y > -60 && p.y < -19)) {
+      expect(s.speedKmh, `t=${s.tSec}`).toBeGreaterThan(5);
+    }
+  });
+
+  it("„Нахлуване в кръга пред циркулираща кола“ REALLY cuts the circulating car off — it has to brake, because of him, as he comes onto the ring", () => {
+    // Founder ruling 2026-10-05, «bill forced braking»: „The lesson own "barge"
+    // demo gets re-staged so it really cuts someone off." The old demo came
+    // through at 22 км/ч and outran the 2.9 m/s car; it was billed on where the
+    // car WAS. This one is billed on what the car DOES — watched here from
+    // outside the grader, against the same cars in a world that never saw him.
+    const drive = drives.get("mistake-barge-entry")!;
+    const frames = replayWithStagedCars(
+      district,
+      [...(SC_RB_EXIT_SIGNAL.staged ?? [])] as StagedEventSpec[],
+      ["sc-rbx-circulating"],
+      (onTick) => recordScRbExitSignalDrive(district, "mistake-barge-entry", { onTick }),
+    );
+    const noseAt = noseOnRingAtSec(frames, RING_EDGE_M)!;
+    expect(noseAt).not.toBeNull();
+    const failed = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD")!;
+    // Nothing he did before his nose was on the ring cost the car anything…
+    expect(carStory(frames, "sc-rbx-circulating", { toSec: noseAt }).lostToHimMps).toBe(0);
+    // …and from there it brakes for him: more than 1 m/s of its 2.9, while the same car in
+    // the world without him never drops below its 2.90 m/s.
+    const story = carStory(frames, "sc-rbx-circulating", { fromSec: noseAt });
+    expect(story.lostToHimMps).toBeGreaterThan(1);
+    expect(story.minMps).toBeLessThan(2.9 - 1);
+    expect(story.aloneMinMps).toBeCloseTo(2.9, 6);
+    // THE BILL IS THAT BRAKING: it lands on the frame the car has lost 0.3 m/s
+    // to him — after his nose is on the ring, never before.
+    expect(story.forcedAtSec).not.toBeNull();
+    expect(Math.abs(failed.t - story.forcedAtSec!)).toBeLessThan(1.5 / 60);
+    expect(failed.t).toBeGreaterThan(noseAt);
+    // A cut-off, not a crash: the two never touch.
+    expect(carStory(frames, "sc-rbx-circulating").nearestM).toBeGreaterThan(4.5);
+    expect(violationCodes(drive)).not.toContain("COLLISION");
   });
 });
 

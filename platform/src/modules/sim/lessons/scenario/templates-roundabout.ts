@@ -381,15 +381,18 @@ export const EXIT_APPROACH_RADIUS_M = 4;
  * The staged CIRCULATING CAR on the rb-mini-v1 ring (CCW loop w → s → e → n →
  * w): the RoundaboutEntryRunner syncs it to sit `conflictLeadM` upstream of
  * the player's south entry at arrival — the "do I go or wait" moment — and the
- * runtime's own circulatingConflict tracker adjudicates the entry
- * (FAILED_TO_YIELD / yielded commendation).
+ * runtime's own roundabout tracker adjudicates the entry (FAILED_TO_YIELD when
+ * this car has to BRAKE because of it, or is touched — founder ruling
+ * 2026-10-05; the yielded commendation when the driver held back and it went
+ * by).
  *
  * cruiseSpeedMps 2.9 is the timing dial and it is pinned to the SAME value
- * sc-roundabout-entry proved, because the ENTRY envelope is the tight one: a
- * faster car has swept onto the north-east arc — the driver's LEFT — by the
- * time the driver commits the entry chord, and the roundabout tracker convicts
- * an otherwise clean entry (measured: 3.35 m/s fires FAILED_TO_YIELD mid-
- * chord). A crawler stays on the driver's RIGHT until ring priority is won.
+ * sc-roundabout-entry proved. HISTORY: the entry envelope used to be the tight
+ * one — under the presence grader a faster car had swept onto the north-east
+ * arc, the driver's LEFT, by the time he committed the entry chord, and an
+ * otherwise clean entry was convicted (measured then: 3.35 m/s fired
+ * FAILED_TO_YIELD mid-chord). That wall is gone with the grader that built it;
+ * the pace is kept because every committed drive here is timed against it.
  * The cost lands on the EXIT half instead: this drill rides ~190° of ring
  * (south mouth → third/west exit), nearly twice the entry template's arc, so
  * the authored circulation matches the car's pace (~10.5 km/h) rather than the
@@ -573,8 +576,13 @@ export const SC_RB_EXIT_SIGNAL: ScenarioSpec = {
         path: "content/traces/sc-rb-exit-signal/mistake-barge-entry.trace.json",
       },
       titleBg: "Нахлуване в кръга пред циркулираща кола",
+      // RE-WORDED 2026-10-05 with the demo it describes (founder ruling «bill
+      // forced braking» — traces/scRbExitSignal.ts BARGE_BRAKE_Y): it read
+      // «влезе в кръга с непроменена скорост пред автомобил, който вече се
+      // движеше в него». The re-staged demo brakes late and ROLLS over the line,
+      // and what makes it a fault is that the car in the ring had to slow down.
       whatWentWrongBg:
-        "До изхода изобщо не се стигна: колата влезе в кръга с непроменена скорост пред автомобил, който вече се движеше в него. Влизащият НЯМА предимство — на входа стои Б1 или Б2, защото знакът „Път с предимство“ Б3 не може да се поставя там (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), а от пътя без предимство пропускаш движещите се по пътя с предимство (ЗДвП чл. 50, ал. 1), дори това да значи пълно спиране на входа. „Пропусни“ не значи „чакай празен кръг“, а „не карай никого в кръга да намалява“.",
+        "До изхода изобщо не се стигна: колата не спря на входа и влезе в кръга пред автомобил, който вече се движеше в него и трябваше да намали заради нея. Влизащият НЯМА предимство — на входа стои Б1 или Б2, защото знакът „Път с предимство“ Б3 не може да се поставя там (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), а от пътя без предимство пропускаш движещите се по пътя с предимство (ЗДвП чл. 50, ал. 1), дори това да значи пълно спиране на входа. „Пропусни“ не значи „чакай празен кръг“, а „не карай никого в кръга да намалява“.",
       codeRefs: ["FAILED_TO_YIELD"],
     },
   ],

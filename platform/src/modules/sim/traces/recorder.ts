@@ -542,8 +542,11 @@ export function recordScriptedDrive(
   runtime.setRightConflictQuery((jx, jy, px, py, h, r, s) =>
     traffic.conflictFromRight(jx, jy, px, py, h, r, s),
   );
+  // The REPORT, as scene/lessonWorldRecipe.ts wires it for the live lesson: a
+  // recorded demo is convicted on the same fact the student is (founder ruling
+  // 2026-10-05 — what the circulating cars had to do because of the entry).
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
-    traffic.circulatingConflict(cx, cy, px, py, h, r),
+    traffic.circulatingTraffic(cx, cy, px, py, h, r),
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));

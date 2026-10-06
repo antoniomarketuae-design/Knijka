@@ -35,6 +35,9 @@ import {
   type District,
 } from "./district";
 import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M } from "../collision/bodies";
+import { obbSeparationM } from "../collision/obb";
+import { isContact } from "../collision/probe";
+import { edgeTravelHalfWidth } from "../world/builders/network";
 import { Locator } from "./locator";
 import { DistrictIndex, LANE_WIDTH_M, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
@@ -749,9 +752,110 @@ const YIELD_BRAKE_RESPONSE_MAX_SEC = 3.0;
  * speed; a human needs reaction time before the brake shows (C1). A real
  * barger holds the condition far longer than this while crossing. */
 const YIELD_CONVICT_SUSTAIN_SEC = 0.9;
-/** Azimuth sweep around the roundabout centre that marks the vehicle as
- * circulating (ring priority) — entry grading stands down after this (C1). */
-const RB_ON_RING_DEG = 35;
+/**
+ * Azimuth the driver sweeps around the roundabout centre, FROM THE MOMENT HIS
+ * NOSE IS ON THE RING, before he counts as circulating (C1): he has joined the
+ * flow and holds ring priority like every other car on it.
+ *
+ * WHAT STILL READS IT: the yield COMMENDATION only — «held back» and «the car
+ * he held back for went by» are things a driver does before he is circulating
+ * (§4c). It is NOT part of the conviction any more. Round 3 of the forced-
+ * braking ruling closed the conviction's window here, and a window measured in
+ * degrees cut both ways: a quick entry escaped with the car braking hard just
+ * after it, a walking-pace creep was billed for a car a third of a lap away,
+ * and a driver who stopped in the lane was not billed at all. The conviction
+ * is now about ONE place — the mouth he entered by (see `rbPassedMouth`).
+ */
+export const RB_ON_RING_DEG = 35;
+/**
+ * «FORCED TO BRAKE», m/s — FOUNDER RULING 2026-10-05, «BILL FORCED BRAKING»:
+ *
+ *   „Bill it only when a circulating car actually has to brake or swerve
+ *    because of the entry, or there is contact. This mirrors your lane-drop
+ *    ruling and how examiners judge taking priority. Patient or careful
+ *    entries are never billed."
+ *
+ * So a roundabout entry is convicted on WHAT HAPPENED, and this is the size of
+ * the thing that has to happen: a vehicle that was circulating and had not yet
+ * passed his mouth when he entered sheds at least this much speed, because of
+ * the student, before it has cleared that mouth.
+ *
+ * WHERE THE SPEED LOSS IS READ. Not computed here and not inferred from where
+ * anybody was: each vehicle's own traffic model accounts the speed it lost to
+ * him (`traffic/vehicles.ts playerShedThisStep` — the ambient fleet's following
+ * law when HIS term is the binding one, the staged actor's player guard, a
+ * hard clamp against his body) and the circulating query hands the running
+ * total across. This tracker differences it from the frame of his entry.
+ *
+ * WHY 0.3. It is the traffic model's own line between «holding its speed» and
+ * «braking»: `traffic/staged.ts` lights an actor's brake lamps when its speed
+ * stands more than 0.3 m/s above the speed its guard is asking for
+ * (`STAGED_BRAKE_LAMP_MARGIN_MPS`; the runtime may not import the traffic
+ * module, so `runtime/__tests__/roundabout-forced-braking.test.ts` pins the two
+ * numbers to each other). Anything smaller is one or two frames of the guard
+ * trimming a car that then carries on — 0.133 m/s is a single 60 Hz frame of
+ * its 8 m/s² ramp — and 0.3 m/s is about 1 км/ч, the smallest change a
+ * speedometer shows. The floor it stands on is not small, it is NIL: a car the
+ * student is not the binding obstacle of accounts exactly 0, so an undisturbed
+ * platoon reads 0.000 for as long as it circulates (measured on the live chain,
+ * every clean leg of the roundabout family — the lane's census).
+ */
+export const ROUNDABOUT_FORCED_SHED_MPS = 0.3;
+/**
+ * «ANY SPEED AT ALL», m/s — the yield COMMENDATION's line. «Правилно отстъпено
+ * предимство» says nobody paid for the entry, so a car with priority that
+ * eased off for him by LESS than the conviction's 0.3 m/s is not billed and is
+ * not praised either. The floor is not small, it is nil (a car he is not the
+ * binding obstacle of accounts exactly 0.000 for as long as it circulates), so
+ * «any» only has to clear floating-point dust: one micrometre per second.
+ */
+export const ROUNDABOUT_ANY_SHED_MPS = 1e-6;
+/**
+ * HAS THIS CAR PASSED THE MOUTH? — the one definition both halves of the
+ * conviction use (the priority set, and «cleared the mouth»).
+ *
+ * The MOUTH is one place: the azimuth, about the ring centre, of the point
+ * where the student's nose came over the ring's edge. A car has PASSED it when
+ * the whole car has gone by — its REAR END is beyond that azimuth, measured
+ * along the car's own circle in its own direction of travel (its centre is
+ * past by more than its half length). So:
+ *
+ *   · a car whose body is still across his mouth has not passed it. Driving
+ *     into the side of it is entering without letting it pass;
+ *   · a car that had passed when he entered is the car he LET GO BY. Whatever
+ *     happens between him and it afterwards — he follows too closely, he runs
+ *     into its back — is a following matter or a collision, never this fault;
+ *   · «past» means less than half a lap past. A car further round than that is
+ *     on its way back to him and has not passed anything.
+ *
+ * `mx, my` is the mouth point and `ox, oy` the car's centre, both relative to
+ * the ring centre; `dirX, dirY` the car's travel direction. Pure geometry at
+ * one instant: no speed, no distance to him, no time gap, no forecast.
+ */
+export function rbPassedMouth(
+  mx: number,
+  my: number,
+  ox: number,
+  oy: number,
+  dirX: number,
+  dirY: number,
+  halfLengthM: number,
+): boolean {
+  // Which way it goes round: +1 counter-clockwise, −1 clockwise.
+  const sense = ox * dirY - oy * dirX >= 0 ? 1 : -1;
+  // The angle FROM the mouth TO the car's centre in that sense: (0, π] = its
+  // centre is beyond the mouth, (−π, 0] = still coming to it.
+  const pastRad = sense * Math.atan2(mx * oy - my * ox, mx * ox + my * oy);
+  return pastRad * Math.hypot(ox, oy) > halfLengthM;
+}
+/**
+ * A vehicle is CIRCULATING — on the ring and going round it — when its centre
+ * is on the ring carriageway and its travel direction is more tangential than
+ * radial. The second half keeps out a car that is itself entering from an arm
+ * (heading inward): it has no priority over the student, and its braking
+ * behind him at a shared mouth is following, not yielding.
+ */
+const RB_CIRCULATING_MAX_RADIAL = Math.SQRT1_2;
 /**
  * How far beyond a roundabout's ring a driver counts as COMMITTED to entering,
  * meters (entry mouths widened with the perceptual road scale).
@@ -769,12 +873,6 @@ const ROUNDABOUT_ENTRY_MARGIN_M = 12;
 /** Extra reach beyond the ring for the circulating-traffic band, meters —
  * circulating NPCs now ride lane centers ~4 m off the ring centerline. */
 const ROUNDABOUT_BAND_EXTRA_M = 9;
-/**
- * Minimum inward component of the driver's heading (unit) to count as ENTERING
- * rather than circulating tangentially — guards against flagging a driver who
- * already holds priority on the ring.
- */
-const ROUNDABOUT_INWARD_MIN = 0.3;
 
 /**
  * True when a vehicle heads against a one-way street's flow. `tangent` is the
@@ -886,7 +984,44 @@ export type RightConflictQuery = (
   playerSpeedKmh?: number,
 ) => boolean;
 
-/** Is a vehicle already circulating a roundabout (approaching entry from the left)? */
+/**
+ * One vehicle in a roundabout's band — the runtime's structural view of the
+ * traffic module's `CirculatingVehicle` (the runtime never imports traffic).
+ */
+export interface CirculatingVehicleReport {
+  id: number;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  speedMps: number;
+  halfLengthM: number;
+  halfWidthM: number;
+  /** Presence: moving, within reach, on the driver's left, not yet past his
+   *  azimuth. Read by the yield COMMENDATION only. */
+  approaching: boolean;
+  /** Geometry: already past the driver's azimuth (less than half a lap). Read
+   *  by the yield COMMENDATION only. */
+  pastEntry: boolean;
+  /** Cumulative speed its own model has shed because of the player, m/s. */
+  playerShedMps: number;
+}
+
+/** What the circulating query answers — `TrafficSystem.circulatingTraffic`. */
+export interface CirculatingQueryReport {
+  /** Presence: a car the driver should be watching (the commendation's
+   *  witness). Convicts nobody. */
+  conflict: boolean;
+  /** Every vehicle in the band; valid for the frame it was returned in. */
+  vehicles: readonly CirculatingVehicleReport[];
+}
+
+/**
+ * The traffic around a roundabout as the driver meets it: who is there to be
+ * watched (`conflict`), and what each vehicle in the band has had to do
+ * because of him (`vehicles[].playerShedMps`) — the fact a roundabout entry is
+ * convicted on.
+ */
 export type CirculatingQuery = (
   cx: number,
   cy: number,
@@ -894,7 +1029,13 @@ export type CirculatingQuery = (
   py: number,
   headingDeg: number,
   bandRadiusM: number,
-) => boolean;
+) => CirculatingQueryReport;
+
+/** The answer of a runtime nobody wired a traffic system into. */
+const NO_CIRCULATING: CirculatingQueryReport = Object.freeze({
+  conflict: false,
+  vehicles: Object.freeze([]) as readonly CirculatingVehicleReport[],
+});
 
 /**
  * VU-02 (doc 72 §7): the nearest SAME-DIRECTION cyclist proxy near the player
@@ -1104,6 +1245,8 @@ export interface DistrictWorldRuntime extends WorldRuntime {
     id: string;
     watchReachM: number;
     commitReachM: number;
+    /** Ring carriageway's outer edge — the nose inside it has ENTERED. */
+    enterReachM: number;
   }>;
 }
 
@@ -1171,7 +1314,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let conflictQuery: JunctionConflictQuery = () => false;
   let oncomingQuery: OncomingQuery = () => false;
   let rightConflictQuery: RightConflictQuery = () => false;
-  let circulatingQuery: CirculatingQuery = () => false;
+  let circulatingQuery: CirculatingQuery = () => NO_CIRCULATING;
   let cyclistQuery: CyclistQuery = () => null;
   let overtakenQuery: CyclistQuery = () => null;
   let sameDirQuery: SameDirVehiclesQuery = () => [];
@@ -1351,11 +1494,23 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
    *    Unchanged, so this whole change is additive on the conviction side: no
    *    drive that was innocent yesterday can be billed today.
    *
-   * Both are squared — the per-frame proximity scan stays sqrt-free.
+   *  - `enterReach2` — where the RING CARRIAGEWAY begins: the ring radius plus
+   *    the drawn half width of its own widest ring edge (the number the world
+   *    builder lays the asphalt with). He has ENTERED when the nose of his car
+   *    is inside it, and that is where the conviction's attribution window
+   *    opens (founder ruling 2026-10-05). Never beyond the commit reach.
+   *
+   * All are squared — the per-frame proximity scan stays sqrt-free.
    */
   const roundabouts = district.roundabouts.map((rb) => {
     const commitReach = rb.radius + ROUNDABOUT_ENTRY_MARGIN_M;
     const watchReach = Math.max(commitReach, roundaboutGiveWayReachM(district, index, rb));
+    const ringEdgeIds = new Set(rb.edgeIds);
+    let ringHalfWidth = 0;
+    for (const e of district.roads.edges) {
+      if (ringEdgeIds.has(e.id)) ringHalfWidth = Math.max(ringHalfWidth, edgeTravelHalfWidth(e));
+    }
+    const enterReach = Math.min(commitReach, rb.radius + ringHalfWidth);
     return {
       id: rb.id,
       x: rb.x,
@@ -1363,6 +1518,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       radius: rb.radius,
       watchReach2: watchReach * watchReach,
       commitReach2: commitReach * commitReach,
+      enterReach2: enterReach * enterReach,
     };
   });
 
@@ -1420,23 +1576,160 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
    */
   let rbCommittedSeen = false; // has been inside the commit radius this visit
   let rbYieldAwarded = false; // the commendation already fired this visit
+  /**
+   * THE ENTRY, AND WHAT IT COST THE CARS ON THE RING (founder ruling
+   * 2026-10-05 — see ROUNDABOUT_FORCED_SHED_MPS and §4c).
+   *
+   *  - `rbOutsideSeen`: his nose has been OUTSIDE the ring carriageway this
+   *    visit, so a later `entered` frame is a real crossing of its edge and not
+   *    a spawn, a respawn or a teleport onto the ring.
+   *  - `rbEnteredPrev` / `rbNosePrev*`: whether his nose was on the ring on the
+   *    previous frame of this visit (null: there was none), and where it was.
+   *    A frame that is `entered` after one that was not is an ENTRY — each one
+   *    its own — and the two nose positions give the point he came over the
+   *    edge at: `rbMouthX/Y`, the MOUTH of that entry (relative to the centre).
+   *  - `rbEntryLive`: an entry has happened this visit and is not finished;
+   *    its priority set stands until the next one, or until he leaves the
+   *    commit reach.
+   *  - `rbSetOpen`: he still OCCUPIES THE MOUTH of the live entry — from the
+   *    entry frame until his own car has passed the mouth (`rbPassedMouth`,
+   *    asked of him as of any car: he has left it and is circulating) or his
+   *    nose is back off the ring. While it is set the priority set takes new
+   *    members; once it is not, it takes none (round 5).
+   *  - `rbEnterAzPrevDeg` / `rbEnterAzAccumDeg`: the azimuth he has swept about
+   *    the centre with his nose on the ring — at RB_ON_RING_DEG of it he is
+   *    circulating. Read by the commendation only.
+   *  - `rbVeh*`: one row per vehicle the circulating query has reported this
+   *    visit. `Last` is its running `playerShedMps` at the previous frame;
+   *    `InP` says it is, or has been, in the PRIORITY SET of the live entry —
+   *    circulating, and not yet past his mouth, on the frame he entered or on
+   *    a later frame he still occupied that mouth (and it leaves the set if
+   *    it drives off the ring before reaching the mouth); `Cleared` says it
+   *    has since passed the mouth (a member that has cleared and comes round
+   *    again while he STILL sits in his mouth joins afresh); `Entry` is what
+   *    it has shed for him from the frame it joined until it cleared (the
+   *    conviction, and at any size the commendation's veto); `Carry` is
+   *    scratch for the frame of a new entry — it was a car with priority over
+   *    the entry before, still not cleared, so if it is in the new set too it
+   *    keeps its account; `OnRing` is what it shed for him at any time his
+   *    nose was on the ring, in the set or not (the commendation's other
+   *    veto); `Held` says he held back for it while it was still coming (the
+   *    commendation's first half). Parallel arrays, grown on first sight only.
+   *  - `rbLetPass`: a car he held back for has since gone past him — the
+   *    commendation's second half.
+   */
+  let rbOutsideSeen = false;
+  /** He has actually ENTERED this visit: his nose crossed onto the ring from outside. */
+  let rbEnteredSeen = false;
+  let rbEnteredPrev: boolean | null = null;
+  let rbNosePrevX = 0;
+  let rbNosePrevY = 0;
+  let rbEntryLive = false;
+  let rbSetOpen = false;
+  let rbMouthX = 0;
+  let rbMouthY = 0;
+  let rbEnterAzPrevDeg: number | null = null;
+  let rbEnterAzAccumDeg = 0;
+  let rbLetPass = false;
+  const rbVehId: number[] = [];
+  const rbVehLast: number[] = [];
+  const rbVehInP: boolean[] = [];
+  const rbVehCleared: boolean[] = [];
+  const rbVehEntry: number[] = [];
+  const rbVehCarry: boolean[] = [];
+  const rbVehOnRing: number[] = [];
+  const rbVehHeld: boolean[] = [];
+  let rbVehCount = 0;
+  let rbOnRingShedMax = 0; // largest rbVehOnRing this visit
+  /** Largest `rbVehEntry` this visit: the most any car with priority lost to
+   *  him before it had cleared his mouth, over every entry he made. */
+  let rbPriorityShedMax = 0;
+  /** His body touched a circulating vehicle at some time his nose was on the
+   *  ring this visit — a car with priority that had not cleared his mouth (a
+   *  conviction) or any other (a collision, billed elsewhere). Either way the
+   *  entry was not «safe». */
+  let rbTouchedOnRing = false;
+  const rbPlayerBox = { x: 0, y: 0, headingDeg: 0, halfLengthM: PLAYER_HALF_LENGTH_M, halfWidthM: PLAYER_HALF_WIDTH_M };
+  const rbOtherBox = { x: 0, y: 0, headingDeg: 0, halfLengthM: 0, halfWidthM: 0 };
+  /**
+   * HAS SOMEBODY ON THE RING PAID FOR HIS ENTRY THIS VISIT? — «когато беше
+   * безопасно» turned round, and the ONE place it is written down. Three
+   * facts, each a thing that happened (see `roundaboutYieldEarned` below for
+   * why each is there): his body touched a circulating car; a car with
+   * priority over an entry of his lost any speed at all to him before it had
+   * cleared his mouth; any circulating car shed the conviction's 0.3 m/s for
+   * him while his nose was on the ring.
+   *
+   * Two readers. The yield commendation is refused on it. And it is published
+   * on the tick (`SimTick.roundaboutEntryPaidFor`) for the instructor's voice,
+   * which says «Интервалът беше добър … без движещият се в кръга да намалява
+   * заради теб» on its own clock: R4-3's «not billed, not praised» has to be
+   * true of BOTH kinds of praise, so both read the same expression.
+   */
+  const roundaboutEntryPaidFor = (): boolean =>
+    rbTouchedOnRing ||
+    rbPriorityShedMax > ROUNDABOUT_ANY_SHED_MPS ||
+    rbOnRingShedMax >= ROUNDABOUT_FORCED_SHED_MPS;
+  /**
+   * HAS THIS VISIT EARNED «Правилно отстъпено предимство»? The card says he
+   * „пропусна превозното средство с предимство и продължи, когато беше
+   * безопасно" — so both halves have to have HAPPENED:
+   *
+   *  - „пропусна": a car with priority was coming, he held back for it — at or
+   *    below the yield speed, not yet circulating — and THAT car then went
+   *    past him (`rbLetPass`; `rbConflictSeen` and `rbSlowed` are the older,
+   *    weaker witnesses and are kept as well). A driver who slows, then rolls
+   *    in AHEAD of the car he slowed for has let nothing past, even when he
+   *    gets away with it;
+   *  - „и продължи": he then went ON — his nose came onto the ring
+   *    (`rbEnteredSeen`). A driver who waits at the line and backs away, or
+   *    whose route only brushes the roundabout, has not continued anywhere;
+   *  - „когато беше безопасно": nobody paid for it. He was not convicted; no
+   *    car with priority — one that had not passed his mouth when he entered —
+   *    lost ANY speed because of him before it had cleared that mouth
+   *    (ROUNDABOUT_ANY_SHED_MPS: an easing too small to bill is still not
+   *    «safe»); no circulating car at all shed ROUNDABOUT_FORCED_SHED_MPS for
+   *    him at any time his nose was on the ring (the car he let past that then
+   *    has to brake behind his crawl has not had its priority taken, and he is
+   *    not billed — but he is not praised); and he touched none of them.
+   */
+  const roundaboutYieldEarned = (): boolean =>
+    rbConflictSeen && rbSlowed && rbLetPass && rbEnteredSeen && !rbFired && !roundaboutEntryPaidFor();
+  const resetRoundaboutVisit = (): void => {
+    rbFired = false;
+    rbConflictSeen = false;
+    rbSlowed = false;
+    rbCommittedSeen = false;
+    rbYieldAwarded = false;
+    rbOutsideSeen = false;
+    rbEnteredSeen = false;
+    rbEnteredPrev = null;
+    rbEntryLive = false;
+    rbSetOpen = false;
+    rbEnterAzPrevDeg = null;
+    rbEnterAzAccumDeg = 0;
+    rbLetPass = false;
+    rbVehCount = 0;
+    rbOnRingShedMax = 0;
+    rbPriorityShedMax = 0;
+    rbTouchedOnRing = false;
+  };
   // C1 revision — yield-adjudication tolerance bands (A12 discipline):
   //  - Braking response: a driver DECELERATING hard toward the conflict is
   //    yielding, not barging — staged conflicts can materialise inside the
   //    physical braking distance ("late"/"tight" tiers), and convicting the
   //    correct reaction mid-brake was a 10-point FP (C1 exam-bank bot,
   //    shells F/G). Mirrors the crossingBrakeResponseMps2 band.
-  //  - Ring-transit latch: the ring polyline is polygonal, so a vehicle
-  //    ALREADY CIRCULATING points "inward" ≥ the entry threshold at every
-  //    corner; once the azimuth around the centre has swept ≥ RB_ON_RING_DEG
-  //    this visit, the vehicle holds ring priority and entry grading stands
-  //    down (C1 FP: graded as a barging entry 70 m PAST a lawful entry).
+  //  - Ring-transit latch: once the driver has swept ≥ RB_ON_RING_DEG about
+  //    the centre with his nose on the ring he holds ring priority (C1 FP:
+  //    graded as a barging entry 70 m PAST a lawful entry). The roundabout
+  //    tracker no longer uses the braking band above, nor this latch, to
+  //    convict — it convicts on what a car that had not passed his mouth had
+  //    to do before clearing it (§4c), so there is no mid-brake frame and no
+  //    «70 m past» for it to misread. The latch still gates the commendation.
   let prevYieldSpeedKmh: number | null = null;
   let prevYieldT = 0;
-  let rbAzPrevDeg: number | null = null;
-  let rbAzAccumDeg = 0;
   let rhrCondSince: number | null = null; // conflict-visible onset (reaction window)
-  let rbCondSince: number | null = null;
 
   // N1 left-turn-across-path tracker (doc 72 JU-10) — one adjudication per
   // junction visit, same visit/latch shape as the RHR tracker above. All the
@@ -2253,7 +2546,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         const rhrCommittedClear = rhrEnteredCore && rhrEnteredClear;
         if (rightConflict && !rhrCommittedClear) {
           // B15's staleness, in the tracker it was NOT fixed in. The identical
-          // repair shipped one block below for `rbCondSince` (see §4c) and its
+          // repair once shipped one block below for the roundabout's sustain
+          // clock (retired with it — §4c no longer runs a clock) and its
           // twin was left here, where the same driver meets the same sentence
           // at every ordinary crossroads: the stamp is taken the first tick the
           // conflict is visible and cleared only when the conflict is GONE, so
@@ -2314,13 +2608,84 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rhrEnteredClear = false;
       }
 
-      // 4c. Roundabout entry: entering the ring (heading inward, at speed) while
-      // a vehicle already circulates from the left = failing to give way. Once
-      // per approach; slowing to let it pass and not barging in is commended on
-      // leaving. Mirrors the right-hand-rule tracker (roundabouts turn CCW, so
-      // the driver with priority is on your left).
+      // 4c. Roundabout entry — FOUNDER RULING 2026-10-05, «BILL FORCED BRAKING»:
+      // „Bill it only when a circulating car actually has to brake or swerve
+      // because of the entry, or there is contact. … Patient or careful entries
+      // are never billed." Once per approach. Holding back while a car with
+      // priority is still coming, and then entering without costing anybody
+      // anything, is commended on leaving.
+      //
+      // WHAT IS JUDGED IS WHAT HAPPENED. The conviction reads two facts and no
+      // forecast: a vehicle with priority LOST SPEED BECAUSE OF HIM (its own
+      // traffic model's account — see ROUNDABOUT_FORCED_SHED_MPS), or his body
+      // TOUCHED one. How many metres or seconds a car had left, how fast he
+      // came up the arm and whether he stopped first are not asked: three
+      // rounds of asking them billed drivers who waited on the line and merged
+      // behind every car, and praised drivers who made the lead brake to half
+      // its speed (sc-rb-busy-gap:a6f83f6b / :8f50287b, w76 and the two
+      // refuted repairs after it). All of that was one defect — prediction.
+      //
+      // WHOSE PRIORITY, AND UNTIL WHEN — ONE PLACE, THE MOUTH (round 4).
+      // Yielding at a roundabout is about the mouth he enters by and the cars
+      // that had not yet passed it when he entered:
+      //
+      //  · THE ENTRY is the frame his nose comes onto the ring carriageway,
+      //    having been off it the frame before. Each such frame is its own
+      //    entry. The MOUTH is where the nose crossed the ring's edge.
+      //  · THE PRIORITY SET of that entry is every vehicle circulating on the
+      //    ring that has NOT passed the mouth (`rbPassedMouth`), wherever on
+      //    the ring it is — on the frame he enters, AND ON EVERY LATER FRAME
+      //    HE STILL OCCUPIES THE MOUTH (round 5). The set is OPEN from the
+      //    entry frame until his own car has passed the mouth — the same
+      //    `rbPassedMouth`, asked of him: he has left his mouth and is
+      //    circulating — or until his nose is back off the ring. While it is
+      //    open a car that is, or comes, short of the mouth (the car he let
+      //    by, come round again; a car that has driven onto the ring) joins
+      //    it on the frame it qualifies, and its account runs from THAT frame.
+      //    Once he has left his mouth the set takes no new member. Geometry of
+      //    each frame — no distance, no gap, no speed, no forecast.
+      //    WHY: round 4 fixed the set on the entry frame, so a driver who
+      //    stopped with his nose a hand's width over the ring's edge had
+      //    «entered» against whoever was there then, and could wait, pull
+      //    out in front of the returning car and make it brake to a stop —
+      //    0 т., «passed» (verifier R4-V2). A nose resting on the edge costs
+      //    nothing by itself, however long; it also buys nothing. And how
+      //    long he takes to leave the mouth is his own: a walking-pace creep
+      //    that is still in it when the car he let by is half a lap round has
+      //    that car in its set, and answers if it must brake before the mouth.
+      //  · THE CONVICTION: a car of the set loses ROUNDABOUT_FORCED_SHED_MPS
+      //    because of him, summed from the frame it joined the set, BEFORE it
+      //    has cleared the mouth — or his body touches it before it has.
+      //    Whether he is moving or standing is not asked: entering ahead of a
+      //    car and stopping in its path is entering without letting it pass.
+      //  · Once a car of the set has cleared the mouth without having had to
+      //    brake for him, his entry did not take its priority. Whatever it
+      //    does for him further round the ring — it catches a crawler, he
+      //    stops for his exit — is not this conviction (and is billed by
+      //    nothing here: recorded, not graded).
+      //  · THE ENTRY IS FINISHED when he leaves the commit reach having been
+      //    inside it (12 m clear of the ring — where the commendation has
+      //    always been awarded), and a car of the set that drives off the
+      //    ring before reaching the mouth has no priority left to take.
+      //
+      // Round 3 measured the entry with a window instead — the frames in which
+      // he was moving, until 35° of ring were behind him — and was refuted on
+      // it three ways (a stop in the lane escaped, a rear-end of the car he
+      // had let past was billed as not yielding, and the degrees cut both
+      // ways). The window, its clock and the «moving» gate are gone from the
+      // conviction; RB_ON_RING_DEG survives for the commendation alone.
+      //
+      // «OR SWERVE». No vehicle in this product steers round the student: the
+      // ambient fleet rides its lane and staged actors change lane only on a
+      // runner's command. Braking is the whole of what a car here can be forced
+      // to do, so it is the whole of what is read. A model that learns to
+      // swerve must account that through the same seam.
       let nearRb: (typeof roundabouts)[number] | null = null;
       let nearRbDist2 = Infinity;
+      /** `SimTick.roundaboutEntryOpen` for this frame — set at the end of the tracker pass. */
+      let rbEntryOpenNow = false;
+      /** `SimTick.roundaboutEntryPaidFor` for this frame — likewise. */
+      let rbEntryPaidNow = false;
       for (const rb of roundabouts) {
         const dx = rb.x - v.position.x;
         const dy = rb.y - v.position.y;
@@ -2334,52 +2699,138 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         }
       }
       if (nearRb !== null) {
-        // COMMITTED = inside the ring-relative entry radius. Everything that
-        // can cost the student points is gated on this and only this; the band
-        // between it and the paint is for WATCHING (his stop, his wait, the
-        // circulator he let past), which is exactly the evidence the old
-        // 30-metre keyhole threw away.
+        // COMMITTED = inside the ring-relative entry radius. The band between
+        // it and the paint is for WATCHING (his stop, his wait, the circulator
+        // he let past) — the evidence the old 30-metre keyhole threw away.
         const committed = nearRbDist2 <= nearRb.commitReach2;
         if (rbNode !== nearRb.id) {
           rbNode = nearRb.id;
-          rbFired = false;
-          rbConflictSeen = false;
-          rbSlowed = false;
-          rbAzPrevDeg = null;
-          rbAzAccumDeg = 0;
-          rbCondSince = null;
-          rbCommittedSeen = false;
-          rbYieldAwarded = false;
+          resetRoundaboutVisit();
         }
         // The entry is FINISHED the moment he leaves the commit radius having
         // been inside it — that is where the commendation belongs and where it
         // has always fired (see the rbCommittedSeen note above).
         if (committed) rbCommittedSeen = true;
-        else if (rbCommittedSeen && !rbYieldAwarded && rbConflictSeen && rbSlowed && !rbFired) {
-          events.push({
-            kind: "prioritySituation",
-            situation: "roundabout",
-            violated: false,
-            yielded: true,
-          });
-          rbYieldAwarded = true;
+        else if (rbCommittedSeen) {
+          if (!rbYieldAwarded && roundaboutYieldEarned()) {
+            events.push({
+              kind: "prioritySituation",
+              situation: "roundabout",
+              violated: false,
+              yielded: true,
+            });
+            rbYieldAwarded = true;
+          }
+          // …AND FINISHED MEANS FINISHED FOR THE CONVICTION TOO. The commit
+          // reach is «the only place a violation may fire» (see `commitReach2`
+          // above) and round 3's window kept to it; the mouth rule has no
+          // window to do that for it, so the entry is closed here by name.
+          // Whatever a car of its set does once he is 12 m clear of the ring
+          // is not his entry — and nothing can be billed to an entry he has
+          // just been commended for. Coming back onto the ring is a new entry,
+          // with its own set (a car still short of his mouth keeps its
+          // account: `Carry`).
+          rbEntryLive = false;
         }
-        // Azimuth sweep this visit — ≥ RB_ON_RING_DEG means the vehicle is
-        // CIRCULATING (holds ring priority); see the C1 note above. Measured
-        // only inside the commit radius, so the latch means the same number of
-        // degrees it always did: an arm that does not point at the centre
-        // sweeps a few degrees of its own on the long approach, and a sweep
-        // budget spent out there would stand entry grading down for a driver
-        // who has not entered anything.
-        if (!committed) rbAzPrevDeg = null; // re-seed on the next committed frame
+        // ENTERED = the front of his car is on the ring carriageway
+        // (`enterReach2`: the ring radius plus the ring's drawn half width; the
+        // nose is the centre carried PLAYER_HALF_LENGTH_M along the heading —
+        // the chassis the collision reporter measures).
+        const rad = (v.headingDeg * Math.PI) / 180;
+        const noseDx = v.position.x + Math.sin(rad) * PLAYER_HALF_LENGTH_M - nearRb.x;
+        const noseDy = v.position.y + Math.cos(rad) * PLAYER_HALF_LENGTH_M - nearRb.y;
+        const noseIn = noseDx * noseDx + noseDy * noseDy <= nearRb.enterReach2;
+        const entered = nearRbDist2 <= nearRb.enterReach2 || noseIn;
+        if (!entered) rbOutsideSeen = true;
+        // AN ENTRY: on the ring now, off it on the previous frame of this
+        // visit. (A car put down on the ring has no previous frame off it: a
+        // spawn or a respawn enters nothing.)
+        const entryNow = entered && rbEnteredPrev === false;
+        if (entryNow) {
+          // THE MOUTH — where his nose came over the ring's edge: the point of
+          // the edge circle on the straight line between his nose's last
+          // position off the ring and this one (so it does not move with the
+          // frame rate). Coming on tail-first there is no nose crossing; the
+          // mouth is then where his centre is.
+          let mx = v.position.x - nearRb.x;
+          let my = v.position.y - nearRb.y;
+          if (noseIn) {
+            const bx = noseDx - rbNosePrevX;
+            const by = noseDy - rbNosePrevY;
+            const qa = bx * bx + by * by;
+            const qb = 2 * (rbNosePrevX * bx + rbNosePrevY * by);
+            const qc = rbNosePrevX * rbNosePrevX + rbNosePrevY * rbNosePrevY - nearRb.enterReach2;
+            const disc = qb * qb - 4 * qa * qc;
+            let f = 1;
+            if (qa > 1e-12 && disc >= 0) {
+              const root = (-qb - Math.sqrt(disc)) / (2 * qa);
+              if (root >= 0 && root <= 1) f = root;
+            }
+            mx = rbNosePrevX + bx * f;
+            my = rbNosePrevY + by * f;
+          }
+          rbMouthX = mx;
+          rbMouthY = my;
+          rbEntryLive = true;
+          rbSetOpen = true;
+          // A new entry is judged on its own cars: the set is rebuilt below,
+          // from where each car is on THIS frame, and «cleared» starts again.
+          // ONE CAR, ONE ACCOUNT, though: a car that had priority over his
+          // previous entry, has still not cleared, and is in the new set as
+          // well has had him come on ahead of it twice — it keeps what it has
+          // already lost to him (`Carry`). Without that, a nose rocking over
+          // the ring's edge in front of a braking car would wipe its account
+          // every time it came back on. Every other car starts from nothing.
+          for (let k = 0; k < rbVehCount; k++) {
+            rbVehCarry[k] = rbVehInP[k] && !rbVehCleared[k];
+            rbVehInP[k] = false;
+            rbVehCleared[k] = false;
+          }
+        }
+        rbEnteredPrev = entered;
+        rbNosePrevX = noseDx;
+        rbNosePrevY = noseDy;
+        // DOES HE STILL OCCUPY HIS MOUTH? (Round 5.) The set stays open to
+        // new members from the entry frame until he has LEFT the mouth: his
+        // nose is back off the ring, or his own car has passed the mouth —
+        // `rbPassedMouth`, the one definition, asked of him as of any car
+        // (his centre is beyond the mouth by more than half his length along
+        // his own circle, in the direction his car points). It is asked
+        // before the cars are looked at, so on the frame he has left it the
+        // set takes no new member; and it latches — only a new entry opens a
+        // set again.
+        if (
+          rbSetOpen &&
+          (!entered ||
+            rbPassedMouth(
+              rbMouthX,
+              rbMouthY,
+              v.position.x - nearRb.x,
+              v.position.y - nearRb.y,
+              Math.sin(rad),
+              Math.cos(rad),
+              PLAYER_HALF_LENGTH_M,
+            ))
+        ) {
+          rbSetOpen = false;
+        }
+        // Azimuth swept about the centre WITH HIS NOSE ON THE RING. At
+        // RB_ON_RING_DEG of it he is circulating — he has joined the flow and
+        // holds ring priority (the C1 latch). Counted from the ring's edge
+        // rather than from the commit radius, so an arm that does not point at
+        // the centre cannot spend the budget on the approach. The commendation
+        // reads it; the conviction does not.
         const azDeg = bearingDeg(v.position.x - nearRb.x, v.position.y - nearRb.y);
-        if (committed) {
-          if (rbAzPrevDeg !== null) rbAzAccumDeg += signedDeltaDeg(rbAzPrevDeg, azDeg);
-          rbAzPrevDeg = azDeg;
+        if (entered && rbOutsideSeen) {
+          rbEnteredSeen = true;
+          if (rbEnterAzPrevDeg !== null) rbEnterAzAccumDeg += signedDeltaDeg(rbEnterAzPrevDeg, azDeg);
+          rbEnterAzPrevDeg = azDeg;
+        } else {
+          rbEnterAzPrevDeg = null; // re-seed on the next frame he is on the ring
         }
-        const onRing = Math.abs(rbAzAccumDeg) >= RB_ON_RING_DEG;
+        const onRing = Math.abs(rbEnterAzAccumDeg) >= RB_ON_RING_DEG;
         const band = nearRb.radius + ROUNDABOUT_BAND_EXTRA_M;
-        const circulating = circulatingQuery(
+        const report = circulatingQuery(
           nearRb.x,
           nearRb.y,
           v.position.x,
@@ -2387,71 +2838,158 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           v.headingDeg,
           band,
         );
-        if (circulating) {
-          rbConflictSeen = true;
-          // B15 — „I waited for the traffic car 3-4 seconds, than I waited it
-          // for twice more and it still stated the error."
-          //
-          // The sustain clock below is a REACTION window and the braking band
-          // is a RESPONSE window; both are measured from `rbCondSince`. Stamped
-          // at the conflict's onset and cleared only when the conflict is gone,
-          // that stamp goes stale under a driver who does the lawful thing and
-          // STANDS STILL: after a 46 s wait the 0.9 s window and the 3.0 s band
-          // are 45 s expired, so the only live gate left is `speedKmh >
-          // RHR_MOVING_KMH` and he is convicted on the tick the wheels turn —
-          // with waiting LONGER making it worse, which is his complaint word
-          // for word. Two constants already shipped for this row
-          // (RB_WITNESS_STOPPED_NEAR_M, CIRCULATING_REACH_M) are upstream of
-          // here and cannot reach it.
-          //
-          // A stationary driver is not entering anything: he has already made
-          // the correct decision, and pulling away afterwards is a NEW act that
-          // deserves its own window. Holding the clock at null below the
-          // conviction floor makes `tSec - rbCondSince` mean what every gate
-          // downstream already reads it as — continuous seconds spent MOVING
-          // into a visible conflict. RHR_MOVING_KMH is the right threshold and
-          // not an arbitrary new one: it is the same floor the conviction test
-          // itself uses, so the clock can never accumulate time the verdict
-          // would refuse to act on (a 2 km/h creep must not bank a window it
-          // then spends on one jab of throttle).
-          //
-          // …and the clock only STARTS once he is committed. The observation
-          // zone now reaches the give-way paint, tens of metres further out
-          // than the ring-relative entry radius; a stamp out there would hand
-          // the conviction gates a window that had already expired by the time
-          // he arrived, which is the same wrongful conviction this block exists
-          // to prevent, wearing a longer approach. Clearing is unconditional on
-          // purpose — mercy applies wherever the tracker can see.
-          if (v.speedKmh <= RHR_MOVING_KMH) rbCondSince = null;
-          else if (rbCondSince === null && committed) rbCondSince = tSec; // conflict became visible
-          if (v.speedKmh <= RHR_YIELD_KMH) rbSlowed = true;
-        } else {
-          rbCondSince = null;
+        // A REPORT, NOT A BOOLEAN. Until 2026-10-05 this query answered
+        // «is a car there» and every harness in the tree wired it to
+        // `traffic.circulatingConflict`. A runtime still handed that boolean
+        // could watch a roundabout and convict nobody on it, for ever, in
+        // silence — so it refuses the frame instead.
+        if (report === null || typeof report !== "object" || report.vehicles === undefined) {
+          throw new Error(
+            "roundabout tracker: the circulating query must answer with the traffic system's " +
+              "report — wire runtime.setCirculatingQuery to traffic.circulatingTraffic, not to " +
+              "the presence boolean traffic.circulatingConflict (founder ruling 2026-10-05)",
+          );
         }
-        // Inward component of the heading: >0 means driving into the ring (entering),
-        // ~0 means going around it (already has priority) → don't flag.
-        const cdx = nearRb.x - v.position.x;
-        const cdy = nearRb.y - v.position.y;
-        const dist = Math.sqrt(nearRbDist2);
-        const rad = (v.headingDeg * Math.PI) / 180;
-        const inward = dist > 0 ? (cdx * Math.sin(rad) + cdy * Math.cos(rad)) / dist : 0;
-        // C1: reaction window from the conflict's onset + braking-response
-        // band + ring-transit latch — as in the RHR tracker above. D1: the
-        // braking immunity expires after YIELD_BRAKE_RESPONSE_MAX_SEC.
-        if (
-          !rbFired &&
-          committed &&
-          circulating &&
-          inward >= ROUNDABOUT_INWARD_MIN &&
-          v.speedKmh > RHR_MOVING_KMH &&
-          !onRing &&
-          rbCondSince !== null &&
-          tSec - rbCondSince >= YIELD_CONVICT_SUSTAIN_SEC &&
-          !(brakingResponse && tSec - rbCondSince <= YIELD_BRAKE_RESPONSE_MAX_SEC)
-        ) {
+        // ── THE COMMENDATION'S WITNESSES (presence — they convict nobody) ────
+        // „A car with priority was there, and he was at or below the yield
+        // speed while it was": the two flags the award has always needed.
+        const heldBack = !onRing && Math.abs(v.speedKmh) <= RHR_YIELD_KMH;
+        if (report.conflict) {
+          rbConflictSeen = true;
+          if (heldBack) rbSlowed = true;
+        }
+        // His nose is on the ring, and got there by crossing its edge.
+        const noseOnRing = entered && rbOutsideSeen;
+        // ── WHAT HAPPENED TO THE CARS ON THE RING ──────────────────────────
+        // Moving or standing, it is the same question: a driver who enters
+        // ahead of a car and stops in its lane has not let it pass.
+        let forced = false;
+        let touched = false;
+        for (let i = 0; i < report.vehicles.length; i++) {
+          const o = report.vehicles[i];
+          let k = 0;
+          while (k < rbVehCount && rbVehId[k] !== o.id) k++;
+          if (k === rbVehCount) {
+            // First sight this visit: nothing it shed before now is his entry's,
+            // and a car first seen after he entered was not there to be yielded to.
+            rbVehId[k] = o.id;
+            rbVehLast[k] = o.playerShedMps;
+            rbVehInP[k] = false;
+            rbVehCleared[k] = false;
+            rbVehEntry[k] = 0;
+            rbVehCarry[k] = false;
+            rbVehOnRing[k] = 0;
+            rbVehHeld[k] = false;
+            rbVehCount++;
+          }
+          // „Пропусна": he held back for THIS car while it was still coming…
+          if (o.approaching && heldBack) rbVehHeld[k] = true;
+          // …and it has since gone by, with him not yet circulating (so it can
+          // only have got past his azimuth by driving past him).
+          else if (rbVehHeld[k] && o.pastEntry && !onRing) rbLetPass = true;
+          // The speed it lost to him since the previous frame (a counter that
+          // went backwards was restarted — nothing to charge).
+          const shed = o.playerShedMps > rbVehLast[k] ? o.playerShedMps - rbVehLast[k] : 0;
+          rbVehLast[k] = o.playerShedMps;
+          // CIRCULATING: on the ring carriageway and going round it.
+          const odx = o.x - nearRb.x;
+          const ody = o.y - nearRb.y;
+          const od2 = odx * odx + ody * ody;
+          if (od2 > nearRb.enterReach2) {
+            // OFF THE RING. A car of the set that drives off the ring
+            // carriageway before it has reached his mouth (it took an exit)
+            // has no priority left for his entry to take, and never comes to
+            // the mouth at all. Should it come round again it has joined the
+            // ring later, like any other car that does — so it leaves the set
+            // here, for good, rather than waiting on a «cleared» that the
+            // geometry would never give it.
+            rbVehInP[k] = false;
+            continue;
+          }
+          if (od2 < 1e-9) continue;
+          const radial = (o.dirX * odx + o.dirY * ody) / Math.sqrt(od2);
+          if (Math.abs(radial) > RB_CIRCULATING_MAX_RADIAL) continue;
+          if (!noseOnRing && !rbEntryLive) continue;
+          // THE PRIORITY SET: this car is on the ring, going round it, and has
+          // not passed his mouth — on the frame he enters, or on any later
+          // frame he still occupies that mouth (`rbSetOpen`). A member loses
+          // its priority by clearing the mouth (or by driving off the ring,
+          // above). A car that is not a member — it had passed when he
+          // entered, it has cleared since, it was not on the ring — JOINS on
+          // the frame it is short of the mouth with the set still open, and
+          // its account starts on that frame from nothing: what it lost to
+          // him before, as the car he had let by or on its last time past, is
+          // not this priority's. (The one account that is kept is `Carry`'s,
+          // on the frame of a new entry.) With the set closed nobody joins.
+          const isMember = rbVehInP[k] && !rbVehCleared[k];
+          if (isMember || rbSetOpen) {
+            const passed = rbPassedMouth(rbMouthX, rbMouthY, odx, ody, o.dirX, o.dirY, o.halfLengthM);
+            if (isMember) {
+              if (passed) rbVehCleared[k] = true;
+            } else if (!passed) {
+              rbVehInP[k] = true;
+              rbVehCleared[k] = false;
+              if (!(entryNow && rbVehCarry[k])) rbVehEntry[k] = 0;
+            }
+          }
+          // A car WITH PRIORITY OVER THIS ENTRY: in the set, mouth not cleared.
+          const hasPriority = rbEntryLive && rbVehInP[k] && !rbVehCleared[k];
+          if (noseOnRing && shed > 0) {
+            rbVehOnRing[k] += shed;
+            if (rbVehOnRing[k] > rbOnRingShedMax) rbOnRingShedMax = rbVehOnRing[k];
+          }
+          if (hasPriority && shed > 0) {
+            rbVehEntry[k] += shed;
+            if (rbVehEntry[k] > rbPriorityShedMax) rbPriorityShedMax = rbVehEntry[k];
+            if (rbVehEntry[k] >= ROUNDABOUT_FORCED_SHED_MPS) forced = true;
+          }
+          // …OR THERE IS CONTACT: his chassis and a circulating vehicle's body
+          // overlap, on the collision module's own boxes and its own test.
+          // With a car that has priority over this entry it convicts; with any
+          // other — the car he let past, a car that had cleared his mouth — it
+          // is a collision, billed as one elsewhere, and never «не пропусна».
+          // Either way it costs him the commendation.
+          rbPlayerBox.x = v.position.x;
+          rbPlayerBox.y = v.position.y;
+          rbPlayerBox.headingDeg = v.headingDeg;
+          rbOtherBox.x = o.x;
+          rbOtherBox.y = o.y;
+          rbOtherBox.headingDeg = bearingDeg(o.dirX, o.dirY);
+          rbOtherBox.halfLengthM = o.halfLengthM;
+          rbOtherBox.halfWidthM = o.halfWidthM;
+          if (isContact(obbSeparationM(rbPlayerBox, rbOtherBox))) {
+            rbTouchedOnRing = true;
+            if (hasPriority) touched = true;
+          }
+        }
+        if (!rbFired && (forced || touched)) {
           events.push({ kind: "prioritySituation", situation: "roundabout", violated: true });
           rbFired = true;
         }
+        // IS THE ENTRY STILL OPEN TO CONVICTION? (`SimTick.roundaboutEntryOpen`.)
+        // The two grounds above read one set of cars and no other: the cars of
+        // the live entry's priority set that have not cleared his mouth. While
+        // one is left the entry can still be billed; when none is, it cannot —
+        // which is the fact the instructor's «Интервалът беше добър» has to
+        // wait for. A car that has dropped out of the report without being
+        // seen to clear or to leave keeps the entry open: silence, not praise.
+        if (rbEntryLive && !rbFired) {
+          // …and while he still occupies his mouth the set is open: a car
+          // that comes round to it now would have priority over him too.
+          if (rbSetOpen) rbEntryOpenNow = true;
+          else {
+            for (let k = 0; k < rbVehCount; k++) {
+              if (rbVehInP[k] && !rbVehCleared[k]) {
+                rbEntryOpenNow = true;
+                break;
+              }
+            }
+          }
+        }
+        // HAS SOMEBODY PAID FOR IT? (`SimTick.roundaboutEntryPaidFor`.) The
+        // commendation's own refusal, said aloud for the instructor's voice
+        // from the frame it becomes a fact to the end of the visit.
+        if (roundaboutEntryPaidFor()) rbEntryPaidNow = true;
       } else {
         // Left the roundabout vicinity entirely. The award normally landed at
         // the commit radius on the way out; this is the backstop for a visit
@@ -2464,14 +3002,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // "saw a circulator" and "was under the yield speed" without ever
         // approaching the thing. Praise for a yield he never made is a smaller
         // lie than a conviction he never earned, but it is the same lie.
-        if (
-          rbNode !== null &&
-          rbCommittedSeen &&
-          !rbYieldAwarded &&
-          rbConflictSeen &&
-          rbSlowed &&
-          !rbFired
-        ) {
+        if (rbNode !== null && rbCommittedSeen && !rbYieldAwarded && roundaboutYieldEarned()) {
           events.push({
             kind: "prioritySituation",
             situation: "roundabout",
@@ -2480,14 +3011,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           });
         }
         rbNode = null;
-        rbFired = false;
-        rbConflictSeen = false;
-        rbSlowed = false;
-        rbAzPrevDeg = null;
-        rbAzAccumDeg = 0;
-        rbCondSince = null;
-        rbCommittedSeen = false;
-        rbYieldAwarded = false;
+        resetRoundaboutVisit();
       }
 
       // 5. Pedestrian-crossing zones.
@@ -2680,6 +3204,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       if (oncomingVehicleGapSec !== undefined) {
         tick.oncomingVehicleGapSec = oncomingVehicleGapSec;
       }
+      // The roundabout tracker's «this entry can still be billed» (§4c) — the
+      // same additive seam: absent on every frame with no entry waiting on a
+      // car, which is every frame away from a ring with traffic on it.
+      if (rbEntryOpenNow) tick.roundaboutEntryOpen = true;
+      // …and its «somebody has paid for this entry» — the same seam again.
+      if (rbEntryPaidNow) tick.roundaboutEntryPaidFor = true;
       // THE PERSON IN THE PATH (`SimTick.vruAheadM`) — additive, and published
       // ONLY when a body was actually measured, so every drive, trace and
       // fixture that has no staged pedestrian grades byte-identically to
@@ -3608,7 +4138,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     },
 
     setCirculatingQuery(fn: CirculatingQuery | null): void {
-      circulatingQuery = fn ?? (() => false);
+      circulatingQuery = fn ?? (() => NO_CIRCULATING);
     },
 
     setCyclistQuery(fn: CyclistQuery | null): void {
@@ -3644,6 +4174,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         id: rb.id,
         watchReachM: Math.sqrt(rb.watchReach2),
         commitReachM: Math.sqrt(rb.commitReach2),
+        enterReachM: Math.sqrt(rb.enterReach2),
       }));
     },
   };

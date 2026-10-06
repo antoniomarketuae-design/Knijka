@@ -20,6 +20,7 @@
 
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
 import { DEFAULT_TRAFFIC_CONFIG, vehicleHalfLengthM } from "./types";
+import { playerShedThisStep } from "./vehicles";
 import type {
   StagedCommand,
   StagedPedestrianSpec,
@@ -43,6 +44,16 @@ const HOLD_LIT_SPEED_MPS = 0.5;
 /** Default laneShift glide duration, s (the FO-03 cut-in reads as one calm
  *  lane change at urban speed — ~8 m of lateral travel over 1.5 s). */
 const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
+/**
+ * How far above the speed its guard or command is asking for an actor's own
+ * speed must stand before its brake lamps light, m/s — this model's own line
+ * between «holding its speed» and «braking». Named (it was a bare 0.3 in the
+ * lamp expression at the bottom of `updateStagedVehicle`) because the
+ * roundabout-entry tracker sizes «forced to brake» by it: founder ruling
+ * 2026-10-05, runtime/worldRuntime.ts ROUNDABOUT_FORCED_SHED_MPS, pinned to
+ * this constant by runtime/__tests__/roundabout-forced-braking.test.ts.
+ */
+export const STAGED_BRAKE_LAMP_MARGIN_MPS = 0.3;
 /** Player-guard corridor: brake for a player within this far ahead, m. */
 const GUARD_AHEAD_M = 16;
 /** Player-guard lateral half-width, m (~car width + margin). */
@@ -536,6 +547,17 @@ export interface StagedVehicleAgent {
    * (RearTailgaterRunner's station law).
    */
   laneWidthM: number;
+  /**
+   * SPEED THIS ACTOR HAS SHED BECAUSE OF THE PLAYER, m/s, cumulative and
+   * monotone for the actor's life — a `reset` does not clear it, so a reader
+   * can always difference two readings (founder ruling 2026-10-05, «bill
+   * forced braking» at a roundabout entry). Accounted in `updateStagedVehicle`
+   * step 3d with the ambient fleet's own arithmetic (`playerShedThisStep`):
+   * the part of a real slow-down that a player guard (steps 2, 2a, 3c) caused
+   * and the actor's command would not have. 0 for ever for an actor the
+   * student never got in the way of.
+   */
+  playerShedMps: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -1034,6 +1056,7 @@ export function createStagedVehicle(
     playerLastY: NaN,
     passGuard: false,
     laneWidthM,
+    playerShedMps: 0,
   };
   publishVehicle(agent);
   return agent;
@@ -1266,6 +1289,15 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     default:
       target = 0;
   }
+  // THE ACCOUNT OF WHAT THE STUDENT COSTS THIS ACTOR (step 3d reads these and
+  // nothing else does; the motion never sees them). `playerBound`: a PLAYER
+  // guard (step 2 or 2a) is the binding target this frame.
+  // `targetNoPlayer` / `brakeCapNoPlayer`: what the actor would be aiming at
+  // with the student absent — the command's own answer, lowered by the ambient
+  // guard (2b) exactly as `target` is.
+  let playerBound = false;
+  let targetNoPlayer = target;
+  let brakeCapNoPlayer = brakeCap;
 
   // 2) Player guard — never ram the player from behind (skip while slamming:
   //    a brake command is already the strongest stop available).
@@ -1335,6 +1367,7 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
+        playerBound = true;
       }
     }
   }
@@ -1408,6 +1441,7 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
+        playerBound = true;
       }
     }
   }
@@ -1436,16 +1470,31 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
+        // An ambient car is the binding obstacle now, not the student.
+        playerBound = false;
+      }
+      if (guardTarget < targetNoPlayer) {
+        targetNoPlayer = guardTarget;
+        brakeCapNoPlayer = HOLD_DECEL_MPS2;
       }
     }
   }
 
   // 3) Integrate speed toward the target (asymmetric accel/brake ramps).
+  const speedBefore = agent.speed;
   if (agent.speed < target) {
     agent.speed = Math.min(target, agent.speed + accel * dt);
   } else if (agent.speed > target) {
     agent.speed = Math.max(target, agent.speed - brakeCap * dt);
   }
+  // The same ramp toward the target the actor would have had WITHOUT the
+  // student — the reference step 3d measures his share against.
+  const speedNoPlayer = !playerBound
+    ? agent.speed
+    : speedBefore < targetNoPlayer
+      ? Math.min(targetNoPlayer, speedBefore + accel * dt)
+      : Math.max(targetNoPlayer, speedBefore - brakeCapNoPlayer * dt);
+  let playerClamped = false;
   const sBefore = agent.s;
   agent.s += agent.speed * dt;
 
@@ -1503,10 +1552,23 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   if (agent.returns > 0 && agent.s > sBefore) {
     const step = agent.s - sBefore;
     const others = env.staged ?? EMPTY_BODIES;
-    if (closesOnPlayer(agent, env, step) || closesOnBodies(agent, others, step)) {
+    const onPlayer = closesOnPlayer(agent, env, step);
+    if (onPlayer || closesOnBodies(agent, others, step)) {
       agent.s = sBefore;
+      if (onPlayer && agent.speed > 0) playerClamped = true;
       agent.speed = 0;
     }
+  }
+
+  // 3d) THE STUDENT'S SHARE OF THIS FRAME'S SLOW-DOWN (founder ruling
+  //     2026-10-05, «bill forced braking»). The roundabout-entry tracker
+  //     convicts on what a circulating car ACTUALLY HAD TO DO because of him,
+  //     and this is where the car says it: the speed it lost this frame under
+  //     a player guard, less whatever its own command would have taken off
+  //     anyway. Nothing here reads it — `system.ts circulatingReportFor`
+  //     publishes it. A frame no player guard bound accounts exactly nothing.
+  if (playerBound || playerClamped) {
+    agent.playerShedMps += playerShedThisStep(speedBefore, agent.speed, speedNoPlayer);
   }
 
   // 4) Path end / loop wrap / retirement run.
@@ -1607,7 +1669,9 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   const holding = target <= HOLD_LIT_TARGET_MPS && agent.speed <= HOLD_LIT_SPEED_MPS;
   agent.state.braking =
     !retiring &&
-    (cmd.type === "brake" || agent.speed > target + 0.3 || (holding && !agent.finished));
+    (cmd.type === "brake" ||
+      agent.speed > target + STAGED_BRAKE_LAMP_MARGIN_MPS ||
+      (holding && !agent.finished));
 
   publishVehicle(agent);
 }

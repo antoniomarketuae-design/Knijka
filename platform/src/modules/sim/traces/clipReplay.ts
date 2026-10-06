@@ -166,9 +166,10 @@ const CLIP_STAGED_OVERRIDES: Readonly<
   Record<string, (mistakeIndex: number) => StagedEventSpec[] | null>
 > = {
   "sc-follow-distance": scFollowDistanceClipStaged,
-  // Roundabout barge — the circulating car it failed to yield to is graded 14 m
-  // upstream (far to the driver's LEFT); pull it to ~the south node for the CLIP
-  // only so the chase cone contains it (grading untouched; see the recorder).
+  // Roundabout barge — registered, and answers «no override» since the demo was
+  // re-staged on 2026-10-05 (the cut-off now happens on the drill's own rig; the
+  // old «sprint to the mouth» would re-enact an entry BEHIND the car — see the
+  // recorder). Kept in the registry so the history has an address.
   "sc-roundabout-entry": scRoundaboutEntryClipStaged,
   // Half-B head-on reels — the oncoming stream is pulled into the fault frame
   // for the CLIP only (the recording keeps the far stream; see reelClipStaged).

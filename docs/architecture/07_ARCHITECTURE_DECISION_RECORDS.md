@@ -252,3 +252,34 @@ the behaviour this ADR retires and must be re-derived against it, not relaxed.
 **Rows it bears on:** `sc-vu-emergency:9e72c8bd` ("the crawling drive still collects ИЗДЪРЖАН"),
 `sc-vu-emergency-junction:853790f7`, `sc-rb-busy-gap:8f50287b` — none of which retire until a sweep
 photographs the new behaviour.
+
+## ADR-011: A roundabout entry is judged by what happened at the mouth (Founder ruling, 2026-10-05)
+
+**Status.** Accepted. Founder ruling 2026-10-05 «Bill forced braking»; built over five adversarially verified rounds
+(lane `rbgap`, rounds 3–5), landed with the commit that carries this entry.
+
+**Context.** «Влизане без пропускане» (FAILED_TO_YIELD, опасна) at a roundabout was decided by PREDICTION: a car within
+26 m, an arrival gap, an approach-speed mode. Verifiers convicted careful drivers who forced nobody to slow and acquitted
+drivers who made a circulating car brake. The founder ruled that the offence is what actually happened: a circulating car
+with priority had to brake or swerve because of the entry, or there was contact.
+
+**Decision.**
+- **The priority set.** At the frame the student's nose first comes onto the ring carriageway, every circulating car that has
+  not yet passed his entry point (his MOUTH) belongs to that entry. While he still occupies the mouth the set stays OPEN:
+  a car that comes into the approaching half-lap joins it. Once he has left the mouth it takes no new member. A car «has
+  passed» the mouth when its REAR END is beyond it; the student «has left» it when his centre is beyond it by more than half
+  his length along his own circle. Geometry of each frame — no distance, gap or speed filter.
+- **The conviction.** FAILED_TO_YIELD fires when a member of the set loses at least 0.3 m/s BECAUSE OF THE STUDENT before it
+  has cleared the mouth (read from the car's own traffic model; 0.3 m/s is the staged brake-lamp margin; the measured noise
+  floor is 0), moving or standing — or when he touches a member before it has cleared. A car he let pass is never a member.
+- **The praise.** YIELDED_TO_PRIORITY and the instructor's «Интервалът беше добър» need that no member lost ANY speed to him
+  and none was touched.
+- **Two measurement-only fields on SimTick** — `roundaboutEntryOpen` and `roundaboutEntryPaidFor`. They are additive, read
+  only by the instructor's voice through `lessons/engine.ts`, and a source census test pins that nothing graded reads them
+  (the same pattern as `edgeAlignment`, 2026-09-20).
+
+**Consequences.** A walking-pace creep (≈2 км/ч and under) that holds the mouth until the next car round has to brake is
+billed — by the letter of the ruling (integrator-ratified, owed to the founder as a read). Crawling or stopping on the ring
+AFTER the car has cleared the mouth is billed by nothing here. The barge demos were re-staged and re-recorded so their
+offence is real; clip `sc-roundabout-entry__m0` must be re-captured. Owed to the founder as reads: the 0.3 m/s size, and the
+voice line said shortly before a later cost.

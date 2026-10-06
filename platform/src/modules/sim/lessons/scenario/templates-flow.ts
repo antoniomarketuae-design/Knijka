@@ -401,8 +401,10 @@ export const SC_ZEBRA_APPROACH: ScenarioSpec = {
  * The staged CIRCULATING CAR on the rb-mini-v1 ring (CCW loop w → s → e →
  * n → w, cruise 6 m/s): the RoundaboutEntryRunner syncs it to sit
  * `conflictLeadM` upstream of the player's south entry at arrival — the
- * "do I go or wait" moment — and the runtime's own circulatingConflict
- * tracker adjudicates the entry (FAILED_TO_YIELD / yielded commendation).
+ * "do I go or wait" moment — and the runtime's own roundabout tracker
+ * adjudicates the entry: FAILED_TO_YIELD when this car has to BRAKE because of
+ * it, or is touched (founder ruling 2026-10-05); the yielded commendation when
+ * the driver held back and it went by.
  */
 const RB_CIRCULATING: RoundaboutEntrySpec = {
   id: "sc-rb-circulating",
@@ -608,8 +610,14 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
         path: "content/traces/sc-roundabout-entry/mistake-barge-entry.trace.json",
       },
       titleBg: "Влизане без пропускане",
+      // RE-WORDED 2026-10-05 with the demo it describes (founder ruling «bill
+      // forced braking» — traces/scRoundaboutEntry.ts BARGE_BRAKE_Y). It read
+      // «навлезе в кръга с непроменена скорост точно пред движещия се в него
+      // автомобил»; the re-staged demo brakes late and ROLLS over the line, so
+      // «с непроменена скорост» would be false of it — and what makes the entry
+      // a fault is now on the card: the car in the ring had to slow down.
       whatWentWrongBg:
-        "Колата навлезе в кръга с непроменена скорост точно пред движещия се в него автомобил. Влизащият НЯМА предимство, и причината стои на самия вход: знакът „Път с предимство“ Б3 не може да се поставя на входовете на кръгово кръстовище (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), затова там винаги стои Б1 или Б2 и ти си на пътя без предимство. А на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него (ЗДвП чл. 50, ал. 1) — дори това да значи пълно спиране на входа.",
+        "Колата не спря на входа: намали, но навлезе в кръга точно пред движещия се в него автомобил и го принуди да намали. Влизащият НЯМА предимство, и причината стои на самия вход: знакът „Път с предимство“ Б3 не може да се поставя на входовете на кръгово кръстовище (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), затова там винаги стои Б1 или Б2 и ти си на пътя без предимство. А на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него (ЗДвП чл. 50, ал. 1) — дори това да значи пълно спиране на входа.",
       codeRefs: ["FAILED_TO_YIELD"],
     },
     {

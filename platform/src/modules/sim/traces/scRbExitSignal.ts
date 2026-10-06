@@ -13,8 +13,10 @@
  *     RB-02; the L3 roundabout OBJECTIVE additionally voids such a traversal,
  *     proven in the bot suite);
  *   - „Нахлуване в кръга пред циркулираща кола“ grades EXACTLY FAILED_TO_YIELD
- *     (the runtime's circulatingConflict tracker — the barge carries a right
- *     indicator so its ONLY graded fault is the priority).
+ *     (the runtime's roundabout tracker, on what the circulating car HAD TO DO:
+ *     the demo rolls over the give-way line without stopping, right in front
+ *     of it, and the car brakes — founder ruling 2026-10-05, see BARGE_* below.
+ *     It carries a right indicator so its ONLY graded fault is the priority).
  *
  * Geometry pinned to content/world/rb-mini-v1.json: ring centerline R = 18
  * around (0, 0), CCW (s → e → n → w); arm right-lane centers ±4.06; south
@@ -213,6 +215,49 @@ export function scRbExitSignalMistakeNoSignalScript(): DriveScript {
 // Mistake demo 2 — „Нахлуване в кръга пред циркулираща кола“ (FAILED_TO_YIELD)
 // ---------------------------------------------------------------------------
 
+/**
+ * THE BARGE, RE-STAGED SO THAT IT REALLY CUTS THE CAR OFF (founder ruling
+ * 2026-10-05, «bill forced braking»: „The lesson own "barge" demo gets
+ * re-staged so it really cuts someone off").
+ *
+ * WHAT WAS WRONG WITH THE OLD ONE. It came through the mouth at 22 км/ч with
+ * the staged car ~17 m behind its merge point, doing 2.9 m/s. A car going
+ * twice the pace of the one behind it forces nothing: the crawler never had to
+ * touch its brake, and the demo was «a priority fault» only because the grader
+ * of the day convicted on where a car WAS. Judged by what happened — the
+ * ruling — that drive is an entry nobody paid for, and it is no longer billed.
+ *
+ * WHAT A REAL ONE IS, on this ring. The circulator crawls at 2.9 m/s and its own
+ * player guard (traffic/staged.ts step 2) starts braking for a body closer
+ * than 9.6 m ahead of it. So a cut-off that does not depend on centimetres is
+ * an entry AHEAD of the car by a driver who is then SLOWER than it: the car
+ * closes on him for as long as he is in its way. That is also the commonest
+ * real one — not a sprint through the mouth, but a driver who comes up fast,
+ * dabs the brake, sees «enough room» and ROLLS over the give-way line without
+ * stopping, in front of a car that is already there.
+ *
+ * THE TWO NUMBERS, both centred in MEASURED bands (the live chain, every rung
+ * L1–L5, with the staged car's phase pushed ±3 m on top of its own seeded
+ * jitter — 15 worlds per cell):
+ *
+ *   BARGE_BRAKE_Y   where the 26 км/ч approach ends and the roll begins.
+ *                   −36 / −34 / −32 all work; −34 is the middle. It has to be
+ *                   LATE: the runner syncs the car to the driver's ETA until
+ *                   he is 14 m from the mouth, and a driver who slows early
+ *                   lets it run past its station and sprint (a different,
+ *                   unsteady choreography — measured, and avoided).
+ *   BARGE_ROLL_KMH  the roll. 6–9 км/ч convicts on forced braking alone in
+ *                   15 of 15 worlds; 5 and below the car arrives first and the
+ *                   demo becomes a collision, 10 and above the driver gets
+ *                   away ahead of it. 7.5 is the middle.
+ *
+ * Measured at these values: the nose is on the ring at t ≈ 13.7, the car has
+ * shed the 0.3 m/s that convicts 1.0–2.7 s later and ~1.8 m/s by the time the
+ * entry is over; nearest approach 6.1 m, no contact, no other fault.
+ */
+const BARGE_BRAKE_Y = -34;
+const BARGE_ROLL_KMH = 7.5;
+
 export function scRbExitSignalMistakeBargeScript(): DriveScript {
   return {
     steps: [
@@ -224,22 +269,30 @@ export function scRbExitSignalMistakeBargeScript(): DriveScript {
       // The barger signals right (correct form for its intended exit), so the
       // ONLY graded fault is the refused priority.
       { kind: "indicator", setting: "right" },
-      { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, -40]], targetKmh: 26, stopAtEnd: false },
+      {
+        // Up the arm at speed, and LATE on the brake (see BARGE_BRAKE_Y).
+        kind: "drive",
+        points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, BARGE_BRAKE_Y]],
+        targetKmh: 26,
+        stopAtEnd: false,
+      },
       { kind: "annotation", textBg: "Колата в кръга приближава отляво… но нашата не спира." },
       {
-        // Straight through the mouth at speed, cutting the circulator off — the
-        // demo freezes on the early ring right after the graded moment (driving
-        // on with the cut-off car on the bumper would only stack unrelated
-        // noise on top of the ONE taught mistake).
+        // The roll: over the give-way line without stopping and onto the ring
+        // right in front of the circulating car, slower than it — so the car
+        // HAS to brake (the graded moment, ~1–3 s after the nose is on the
+        // ring). The demo freezes on the early ring right after it: driving on
+        // with the cut-off car on the bumper would only stack unrelated noise
+        // on top of the ONE taught mistake.
         kind: "drive",
         points: [
-          [X_LANE, -40],
+          [X_LANE, BARGE_BRAKE_Y],
           [X_LANE, -26],
           [5.4, -21.5],
           [7.4, -18.3],
-          ...ringRun(30, 60),
+          ...ringRun(30, 40),
         ],
-        targetKmh: 22,
+        targetKmh: BARGE_ROLL_KMH,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.5, brake: true },

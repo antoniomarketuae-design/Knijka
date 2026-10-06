@@ -26,13 +26,25 @@
  * production SimTick (`tick.indicator`) exactly as the cockpit stalk would.
  *
  * L5 adds a THIRD platoon car (`sc-rbg-third`, stagedAdd). The shadow's 10 s
- * wait is authored for two cars and enters in front of the third (honestly
- * billed — measured below), so at L5 the PATIENT act is to wait the third car
+ * wait is authored for two cars and comes onto the ring as the third goes by
+ * his mouth — its tail 0.8 m past it — and into the back of it (a collision,
+ * honestly billed), so at L5 the PATIENT act is to wait the third car
  * out too: 25 s, the middle of the measured clean window (18–32.5 s).
  *
- * ── PRODUCT DEFECT FOUND by witness-a, REPAIRED (rbgap lane; see the last block) ──
- * The repair is `circulatingConflictFor` clause (R) DEPARTING AND CLEAR; what
- * follows is the defect as witness-a measured it before that clause existed.
+ * ── PRODUCT DEFECT FOUND by witness-a, REPAIRED (rbgap lane; see the last blocks) ──
+ * THE REPAIR THAT HELD is the founder ruling of 2026-10-05, «BILL FORCED
+ * BRAKING»: a roundabout entry is FAILED_TO_YIELD when a circulating car has to
+ * BRAKE because of it, or is touched — and for no other reason
+ * (runtime/worldRuntime.ts §4c; acceptance:
+ * ./roundabout-entry-forced-braking.property.test.ts). It took three rounds:
+ *   round 1  `circulatingConflictFor` clause (R) DEPARTING AND CLEAR — fixed the
+ *            11–15 s band below, left a driver who waits 33–38 s billed with
+ *            every car 12–25 m away and nobody slowing;
+ *   round 2  «no entry, no offence» + an arrival gap — refuted both ways
+ *            (a creep in BEHIND the last car billed; a slow entry AHEAD of the
+ *            returning lead praised while it braked to 1.28 m/s);
+ *   round 3  the ruling: prediction is gone from the conviction.
+ * What follows is the defect as witness-a measured it before any of that.
  * Patience WAS punished, in one band: a driver who waits 1–5 s LONGER than the
  * shadow (11, 12, 14, 15 s at L1) and then merges BEHIND the platoon is billed
  * FAILED_TO_YIELD (опасна, 10 т., НЕИЗДЪРЖАН) — against cars that are already
@@ -171,17 +183,24 @@ describe("sc-rb-busy-gap — the patient correct drive at every rung (a6f83f6b �
   });
 });
 
-describe("sc-rb-busy-gap — waiting LONGER is not priced (8f50287b's causal clause), outside the red band below", () => {
-  // Measured clean windows (this file's sweep, 0.5–1 s steps): L1 16–32 s, L5 18–32.5 s.
-  // Past ~33 s the looping platoon comes round to the mouth again and entering
-  // then IS a failure to yield — that is the ring, not a price on patience.
+describe("sc-rb-busy-gap — waiting LONGER is not priced (8f50287b's causal clause)", () => {
+  // Measured clean windows (the 0.5 s sweep, forced-braking grader): L1 10–38.5 s,
+  // L5 13–38.5 s. From 39 s the looping platoon has come round and the LEAD has to
+  // brake for him — that is a real failure to yield (pinned in the next block),
+  // not a price on patience. 33–38 s — the band rounds 0 and 1 billed with every
+  // car 12–25 m away — is inside the clean window now.
   const LONG: Array<[ScenarioLevel, number]> = [
     [1, 16],
     [1, 20],
     [1, 25],
     [1, 30],
+    [1, 33],
+    [1, 36],
+    [1, 38],
     [5, 18],
     [5, 30],
+    [5, 35],
+    [5, 38],
   ];
   const runs = LONG.map(([level, w]) => ({ level, w, out: drive(level, shadowWaiting(w)) }));
 
@@ -197,6 +216,53 @@ describe("sc-rb-busy-gap — waiting LONGER is not priced (8f50287b's causal cla
     // The 30 s wait at L1 runs past par time and is still 3★ (ruling 21: par gates stars only).
     const l1Long = runs.find((r) => r.level === 1 && r.w === 30)!;
     expect(l1Long.out.result.durationSec).toBeGreaterThan(SC_RB_BUSY_GAP.rubric!.parTimeSec!);
+  });
+});
+
+describe("sc-rb-busy-gap — where the long wait DOES become an offence, it is one: the returning lead has to brake (founder ruling 2026-10-05)", () => {
+  // One car's story per drive, from PUBLISHED speeds: the lead's slowest speed
+  // after his wait, and how near it came.
+  const watch = (level: ScenarioLevel, w: number) => {
+    let slowest = Infinity;
+    let nearest = Infinity;
+    let waited = false;
+    const out = drive(level, shadowWaiting(w), ({ tick, traffic }) => {
+      if (tick.speedKmh < 0.5 && Math.abs(tick.position.y + 27.5) < 0.2) waited = true;
+      if (!waited || tick.speedKmh < 0.5) return;
+      const lead = traffic.staged("sc-rbg-lead");
+      if (!lead) return;
+      slowest = Math.min(slowest, lead.speedMps);
+      nearest = Math.min(nearest, Math.hypot(lead.x - tick.position.x, lead.y - tick.position.y));
+    });
+    return { out, slowest, nearest };
+  };
+
+  it("waits 33–38 s (the band billed until now with nobody affected): the lead never drops below its 2.90 m/s, never comes within 11 m — and the drive is 0 т., ИЗДЪРЖАН, commended", () => {
+    for (const level of [1, 3, 5] as const) {
+      for (const w of [33, 35, 37, 38]) {
+        const { out, slowest, nearest } = watch(level, w);
+        const label = `L${level} wait ${w}s`;
+        expect(slowest, label).toBe(2.9);
+        expect(nearest, label).toBeGreaterThan(11);
+        expect(out.violationCodes, label).toEqual([]);
+        expect(out.result.score, label).toBe(0);
+        expect(out.result.passed, label).toBe(true);
+        expect(out.commendationCodes, label).toContain("YIELDED_TO_PRIORITY");
+      }
+    }
+  });
+
+  it("waits 39–41 s: he pulls out ahead of the returning lead, which HAS TO BRAKE — billed FAILED_TO_YIELD, not passed, not commended", () => {
+    for (const level of [1, 3, 5] as const) {
+      for (const w of [39, 40, 41]) {
+        const { out, slowest } = watch(level, w);
+        const label = `L${level} wait ${w}s`;
+        expect(slowest, label).toBeLessThan(2.9 - 0.3);
+        expect(out.violationCodes, label).toContain("FAILED_TO_YIELD");
+        expect(out.result.passed, label).toBe(false);
+        expect(out.commendationCodes, label).not.toContain("YIELDED_TO_PRIORITY");
+      }
+    }
   });
 });
 
@@ -235,10 +301,12 @@ describe("sc-rb-busy-gap — the lesson's own wrong acts are billed at every run
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REPAIRED (rbgap lane, 2026-10-04) — was the witness-a RED SPECIFICATION.
-// `traffic/system.ts circulatingConflictFor` clause (R) DEPARTING AND CLEAR: a
-// circulating car already past the driver's entry azimuth, and more than
-// CONFLICT_CLEARED_M beyond it, is no longer a car he owes way to.
+// REPAIRED (rbgap lane) — was the witness-a RED SPECIFICATION. Round 1
+// (2026-10-04) cleared it with `circulatingConflictFor` clause (R) DEPARTING AND
+// CLEAR; since the founder ruling of 2026-10-05 the conviction does not read
+// that predicate at all (a merge behind every car makes nobody brake), and the
+// measurement below — what the PRESENCE test still sees — is kept as the record
+// of why presence could not be the conviction.
 // ─────────────────────────────────────────────────────────────────────────────
 /** Waits at L1 that merge BEHIND the platoon (measured: billed before the repair). */
 const MERGE_BEHIND_WAITS = [11, 12, 14, 15] as const;

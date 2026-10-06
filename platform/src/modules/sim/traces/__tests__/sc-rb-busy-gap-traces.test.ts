@@ -11,10 +11,11 @@
  *      only FAILED_TO_YIELD, and the short-gap entry grades FAILED_TO_YIELD +
  *      COLLISION and nothing else.
  *   4. THE AUTHORED COLLISION IS HONEST — the short-gap demo's `collision` beat
- *      is scripted (see the trace script's note: both runners resolve on the
- *      priority conviction 4 s earlier, so the runner's own contact branch can
- *      never reach it), and this gate proves independently that the two cars are
- *      genuinely in the same place at that clock.
+ *      is scripted (see the trace script's note), and this gate proves
+ *      independently that the two cars are genuinely in the same place at that
+ *      clock — and that the demo really takes the gap IN FRONT of the follower,
+ *      which has to brake for him before its tail has cleared his mouth
+ *      (founder ruling 2026-10-05, round 4).
  *   5. COMMITTED FILES ARE the recordings, byte-for-byte, with public copies.
  *
  * Geometry the drills depend on is asserted against the generated district in
@@ -38,6 +39,10 @@ import type { TrafficDistrict } from "../../traffic/types";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScRbBusyGapDrive, type ScRbBusyGapTraceName } from "../scRbBusyGap";
 import type { RecordedDrive } from "../recorder";
+import { carStory, noseOnRingAtSec, replayWithStagedCars } from "./stagedTwin";
+
+/** rb-mini-v1: ring radius 18 + half its 8.125 m lane — where an entry begins. */
+const RING_EDGE_M = 22.0625;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
@@ -158,6 +163,23 @@ describe("sc-rb-busy-gap — the shadow gate (doc 76 §5)", () => {
     ]);
   });
 
+  it("«никой в кръга не намали заради нас» — the shadow's own last line, measured: no car on the ring loses any speed because of it", () => {
+    // The other half of the ruling — „Patient or careful entries are never
+    // billed" — measured the same way the barge is: every staged car, every
+    // frame, against the same car in a world that never saw him.
+    const frames = replayWithStagedCars(
+      district,
+      [...(SC_RB_BUSY_GAP.staged ?? [])] as StagedEventSpec[],
+      ["sc-rbg-lead", "sc-rbg-follower"],
+      (onTick) => recordScRbBusyGapDrive(district, "shadow-correct", { onTick }),
+    );
+    for (const id of ["sc-rbg-lead", "sc-rbg-follower"]) {
+      const story = carStory(frames, id);
+      expect(story.lostToHimMps, id).toBe(0);
+      expect(story.nearestM, id).toBeGreaterThan(4.5);
+    }
+  });
+
   it("really STOPS at the yield line and really waits ~10 s there", () => {
     // The drill's own gate demands ≤ 6 km/h at (4.06, −26); the shadow does the
     // honest thing and comes to rest. A rolling „yield" would be one 0.9 s
@@ -268,43 +290,150 @@ describe("sc-rb-busy-gap — mistake demos grade their exact codes (doc 76 §9 s
     // It really never yields: no stop, no crawl anywhere on the approach.
     const approach = drive.trace.samples.filter((s) => s.y > -60 && s.y < -20);
     for (const s of approach) expect(s.speedKmh, `t=${s.tSec}`).toBeGreaterThan(8);
+    // «…влезе в кръга с непроменена скорост»: ONE speed from the arm to the ring.
+    const speeds = approach.map((s) => s.speedKmh);
+    expect(Math.max(...speeds) - Math.min(...speeds)).toBeLessThan(0.5);
+  });
+
+  it("„Нахлуване пред циркулиращата кола“ REALLY cuts the circulating car off — it has to brake, because of him, as he comes onto the ring", () => {
+    // Founder ruling 2026-10-05, «bill forced braking»: „The lesson own "barge"
+    // demo gets re-staged so it really cuts someone off." The old demo came
+    // through at 22 км/ч and outran the 2.9 m/s car; it was billed on where the
+    // car WAS. This one is billed on what the car DOES — watched here from
+    // outside the grader, against the same cars in a world that never saw him.
+    const drive = drives.get("mistake-barge-lead")!;
+    const frames = replayWithStagedCars(
+      district,
+      [...(SC_RB_BUSY_GAP.staged ?? [])] as StagedEventSpec[],
+      ["sc-rbg-lead", "sc-rbg-follower"],
+      (onTick) => recordScRbBusyGapDrive(district, "mistake-barge-lead", { onTick }),
+    );
+    const noseAt = noseOnRingAtSec(frames, RING_EDGE_M)!;
+    expect(noseAt).not.toBeNull();
+    const failed = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD")!;
+    // Nothing he did before his nose was on the ring cost the car anything…
+    expect(carStory(frames, "sc-rbg-lead", { toSec: noseAt }).lostToHimMps).toBe(0);
+    // …and from there it brakes for him: 1.08 m/s of its 2.90 (to 1.82), while the same car in
+    // the world without him never drops below its 2.90 m/s.
+    const story = carStory(frames, "sc-rbg-lead", { fromSec: noseAt });
+    expect(story.lostToHimMps).toBeGreaterThan(0.9);
+    expect(story.minMps).toBeLessThan(2.9 - 0.9);
+    expect(story.aloneMinMps).toBeCloseTo(2.9, 6);
+    // THE BILL IS THAT BRAKING: it lands on the frame the car has lost 0.3 m/s
+    // to him — after his nose is on the ring, never before.
+    expect(story.forcedAtSec).not.toBeNull();
+    expect(Math.abs(failed.t - story.forcedAtSec!)).toBeLessThan(1.5 / 60);
+    expect(failed.t).toBeGreaterThan(noseAt);
+    // A cut-off, not a crash: the two never touch.
+    expect(carStory(frames, "sc-rbg-lead").nearestM).toBeGreaterThan(4.5);
+    expect(violationCodes(drive)).not.toContain("COLLISION");
   });
 
   it("„Влизане в твърде къса пролука“: exactly FAILED_TO_YIELD + COLLISION", () => {
     const drive = drives.get("mistake-short-gap")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_RB_BUSY_GAP.mistakes[1].codeRefs].sort());
-    // The priority fault lands BEFORE the crash it causes — that ordering is the
-    // whole teach (the gap was already refused by physics before the bang).
+    // THE PRIORITY FAULT IS THE FOLLOWER'S BRAKING, AND THE CRASH IS THE NEXT
+    // FRAME (founder ruling 2026-10-05, «bill forced braking», as the integrator
+    // pinned it for round 4: yielding is about ONE place, the mouth he enters by,
+    // and the cars that had not passed it when he entered).
     //
-    // B81 — THE SECOND CLAUSE OF THAT SENTENCE USED TO READ „and it is also why
-    // the crash has to be authored: both runners resolve on the conviction, so
-    // the runner's own contact branch never runs." That was a correct diagnosis
-    // of a real defect, worked around instead of reported: contact used to be a
-    // branch of `step()`, and `step()` returns immediately once the runner has
-    // retired. The watch now lives in the director's ContactSentinel, outside
-    // any runner's lifetime, so the crash is billed FROM THE GEOMETRY:
+    // WHAT THIS GATE HAS PINNED, AND WHY IT MOVED EACH TIME. Before the ruling:
+    // «the priority fault lands BEFORE the crash it causes», FAILED_TO_YIELD at
+    // t 20.00 and the contact at 21.78 — the old grader convicting on where the
+    // follower WAS, 3 m before the car had even reached the ring. Round 3: both
+    // bills on the one contact tick (21.78), because any touch inside 35° of
+    // ring was «не пропусна». Round 4 looked at that tick: with the 6.5 s wait
+    // the follower's body was ACROSS his mouth when his nose came onto the ring
+    // (its tail 1.3 m short of it), it went by unbraked, and he drove into its
+    // rear quarter 0.4 s after its tail had cleared the mouth. That is running
+    // into a car that has gone by — a collision, and not «влезе пред кола» —
+    // so the demo no longer committed the fault its card names. It is RE-STAGED
+    // (SHORT_GAP_WAIT_SEC 6.5 → 5.6, the chord cut at the new contact point):
+    // he now really takes the gap, in FRONT of the follower.
     //
-    //   t 20.00  FAILED_TO_YIELD (the gap is refused)
-    //   t 21.78  the follower's body and the player's body overlap — the first
-    //            of 169 consecutive frames of real contact, 2.09 m deep at its
-    //            worst (t 23.43). THIS is now the billed clock.
-    //   t 23.40  the script's authored `collision` beat still fires, 1.62 s
-    //            inside that unbroken overlap — and folds into the SAME
-    //            encounter (collisionSeparationSec), so it is one accident.
+    //   t 20.00  his nose is on the ring — the lead's tail is 4.2 m past his
+    //            mouth, the follower's tail 3.9 m SHORT of it (its nose is at
+    //            the mouth): he is entering ahead of the follower
+    //   t 20.87  the follower has lost 0.3 m/s to him, its tail still 1.4 m
+    //            short of the mouth: FAILED_TO_YIELD (the runtime's roundabout
+    //            tracker, on the car's own account)
+    //   t 20.88  the two bodies overlap: COLLISION (the director's
+    //            ContactSentinel) — one frame later, and the follower is
+    //            standing by then: it braked 2.90 → 0 for him.
     //
-    // 1.78 s, not the 3.40 s the authored beat used to produce. The authored
-    // beat is now redundant; removing it is the authoring lane's call, because
-    // the demo's annotation copy is timed against it.
+    // The authored `collision` beat fires on the frame his chord ends, inside
+    // that unbroken overlap, and folds into the SAME encounter
+    // (collisionSeparationSec): one accident.
     const yieldAt = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD")!;
     const hitAt = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "COLLISION")!;
-    expect(yieldAt.t).toBeLessThan(hitAt.t);
-    expect(hitAt.t - yieldAt.t).toBeGreaterThan(1.5);
-    // ONE accident, however many ways it is reported.
+    expect(drive.ruleEvents.indexOf(yieldAt)).toBeLessThan(drive.ruleEvents.indexOf(hitAt));
+    expect(hitAt.t - yieldAt.t).toBeGreaterThanOrEqual(0);
+    expect(hitAt.t - yieldAt.t).toBeLessThan(2.5 / 60);
+    // …and that tick is a tick of the ENTRY: his nose over the ring's edge
+    // (22.06 m from the centre), the car not yet round the ring.
+    const at = drive.trace.samples.reduce((best, s) =>
+      Math.abs(s.tSec - hitAt.t) < Math.abs(best.tSec - hitAt.t) ? s : best,
+    );
+    expect(Math.hypot(at.x, at.y)).toBeLessThan(22.0625 + 2.02);
+    expect(Math.hypot(at.x, at.y)).toBeGreaterThan(18);
+    // ONE fault and ONE accident, however many ways they are reported.
+    expect(violationCodes(drive).filter((c) => c === "FAILED_TO_YIELD")).toHaveLength(1);
     expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(1);
     // This demo is NOT the barge: it stops at the line and lets the lead through
     // first. That is what makes it the harder mistake.
     expect(drive.trace.samples.some((s) => s.speedKmh < 0.5 && s.y > -28 && s.y < -27)).toBe(true);
+  });
+
+  it("„Влизане в твърде къса пролука“ REALLY takes the gap in front of the follower — the lead has gone by his mouth, the follower has not, and it has to brake for him before it gets there", () => {
+    // Watched from outside the grader: the same cars in a world that never saw
+    // him (`replayWithStagedCars`), and where each car's TAIL stood against the
+    // mouth — the point of the ring's edge his nose came over — read off the
+    // published poses.
+    const drive = drives.get("mistake-short-gap")!;
+    const frames = replayWithStagedCars(
+      district,
+      [...(SC_RB_BUSY_GAP.staged ?? [])] as StagedEventSpec[],
+      ["sc-rbg-lead", "sc-rbg-follower"],
+      (onTick) => recordScRbBusyGapDrive(district, "mistake-short-gap", { onTick }),
+    );
+    const noseAt = noseOnRingAtSec(frames, RING_EDGE_M)!;
+    expect(noseAt).not.toBeNull();
+    const entry = frames.find((f) => f.tSec === noseAt)!;
+    const rad = (entry.pHeadingDeg * Math.PI) / 180;
+    // Compass azimuth of the mouth (his nose on the entry frame) and of a car;
+    // the ring is driven counter-clockwise, so a car's azimuth FALLS as it goes.
+    const mouthAz = Math.atan2(entry.px + Math.sin(rad) * 2.02, entry.py + Math.cos(rad) * 2.02);
+    /** Metres of its own circle the car's TAIL has still to run to be past the mouth (negative: it is past). */
+    const tailRunM = (f: (typeof frames)[number], id: string): number => {
+      const c = f.cars[id];
+      let d = Math.atan2(c.x, c.y) - mouthAz;
+      if (d > Math.PI) d -= 2 * Math.PI;
+      if (d < -Math.PI) d += 2 * Math.PI;
+      return d * Math.hypot(c.x, c.y) + 2.05;
+    };
+    // The lead HAS gone by — it is the car he let pass…
+    expect(tailRunM(entry, "sc-rbg-lead")).toBeLessThan(-3);
+    // …and the follower has NOT: its whole body is still short of his mouth.
+    expect(tailRunM(entry, "sc-rbg-follower")).toBeGreaterThan(3);
+    expect(tailRunM(entry, "sc-rbg-follower")).toBeLessThan(4.6);
+    const failed = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD")!;
+    // Nothing he did before his nose was on the ring cost either car anything…
+    expect(carStory(frames, "sc-rbg-follower", { toSec: noseAt }).lostToHimMps).toBe(0);
+    expect(carStory(frames, "sc-rbg-lead").lostToHimMps).toBe(0);
+    // …and from there the follower brakes for him, all the way to a stop, while
+    // the same car in the world without him never drops below its 2.90 m/s.
+    const story = carStory(frames, "sc-rbg-follower", { fromSec: noseAt });
+    expect(story.lostToHimMps).toBeGreaterThan(2.5);
+    expect(story.minMps).toBeLessThan(0.1);
+    expect(story.aloneMinMps).toBeCloseTo(2.9, 6);
+    // THE BILL IS THAT BRAKING: on the frame it has lost 0.3 m/s to him, after
+    // his nose is on the ring — and BEFORE its tail has cleared his mouth.
+    expect(story.forcedAtSec).not.toBeNull();
+    expect(Math.abs(failed.t - story.forcedAtSec!)).toBeLessThan(1.5 / 60);
+    expect(failed.t).toBeGreaterThan(noseAt + 0.5);
+    const billFrame = frames.reduce((b, f) => (Math.abs(f.tSec - failed.t) < Math.abs(b.tSec - failed.t) ? f : b));
+    expect(tailRunM(billFrame, "sc-rbg-follower")).toBeGreaterThan(1);
   });
 
   it("the two demos are the two ends of ONE misjudgment, not one fault twice", () => {
@@ -327,9 +456,9 @@ describe("sc-rb-busy-gap — the crash depicts real geometry (doc 76 §0 honesty
     const frames = replayWithActors("mistake-short-gap");
     const at = frames.reduce((b, f) => (Math.abs(f.tSec - hitAt.t) < Math.abs(b.tSec - hitAt.t) ? f : b));
 
-    // B81: the bill now lands where the BODIES meet (t 21.78), not at the
-    // script's authored beat 1.6 s later, so this assertion measures the right
-    // thing with the right instrument. Centre distance was never the right
+    // B81: the bill lands where the BODIES meet (t 20.88 since the round-4
+    // re-stage; 21.78 before it), not at the script's authored beat, so this
+    // assertion measures the right thing with the right instrument. Centre distance was never the right
     // instrument — a 3.40 m gap of CENTRES between two 4.1 m cars nose-to-tail
     // is 0.67 m of INTERPENETRATION, and the old `hypot(...) < 1` would have
     // called that innocent. Exact bodies, exact answer.
@@ -338,9 +467,10 @@ describe("sc-rb-busy-gap — the crash depicts real geometry (doc 76 §0 honesty
       { x: at.foll.x, y: at.foll.y, headingDeg: at.follHeadingDeg, halfLengthM: 2.05, halfWidthM: 0.92 },
     );
     expect(sepM).toBeLessThanOrEqual(0);
-    // …and the contact is unbroken from there: 169 consecutive frames of real
-    // overlap, which is what makes the whole thing ONE accident and what the
-    // authored beat, landing inside it, now folds into.
+    // …and the contact is unbroken from there to the end of the demo (the
+    // chord ends on the contact point and he stands there for the 1.2 s the
+    // demo has left — 75 frames), which is what makes the whole thing ONE
+    // accident and what the authored beat, landing inside it, folds into.
     const overlapping = frames.filter(
       (f) =>
         f.tSec >= at.tSec &&
@@ -352,7 +482,8 @@ describe("sc-rb-busy-gap — the crash depicts real geometry (doc 76 §0 honesty
           halfWidthM: 0.92,
         }) <= 0,
     );
-    expect(overlapping.length).toBeGreaterThan(100);
+    expect(overlapping.length).toBeGreaterThan(60);
+    expect(overlapping.length).toBe(frames.filter((f) => f.tSec >= at.tSec).length);
   });
 });
 

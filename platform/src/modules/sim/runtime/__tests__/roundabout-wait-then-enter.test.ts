@@ -2,113 +2,159 @@ import { describe, expect, it } from "vitest";
 import { createWorldRuntime } from "..";
 import { loadDistrict, mkVehicle } from "./helpers";
 import type { SimTickEvent } from "../../rules/types";
+import type { CirculatingQueryReport } from "../worldRuntime";
+import { ringReport, type StubCar } from "./circulatingStub";
 
 /**
  * B15 — „I waited for the traffic car 3-4 seconds, than I waited it for twice
  * more and it still stated the error."
  *
  * His sequence, at the runtime level: approach, STOP on the give-way paint,
- * stand there, then move off. Two constants shipped for this row before
- * (`RB_WITNESS_STOPPED_NEAR_M`, `CIRCULATING_REACH_M`) and neither is on this
- * path — the conviction comes from the sustain clock itself.
+ * stand there, then move off.
  *
- * `rbCondSince` is stamped the first tick a circulating conflict is visible and
- * (before this fix) cleared only on a tick where the conflict is ABSENT. A
- * driver standing still never clears it, so after a long wait both mercies the
- * C1/D1 comments exist to grant — the 0.9 s reaction window and the 3.0 s
- * braking-immunity band — are stale by tens of seconds, and the only live gate
- * left is `speedKmh > RHR_MOVING_KMH`. He is convicted on the FIRST tick the
- * wheels turn, and waiting longer makes it worse, which is what he reported.
+ * THE DEFECT, AS IT WAS. The tracker used to convict on PRESENCE — a car on the
+ * ring, on his left — once a sustain clock had run 0.9 s. The clock was stamped
+ * when the car first became visible and cleared only when it was gone, so a
+ * driver who did the lawful thing and stood still banked the whole wait, and
+ * was convicted on the first tick the wheels turned. Waiting longer made it
+ * worse. The first repair (2026-08) held the clock at null while he stood.
  *
- * The fix makes the clock mean what the rest of the block already says it
- * means: seconds spent MOVING into a visible conflict.
+ * WHAT ANSWERS IT NOW. There is no clock (founder ruling 2026-10-05, «bill
+ * forced braking»): an entry is billed when a circulating car has to BRAKE
+ * because of it, or is touched — and for no other reason. A car that is merely
+ * there, for four seconds or for forty-six, bills nothing; and when a car does
+ * have to brake, the bill lands on that braking and is the same whether he
+ * waited at all. Both halves are measured below.
  */
 
 const DT = 0.05;
-const MOVING_KMH = 3; // RHR_MOVING_KMH — the conviction floor
+const MOVING_KMH = 1; // this file's own «the wheels have turned» (the conviction itself does not ask whether he is moving)
 
 interface WaitDriveResult {
   /** Seconds after the wheels first turned that the violation fired, or null. */
   convictedAfterSec: number | null;
-  /** Seconds of standing still before the move-off. */
-  waitedSec: number;
+  /** His distance from the ring centre when it fired, m. */
+  convictedAtM: number | null;
 }
 
 /**
- * Stand at the south mouth of rb-1 with a circulating conflict permanently
- * visible, then accelerate into the ring. `brakingKmh` drives the move-off
- * profile: a positive ramp accelerates from 0.
+ * Stand on the south approach of rb-1, a metre short of where his nose would
+ * be on the ring, for `waitSec`; then pull away into it (~1.4 m/s²).
+ * `ring(i, moving)` says what the car on the ring is doing on each frame.
  */
-function waitThenEnter(waitSec: number, opts: { moveFrames?: number } = {}): WaitDriveResult {
+function waitThenEnter(
+  waitSec: number,
+  ring: (rb: { x: number; y: number; radius: number }, moving: boolean, movedM: number) => CirculatingQueryReport,
+): WaitDriveResult {
   const rt = createWorldRuntime(loadDistrict());
   const rb = rt.district.roundabouts[0];
-  // A car is on the ring the whole time — the worst case, and the one the
-  // register measured: the loop actor keeps coming round, so from the
-  // stationary driver's seat the conflict never resolves for long.
-  rt.setCirculatingQuery(() => true);
+  const enterM = rt.debugRoundaboutZones()[0]!.enterReachM;
+  const startM = enterM + 2.02 + 1; // nose 1 m outside the ring carriageway
+  let moving = false;
+  let movedM = 0;
+  rt.setCirculatingQuery(() => ring(rb, moving, movedM));
 
-  // Fixed pose at the south mouth pointing north (inward = 1, azimuth never
-  // sweeps, so the "already circulating" latch stays off — this is an ENTRY).
-  const pose = { x: rb.x, y: rb.y - (rb.radius + 4), headingDeg: 0 };
   let t = 0;
-
   // --- the wait: parked, engine running, watching the ring ---
   for (let i = 0; i < Math.round(waitSec / DT); i += 1) {
     t += DT;
     rt.update(DT);
-    rt.sample(mkVehicle(pose, { speedKmh: 0 }), t, false);
+    rt.sample(mkVehicle({ x: rb.x, y: rb.y - startM, headingDeg: 0 }, { speedKmh: 0 }), t, false);
   }
 
-  // --- the move-off: a normal pull-away, ~1.4 m/s² ---
-  const moveFrames = opts.moveFrames ?? 80; // 4.0 s
+  // --- the move-off: a normal pull-away, straight in ---
   let convictedAfterSec: number | null = null;
+  let convictedAtM: number | null = null;
   let firstMovingT: number | null = null;
-  for (let i = 0; i < moveFrames; i += 1) {
+  let v = 0;
+  for (let i = 0; i < 120; i += 1) {
     t += DT;
-    const speedKmh = 5 * (i + 1) * DT * 5; // 0 → 20 km/h over 1.6 s, then on up
+    v = Math.min(20 / 3.6, v + 1.4 * DT);
+    movedM += v * DT;
+    const speedKmh = v * 3.6;
+    moving = speedKmh > MOVING_KMH;
+    if (moving && firstMovingT === null) firstMovingT = t;
     rt.update(DT);
-    const tick = rt.sample(mkVehicle(pose, { speedKmh }), t, false);
-    if (speedKmh > MOVING_KMH && firstMovingT === null) firstMovingT = t;
+    const d = Math.max(rb.radius - 2, startM - movedM);
+    const tick = rt.sample(mkVehicle({ x: rb.x, y: rb.y - d, headingDeg: 0 }, { speedKmh }), t, false);
     const violated = tick.events.some(
       (e: SimTickEvent) => e.kind === "prioritySituation" && e.situation === "roundabout" && e.violated,
     );
     if (violated && convictedAfterSec === null) {
       convictedAfterSec = t - (firstMovingT ?? t);
+      convictedAtM = d;
     }
   }
-  return { convictedAfterSec, waitedSec: waitSec };
+  return { convictedAfterSec, convictedAtM };
 }
+
+const carOnRing = (rb: { radius: number }, extra: Partial<StubCar> = {}): StubCar => ({
+  id: 7,
+  azDeg: 230,
+  radiusM: rb.radius,
+  speedMps: 5,
+  shedMps: 0,
+  ...extra,
+});
 
 describe("B15 — roundabout: wait on the give-way line, then enter", () => {
   // The three waits from his sentence: „3-4 seconds", „twice more", and the
   // 46 s the re-look wave stood there.
   for (const waitSec of [4, 8, 46]) {
-    it(`gives a full reaction window after standing still for ${waitSec} s`, () => {
-      const { convictedAfterSec } = waitThenEnter(waitSec);
-      // Either he is not convicted at all, or — if a car really is circulating
-      // right there — the conviction lands no sooner than the sustain window
-      // every other driver gets. What must NEVER happen is conviction on the
-      // tick the wheels turn.
-      if (convictedAfterSec !== null) {
-        expect(convictedAfterSec).toBeGreaterThanOrEqual(0.9 - DT);
-      }
+    it(`a car that is on the ring the whole time and never has to brake bills nothing after standing ${waitSec} s`, () => {
+      // The worst case of the old defect: the loop actor keeps coming round, so
+      // from the stationary driver's seat a car is always «there».
+      let car: StubCar | null = null;
+      const { convictedAfterSec } = waitThenEnter(waitSec, (rb) => {
+        car ??= carOnRing(rb, { approaching: true });
+        return ringReport(rb, [car], true);
+      });
+      expect(convictedAfterSec).toBeNull();
     });
   }
 
-  it("does not make a LONGER wait worse than a shorter one", () => {
-    // His actual complaint: waiting more made it fire sooner, not later.
-    const short = waitThenEnter(4).convictedAfterSec;
-    const long = waitThenEnter(46).convictedAfterSec;
-    expect(long === null ? Infinity : long).toBeGreaterThanOrEqual(
-      (short === null ? Infinity : short) - DT,
-    );
+  it("a LONGER wait is never worse than a shorter one: when a car does have to brake, the bill lands on the same frame of the entry", () => {
+    // His actual complaint: waiting more made it fire sooner. Now the wait is
+    // not an input at all — the car brakes from the moment his nose is on the
+    // ring, and the conviction is that braking.
+    const run = (waitSec: number) => {
+      let car: StubCar | null = null;
+      return waitThenEnter(waitSec, (rb, moving, movedM) => {
+        car ??= carOnRing(rb);
+        if (moving && movedM >= 1) car.shedMps += 0.1; // his nose is over the edge
+        return ringReport(rb, [car]);
+      });
+    };
+    const short = run(4);
+    const long = run(46);
+    expect(short.convictedAfterSec).not.toBeNull();
+    expect(long.convictedAfterSec).not.toBeNull();
+    expect(long.convictedAfterSec!).toBeCloseTo(short.convictedAfterSec!, 9);
+    expect(long.convictedAtM!).toBeCloseTo(short.convictedAtM!, 9);
   });
 
-  it("still convicts a driver who barges in from the line without stopping", () => {
-    // Guard-rail: the mercy is a reaction window, not an amnesty. A driver who
-    // stands, then accelerates into a car that is genuinely on the ring beside
-    // him is still graded — just not instantly.
-    const { convictedAfterSec } = waitThenEnter(46, { moveFrames: 200 });
+  it("standing still is not an amnesty: a driver who waits 46 s and then pulls out in front of a car that has to brake is billed — on the entry, not on the first turn of the wheels", () => {
+    let car: StubCar | null = null;
+    const { convictedAfterSec, convictedAtM } = waitThenEnter(46, (rb, moving, movedM) => {
+      car ??= carOnRing(rb);
+      if (moving && movedM >= 1) car.shedMps += 0.1;
+      return ringReport(rb, [car]);
+    });
     expect(convictedAfterSec).not.toBeNull();
+    // He had to cover the metre to the ring's edge first (≈ 1.2 s at 1.4 m/s²)…
+    expect(convictedAfterSec!).toBeGreaterThan(0.5);
+    // …and the bill lands with his nose on the ring carriageway.
+    const rt = createWorldRuntime(loadDistrict());
+    expect(convictedAtM!).toBeLessThanOrEqual(rt.debugRoundaboutZones()[0]!.enterReachM + 2.02);
+  });
+
+  it("whatever a car sheds while he is still standing on the line is not his entry", () => {
+    let car: StubCar | null = null;
+    const { convictedAfterSec } = waitThenEnter(8, (rb, moving) => {
+      car ??= carOnRing(rb);
+      if (!moving) car.shedMps += 0.1; // «brakes for him» throughout the wait, then goes
+      return ringReport(rb, [car]);
+    });
+    expect(convictedAfterSec).toBeNull();
   });
 });

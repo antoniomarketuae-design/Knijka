@@ -74,6 +74,9 @@ import {
   DEFAULT_TRAFFIC_CONFIG,
   PLAYER_HALF_LENGTH_M,
   vehicleHalfLengthM,
+  vehicleHalfWidthM,
+  type CirculatingReport,
+  type CirculatingVehicle,
   type CyclistApproach,
   type DistrictEdge,
   type OncomingApproach,
@@ -338,6 +341,13 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly ambientStates: TrafficVehicleState[] = [];
   private readonly stagedPeds: StagedPedestrianAgent[] = [];
   private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
+  /** circulatingTraffic's reused answer (one report, one row pool — the
+   *  per-frame roundabout query allocates nothing after warm-up). */
+  private readonly circulatingRows: CirculatingVehicle[] = [];
+  private readonly circulatingReport: { conflict: boolean; vehicles: CirculatingVehicle[] } = {
+    conflict: false,
+    vehicles: this.circulatingRows,
+  };
   private readonly stagedEnv: StagedEnv;
   /** The drawn lane width every lane of this system was resolved with — handed
    *  to each staged vehicle so its pass guard (and the runner reading its view)
@@ -885,6 +895,25 @@ class TrafficSystemImpl implements TrafficSystem {
     return circulatingConflictFor(this.vehicles, cx, cy, px, py, headingDeg, bandRadiusM);
   }
 
+  circulatingTraffic(
+    cx: number,
+    cy: number,
+    px: number,
+    py: number,
+    headingDeg: number,
+    bandRadiusM: number,
+  ): CirculatingReport {
+    // Ambient agents first, staged after — the order `this.vehicles` publishes
+    // them in, so the report is deterministic and matches the presence scan.
+    const rows = this.circulatingRows;
+    let n = circulatingRowsFor(this.vehicleAgents, cx, cy, px, py, headingDeg, bandRadiusM, rows, 0);
+    n = circulatingRowsFor(this.stagedVehicles, cx, cy, px, py, headingDeg, bandRadiusM, rows, n);
+    rows.length = n;
+    const report = this.circulatingReport;
+    report.conflict = circulatingConflictFor(this.vehicles, cx, cy, px, py, headingDeg, bandRadiusM);
+    return report;
+  }
+
   cyclistNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null {
     return cyclistNearFor(
       this.vehicles,
@@ -1065,8 +1094,18 @@ export function sameDirVehicleNearFor(
  * Pure "circulating vehicle approaching from the driver's left" test for a
  * roundabout entry. Right-hand traffic circles counter-clockwise, so a car
  * already on the ring reaches your entry from the LEFT. True when a moving
- * vehicle sits within the ring band AND to the driver's left — the driver must
- * give way to it.
+ * vehicle sits within the ring band AND to the driver's left — a car he should
+ * be watching.
+ *
+ * WHAT IT IS FOR NOW (founder ruling 2026-10-05, «bill forced braking»). This
+ * is PRESENCE, and presence no longer convicts anybody: a roundabout entry is
+ * FAILED_TO_YIELD when a circulating car has to brake because of it, or is
+ * touched (`circulatingRowsFor` below carries each car's own account to the
+ * runtime's tracker). What still asks «is a car there»: the yield COMMENDATION
+ * (he held back for a car that was coming) and a driver-bot deciding whether to
+ * wait at the line. The history that follows is why the predicate has the
+ * clauses it has; where it says a driver «was billed», read «was billed by the
+ * grader of the day».
  *
  * THE QUESTION IT USED NOT TO ASK: HAS THAT CAR ALREADY GONE PAST MY ENTRY.
  *
@@ -1126,29 +1165,150 @@ export function circulatingConflictFor(
   const pcy = py - cy;
   const pRadM = Math.hypot(pcx, pcy);
   for (const v of vehicles) {
-    const cdx = v.x - cx;
-    const cdy = v.y - cy;
-    if (cdx * cdx + cdy * cdy > r2) continue; // not in / near the ring
-    if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue; // parked / creeping
-    // …and near the DRIVER, not merely near the island (B15 — see
-    // CIRCULATING_REACH_M). Being inside the band is a fact about the ring; a
-    // give-way duty is a fact about the two of you.
-    const pdx = v.x - px;
-    const pdy = v.y - py;
-    if (pdx * pdx + pdy * pdy > CIRCULATING_REACH_M * CIRCULATING_REACH_M) continue;
-    if (pdx * lx + pdy * ly < RIGHT_MIN_M) continue; // not on the left
-    if (departedPastEntry(cdx, cdy, v.dirX, v.dirY, pcx, pcy, pRadM)) continue; // (R)
-    return true;
+    if (circulatingPresenceOf(v, cx, cy, px, py, lx, ly, r2, pcx, pcy, pRadM) !== 0) return true;
   }
   return false;
 }
 
 /**
- * Clause (R) of `circulatingConflictFor`: has this circulating car already
- * gone PAST the driver's entry and cleared it? All vectors are relative to the
- * ring centre. False (= keep counting it) whenever the geometry cannot answer.
+ * ONE vehicle's presence answer for `circulatingConflictFor` — the body of its
+ * loop, shared with the circulating report so the two can never disagree:
+ *
+ *   0  not a conflict (outside the band, stopped, out of reach, not on his
+ *      left, or DEPARTED AND CLEAR — clause (R));
+ *   1  a conflict that has already gone past his azimuth but is still
+ *      straddling his mouth (inside CONFLICT_CLEARED_M of it);
+ *   2  a conflict still COMING to his azimuth — or one whose geometry cannot
+ *      say (purely radial motion, a driver on the centre), which keeps the
+ *      old presence answer.
  */
-function departedPastEntry(
+function circulatingPresenceOf(
+  v: { x: number; y: number; dirX: number; dirY: number; speedMps: number },
+  cx: number,
+  cy: number,
+  px: number,
+  py: number,
+  lx: number,
+  ly: number,
+  r2: number,
+  pcx: number,
+  pcy: number,
+  pRadM: number,
+): 0 | 1 | 2 {
+  const cdx = v.x - cx;
+  const cdy = v.y - cy;
+  if (cdx * cdx + cdy * cdy > r2) return 0; // not in / near the ring
+  if (v.speedMps < CONFLICT_MIN_SPEED_MPS) return 0; // parked / creeping
+  // …and near the DRIVER, not merely near the island (B15 — see
+  // CIRCULATING_REACH_M). Being inside the band is a fact about the ring; a
+  // give-way duty is a fact about the two of you.
+  const pdx = v.x - px;
+  const pdy = v.y - py;
+  if (pdx * pdx + pdy * pdy > CIRCULATING_REACH_M * CIRCULATING_REACH_M) return 0;
+  if (pdx * lx + pdy * ly < RIGHT_MIN_M) return 0; // not on the left
+  const past = pastEntryM(cdx, cdy, v.dirX, v.dirY, pcx, pcy, pRadM);
+  if (past === null) return 2; // geometry cannot answer: still a conflict
+  if (past > CONFLICT_CLEARED_M) return 0; // (R) departed and clear
+  return past > 0 ? 1 : 2;
+}
+
+/**
+ * THE CIRCULATING REPORT'S ROWS (founder ruling 2026-10-05, «bill forced
+ * braking» — see CirculatingReport). Every agent whose body is within the band
+ * of the ring, moving or not, written into `out` from index `from`; returns the
+ * next free index. Rows are created once and reused. Pure: the agents are read
+ * and never touched.
+ *
+ * NOT filtered by speed, reach or side, on purpose. Those are the PRESENCE
+ * filters, and presence is exactly what a conviction may no longer rest on: a
+ * car the student has just brought to a standstill is doing 0 m/s, and a car
+ * braking behind him is on nobody's left. What the runtime needs from here is
+ * what each car in the band has had to do — `playerShedMps`, the agent's own
+ * account — and where its body is.
+ */
+export function circulatingRowsFor(
+  agents: readonly {
+    state: {
+      id: number;
+      x: number;
+      y: number;
+      dirX: number;
+      dirY: number;
+      speedMps: number;
+      profile?: VehicleProfile;
+    };
+    playerShedMps: number;
+  }[],
+  cx: number,
+  cy: number,
+  px: number,
+  py: number,
+  headingDeg: number,
+  bandRadiusM: number,
+  out: CirculatingVehicle[],
+  from: number,
+): number {
+  const rad = (headingDeg * Math.PI) / 180;
+  const lx = -Math.cos(rad);
+  const ly = Math.sin(rad);
+  const r2 = bandRadiusM * bandRadiusM;
+  const pcx = px - cx;
+  const pcy = py - cy;
+  const pRadM = Math.hypot(pcx, pcy);
+  let n = from;
+  for (const a of agents) {
+    const v = a.state;
+    const cdx = v.x - cx;
+    const cdy = v.y - cy;
+    if (cdx * cdx + cdy * cdy > r2) continue; // not in / near the ring
+    let row = out[n];
+    if (row === undefined) {
+      row = {
+        id: 0,
+        x: 0,
+        y: 0,
+        dirX: 0,
+        dirY: 0,
+        speedMps: 0,
+        halfLengthM: 0,
+        halfWidthM: 0,
+        approaching: false,
+        pastEntry: false,
+        playerShedMps: 0,
+      };
+      out[n] = row;
+    }
+    row.id = v.id;
+    row.x = v.x;
+    row.y = v.y;
+    row.dirX = v.dirX;
+    row.dirY = v.dirY;
+    row.speedMps = v.speedMps;
+    row.halfLengthM = vehicleHalfLengthM(v.profile);
+    row.halfWidthM = vehicleHalfWidthM(v.profile);
+    row.approaching = circulatingPresenceOf(v, cx, cy, px, py, lx, ly, r2, pcx, pcy, pRadM) === 2;
+    const past = pastEntryM(cdx, cdy, v.dirX, v.dirY, pcx, pcy, pRadM);
+    row.pastEntry = past !== null && past > 0;
+    row.playerShedMps = a.playerShedMps;
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Clause (R) of `circulatingConflictFor`: how far PAST the driver's entry has
+ * this circulating car already gone — the straight line from the conflict
+ * point (the place on the car's own circle at his azimuth) to its centre, m.
+ * All vectors are relative to the ring centre.
+ *
+ *   > 0   it is past his azimuth, by this much (the car is departed and clear
+ *         once this exceeds CONFLICT_CLEARED_M);
+ *   0     it is still coming (upstream of his azimuth, or level with it);
+ *   null  the geometry cannot answer — a driver or car on the centre, or purely
+ *         radial motion with no angular direction to read. The caller keeps
+ *         counting such a car.
+ */
+function pastEntryM(
   cdx: number,
   cdy: number,
   dirX: number,
@@ -1156,23 +1316,23 @@ function departedPastEntry(
   pcx: number,
   pcy: number,
   pRadM: number,
-): boolean {
+): number | null {
   const vRadM = Math.hypot(cdx, cdy);
-  if (pRadM < 1e-6 || vRadM < 1e-6) return false;
+  if (pRadM < 1e-6 || vRadM < 1e-6) return null;
   // Its angular direction about the centre: +1 counter-clockwise, −1 clockwise.
   const cross = cdx * dirY - cdy * dirX;
-  if (Math.abs(cross) < 1e-9) return false; // purely radial: no direction to read
+  if (Math.abs(cross) < 1e-9) return null; // purely radial: no direction to read
   const sense = cross > 0 ? 1 : -1;
   // Signed angle FROM the driver's azimuth TO the car, in the car's own
   // direction of travel: (0, π) = it is already past his azimuth (downstream),
   // (−π, 0) = it is still coming (upstream).
   const pastRad = sense * Math.atan2(pcx * cdy - pcy * cdx, pcx * cdx + pcy * cdy);
-  if (!(pastRad > 0)) return false; // upstream (or level): still a conflict
+  if (!(pastRad > 0)) return 0; // upstream (or level): still a conflict
   // The conflict point on the car's own circle at his azimuth, and how far the
   // car's centre already is beyond it (straight line, like clause (5)).
   const ex = (pcx / pRadM) * vRadM;
   const ey = (pcy / pRadM) * vRadM;
-  return Math.hypot(cdx - ex, cdy - ey) > CONFLICT_CLEARED_M;
+  return Math.hypot(cdx - ex, cdy - ey);
 }
 
 /**

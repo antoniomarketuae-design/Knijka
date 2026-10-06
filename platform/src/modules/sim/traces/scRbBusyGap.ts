@@ -16,9 +16,36 @@
  * (4.06, −93) heading north; ring limit 30, arms 40. This drill takes the SECOND
  * (north) exit, peeling off the ring arc at φ ≈ 150°.
  *
- * FOUR ENVELOPES DECIDE EVERY NUMBER BELOW — all four measured, not guessed:
+ * READ THIS FIRST (2026-10-05). The first envelope below — «THE LEFT
+ * HALF-PLANE IS THE WHOLE GAME» — and every later sentence that speaks of the
+ * 0.9 s sustain or of a car «in the driver's left band» convicting describe
+ * the grader these drives were AUTHORED AGAINST: one that billed an entry on
+ * where a circulating car was. It is gone. Founder ruling 2026-10-05, «bill
+ * forced braking»: an entry is FAILED_TO_YIELD when a circulating car has to
+ * BRAKE because of it (the car's own account, runtime/worldRuntime.ts §4c) or
+ * is touched — and for no other reason. The drives did not have to move for
+ * that, except two: the barge, which under the old grader was billed for a car
+ * it outran, is re-staged (BARGE_KMH); and the short gap, which drove into the
+ * side of a car that was already going by, is re-staged to take the gap in
+ * FRONT of the follower (SHORT_GAP_WAIT_SEC — round 4 of the ruling: yielding
+ * is about the mouth he enters by and the cars that had not yet passed it).
+ * What each drive is billed on now:
  *
- *  · THE LEFT HALF-PLANE IS THE WHOLE GAME. FAILED_TO_YIELD (the runtime's
+ *   shadow      nothing — no car on the ring loses any speed because of it
+ *               (the trace gate measures that against a world without him);
+ *   barge       the LEAD has to brake, 0.4 s after his nose is on the ring;
+ *   short gap   the FOLLOWER has to brake, at t = 20.87 — its tail still
+ *               1.4 m short of his mouth — and the two bodies meet on the next
+ *               frame (20.88): FAILED_TO_YIELD, then COLLISION. Its guard
+ *               looks down its own lane and he comes at it from the side, so
+ *               it brakes late and hard: 2.90 m/s to a stop.
+ *
+ * The paragraphs are kept because the geometry in them is still true and the
+ * phasing arithmetic still explains where every car is.
+ *
+ * FOUR ENVELOPES DECIDED EVERY NUMBER BELOW — all four measured, not guessed:
+ *
+ *  · THE LEFT HALF-PLANE WAS THE WHOLE GAME. FAILED_TO_YIELD (the runtime's
  *    roundabout tracker) fires when a MOVING car sits in the ring band AND in
  *    the driver's left half-plane (circulatingConflictFor: left · (car − player)
  *    ≥ 1.5) for YIELD_CONVICT_SUSTAIN_SEC = 0.9 s, while the driver is inward
@@ -128,13 +155,12 @@ const EXIT_NORTH: Array<[number, number]> = [
 
 /**
  * The shared approach: roll down the south arm and come to REST on the yield
- * line at (4.06, −27.5). Arriving at rest is not decoration — it is what keeps
- * the whole wait innocent. The tracker arms at 30 m from the ring centre
- * (y ≈ −29.7 in this lane) and the pair is in the left half-plane for most of
- * the cycle, so any approach still rolling above RHR_MOVING_KMH (3) there is one
- * 0.9 s sustain away from a conviction. Stopped, the driver is untouchable —
- * and the drill's own „изчакай на линията" gate (≤ 6 km/h at y = −26) demands
- * exactly this anyway.
+ * line at (4.06, −27.5). Arriving at rest is what the drill's own „изчакай на
+ * линията" gate (≤ 6 km/h at y = −26) demands. (It used to be what kept the
+ * wait innocent, too: under the presence grader any approach still rolling
+ * above 3 км/ч inside 30 m of the ring was one 0.9 s sustain away from a
+ * conviction. Since 2026-10-05 no approach is billed, rolling or not — only an
+ * entry that makes a circulating car brake.)
  */
 function approachToLineSteps(): DriveScript["steps"] {
   return [
@@ -261,6 +287,35 @@ export function scRbBusyGapShadowScript(): DriveScript {
 // Mistake demo 1 — „Нахлуване пред циркулиращата кола“ (FAILED_TO_YIELD)
 // ---------------------------------------------------------------------------
 
+/**
+ * THE BARGE'S ONE SPEED, км/ч — held from the spawn to the ring, because the
+ * card says so («Колата дори не намали на входа: влезе в кръга с непроменена
+ * скорост пред първата циркулираща кола») and the demo has to be that drive.
+ *
+ * RE-STAGED 2026-10-05 (founder ruling «bill forced braking»: „The lesson own
+ * "barge" demo gets re-staged so it really cuts someone off"). The old barge
+ * came through the mouth at 22 км/ч with the lead ~11 m behind its merge point
+ * and outran it: the lead held 2.90 m/s to the end, nobody had to brake, and
+ * the drive was «a priority fault» only to a grader that convicted on where a
+ * car WAS. Judged by what happened it is an entry nobody paid for.
+ *
+ * The platoon is a metronome from the moment the driver passes 60 m from the
+ * ring centre (the sync is pinned out — see the template), so WHEN he reaches
+ * the ring is set by this speed alone, on every rung and under every seed.
+ * MEASURED on the live chain, identical at L1–L5:
+ *
+ *   12 км/ч  the lead is in the mouth as he arrives — COLLISION (0.1 m)
+ *   14       he merges ~7 m ahead of it; the lead sheds 2.47 m/s
+ *   15       ~8 m ahead; the lead sheds 1.08 m/s (2.90 → 1.82)   ← authored
+ *   16       ~9 m ahead; the lead sheds 0.60 m/s
+ *   17 +     he is clear ahead of it: nothing is forced, nothing is billed
+ *
+ * 15 is the middle of the band in which the lead really has to brake and the
+ * two cars never touch (nearest 6.2 m). The conviction lands 0.4 s after his
+ * nose is on the ring, on the lead's own braking.
+ */
+const BARGE_KMH = 15;
+
 export function scRbBusyGapMistakeBargeScript(): DriveScript {
   return {
     steps: [
@@ -272,16 +327,22 @@ export function scRbBusyGapMistakeBargeScript(): DriveScript {
       // The barger signals right (correct form — it takes the first exit), so
       // its ONLY graded fault is the refused priority.
       { kind: "indicator", setting: "right" },
-      { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, -40]], targetKmh: 26, stopAtEnd: false },
+      {
+        kind: "drive",
+        points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, -40]],
+        targetKmh: BARGE_KMH,
+        stopAtEnd: false,
+      },
       { kind: "annotation", textBg: "Първата кола в кръга приближава отляво… но нашата не спира." },
       {
-        // Straight through the mouth at speed, cutting the lead off — the demo
-        // freezes on the early ring right after the graded moment (driving on
-        // with the cut-off car on the bumper would only stack unrelated noise
-        // on top of the ONE taught mistake).
+        // Straight through the mouth at the same speed, right in front of the
+        // lead — which has to brake (the graded moment). The demo freezes on
+        // the early ring right after it (driving on with the cut-off car on
+        // the bumper would only stack unrelated noise on top of the ONE taught
+        // mistake).
         kind: "drive",
         points: [[X_LANE, -40], [X_LANE, -26], [5.4, -21.5], [7.4, -18.3], ...ringRun(30, 60)],
-        targetKmh: 22,
+        targetKmh: BARGE_KMH,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.5, brake: true },
@@ -301,21 +362,40 @@ export function scRbBusyGapMistakeBargeScript(): DriveScript {
 /**
  * The wait that ends one car too early: long enough to let the LEAD pass (t =
  * 15.8, so the demo is visibly NOT the barge — this driver did look and did give
- * way once), short enough that the launch at t = 18.75 lands in the platoon's
- * 2.8 s gap with the follower still 15° short of the mouth and square in the
- * driver's left band. Measured: the 0.9 s sustain expires at t = 19.1, mid-chord.
+ * way once), short enough that the launch at t = 17.85 lands in the platoon's
+ * 2.8 s gap IN FRONT of the follower.
+ *
+ * RE-STAGED 2026-10-06 (founder ruling 2026-10-05, round 4), 6.5 s → 5.6 s. With
+ * 6.5 s his nose came onto the ring at t = 20.90 with the follower's body
+ * already ACROSS his mouth (its tail 1.3 m short of it); the follower went by
+ * without lifting and he drove into its rear quarter at 21.78, 0.4 s after its
+ * tail had cleared the mouth. Judged at the mouth, that is running into a car
+ * that has gone by — a collision, not «влезе пред кола» — and the demo no
+ * longer committed the fault its card names. A second less at the line puts
+ * him where the lesson says he is. Measured (live chain, L1–L5):
+ *
+ *   t 20.00  his nose is on the ring: the lead's tail 4.2 m PAST his mouth,
+ *            the follower's tail 3.9 m SHORT of it (its nose at the mouth)
+ *   t 20.87  the follower has lost 0.3 m/s to him, 1.4 m short of clearing the
+ *            mouth — FAILED_TO_YIELD — and brakes on to a stop
+ *   t 20.88  the two bodies overlap — COLLISION
+ *
+ * The window, on this chord: 5.5–5.7 s gives this picture on every rung. At
+ * 5.4 s the follower has stopped by the time they meet and the live chain bills
+ * the fault without the crash; from 5.8 s the touch comes within half a metre
+ * of the follower clearing the mouth.
  */
-const SHORT_GAP_WAIT_SEC = 6.5;
+const SHORT_GAP_WAIT_SEC = 5.6;
 
 /**
- * The contact point, and it is MEASURED, not staged for effect. Replaying this
- * script with the production traffic system exposed (the same twin the trace gate
- * rebuilds) puts the follower 0.12 m from the driver at t = 23.40, with the
- * driver at (12.7, −12.9) — the two cars are in the same square metre, the
- * closest approach of the whole drive. The authored `collision` beat below sits
- * exactly there, so the ghost's crash depicts geometry rather than asserting it.
+ * The contact point, and it is MEASURED, not staged for effect: replaying this
+ * script through the live chain (and through the trace gate's own traffic twin)
+ * the driver's body and the follower's first overlap at t = 20.88 with the
+ * driver at (8.27, −18.91), on the chord between (6, −23) and (8.5, −18.5). The
+ * chord is cut there and the authored `collision` beat below sits exactly on
+ * it, so the ghost's crash depicts geometry rather than asserting it.
  */
-const SHORT_GAP_CONTACT: [number, number] = [12.7, -12.9];
+const SHORT_GAP_CONTACT: [number, number] = [8.27, -18.91];
 
 export function scRbBusyGapMistakeShortGapScript(): DriveScript {
   return {
@@ -336,24 +416,23 @@ export function scRbBusyGapMistakeShortGapScript(): DriveScript {
       },
       { kind: "annotation", textBg: "Първата отмина — и кракът тръгва. Но на три секунди зад нея идва втора…" },
       {
-        // The SAME flat chord as the shadow, taken one car too early: the
-        // follower is square in the rotating left band for the whole sweep, so
-        // the tracker convicts mid-chord (FAILED_TO_YIELD) — and then the two
-        // paths intersect. The chord is truncated at the measured contact point.
+        // The SAME flat chord as the shadow, taken one car too early: he comes
+        // onto the ring in front of the follower, which has to brake for him
+        // (FAILED_TO_YIELD) and still cannot avoid him (COLLISION, one frame
+        // later). The chord is truncated at the measured contact point.
         kind: "drive",
-        points: [[X_LANE, -27.5], [6.0, -23.0], [8.5, -18.5], [11.0, -15.0], SHORT_GAP_CONTACT],
+        points: [[X_LANE, -27.5], [6.0, -23.0], SHORT_GAP_CONTACT],
         targetKmh: 17,
         stopAtEnd: false,
       },
       {
-        // The AUTHORED consequence (the S1 mistake-demo seam), and the reason it
-        // has to be authored: the RoundaboutEntryRunner owns a contact branch of
-        // its own, but it never reaches it here — both runners resolve the moment
-        // the runtime's roundabout tracker emits the violation at t = 19.1, and a
-        // resolved runner stops stepping. The priority fault ALWAYS lands 4 s
-        // before the crash it causes, so on this encounter the crash can only be
-        // authored. The trace gate proves the geometry independently rather than
-        // taking this step's word for it.
+        // The AUTHORED consequence (the S1 mistake-demo seam). HISTORY: it had
+        // to be authored when contact was a branch of the runner's own step() and
+        // a resolved runner stopped stepping. The director's ContactSentinel has
+        // billed the crash from the geometry since B81 (t = 20.88), so this beat
+        // is redundant — it lands inside the same unbroken overlap and folds
+        // into the same accident. Kept because the annotation copy is timed
+        // against it; the trace gate proves the geometry independently.
         kind: "collision",
         withWhat: "vehicle",
       },

@@ -330,8 +330,9 @@ export const LESSONS: readonly LessonSpec[] = [
     //     It continues STRAIGHT south while the player turns right across it.
     //  2. Roundabout entry conflict at rb-1 — a scripted car circulates the
     //     ring timed to be just left of the player's entry mouth when they
-    //     reach the yield line; the runtime's circulatingConflict query
-    //     grades the entry exactly as it would any ambient car.
+    //     reach the yield line; the runtime's roundabout tracker grades the
+    //     entry on this car exactly as it would on any ambient one — by whether
+    //     it has to brake because of him (founder ruling 2026-10-05).
     stagedEvents: [
       cyclistRightHookAtT("l3-cyclist-right-hook"),
       roundaboutEntryConflict("l3-roundabout-conflict"),

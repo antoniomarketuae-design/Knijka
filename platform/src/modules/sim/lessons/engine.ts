@@ -3421,6 +3421,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // tied to the site it was billed at (advisor.ts `YieldVoiceSite`). Pure
       // geometry off the route's own objectives; nothing graded reads it.
       site: yieldVoiceSiteAt(objectives, tick.position),
+      // Founder ruling 2026-10-05, round 4 — whether the roundabout tracker can
+      // still bill the entry he has made, so «Интервалът беше добър» is not
+      // said over an entry whose car has yet to reach his mouth. Absent on
+      // every frame nothing is waiting on; nothing graded reads it.
+      ringEntryOpen: tick.roundaboutEntryOpen,
+      // …and whether somebody on the ring has paid for that entry (R4-3: an
+      // easing too small to bill is not praised either). Same seam, same rule:
+      // absent on almost every frame, and nothing graded reads it.
+      ringEntryPaidFor: tick.roundaboutEntryPaidFor,
     });
     yieldVoice = voice.state;
     for (const n of voice.notices) hudEvents.push(n);

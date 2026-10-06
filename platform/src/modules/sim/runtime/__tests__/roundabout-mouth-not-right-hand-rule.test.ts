@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createWorldRuntime, parseDistrict, type District } from "..";
 import type { VehicleSample } from "../../contracts";
 import type { SimTickEvent } from "../../rules/types";
+import { NO_RING, ringReport, type StubCar } from "./circulatingStub";
 
 /**
  * B15, THE THIRD SITE — „at the roundabout I wait at the give-way line, and the
@@ -114,7 +115,7 @@ interface Run {
 function waitThenEnter(waitSec: number, opts: { rightConflict?: boolean } = {}): Run {
   const rt = createWorldRuntime(loadRbMini());
   rt.setRightConflictQuery(() => opts.rightConflict ?? true);
-  rt.setCirculatingQuery(() => false); // the RING itself is clear — his case
+  rt.setCirculatingQuery(() => NO_RING); // the RING itself is clear — his case
 
   let t = 0;
   for (let i = 0; i < Math.round(waitSec / DT); i += 1) {
@@ -191,7 +192,7 @@ describe("B15 — a roundabout mouth is not an equal junction", () => {
     const plain = city.debugUncontrolledJunctions().find((j) => !ringNodes.has(j.id));
     expect(plain).toBeDefined();
     city.setRightConflictQuery(() => true);
-    city.setCirculatingQuery(() => false);
+    city.setCirculatingQuery(() => NO_RING);
 
     // Stand 60 s, 14 m south of the node (inside RHR_CORE_RADIUS_M = 18).
     let t = 0;
@@ -230,11 +231,16 @@ describe("B15 — a roundabout mouth is not an equal junction", () => {
   });
 
   it("the ring's OWN priority still convicts a barging entry (not an amnesty)", () => {
-    // Same mouth, same driver, but now a car really is circulating on his left
-    // and he drives in anyway. The roundabout tracker must still bill it.
+    // Same mouth, same driver, but now a car really is circulating on his left,
+    // he drives in anyway and it has to brake for him. The roundabout tracker
+    // must still bill it (founder ruling 2026-10-05: on what the car had to do).
     const rt = createWorldRuntime(loadRbMini());
     rt.setRightConflictQuery(() => false);
-    rt.setCirculatingQuery(() => true);
+    const car: StubCar = { id: 1000, azDeg: 215, radiusM: 18, speedMps: 2.9, shedMps: 0 };
+    rt.setCirculatingQuery(() => {
+      car.shedMps += 0.5;
+      return ringReport({ x: 0, y: 0 }, [car]);
+    });
     let t = 0;
     let y = -40;
     let convicted: string | null = null;

@@ -70,7 +70,7 @@ export function makeStack(
     traffic.conflictFromRight(jx, jy, px, py, h, r, s),
   );
   runtime.setCirculatingQuery((cx, cy, px, py, h, r) =>
-    traffic.circulatingConflict(cx, cy, px, py, h, r),
+    traffic.circulatingTraffic(cx, cy, px, py, h, r),
   );
   const director = createScenarioDirector(events, traffic, {
     seed,

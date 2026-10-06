@@ -1311,7 +1311,9 @@ export interface CyclistRightHookSpec extends StagedEventBase {
 }
 
 /** A scripted car circulates the roundabout timed to the player's approach —
- * the runtime's existing circulatingConflict query grades the entry. */
+ * the runtime's roundabout tracker grades the entry on what this car has to
+ * do because of it (it brakes for him, or is touched — founder ruling
+ * 2026-10-05; the traffic system's `circulatingTraffic` report carries it). */
 export interface RoundaboutEntrySpec extends StagedEventBase {
   kind: "roundaboutEntry";
   center: { x: number; y: number };

@@ -8,8 +8,10 @@
  *   - shadow: ZERO violations + the YIELDED_TO_PRIORITY commendation
  *     (waited the circulator out) + the roundabout objective completes;
  *   - „Влизане без пропускане" grades EXACTLY FAILED_TO_YIELD (the runtime's
- *     circulatingConflict tracker — the barge carries a right indicator so
- *     its ONLY graded fault is the priority);
+ *     roundabout tracker, on what the circulating car HAD TO DO: the demo
+ *     rolls over the give-way line without stopping, right in front of it, and
+ *     the car brakes — founder ruling 2026-10-05, see BARGE_* below. It carries
+ *     a right indicator so its ONLY graded fault is the priority);
  *   - „Излизане без десен мигач" grades EXACTLY TURN_WITHOUT_INDICATOR (the
  *     runtime's turn detector at the north exit joint — the honest existing
  *     code for RB-02; the L3 roundabout OBJECTIVE additionally voids such a
@@ -21,12 +23,14 @@
  *
  * Two runtime windows must BOTH stay closed for the shadow, and they pull
  * opposite ways (worked out against the live circulator trajectory):
- *  · FAILED_TO_YIELD (roundabout tracker): fires if a circulating car is on
- *    the driver's LEFT while the driver is still entering (inward, moving,
- *    azimuth-swept < RB_ON_RING_DEG = 35°). Closed by a BRISK flat-chord
- *    entry (17 km/h, a nearly-straight NE line that sweeps 35° of azimuth with
- *    only ~40° of heading change) so ring priority is held while the 2.9 m/s
- *    car is still on the driver's RIGHT (east arc).
+ *  · FAILED_TO_YIELD (roundabout tracker). HISTORY: it used to fire if a
+ *    circulating car was on the driver's LEFT while he was still entering, and
+ *    the BRISK flat-chord entry below (17 km/h, a nearly-straight NE line that
+ *    sweeps 35° of azimuth with only ~40° of heading change) was authored to
+ *    keep the 2.9 m/s car on his RIGHT until ring priority was held. Since the
+ *    founder ruling of 2026-10-05 it fires only when a circulating car has to
+ *    BRAKE because of the entry (or is touched) — and this drive enters behind
+ *    the car it waited for, so nothing does. The chord is kept as authored.
  *  · COLLISION (rear-end): the driver circulates FASTER than the crawling
  *    car and would catch it at the north exit. Closed by MATCHED circulation
  *    (12 km/h ≈ the car's 2.9 m/s) after priority is won — the driver trails
@@ -39,7 +43,7 @@
  * fault, and nothing else.
  */
 
-import type { RoundaboutEntrySpec, StagedEventSpec } from "../contracts";
+import type { StagedEventSpec } from "../contracts";
 import { SC_ROUNDABOUT_ENTRY } from "../lessons/scenario/templates-flow";
 import {
   recordScriptedDrive,
@@ -146,6 +150,49 @@ export function scRoundaboutEntryShadowScript(): DriveScript {
 // Mistake demo 1 — „Влизане без пропускане" (FAILED_TO_YIELD)
 // ---------------------------------------------------------------------------
 
+/**
+ * THE BARGE, RE-STAGED SO THAT IT REALLY CUTS THE CAR OFF (founder ruling
+ * 2026-10-05, «bill forced braking»: „The lesson own "barge" demo gets
+ * re-staged so it really cuts someone off").
+ *
+ * WHAT WAS WRONG WITH THE OLD ONE. It came through the mouth at 22 км/ч with
+ * the staged car ~17 m behind its merge point, doing 2.9 m/s. A car going
+ * twice the pace of the one behind it forces nothing: the crawler never had to
+ * touch its brake, and the demo was «a priority fault» only because the grader
+ * of the day convicted on where a car WAS. Judged by what happened — the
+ * ruling — that drive is an entry nobody paid for, and it is no longer billed.
+ *
+ * WHAT A REAL ONE IS, on this ring. The circulator crawls at 2.9 m/s and its own
+ * player guard (traffic/staged.ts step 2) starts braking for a body closer
+ * than 9.6 m ahead of it. So a cut-off that does not depend on centimetres is
+ * an entry AHEAD of the car by a driver who is then SLOWER than it: the car
+ * closes on him for as long as he is in its way. That is also the commonest
+ * real one — not a sprint through the mouth, but a driver who comes up fast,
+ * dabs the brake, sees «enough room» and ROLLS over the give-way line without
+ * stopping, in front of a car that is already there.
+ *
+ * THE TWO NUMBERS, both centred in MEASURED bands (the live chain, every rung
+ * L1–L5, with the staged car's phase pushed ±3 m on top of its own seeded
+ * jitter — 15 worlds per cell):
+ *
+ *   BARGE_BRAKE_Y   where the 26 км/ч approach ends and the roll begins.
+ *                   −36 / −34 / −32 all work; −34 is the middle. It has to be
+ *                   LATE: the runner syncs the car to the driver's ETA until
+ *                   he is 14 m from the mouth, and a driver who slows early
+ *                   lets it run past its station and sprint (a different,
+ *                   unsteady choreography — measured, and avoided).
+ *   BARGE_ROLL_KMH  the roll. 6–9 км/ч convicts on forced braking alone in
+ *                   15 of 15 worlds; 5 and below the car arrives first and the
+ *                   demo becomes a collision, 10 and above the driver gets
+ *                   away ahead of it. 7.5 is the middle.
+ *
+ * Measured at these values: the nose is on the ring at t ≈ 13.7, the car has
+ * shed the 0.3 m/s that convicts 1.0–2.7 s later and ~1.8 m/s by the time the
+ * entry is over; nearest approach 6.1 m, no contact, no other fault.
+ */
+const BARGE_BRAKE_Y = -34;
+const BARGE_ROLL_KMH = 7.5;
+
 export function scRoundaboutEntryMistakeBargeScript(): DriveScript {
   return {
     steps: [
@@ -157,22 +204,30 @@ export function scRoundaboutEntryMistakeBargeScript(): DriveScript {
       // The barger signals right (correct form — it takes the first exit),
       // so the ONLY graded fault is the refused priority.
       { kind: "indicator", setting: "right" },
-      { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, -40]], targetKmh: 26, stopAtEnd: false },
+      {
+        // Up the arm at speed, and LATE on the brake (see BARGE_BRAKE_Y).
+        kind: "drive",
+        points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, BARGE_BRAKE_Y]],
+        targetKmh: 26,
+        stopAtEnd: false,
+      },
       { kind: "annotation", textBg: "Колата в кръга приближава отляво… но нашата не спира." },
       {
-        // Straight through the mouth at speed, cutting the circulator off —
-        // the demo freezes on the early ring right after the graded moment
-        // (driving on with the cut-off car on the bumper would only stack
-        // unrelated noise on top of the ONE taught mistake).
+        // The roll: over the give-way line without stopping and onto the ring
+        // right in front of the circulating car, slower than it — so the car
+        // HAS to brake (the graded moment, ~1–3 s after the nose is on the
+        // ring). The demo freezes on the early ring right after it: driving on
+        // with the cut-off car on the bumper would only stack unrelated noise
+        // on top of the ONE taught mistake.
         kind: "drive",
         points: [
-          [X_LANE, -40],
+          [X_LANE, BARGE_BRAKE_Y],
           [X_LANE, -26],
           [5.4, -21.5],
           [7.4, -18.3],
-          ...ringRun(30, 60),
+          ...ringRun(30, 40),
         ],
-        targetKmh: 22,
+        targetKmh: BARGE_ROLL_KMH,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.5, brake: true },
@@ -268,42 +323,32 @@ const SCRIPTS: Record<ScRoundaboutEntryTraceName, { kind: "shadow" | "mistake"; 
 };
 
 /**
- * CLIP staged override (doc 66 R1 — produced-media honesty), the roundabout
- * twin of scFollowDistanceClipStaged. The barge demo's FAILED_TO_YIELD was
- * graded against the circulator RB_CIRCULATING.conflictLeadM = 14 m UPSTREAM of
- * the south node — on the SW arc, ~54° to the LEFT of the entry heading, so the
- * chase camera's forward cone (CHASE_FOV 44° → ~71° horizontal) never contains
- * it at the fault and R1 fails ("липсва vehicle": the viewer never sees WHICH
- * car the ego cut off). Pull the circulator DOWNSTREAM to ~the south node (the
- * mouth) for the CLIP ONLY: it then sits ahead-left of the barging car — the
- * very car it cut in front of — inside the frame (verified: at fault 11.58 s
- * the car is at (0.2, −18.0), in-frame across the whole presence beat; min
- * ego↔car gap 5.26 m > VEHICLE_CONTACT_M, so no contact fires — the barging ego
- * at ~6 m/s outruns the 2.9 m/s crawler).
+ * CLIP staging for this template (doc 66 R1 — produced-media honesty): NONE —
+ * the clip re-enacts the compiled DRILL rig, like every demo that registers no
+ * override.
  *
- * WHY a large NEGATIVE lead: the RoundaboutEntryRunner LOCKS the circulation
- * (drops it to the 2.9 m/s crawl) as the player reaches RB_LOCK_PLAYER_ENTRY_M,
- * ~1.2 s BEFORE this fast barge's fault — so conflictLeadM only sets where the
- * car is AT LOCK, and its sync is speed-capped (maxSyncSpeedMps 8.5). Any
- * sufficiently-downstream target (conflictS = southNodeS − conflictLeadM)
- * SATURATES that cap: the car runs flat-out from the arm until the lock and
- * lands at the mouth regardless of the exact magnitude (−30 and −40 land
- * identically), so this is a robust "sprint to the mouth", not a fragile pin.
+ * HISTORY, and why the override is gone rather than re-tuned. Until 2026-10-05
+ * the barge clip (m0) swapped the circulator's `conflictLeadM` 14 → −30 «for the
+ * clip only»: a sprint to the mouth that put the car ahead-left of the barging
+ * ego, inside the chase camera's cone. It was needed because the old barge was
+ * graded against a car 14 m upstream that it then outran — the viewer never
+ * saw WHICH car had been «cut off», because no car had been.
  *
- * Clip-scoped: the recorder and the trace-gate read SC_ROUNDABOUT_ENTRY.staged
- * (the graded 14 m) unchanged, so grading is untouched. Only the barge demo
- * (m0) needs it; the exit demo (m1) frames its own circulator — drill default.
+ * The demo is re-staged (founder ruling 2026-10-05 — see BARGE_BRAKE_Y): the
+ * ego now rolls onto the ring ahead of the car and the car HAS TO BRAKE behind
+ * it, on the drill's own staging. Under the old override that would be a false
+ * clip: the sprinting car reaches the mouth first, and the picture is an ego
+ * entering BEHIND the car it is captioned as having cut off. So the clip world
+ * is the graded world again (clips/capture/captureFeedParity.test.ts replays it
+ * and finds the conviction on the plan's fault time).
+ *
+ * WHAT THAT LEAVES FOR THE CLIP LANE: at the fault the cut-off car is 6–9 m
+ * behind-left of the ego — outside a forward chase frame (the parity test's
+ * checklist says so). The clip needs re-capturing and an R0 look, most likely
+ * on the rear-aware camera the tailgater clips use. Not media this lane makes.
  */
-export const RB_CLIP_CONFLICT_LEAD_M = -30;
-
-export function scRoundaboutEntryClipStaged(mistakeIndex: number): StagedEventSpec[] | null {
-  if (mistakeIndex !== 0) return null;
-  const base = (SC_ROUNDABOUT_ENTRY.staged ?? []) as StagedEventSpec[];
-  return base.map((spec) =>
-    spec.kind === "roundaboutEntry" && spec.id === "sc-rb-circulating"
-      ? ({ ...(spec as RoundaboutEntrySpec), conflictLeadM: RB_CLIP_CONFLICT_LEAD_M } as StagedEventSpec)
-      : spec,
-  );
+export function scRoundaboutEntryClipStaged(): StagedEventSpec[] | null {
+  return null;
 }
 
 /**

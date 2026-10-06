@@ -53,6 +53,15 @@ export interface VehicleAgent {
    * cannot be re-grabbed by the same stalled agent on its very next frame.
    */
   reserveCooldownUntilSec: number;
+  /**
+   * SPEED THIS AGENT HAS SHED BECAUSE OF THE PLAYER, m/s, cumulative and
+   * monotone for the agent's life (founder ruling 2026-10-05, «bill forced
+   * braking» at a roundabout entry — see `playerShedThisStep` below and
+   * `traffic/system.ts circulatingReportFor`). Nothing in this file reads it:
+   * it is the agent's own account of what the student cost it, published
+   * through the traffic system's circulating report.
+   */
+  playerShedMps: number;
 }
 
 /** Time-slot reservation for one unsignalized intersection node. */
@@ -189,6 +198,7 @@ export function createVehicleAgent(
     heldNode: null,
     heldStalledSinceSec: null,
     reserveCooldownUntilSec: -Infinity,
+    playerShedMps: 0,
   };
 }
 
@@ -232,6 +242,11 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
 
   // --- Most restrictive obstacle term.
   let term = 0;
+  // The same maximum with the PLAYER left out, and the player's own term — the
+  // two numbers `playerShedThisStep` needs to say how much of this step's
+  // braking is his (founder ruling 2026-10-05). Neither feeds the motion.
+  let termOther = 0;
+  let playerTerm = 0;
 
   // 1) Nearest agent ahead on the current or next lane of the route.
   const curLaneIdx = agent.route.laneIndices[agent.routePos];
@@ -256,6 +271,7 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   if (leaderDs < 70) {
     const t = idmTerm(cfg, v, leaderDs - VEHICLE_LENGTH_M, leaderV);
     if (t > term) term = t;
+    if (t > termOther) termOther = t;
   }
 
   // 2) Player ahead in lane (heading projection; conservative and O(1)).
@@ -271,6 +287,7 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       const vLead = aligned ? env.playerSpeedMps : 0;
       const t = idmTerm(cfg, v, along - 2 * HALF_LEN, vLead);
       if (t > term) term = t;
+      playerTerm = t;
     }
   }
 
@@ -296,6 +313,7 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
     const halfSum = HALF_LEN + vehicleHalfLengthM(st.profile);
     const t = idmTerm(cfg, v, along - halfSum, vLead);
     if (t > term) term = t;
+    if (t > termOther) termOther = t;
     if (along < stagedAlong) {
       stagedAlong = along;
       stagedMinSep = halfSum + 0.8;
@@ -303,7 +321,9 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   }
 
   // 3) Stop points ahead: signals, occupied crossings, unreserved junctions.
-  term = Math.max(term, stopPointTerm(agent, env, cur, v));
+  const stopTerm = stopPointTerm(agent, env, cur, v);
+  term = Math.max(term, stopTerm);
+  termOther = Math.max(termOther, stopTerm);
 
   // --- IDM integration.
   const acc = clampAcc(
@@ -313,6 +333,16 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   const sBefore = agent.s;
   agent.speed = Math.max(0, v + acc * dt);
   agent.s += agent.speed * dt;
+  // What this agent would be doing after this step if the student were not in
+  // its path: the same law on the same road with his term left out.
+  const playerBinding = playerTerm > termOther;
+  const speedWithoutPlayer = playerBinding
+    ? Math.max(
+        0,
+        v + clampAcc(cfg.accelMps2 * (1 - Math.pow(v / v0, IDM_DELTA) - termOther), cfg) * dt,
+      )
+    : agent.speed;
+  let playerClamped = false;
 
   // Hard anti-overlap clamp vs the player (kinematic guarantee: never clip).
   if (env.hasPlayer) {
@@ -327,6 +357,7 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       const allowedMove = Math.max(0, along - minSep);
       agent.s -= moved - allowedMove;
       if (agent.s < 0) agent.s = 0;
+      if (agent.speed > 0) playerClamped = true;
       agent.speed = 0;
     }
   }
@@ -439,6 +470,7 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
     const dBefore = Math.hypot(env.playerX - agent.state.x, env.playerY - agent.state.y);
     if (dAfter < sep && dAfter < dBefore) {
       agent.s = sBefore;
+      if (agent.speed > 0) playerClamped = true;
       agent.speed = 0;
     }
   }
@@ -453,6 +485,13 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   }
 
   agent.state.braking = acc < -0.5 || (term > 0.8 && agent.speed < 0.5);
+
+  // The student's share of this step's slow-down (see playerShedThisStep):
+  // his following term was the binding one, or a hard clamp against HIS body
+  // took the speed off. Any other step accounts nothing.
+  if (playerBinding || playerClamped) {
+    agent.playerShedMps += playerShedThisStep(v, agent.speed, speedWithoutPlayer);
+  }
 
   // --- Lane transitions (may cross several short lanes in one frame).
   let curLane = lane(env, agent, 0);
@@ -546,6 +585,41 @@ export function separateVehicleFrom(
     updateVehicle(agent, 0, env);
   }
   return Math.hypot(agent.state.x - obsX, agent.state.y - obsY) >= minSepM;
+}
+
+/**
+ * HOW MUCH SPEED A VEHICLE LOST THIS STEP BECAUSE OF THE STUDENT, m/s — the one
+ * arithmetic both traffic models (this file's following law and staged.ts's
+ * player guard) account their braking with. Founder ruling 2026-10-05, «bill
+ * forced braking»: at a roundabout entry FAILED_TO_YIELD is judged by what the
+ * circulating car ACTUALLY HAD TO DO, read from the car's own model — never
+ * predicted from where it was.
+ *
+ * `before` is its speed entering the step, `after` the speed it left with, and
+ * `withoutPlayer` the speed the SAME law would have left it with had the
+ * student not been in its path (his term dropped from the maximum here; his
+ * guard target dropped from the minimum in staged.ts). The loss that is his is
+ * the part of a real slow-down that would not have happened anyway:
+ *
+ *   · it must be a SLOW-DOWN — a car that merely accelerates less hard is not
+ *     braking, so the reference is capped at `before`;
+ *   · and it must be HIS — a car already slowing for a red light, a bend or
+ *     another car sheds that speed with him or without him, so only what lies
+ *     below `withoutPlayer` counts.
+ *
+ * STEP BY STEP, on purpose: the reference is rebuilt each step from the speed
+ * the vehicle actually has, so a car that brakes HARDER for him than it was
+ * already braking for something else is charged that difference as it happens
+ * (and all of whatever it then loses below where the other thing would have
+ * left it). It is never charged the part its own law was taking off anyway.
+ *
+ * A vehicle whose binding obstacle is not the student never calls this, so a
+ * platoon nobody disturbs accounts exactly 0: the floor of this channel is not
+ * small, it is nil (measured — see traffic/circulating.test.ts).
+ */
+export function playerShedThisStep(before: number, after: number, withoutPlayer: number): number {
+  const reference = Math.min(before, withoutPlayer);
+  return reference > after ? reference - after : 0;
 }
 
 function clampAcc(acc: number, cfg: TrafficConfig): number {
