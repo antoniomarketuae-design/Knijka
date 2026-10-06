@@ -229,7 +229,7 @@ const PED_POSE_ARM_EXTEND_RAD = Math.PI / 2;
  * silhouette a uniformed figure has to have to be found at all in a busy
  * junction. The caption bubble above him does the rest at distance.
  */
-const PED_OFFICER_HEIGHT = 1.22;
+export const PED_OFFICER_HEIGHT = 1.22;
 const PED_OFFICER_BUILD = 1.18;
 /**
  * B41 again, 2026-08-10 — „we spoke that we will make them bigger but I now
@@ -1113,8 +1113,51 @@ function makeBlobTexture(): CanvasTexture {
  * the officer 6 m off axis at 20 m — reads corners at NDC −0.667 … −0.110
  * against a ±0.97 frame, so nothing that was whole stops being whole; the two
  * cases that must stay HIDDEN (8 m, and 12 m off axis at 14 m) still are.
+ *
+ * ── WIDENED AGAIN, 4.95 → 6.46875 m · FOUNDER RULING 2026-10-04 «ENLARGE
+ * ANSWER LINE» (sc-sig-controller-postures:ef0e821c).
+ *
+ * The short card (ruling 2026-09-22) made the caption three lines; on the
+ * approach its answer line — «Спираш ТИ, напречното минава» — still stood
+ * ≈ 8 CSS px of cap on the audited 852 × 393 DPR-3 phone. The ruling: that
+ * line reaches about 11, ONLY that line grows, and the card may leave the
+ * windscreen 0.5–1 m earlier at the stop. 11 CSS px is `BUBBLE_LINE_PX.answer`
+ * = 94, and a 30-character line at 94 px is 1748 px on the painter test's
+ * 0.62 em/char stub — it does not fit a 1320 px ink box and `bubbleLine`
+ * would have shrunk it straight back to 70. So the same lever is pulled the
+ * same way: plane and texture widen TOGETHER, by 1840/1408, metres per texel
+ * unchanged at 0.003516, and the ink box is 1752 px.
+ *
+ * WHY WIDTH AND NOT THE ALLOWANCE. The ruling permitted a card that leaves the
+ * windscreen sooner, i.e. a TALLER card (a nearer `BUBBLE_REF_DIST_M`). That
+ * buys nothing here: the answer line's width on the glass is fixed by its
+ * length and its size — ≈ 250–270 CSS px for 28–30 characters at 11 px of cap
+ * — whichever constant delivers it, so a taller card would be exactly as wide
+ * AND cost the approach. The card is billboarded, so its top edge is level on
+ * the glass whatever its width: the windscreen-top limit and the HUD-strip
+ * gate below are unchanged to the centimetre, and the allowance is not spent.
+ *
+ * WHAT IT DOES COST, measured on the shipped lens (hFOV 75.4°, 4° down):
+ *  - the card is 36.4 % of the viewport's width, 310 CSS px on the audited
+ *    phone (was 27.8 %, 237 px);
+ *  - it is whole only while the officer is within 23.9° of the camera axis
+ *    (was 26.9°). On the three регулировчик drills he stands 3.8 m left of
+ *    the eye: the side of the frame binds only inside ≈ 9 m, after the top
+ *    already has (10.3–16.0 m by viewport), so the range the card is shown
+ *    over does not move on the phone or on either desktop canvas. On
+ *    `sc-vp-police-stop` he stands 3.6 m right and is shorter, so the top
+ *    binds later: nothing moves on the phone or at 1264 × 620, and on a 16:9
+ *    desktop the card leaves at 9.4 m where it left at 8.9 m — 0.45 m, inside
+ *    the ruled allowance. On `sc-pe-school-patrol` the warden
+ *    stands 13.5 m to the side and the card leaves the side of the frame at
+ *    31.2 m where it left at 27.1 m — 4.1 m sooner, on a figure the student
+ *    never stops in front of. `officer-and-caption-legibility.test.ts` pins
+ *    all five.
+ *  - on the phone its left margin runs further under the «Демонстрация» pill
+ *    when the officer is left of centre (the 4.95 m card already did, by
+ *    ≈ 10 CSS px on w61 04-t023s). The pill is HUD and stays on top.
  */
-export const BUBBLE_W_M = 4.95;
+export const BUBBLE_W_M = 6.46875;
 /**
  * DELIBERATELY UNCHANGED when the sixth line landed (B41, 2026-08-10). The
  * card gained `priorityBg` and the obvious move was to grow it — 540 → 576 px
@@ -1129,9 +1172,10 @@ export const BUBBLE_W_M = 4.95;
  * size costs nothing and gives back 2 m of approach.
  */
 export const BUBBLE_H_M = 1.9;
-/** 1024 × 1.375 — see `BUBBLE_W_M`. The two move together or the card's
- *  physical proportions and its texel density both change with them. */
-export const BUBBLE_TEX_W = 1408;
+/** 1024 × 1.375 = 1408, then 1840 for the 2026-10-04 answer line — see
+ *  `BUBBLE_W_M`. The two move together or the card's physical proportions and
+ *  its texel density both change with them: 6.46875 / 1840 = 4.95 / 1408. */
+export const BUBBLE_TEX_W = 1840;
 export const BUBBLE_TEX_H = 540;
 /** Bubble base sits this far above the figure's head. */
 export const BUBBLE_GAP_M = 0.42;
@@ -1400,13 +1444,28 @@ export const BUBBLE_LINE_PX = {
   //
   // `name` IS THE «ЧАСТИЧНА ПОМОЩ» CARD'S NAME SIZE, on purpose: the two rungs
   // share a header, so the card does not change shape between L1 and L2 — L2
-  // simply loses the answer line. `answer` is 68 → the 56 px body line it
-  // replaces gains 21 % of cap height, and the longest answer (30 characters)
-  // paints 1265 px on the painter test's unforgiving 0.62 em/char stub inside
-  // the 1320 px ink box, i.e. at its authored size, never shrunk. `law` keeps
+  // simply loses the answer line. `answer` WAS 68 on that card → the 56 px body
+  // line it replaced gained 21 % of cap height, and the longest answer (30
+  // characters) painted 1265 px on the painter test's unforgiving 0.62 em/char
+  // stub inside the then 1320 px ink box, i.e. at its authored size. `law` keeps
   // the 50 px both cards already use: ADR-002 will not let the card drop it.
+  //
+  // ── 2026-10-04 · `answer` 68 → 94 (founder ruling «Enlarge answer line»).
+  // 68 px is 8.0 CSS px of cap on the audited 852 × 393 DPR-3 phone at the
+  // size the card holds from 11.5 to 54.6 m — measured on w61 04-t018s, 24
+  // device px — and the ruling is about 11. On the product's own lens
+  // (551 CSS px per radian; `__tests__/captionLens.ts`) one texture px of type
+  // is 0.1180 CSS px of cap, so 11 needs ≥ 93.2: 94 is the first integer that
+  // reaches it, at 11.09. (On the more generous scale the FR-OFC-CARD floors
+  // are stated in it reads 11.75.) The 30-character answer paints 1748 px on
+  // the 0.62 em/char stub inside the 1752 px ink box `BUBBLE_TEX_W` was
+  // widened to hold, i.e. still at its authored size, never shrunk.
+  //
+  // `name` AND `law` DO NOT MOVE. The ruling grows one line; the citation is
+  // the size the founder accepted on 2026-09-27 (5.9 CSS px of cap here) and
+  // the header was never the complaint.
   name: BUBBLE_POSTURE_NAME_PX,
-  answer: 68,
+  answer: 94,
   law: 50,
 } as const;
 
@@ -1590,14 +1649,20 @@ export function drawControllerBubble(
   //
   // THE BASELINES SHARE THE «ЧАСТИЧНА ПОМОЩ» CARD'S FOOT (430) so the two
   // rungs do not change shape, and spend the body evenly: name 112 px at 170
-  // (ascender 0.8 em → top at 80.4; descender 0.3 em → 203.6), answer 68 px at
-  // 300 (245.6 … 320.4), law 50 px at 430 (390 … 445) against the body edge at
+  // (ascender 0.8 em → top at 80.4; descender 0.3 em → 203.6), answer 94 px at
+  // 320 (244.8 … 348.2), law 50 px at 430 (390 … 445) against the body edge at
   // 506 (`BUBBLE_TAIL_PX` reserved) — the painter test's own 0.8/0.3 em,
   // which round away from the card in both directions.
+  //
+  // THE ANSWER'S BASELINE MOVED 300 → 320 WITH ITS SIZE (founder ruling
+  // 2026-10-04). Left at 300 the 94 px line keeps the 68 px line's foot and
+  // puts its head 21 px under the name with 62 px of empty card beneath it; at
+  // 320 the clear card is 41 px above and 42 below. Name and citation stay
+  // where they were, so the foot is still the one «Частична помощ» shares.
   g.fillStyle = copy.accent;
   bubbleLine(g, copy.postureNameBg, 700, BUBBLE_LINE_PX.name, 170, W);
   g.fillStyle = BUBBLE_POSTURE_INK;
-  bubbleLine(g, copy.answerBg, 700, BUBBLE_LINE_PX.answer, 300, W);
+  bubbleLine(g, copy.answerBg, 700, BUBBLE_LINE_PX.answer, 320, W);
   g.fillStyle = "#b9c9de";
   bubbleLine(g, copy.lawRef, 700, BUBBLE_LINE_PX.law, 430, W);
 }
@@ -1769,7 +1834,8 @@ export function TrafficLayer({
     // the card's accent border spans x 783 → 1311, i.e. 528 device px, for the
     // 1024 px canvas that build shipped. That is 1.94 texels per pixel — and it
     // is STILL 1.94 after the widening, because `BUBBLE_TEX_W` and `BUBBLE_W_M`
-    // grew by the same 1.375 — so GL's LOD is
+    // grew by the same 1.375 (and again together, 1408 → 1840, for the
+    // 2026-10-04 answer line) — so GL's LOD is
     // log2(1.94) = 0.96 and `LinearMipmapLinearFilter` — three's DEFAULT for a
     // CanvasTexture, which is what this used to be — samples 96 % mip 1. Mip 1
     // is a 512 × 270 box average: a 46 px body line is reduced to 23 px of

@@ -10605,3 +10605,59 @@ FULL_STOP_AT_STOP_SIGN minted inside the mark's ring is withdrawn iff no standst
 the star in every chain state (stalled, pending, active, done), at-line stops keep it in every one; nothing is billed; the authored-tape census
 is identical (2,434). Conditions: the `stoodAtLine` latch survives in-ring manoeuvring after an at-line stop (a later short stop inside the
 ring keeps a star); the dwell at the watch site and the reset radius are pinned only by long excursions.
+
+## Wave C verdicts — 2026-10-05
+
+This run retired 2 row(s). Their evidence frames were driven at (unattributable: 2 of 2) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`e03849375eee`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 16 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 20 |
+
+**Open list: 39 → 37**, out of 1531 filed across the whole programme (1492 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+**What these two closures rest on (w78, judge-w78-praise, HEAD `e038493`).** Both are grading claims settled IN PROCESS through the production
+chain (compileScenario → createLessonSession → runtime + traffic + staged cast → applyTick → buildLessonResult → buildDebrief), on tapes the
+judge and the adversarial verifier each wrote themselves — not on a fresh browser frame, so the generated sentence above about «a NEW frame»
+does not describe them. `sc-jx-priority-confidence:9c987e7b`: 20 of 20 needless-stop acts at L1–L5 and 1,204 + 252 sweep drives carry no yield
+praise (54 of 252 were praised on the old keys); the true praise still mints on sc-junction-gap. Disclosed: the repair is an authoring key on the
+two stem cars plus a catalogue census test, not a runtime rule — a future spec mis-keyed `stopLine` is caught by the census, not the engine.
+`sc-merge-from-property:a401e4a7`: 0 stars for a stop short of the line on 180 judge drives and 163 verifier drives in both chain states; the
+lawful at-line stop keeps its star on 85 + 40. No live drive at this commit exists for either row.
+
+## The phone controller card's answer line is 11 CSS px on the approach (founder ruling 2026-10-04 «Enlarge answer line») — `sc-sig-controller-postures:ef0e821c`
+
+The short traffic-controller card held one apparent size from 11.5 to 54.6 m, and at that size its answer line («Спираш ТИ, напречното
+минава» and its siblings) was 8.0 CSS px of capital on the audited 852×393 DPR-3 lens. The founder ruled the answer line up to about 11.
+
+- **What changed** (`traffic/TrafficLayer.tsx`): the answer line is authored at 94 texture px (was 68); the card and its texture are 31 %
+  wider (6.46875 m × 1840 px, was 4.95 m × 1408 px — the same metres per texel), because a 30-character line at the ruled size does not fit the
+  old 1320 px ink box and the painter would have shrunk it back to 70 px. The header (112), the citation (50 — the size accepted on
+  2026-09-27), the card height, the reference distance and the three strings are unchanged.
+- **Measured** (builder, then an adversarial verifier independently): answer capital 8.03 → 11.09 CSS px by the lens formula, 11.24–11.51 by
+  projection through the product camera from 11.5 to 54.4 m; citation 5.90 → 5.90. The card leaves the TOP of the windscreen at the stop
+  0 m earlier (a billboarded plane's top edge does not move with its width), so the ruled 0.5–1 m allowance is not spent.
+- **Wiring pinned at integration**: the verifier's three surviving sabotages (texture canvas left at 1408 px, plane left 4.95 m, frame gate
+  judging a 4.95 m card) are now killed by source pins that fail when a site cannot be found (`controller-bubble.test.ts`, 4 of 4 mutants red
+  on assertion text).
+- **Disclosed costs, accepted by the integrator and owed to the founder as a read**: the same card is used by five lessons. On
+  `sc-pe-school-patrol` the warden stands 13.5 m to the side, and the wider card reaches the SIDE of the frame earlier — 3.5 m on both pc
+  canvases (24.95 → 28.45 m), 0.85 m on the phone at rest, 2.3 m at 30 км/ч. With the car yawed 10° the in-lane lessons lose up to 2.3 m on
+  16:9 pc; nothing changes on the phone. The «Частична помощ» (L2) card is the same wider plate with unchanged type.
+- **Not yet photographed.** Every number above is in-process or read off w61 frames. The row stays open until a phone frame inside the
+  11.5–54.6 m band shows the line; the verifier estimates the answer ink clears the «Демонстрация» pill by about 3 CSS px there.
+- **Pre-existing, not changed**: a test-side replica of the frame loop's HUD-strip gate says the phone hides the регулировчик card inside
+  about 25–26 m, before the stop-line pose. Identical for both widths; needs a frame, and its own row if the frame confirms it.

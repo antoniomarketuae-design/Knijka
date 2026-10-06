@@ -34,14 +34,23 @@
 import { PerspectiveCamera, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 
+import { SCENARIO_TEMPLATES } from "@/modules/sim/lessons/scenario/templates";
 import { SIGNAL_SETBACK_M } from "@/modules/sim/runtime/stoplines";
+import {
+  COCKPIT_EYE,
+  COCKPIT_FOV_MAX,
+  COCKPIT_PITCH_BASE,
+  cockpitVFovForAspect,
+} from "@/modules/sim/vehicle/tuning";
 import {
   BUBBLE_GAP_M,
   BUBBLE_H_M,
   BUBBLE_LINE_PX,
   BUBBLE_MAX_SCALE,
+  BUBBLE_POSTURE_LINE_PX,
   BUBBLE_REF_DIST_M,
   BUBBLE_TEX_H,
+  BUBBLE_TEX_W,
   BUBBLE_W_M,
   OFC_ARM_FWD_RAD,
   OFC_ARM_OUT_RAD,
@@ -49,6 +58,7 @@ import {
   PED_CONTROLLER_BUILD,
   PED_CONTROLLER_HEIGHT,
   PED_HEAD_Y,
+  PED_OFFICER_HEIGHT,
   PED_POSE_ARM_RAISE_RAD,
   PED_SHOULDER_HALF,
   PED_TORSO_RADIUS_M,
@@ -57,6 +67,7 @@ import {
   officerArmTarget,
   type OfficerArmTarget,
 } from "../TrafficLayer";
+import { AUDITED_PHONE, PC_LENSES, focalCssPx, lineCapCssPx } from "./captionLens";
 
 // --- the officer, at the pinned controller scale -----------------------------
 /** Shoulder joint → fingertip on the JU-18 figure, m. */
@@ -250,8 +261,18 @@ describe("FR-OFC-CARD — the caption is readable where the decision is made, an
     expect(bodyCapPx(BUBBLE_LINE_PX.answer, D)).toBeGreaterThan(24);
     // The header was never the problem and must not have been shrunk to buy
     // the answer line.
+    //
+    // THIS READ `name > answer × 1.5`, AND THE RATIO WAS THE WRONG WAY TO SAY
+    // IT (founder ruling 2026-10-04 «Enlarge answer line»). 1.5 was simply
+    // what 112 / 68 left room for; it goes red the day the answer is RAISED to
+    // the ruled size, although the header has not lost a pixel — a guard on
+    // the header that fails when a different line grows is guarding nothing
+    // about the header. The claim is stated directly now: the header is the
+    // size the reviewed card painted it at (41.99 device px on this file's
+    // scale), and it is still the biggest line on the card.
+    expect(bodyCapPx(BUBBLE_LINE_PX.name, D)).toBeGreaterThan(41.9);
     expect(bodyCapPx(BUBBLE_LINE_PX.name, D)).toBeGreaterThan(
-      bodyCapPx(BUBBLE_LINE_PX.answer, D) * 1.5,
+      bodyCapPx(BUBBLE_LINE_PX.answer, D),
     );
   });
 
@@ -288,5 +309,346 @@ describe("FR-OFC-CARD — the caption is readable where the decision is made, an
       }
     }
     expect(marginal, "a band exists where ENTER and EXIT disagree").toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FOUNDER RULING 2026-10-04 «ENLARGE ANSWER LINE» — sc-sig-controller-postures:
+// ef0e821c, the part of the row the 2026-09-22 short card left open.
+//
+// The short card made the L1 caption three lines; it did not make the line
+// that carries the rule big enough to read where it is read. The card holds
+// ONE apparent size from BUBBLE_REF_DIST_M out to the cap (11.5 → 54.6 m), and
+// at that size «Спираш ТИ, напречното минава» stood ≈ 8 CSS px on the audited
+// 852 × 393 DPR-3 phone, the citation ≈ 6. The founder accepted the citation
+// (2026-09-27) and ruled on the answer:
+//
+//   · the ANSWER LINE reaches about 11 CSS px on the approach;
+//   · ONLY the answer line grows — the citation stays the size he accepted;
+//   · the card may leave the windscreen about 0.5–1 m earlier at the stop;
+//   · it is still three lines in one accent plus neutral ink.
+//
+// Everything below is measured through `captionLens.ts` — the product's own
+// horizontal field of view, checked there against the two w61 frames the row
+// was judged on — and the reviewed card's numbers are LITERALS on purpose: a
+// floor written as `BUBBLE_LINE_PX.law` would follow the constant wherever a
+// later edit took it.
+// ---------------------------------------------------------------------------
+
+/** The size the founder ruled, CSS px of cap height on the audited phone. */
+const RULED_ANSWER_CSS_PX = 11;
+/** How much earlier the card may leave the windscreen, m (the ruling's upper
+ *  figure). */
+const RULED_EARLIER_EXIT_M = 1.0;
+
+/** The short card as a0a3ac7 built it and the 2026-09-27 ruling accepted it. */
+const REVIEWED_CARD = {
+  namePx: 112,
+  answerPx: 68,
+  lawPx: 50,
+  wM: 4.95,
+  hM: 1.9,
+  texW: 1408,
+  texH: 540,
+  refDistM: 11.5,
+  maxScale: 4.75,
+} as const;
+const reviewedLens = {
+  hM: REVIEWED_CARD.hM,
+  texH: REVIEWED_CARD.texH,
+  scale: (d: number) =>
+    Math.min(REVIEWED_CARD.maxScale, Math.max(1, d / REVIEWED_CARD.refDistM)),
+};
+
+/** The far end of the band the card holds one apparent size across, m. */
+const BAND_FAR_M = BUBBLE_REF_DIST_M * BUBBLE_MAX_SCALE;
+
+/**
+ * The SHIPPED cockpit camera on a viewport of this shape: the hFOV-locked
+ * vertical field of view, the eye 1.20 m above the road and the 4° of standing
+ * down-pitch (`COCKPIT_PITCH_BASE`).
+ *
+ * Not `phoneCamera()` above. That one is LEVEL and is reconstructed from a
+ * clipping observation on an older canvas; it is what the FR-OFC-CARD cases
+ * were written against and they keep it. The pitch is not a detail here: it
+ * lifts everything ahead of the car up the frame, and with it the card is
+ * whole on the audited phone from 15.3 m dead ahead, not from the 11.7 m a
+ * level camera reports.
+ */
+function productCamera(cssW: number, cssH: number): PerspectiveCamera {
+  const aspect = cssW / cssH;
+  const cam = new PerspectiveCamera(cockpitVFovForAspect(aspect), aspect, 0.1, 2000);
+  cam.position.set(0, EYE_Y, 0);
+  cam.rotation.set(COCKPIT_PITCH_BASE, 0, 0);
+  cam.updateMatrixWorld(true);
+  cam.updateProjectionMatrix();
+  return cam;
+}
+
+/** Is a card `widthM` wide whole on this glass, with the figure `forwardM`
+ *  ahead of the eye and `lateralM` to its right (negative = left), its head
+ *  `headY` above the road? Placed as the frame loop places it before the HUD
+ *  strip is consulted: centred over the head, half a card above the gap. */
+function wholeOnGlass(
+  cam: PerspectiveCamera,
+  lateralM: number,
+  forwardM: number,
+  widthM: number,
+  headY: number,
+): boolean {
+  const s = bubbleScale(Math.hypot(lateralM, forwardM));
+  return bubbleWhollyVisible(
+    cam,
+    lateralM,
+    headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2,
+    -forwardM,
+    (widthM * s) / 2,
+    (BUBBLE_H_M * s) / 2,
+    false,
+    new Vector3(),
+  );
+}
+
+/** The nearest the officer can be with the card still whole, walking in from
+ *  the far end of the band in 5 cm steps — so „whole from here out" is what
+ *  the number means, with no hole behind it. Infinity = not whole even there. */
+function nearLimitM(
+  cam: PerspectiveCamera,
+  lateralM: number,
+  widthM: number,
+  headY: number = HEAD_Y,
+): number {
+  let limit = Number.POSITIVE_INFINITY;
+  for (let d = BAND_FAR_M; d >= 3; d -= 0.05) {
+    if (!wholeOnGlass(cam, lateralM, d, widthM, headY)) break;
+    limit = d;
+  }
+  return limit;
+}
+
+/**
+ * CENSUS — every lesson that puts this card on the glass.
+ *
+ * The frame loop captions the first pedestrian that publishes a `pose`, and a
+ * pose is published by exactly two staged kinds (`orchestrator/runners.ts`:
+ * `trafficController` → "directTraffic", `policeStop` → "stopSignal"). So the
+ * set is found by kind, over the whole template — level overrides included —
+ * rather than listed, and a sixth lesson reddens this the day it is authored.
+ *
+ * `laneX` is the centre of the lane the student approaches in (all five head
+ * north, +y); it is the one number here the spec does not carry, and the
+ * officer's own coordinates are asserted against the spec so that moving him
+ * cannot leave this table describing somewhere he no longer stands.
+ */
+const CARD_CENSUS = [
+  { id: "sc-signal-controller", kind: "trafficController", officer: { x: 0, y: -11 }, laneX: 4.0625 },
+  { id: "sc-sig-controller-live", kind: "trafficController", officer: { x: 0, y: -11 }, laneX: 4.0625 },
+  { id: "sc-sig-controller-postures", kind: "trafficController", officer: { x: 0, y: -11 }, laneX: 4.0625 },
+  { id: "sc-vp-police-stop", kind: "policeStop", officer: { x: 15.6, y: 208 }, laneX: 12.19 },
+  { id: "sc-pe-school-patrol", kind: "policeStop", officer: { x: -9.72, y: 246 }, laneX: 4.06 },
+] as const;
+const POSED_KINDS = ["trafficController", "policeStop"] as const;
+
+/** Officer's offset from the driver's eye, m to the right. Heading north, the
+ *  driver sits `COCKPIT_EYE.x` to the LEFT of the lane centre, i.e. at −x. */
+const lateralOf = (row: (typeof CARD_CENSUS)[number]) =>
+  row.officer.x - (row.laneX - COCKPIT_EYE.x);
+
+/** The head the card is mounted over, m. The frame loop pins the JU-18
+ *  регулировчик at `PED_CONTROLLER_HEIGHT` and every other posed figure — the
+ *  police officer, the school warden — at `PED_OFFICER_HEIGHT`. */
+const headOf = (row: (typeof CARD_CENSUS)[number]) =>
+  PED_HEAD_Y * (row.kind === "trafficController" ? PED_CONTROLLER_HEIGHT : PED_OFFICER_HEIGHT);
+
+describe("founder ruling 2026-10-04 — the answer line is ≈ 11 CSS px on the approach", () => {
+  const LENSES = [
+    { name: "phone 852 × 393", cssW: AUDITED_PHONE.cssW, cssH: AUDITED_PHONE.cssH },
+    ...PC_LENSES,
+  ];
+
+  it("the lens is the product's own, and it is not the generous one", () => {
+    // 551.1 CSS px per radian at the centre of the audited phone — 1653 device
+    // px at DPR 3, against the 1702 this file's FR-OFC-CARD floors are stated
+    // in. Every viewport measured here holds the hFOV (none is squarer than
+    // the 1.454 : 1 at which the vertical clamp would start trading it away).
+    expect(focalCssPx(AUDITED_PHONE.cssW)).toBeCloseTo(551.1, 1);
+    expect(focalCssPx(AUDITED_PHONE.cssW) * AUDITED_PHONE.dpr).toBeLessThan(PX_PER_RAD);
+    for (const l of LENSES) {
+      expect(cockpitVFovForAspect(l.cssW / l.cssH), l.name).toBeLessThan(COCKPIT_FOV_MAX);
+    }
+    // …and it reproduces what the reviewed card measured on w61 04-t018s:
+    // capitals 24 device px tall on the answer line, i.e. the row's ≈ 8 CSS px.
+    expect(
+      lineCapCssPx(REVIEWED_CARD.answerPx, 48, AUDITED_PHONE.cssW, reviewedLens) * AUDITED_PHONE.dpr,
+    ).toBeCloseTo(24.1, 1);
+  });
+
+  it("the ANSWER line reaches the ruled size at the reference distance — and holds it to the cap", () => {
+    // Computed the way this file computes every other floor (`bodyCapPx`, the
+    // 1702 / 0.72 pair) …
+    expect(
+      bodyCapPx(BUBBLE_LINE_PX.answer, BUBBLE_REF_DIST_M) / AUDITED_PHONE.dpr,
+    ).toBeGreaterThanOrEqual(RULED_ANSWER_CSS_PX);
+    // … AND on the product's own lens, which is 6 % less generous and is the
+    // one a re-driven frame will be measured against. The reviewed card read
+    // 8.03 here. The distances are the ruling's own band — «on the APPROACH,
+    // 11.5–54.6 m» — as literals, so a band that is shortened or a reference
+    // distance that is moved fails here rather than moving the yardstick.
+    for (const d of [11.5, 16.7, 27, 40, 54.6]) {
+      expect(
+        lineCapCssPx(BUBBLE_LINE_PX.answer, d, AUDITED_PHONE.cssW),
+        `${d} m`,
+      ).toBeGreaterThanOrEqual(RULED_ANSWER_CSS_PX);
+    }
+    // NON-VACUITY: the reviewed card does not pass this.
+    expect(
+      lineCapCssPx(REVIEWED_CARD.answerPx, REVIEWED_CARD.refDistM, AUDITED_PHONE.cssW, reviewedLens),
+    ).toBeLessThan(8.1);
+  });
+
+  it("ONLY the answer line grew — the citation and the header are the reviewed sizes", () => {
+    // The citation the founder accepted on 2026-09-27, to the texture px …
+    expect(BUBBLE_LINE_PX.law).toBe(REVIEWED_CARD.lawPx);
+    expect(BUBBLE_POSTURE_LINE_PX.law).toBe(REVIEWED_CARD.lawPx);
+    expect(BUBBLE_LINE_PX.name).toBe(REVIEWED_CARD.namePx);
+    // … and to the pixel on the glass, at every range in the band. A change to
+    // the card's height, its texture height or its reference distance moves
+    // this even with the 50 left alone, which is the edit a bare constant pin
+    // cannot see.
+    for (const d of [BUBBLE_REF_DIST_M, 27, BAND_FAR_M]) {
+      expect(
+        lineCapCssPx(BUBBLE_LINE_PX.law, d, AUDITED_PHONE.cssW),
+        `law @ ${d} m`,
+      ).toBeCloseTo(lineCapCssPx(REVIEWED_CARD.lawPx, d, AUDITED_PHONE.cssW, reviewedLens), 9);
+      expect(
+        lineCapCssPx(BUBBLE_LINE_PX.name, d, AUDITED_PHONE.cssW),
+        `name @ ${d} m`,
+      ).toBeCloseTo(lineCapCssPx(REVIEWED_CARD.namePx, d, AUDITED_PHONE.cssW, reviewedLens), 9);
+    }
+    // 5.90 CSS px — the «≈ 6» of the row, stated so the pin has a number.
+    expect(
+      lineCapCssPx(BUBBLE_LINE_PX.law, BUBBLE_REF_DIST_M, AUDITED_PHONE.cssW),
+    ).toBeCloseTo(5.9, 1);
+  });
+
+  it("the card grew SIDEWAYS only: same height, same band, same metres per texel", () => {
+    // Height is what the windscreen refuses (see BUBBLE_H_M) and what the
+    // ruling's «0.5–1 m earlier» would have been spent on. None of it is.
+    expect(BUBBLE_H_M).toBe(REVIEWED_CARD.hM);
+    expect(BUBBLE_TEX_H).toBe(REVIEWED_CARD.texH);
+    expect(BUBBLE_REF_DIST_M).toBe(REVIEWED_CARD.refDistM);
+    expect(BUBBLE_MAX_SCALE).toBe(REVIEWED_CARD.maxScale);
+    // Plane and texture widen TOGETHER, so the border, the corner radius, the
+    // pointer and the padding keep the physical size they were photographed at
+    // and the type is not stretched: one texel is the same 3.516 mm both ways.
+    expect(BUBBLE_W_M / BUBBLE_TEX_W).toBeCloseTo(REVIEWED_CARD.wM / REVIEWED_CARD.texW, 12);
+    expect(BUBBLE_W_M / BUBBLE_TEX_W).toBeCloseTo(BUBBLE_H_M / BUBBLE_TEX_H, 5);
+    // And it did grow — the ink box is the only place the bigger line can go.
+    expect(BUBBLE_W_M).toBeGreaterThan(REVIEWED_CARD.wM);
+  });
+
+  it("no pc size regresses: every line is at least what the reviewed card showed", () => {
+    for (const l of PC_LENSES) {
+      for (const d of [BUBBLE_REF_DIST_M, 27, BAND_FAR_M]) {
+        const at = `${l.name} @ ${d} m`;
+        expect(lineCapCssPx(BUBBLE_LINE_PX.name, d, l.cssW), at).toBeGreaterThanOrEqual(
+          lineCapCssPx(REVIEWED_CARD.namePx, d, l.cssW, reviewedLens) - 1e-9,
+        );
+        expect(lineCapCssPx(BUBBLE_LINE_PX.law, d, l.cssW), at).toBeGreaterThanOrEqual(
+          lineCapCssPx(REVIEWED_CARD.lawPx, d, l.cssW, reviewedLens) - 1e-9,
+        );
+        expect(lineCapCssPx(BUBBLE_LINE_PX.answer, d, l.cssW), at).toBeGreaterThan(
+          lineCapCssPx(REVIEWED_CARD.answerPx, d, l.cssW, reviewedLens),
+        );
+      }
+    }
+  });
+
+  it("CENSUS: these five lessons are every lesson that renders the card", () => {
+    const found = SCENARIO_TEMPLATES.filter((s) => {
+      const json = JSON.stringify(s);
+      return POSED_KINDS.some((k) => json.includes(`"kind":"${k}"`));
+    })
+      .map((s) => s.id)
+      .sort();
+    expect(found).toEqual(CARD_CENSUS.map((r) => r.id).sort());
+    for (const row of CARD_CENSUS) {
+      const spec = SCENARIO_TEMPLATES.find((s) => s.id === row.id)!;
+      const posed = (spec.staged ?? []).filter((e) => e.kind === row.kind);
+      expect(posed, row.id).toHaveLength(1);
+      expect(
+        (posed[0] as unknown as { officer: { x: number; y: number } }).officer,
+        row.id,
+      ).toEqual(row.officer);
+    }
+  });
+
+  it("the card is still WHOLE on the approach, on the shipped lens, and leaves no earlier than ruled", () => {
+    // THE WIDER CARD COSTS NOTHING VERTICALLY — it is billboarded, so its top
+    // edge is level on the glass and does not move with its width — and that
+    // is the axis the ruling's allowance was for. What a wider card can lose is
+    // the SIDE of the frame, so the question is put per lesson, at the lateral
+    // offset its officer actually stands at.
+    const inLane = CARD_CENSUS.filter((r) => r.id !== "sc-pe-school-patrol");
+    expect(inLane).toHaveLength(4);
+    for (const l of LENSES) {
+      const cam = productCamera(l.cssW, l.cssH);
+      // Dead ahead is the reference case: not one step earlier.
+      expect(nearLimitM(cam, 0, BUBBLE_W_M), `${l.name}, dead ahead`).toBe(
+        nearLimitM(cam, 0, REVIEWED_CARD.wM),
+      );
+      for (const row of inLane) {
+        const lat = lateralOf(row);
+        const now = nearLimitM(cam, lat, BUBBLE_W_M, headOf(row));
+        const was = nearLimitM(cam, lat, REVIEWED_CARD.wM, headOf(row));
+        const at = `${l.name}, ${row.id} (officer ${lat.toFixed(2)} m)`;
+        expect(Number.isFinite(now), at).toBe(true);
+        expect(now - was, at).toBeLessThanOrEqual(RULED_EARLIER_EXIT_M);
+        // …and nothing nearer than the reviewed card managed: a wider card
+        // that fitted CLOSER would be a card whose height had been cut.
+        expect(now, at).toBeGreaterThanOrEqual(was);
+      }
+    }
+    // AT THE STOP LINE ITSELF, on the phone, for the three регулировчик
+    // drills: the officer stands `lineDistM` − 11 = 16.7 m beyond the line.
+    // Counting the eye as if it were ON the front bumper (it is ≈ 2 m behind
+    // it, so this is the unkind reading) the card must still be whole.
+    const phone = productCamera(AUDITED_PHONE.cssW, AUDITED_PHONE.cssH);
+    for (const row of CARD_CENSUS.filter((r) => r.kind === "trafficController")) {
+      const spec = SCENARIO_TEMPLATES.find((s) => s.id === row.id)!;
+      const ev = (spec.staged ?? []).find((e) => e.kind === "trafficController") as unknown as {
+        lineDistM: number;
+        junction: { y: number };
+      };
+      const officerPastLineM = ev.lineDistM - Math.abs(row.officer.y - ev.junction.y);
+      expect(officerPastLineM, row.id).toBeCloseTo(16.7, 6);
+      expect(nearLimitM(phone, lateralOf(row), BUBBLE_W_M, headOf(row)), row.id).toBeLessThanOrEqual(
+        officerPastLineM,
+      );
+    }
+  });
+
+  it("DISCLOSED COST: the school warden, 13.5 m to the side, loses the card sooner than the ruling allows a stop", () => {
+    // `sc-pe-school-patrol` stands its warden on the far kerb, 13.54 m left of
+    // the driver's eye. The card over her head is whole only while she is
+    // within ≈ 24° of the camera axis (it was ≈ 27° at 4.95 m wide), so it
+    // leaves the SIDE of the frame at 31.2 m where it used to leave at
+    // 27.1 m: 4.1 m sooner, four times the ruled allowance. The ruling was
+    // about the card leaving the top of the windscreen at a stop; this is a
+    // different edge, on a figure the student never stops in front of, and it
+    // is the price of a 30-character line at 11 CSS px. It is pinned so it
+    // cannot get worse unseen, and reported so it is not a surprise.
+    const row = CARD_CENSUS.find((r) => r.id === "sc-pe-school-patrol")!;
+    const lat = lateralOf(row);
+    expect(lat).toBeCloseTo(-13.54, 2);
+    for (const l of LENSES) {
+      const cam = productCamera(l.cssW, l.cssH);
+      const now = nearLimitM(cam, lat, BUBBLE_W_M, headOf(row));
+      const was = nearLimitM(cam, lat, REVIEWED_CARD.wM, headOf(row));
+      expect(was, l.name).toBeGreaterThan(27.0);
+      expect(was, l.name).toBeLessThan(27.2);
+      expect(now - was, l.name).toBeGreaterThan(RULED_EARLIER_EXIT_M);
+      expect(now - was, l.name).toBeLessThanOrEqual(4.2);
+    }
   });
 });

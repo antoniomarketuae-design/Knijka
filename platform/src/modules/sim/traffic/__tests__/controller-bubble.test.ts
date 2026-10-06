@@ -34,6 +34,7 @@ import {
   BUBBLE_MIN_FONT_SCALE,
   BUBBLE_PAD_X,
   BUBBLE_POSTURE_LINE_PX,
+  BUBBLE_REF_DIST_M,
   BUBBLE_TAIL_PX,
   BUBBLE_TEX_H,
   BUBBLE_TEX_W,
@@ -41,6 +42,7 @@ import {
   drawControllerBubble,
   officerArmTarget,
 } from "../TrafficLayer";
+import { AUDITED_PHONE, lineCapCssPx } from "./captionLens";
 
 /** The renderer's own source — the `"off"` rung is spent in the frame loop, and
  *  a frame loop is the one thing this file cannot drive. Newlines normalised so
@@ -127,10 +129,15 @@ describe("controller bubble copy (B42)", () => {
   });
 
   it("stays short enough to read on a billboard from the approach", () => {
-    // The ink box is 1320 px (1408 − 2 × 44). The answer is drawn at 68 px, so
-    // on the 0.62 em/char stub 31 characters is the most that paints at its
-    // authored size; the name at 112 px has room for 19. The caps below are
-    // one under each, so the shrink clamp is a backstop and never the layout.
+    // The ink box is `BUBBLE_TEX_W − 2 × BUBBLE_PAD_X` and the answer is drawn
+    // at `BUBBLE_LINE_PX.answer`; on the 0.62 em/char stub the 30-character cap
+    // below paints inside it at its authored size, and so does the 18-character
+    // name. Since the founder's 2026-10-04 ruling raised the answer to ≈ 11 CSS
+    // px the answer cap is no longer one UNDER what fits — 30 is what fits, and
+    // the box was widened to exactly hold it — so a 31st character is a line
+    // the clamp shrinks, which the ruled-size test at the foot of this file
+    // refuses. The stub is the slack: real Cyrillic in the shipped face runs
+    // ≈ 0.565 em (measured on w61 04-t018s / 04-t023s), 9 % under it.
     for (const b of CONTROLLER_BUBBLES) {
       expect(b.postureNameBg.length, b.posture).toBeLessThanOrEqual(18);
       expect(b.answerBg.length, b.posture).toBeLessThanOrEqual(30);
@@ -428,6 +435,20 @@ function recordingCanvas(): {
 describe("the bubble PAINTER clamps its own ink (B41)", () => {
   const INK_BUDGET = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
 
+  /**
+   * A citation grown — by whole clauses, so it still reads as one — until it
+   * no longer fits the ink box at `atScale` of the authored law size. The
+   * clamp's cases need a string that OVERFLOWS, and „overflows" is a fact
+   * about the box, which has been widened twice; a literal sized against one
+   * box is a test that goes red, or silently vacuous, at the next.
+   */
+  function overflowingLaw(seed: string, atScale: number): string {
+    const px = Math.floor(BUBBLE_LINE_PX.law * atScale);
+    let s = seed;
+    while (s.length * EM_PER_CHAR * px <= INK_BUDGET) s += "; ЗДвП чл. 6";
+    return s;
+  }
+
   it("paints the three lines of the short card for every posture", () => {
     for (const b of CONTROLLER_BUBBLES) {
       const { canvas, lines } = recordingCanvas();
@@ -474,10 +495,17 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
   });
 
   it("a law line long enough to overflow is SHRUNK, never truncated", () => {
-    // The exact class of regression this exists for: a citation that grows.
-    // 56 characters against today's 43 — the painter must still put the WHOLE
-    // string on the card, at a smaller size.
-    const grown = "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7 и чл. 6";
+    // The exact class of regression this exists for: a citation that grows —
+    // the painter must still put the WHOLE string on the card, at a smaller
+    // size.
+    //
+    // GROWN UNTIL IT OVERFLOWS, NOT TO A FIXED LENGTH. This was one literal, 51
+    // characters, sized against the 1320 px ink box; when the box was widened
+    // for the founder's 2026-10-04 answer line it simply fitted, and the test
+    // went red on „it did shrink" with the clamp untouched. The string now
+    // follows the box, and the premise is asserted instead of assumed.
+    const grown = overflowingLaw("ППЗДвП сигнали на регулировчика; ЗДвП чл. 7 и чл. 6", 1);
+    expect(grown.length * EM_PER_CHAR * BUBBLE_LINE_PX.law).toBeGreaterThan(INK_BUDGET);
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: grown });
     const law = lines.at(-1)!;
@@ -496,11 +524,18 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
   });
 
   it("past the legibility floor the canvas squeeze still keeps ink on the card", () => {
-    // A string nobody should ship (82 chars) — the shrink stops at
+    // A string nobody should ship — the shrink stops at
     // BUBBLE_MIN_FONT_SCALE rather than dissolving the law into a grey smear,
     // and the `maxWidth` argument condenses the rest. The card never leaks.
-    const absurd =
-      "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7; ЗДвП чл. 6; ППЗДвП чл. 66; ЗДвП чл. 50";
+    // Grown, like the one above, until it overflows the box EVEN AT THE FLOOR
+    // (82 characters did that to the 1320 px box and no longer do).
+    const absurd = overflowingLaw(
+      "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7; ЗДвП чл. 6; ППЗДвП чл. 66; ЗДвП чл. 50",
+      BUBBLE_MIN_FONT_SCALE,
+    );
+    expect(
+      absurd.length * EM_PER_CHAR * Math.floor(BUBBLE_LINE_PX.law * BUBBLE_MIN_FONT_SCALE),
+    ).toBeGreaterThan(INK_BUDGET);
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: absurd });
     const law = lines.at(-1)!;
@@ -521,15 +556,29 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
   });
 
   it("NON-VACUITY: the pre-fix painter would have overflowed on today's copy", () => {
-    // Reconstructs the defect. The shipped 43-character lawRef at the authored
-    // 38 px is 43 × 0.62 × 38 = 1013 px of ink in a 936 px card — off both
-    // sides. If this ever stops being true the test above has gone vacuous and
-    // is no longer guarding anything.
+    // Reconstructs the defect, AS IT WAS: the shipped 43-character lawRef at
+    // the 38 px the 1024 px card authored it at is 43 × 0.62 × 38 = 1013 px of
+    // ink in a 936 px box — off both sides.
+    //
+    // THE NUMBERS ARE THE DEFECT'S OWN NOW, NOT TODAY'S CONSTANTS. This read
+    // `lawRef × BUBBLE_LINE_PX.law > INK_BUDGET`, which stayed true through the
+    // first widening (1333 px in 1320) only by 13 px, and stopped being true
+    // when the box was widened for the founder's 2026-10-04 answer line — with
+    // nothing about the clamp having changed. Today's copy fits the box
+    // unclamped on this stub; what keeps the clamp's tests from being vacuous
+    // is asserted where they are, on strings grown until they overflow.
+    const PRE_FIX_LAW_PX = 38;
+    const PRE_FIX_INK_BOX = 1024 - 2 * BUBBLE_PAD_X;
     const longest = CONTROLLER_BUBBLES.reduce((a, b) =>
       a.lawRef.length >= b.lawRef.length ? a : b,
     );
-    const unclamped = longest.lawRef.length * EM_PER_CHAR * BUBBLE_LINE_PX.law;
-    expect(unclamped).toBeGreaterThan(INK_BUDGET);
+    expect(longest.lawRef.length * EM_PER_CHAR * PRE_FIX_LAW_PX).toBeGreaterThan(PRE_FIX_INK_BOX);
+    // …and an unclamped painter would STILL leak a citation that grows, on
+    // today's box: the clamp is exercised, not decorative.
+    const grown = overflowingLaw(longest.lawRef, 1);
+    const { canvas, lines } = recordingCanvas();
+    drawControllerBubble(canvas, { ...longest, lawRef: grown });
+    expect(lines.at(-1)!.sizePx).toBeLessThan(BUBBLE_LINE_PX.law);
   });
 });
 
@@ -763,5 +812,136 @@ describe("the «Пълна помощ» card is the short card the founder ruled
       drawControllerBubble(canvas, b, "posture");
       expect(lines.map((l) => l.text), b.posture).toEqual([b.postureNameBg, b.lawRef]);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FOUNDER RULING 2026-10-04 «ENLARGE ANSWER LINE» — the painter's half.
+//
+// `officer-and-caption-legibility.test.ts` holds the geometry: the authored
+// answer size is ≈ 11 CSS px of cap on the audited phone across the approach.
+// An authored size is a promise the PAINTER can quietly break — `bubbleLine`
+// shrinks any line that does not fit its ink box, down to 0.62 of what was
+// asked for — so the ruled size is asserted here on what is actually painted,
+// for every posture's own string.
+// ---------------------------------------------------------------------------
+describe("founder ruling 2026-10-04 — the answer line is painted at the ruled size", () => {
+  const RULED_ANSWER_CSS_PX = 11;
+  /** The citation the founder accepted on 2026-09-27, texture px. A literal on
+   *  purpose: the ruling is that this number does not move. */
+  const ACCEPTED_LAW_PX = 50;
+  const INK = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
+
+  it("every posture's answer is ONE line at ≥ 11 CSS px on the audited phone — never shrunk to fit", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      // Three lines, the answer whole on the second: no wrap, no fourth line.
+      expect(lines.map((l) => l.text), b.posture).toEqual([b.postureNameBg, b.answerBg, b.lawRef]);
+      const answer = lines[1];
+      // What reached the glass, not what was authored: a shrunk line reports
+      // the shrunk size here, and a squeezed one a width under its natural one.
+      expect(
+        lineCapCssPx(answer.sizePx, BUBBLE_REF_DIST_M, AUDITED_PHONE.cssW),
+        `${b.posture}: «${b.answerBg}» painted at ${answer.sizePx} px`,
+      ).toBeGreaterThanOrEqual(RULED_ANSWER_CSS_PX);
+      expect(answer.sizePx, b.posture).toBe(BUBBLE_LINE_PX.answer);
+      expect(answer.width, b.posture).toBe(b.answerBg.length * EM_PER_CHAR * answer.sizePx);
+      expect(answer.width, b.posture).toBeLessThanOrEqual(INK);
+    }
+  });
+
+  it("the citation is painted at exactly the size the founder accepted — it neither grew nor shrank", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const full = recordingCanvas();
+      drawControllerBubble(full.canvas, b, "full");
+      expect(full.lines[2].text, b.posture).toBe(b.lawRef);
+      expect(full.lines[2].sizePx, `${b.posture} «Пълна помощ»`).toBe(ACCEPTED_LAW_PX);
+      // «Частична помощ» wears the same citation and was not ruled on.
+      const posture = recordingCanvas();
+      drawControllerBubble(posture.canvas, b, "posture");
+      expect(posture.lines[1].sizePx, `${b.posture} «Частична помощ»`).toBe(ACCEPTED_LAW_PX);
+    }
+  });
+
+  it("the bigger line sits CENTRED between the name and the citation, crowding neither", () => {
+    // Clear card between the lines, on the painter test's own 0.8 / 0.3 em
+    // (ascender above the baseline, descender below). A bigger answer left on
+    // the old baseline keeps its foot where it was and pushes its head 21 px
+    // from the name — legal by the no-overlap test above, and visibly a line
+    // that was enlarged in place rather than set.
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b, "full");
+      const [name, answer, law] = lines;
+      const above = answer.y - 0.8 * answer.sizePx - (name.y + 0.3 * name.sizePx);
+      const below = law.y - 0.8 * law.sizePx - (answer.y + 0.3 * answer.sizePx);
+      expect(Math.abs(above - below), `${b.posture}: ${above.toFixed(1)} above, ${below.toFixed(1)} below`).toBeLessThan(2);
+      expect(above, b.posture).toBeGreaterThan(36);
+    }
+  });
+
+  it("the header and the foot did not move: the card keeps the shape it shares with «Частична помощ»", () => {
+    for (const b of CONTROLLER_BUBBLES) {
+      const full = recordingCanvas();
+      drawControllerBubble(full.canvas, b, "full");
+      const posture = recordingCanvas();
+      drawControllerBubble(posture.canvas, b, "posture");
+      expect(full.lines[0].sizePx, b.posture).toBe(posture.lines[0].sizePx);
+      expect(full.lines[0].y, b.posture).toBe(170);
+      expect(full.lines[2].y, b.posture).toBe(posture.lines[1].y);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE WIDENED CARD IS ONLY AS GOOD AS ITS THREE READERS
+// (sc-sig-controller-postures:ef0e821c, the verifier's conditions V1–V3)
+//
+// Every test above drives the PAINTER on a canvas the test itself sizes from
+// `BUBBLE_TEX_W`, and the legibility file computes from `BUBBLE_W_M`. Neither
+// touches the component, and the adversarial pass showed what that leaves open:
+// three one-token sabotages of TrafficLayer.tsx — the texture canvas left at
+// 1408 px, the plane left 4.95 m wide, the frame gate judging a 4.95 m card —
+// each survived a green 417-test traffic suite. The first is the ruled defect
+// itself coming back: on a 1408 px canvas the painter shrinks the answer to
+// ≈70 px and the wider plane then stretches it.
+//
+// A frame loop and a JSX mesh cannot be executed here, so these are source
+// pins, and a source pin that cannot find its site is RED, never a skip: each
+// anchor must resolve to exactly one site before its expression is compared.
+// ---------------------------------------------------------------------------
+describe("the widened card is WIRED: canvas, plane and frame gate read the card's own constants", () => {
+  /** The one capture of `re` in `src`; anything but exactly one site fails with what was found. */
+  function oneSite(src: string, re: RegExp, what: string): string {
+    const found = [...src.matchAll(re)].map((m) => m[1].replace(/\s+/g, " ").trim());
+    expect(found, `${what}: expected exactly one site, found ${JSON.stringify(found)}`).toHaveLength(1);
+    return found[0];
+  }
+
+  /** The texture's own factory: from its `useMemo` to the texture it returns. */
+  const TEX_BLOCK = oneSite(
+    LAYER_SRC,
+    /const bubbleTex = useMemo\(\(\) => \{\n([\s\S]*?)new CanvasTexture\(c\)/g,
+    "the bubble texture factory",
+  );
+
+  it("the texture canvas is BUBBLE_TEX_W × BUBBLE_TEX_H (V1: a literal 1408 shrinks the answer back to ≈70 px)", () => {
+    expect(oneSite(TEX_BLOCK, /\bc\.width\s*=\s*([^;]+);/g, "canvas width")).toBe("BUBBLE_TEX_W");
+    expect(oneSite(TEX_BLOCK, /\bc\.height\s*=\s*([^;]+);/g, "canvas height")).toBe("BUBBLE_TEX_H");
+  });
+
+  it("the billboard plane is BUBBLE_W_M × BUBBLE_H_M (V2: a 4.95 m plane squeezes the wider texture)", () => {
+    const args = oneSite(
+      LAYER_SRC,
+      /<mesh ref=\{bubbleRef\}[^>]*>\s*<planeGeometry args=\{\[([^\]]*)\]\} \/>/g,
+      "the bubble plane",
+    );
+    expect(args).toBe("BUBBLE_W_M, BUBBLE_H_M");
+  });
+
+  it("the frame gate judges the card that is DRAWN (V3: a 4.95 m half-width keeps a card whose edge is off the glass)", () => {
+    expect(oneSite(LAYER_SRC, /\bconst halfW = ([^;]+);/g, "the gate half-width")).toBe("(BUBBLE_W_M * s) / 2");
+    expect(oneSite(LAYER_SRC, /\bconst halfH = ([^;]+);/g, "the gate half-height")).toBe("(BUBBLE_H_M * s) / 2");
   });
 });
