@@ -24,8 +24,8 @@
  *
  * AND A FOLD IS ONLY AS GOOD AS ITS MATERIAL. The first cut of this file drove
  * two legs that were measured, on the carriageway, one-way and `travelDir: +1`
- * on every single tick, and perturbed three of the record's seven members. So
- * a detector gated on any of the other four — or on a state the drives never
+ * on every single tick, and perturbed three of the record's (then) seven
+ * members. So a detector gated on any of the other four — or on a state the drives never
  * entered — produced identical folds and shipped GREEN. Three mutations of
  * `rules/engine.ts` did exactly that and survived: grading
  * `edgeAlignment.offCarriageway === true` (which reintroduces, one kerb over,
@@ -33,6 +33,14 @@
  * `reason === "no-edge-fix"`, and grading `deg === null`. The streams now
  * cover every state of the record and `corrupted()` lies about every member,
  * and both of those properties are asserted rather than assumed.
+ *
+ * THE ONE EXCEPTION (2026-10-05), AND WHY IT IS NOT A HOLE IN THE ABOVE. Every
+ * fold in the first two suites runs under `DEFAULT_RULE_CONFIG`, which is what
+ * every lesson but one compiles to, and the constraint holds there unchanged.
+ * `rules/engine.ts` „THE REVERSAL ACROSS THE SOLID AXIS" reads the record where
+ * — and only where — a lesson authors `solidCrossUTurnEnabled`; the last suite
+ * in this file pins that reader from both sides (who may arm it, that it really
+ * reads, and that it bills nothing on these streams).
  *
  * HOW THIS TEST FAILS. Wire the field into any detector — one
  * `tick.edgeAlignment` read that changes an emitted event or any byte of the
@@ -48,6 +56,10 @@ import { createRuleEngine, reduceTick, type RuleEngineState } from "../../rules/
 import type { EdgeAlignment, SimTick } from "../../rules/types";
 import { applyTick, createLessonSession } from "../../lessons/engine";
 import type { LessonSpec } from "../../contracts";
+import { compileScenario } from "../../lessons/scenario/compile";
+import { SCENARIO_TEMPLATES } from "../../lessons/scenario/templates";
+import type { ScenarioLevel } from "../../lessons/scenario/types";
+import type { RuleEngineConfig } from "../../rules/types";
 
 // ---------------------------------------------------------------------------
 // the material: real ticks off the real world, including convicted ones
@@ -144,8 +156,11 @@ function stripped(ticks: readonly SimTick[]): SimTick[] {
  * and its magnitude move — a grader reading `|deg|` is caught as surely as one
  * reading `deg`), `null` becomes 0 (the strongest possible „aligned"), the two
  * booleans and `travelDir` are negated, `reason` is added where it was absent
- * and removed where it was present, and `edgeId` swaps `null` for a real id
- * and a real id for `null`.
+ * and removed where it was present, `edgeId` swaps `null` for a real id
+ * and a real id for `null`, and `axisClearM` (the eighth member, 2026-10-05:
+ * how far the BODY is from a two-way road's axis) changes SIGN — «the whole
+ * body is on this bank» becomes «astride the axis» and back — and appears
+ * where it was absent.
  *
  * The result is a DELIBERATELY INCONSISTENT record — `reason` present beside a
  * numeric `deg`, an `edgeId` beside a null one. That is the point: the claim
@@ -167,6 +182,7 @@ function corrupted(ticks: readonly SimTick[]): SimTick[] {
         offCarriageway: !ea.offCarriageway,
         travelDir: ea.travelDir === undefined ? 1 : ea.travelDir === 1 ? -1 : 1,
         roundabout: ea.roundabout === undefined ? true : !ea.roundabout,
+        axisClearM: ea.axisClearM === undefined ? 1 : ea.axisClearM >= 0 ? -1 - ea.axisClearM : 1 - ea.axisClearM,
       },
     };
   });
@@ -176,7 +192,16 @@ function corrupted(ticks: readonly SimTick[]): SimTick[] {
  *  assert that `corrupted()` really moved each one on real material rather
  *  than trusting the expression above to be exhaustive. */
 function members(ea: EdgeAlignment): unknown[] {
-  return [ea.deg, ea.reason, ea.wrongWayArmed, ea.edgeId, ea.offCarriageway, ea.travelDir, ea.roundabout];
+  return [
+    ea.deg,
+    ea.reason,
+    ea.wrongWayArmed,
+    ea.edgeId,
+    ea.offCarriageway,
+    ea.travelDir,
+    ea.roundabout,
+    ea.axisClearM,
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -188,8 +213,8 @@ interface RuleFrame {
   state: RuleEngineState;
 }
 
-function foldRules(ticks: readonly SimTick[]): RuleFrame[] {
-  let state = createRuleEngine();
+function foldRules(ticks: readonly SimTick[], config?: Partial<RuleEngineConfig>): RuleFrame[] {
+  let state = createRuleEngine(config);
   const frames: RuleFrame[] = [];
   for (const tick of ticks) {
     const r = reduceTick(state, tick);
@@ -234,16 +259,20 @@ describe("nothing in the rule engine reads edgeAlignment", () => {
     expect(eas.some((ea) => ea.travelDir === 1)).toBe(true);
     expect(eas.some((ea) => ea.edgeId === null)).toBe(true);
     expect(eas.some((ea) => ea.edgeId !== null)).toBe(true);
+    // The body's distance from the axis: published on the two-way road (the
+    // whole body on its bank there), absent on every one-way.
+    expect(eas.some((ea) => ea.axisClearM !== undefined && ea.axisClearM >= 0)).toBe(true);
+    expect(eas.some((ea) => ea.axisClearM === undefined)).toBe(true);
     // The record naming an edge while the TICK says the car is nowhere.
     expect(ticks.some((t) => t.edgeId === null && t.edgeAlignment!.edgeId !== null)).toBe(true);
   });
 
   it("…and CORRUPTING it really moves every member on that material", () => {
-    // `corrupted()` claims to lie about all seven members. Asserted, because a
+    // `corrupted()` claims to lie about all eight members. Asserted, because a
     // member it silently left alone is a member a detector could be gated on
     // without either fold noticing — which is how three engine mutations came
     // through green.
-    const unmoved = [0, 1, 2, 3, 4, 5, 6].filter((i) =>
+    const unmoved = [0, 1, 2, 3, 4, 5, 6, 7].filter((i) =>
       all.every((s) => {
         const lies = corrupted(s.ticks);
         return s.ticks.every(
@@ -279,7 +308,7 @@ describe("nothing in the rule engine reads edgeAlignment", () => {
     }
   });
 
-  it("CORRUPTING the field — all seven members lied about — changes nothing either", () => {
+  it("CORRUPTING the field — all eight members lied about — changes nothing either", () => {
     for (const s of all) {
       expect({ run: s.name, frames: foldRules(corrupted(s.ticks)) }).toEqual({
         run: s.name,
@@ -349,6 +378,96 @@ describe("nothing in the lesson engine reads edgeAlignment", () => {
       expect({ run: s.name, frames: foldLesson(corrupted(s.ticks)) }).toEqual({
         run: s.name,
         frames: foldLesson(s.ticks),
+      });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE ONE OPT-IN READER (2026-10-05) — pinned from both sides
+// ---------------------------------------------------------------------------
+//
+// Everything above folds under `DEFAULT_RULE_CONFIG`, and stays the contract
+// for every lesson that authors nothing: no reader.
+//
+// ONE reader was added on purpose: `rules/engine.ts` „THE REVERSAL ACROSS THE
+// SOLID AXIS" decides «was this crossing of a solid axis a U-turn?» from the
+// car's relation to the ROAD, and this record is the only signal on the tick
+// that carries it (round 1 of that repair read the car's own heading history
+// instead and was refuted in both directions). It runs ONLY where a lesson
+// authors `RuleEngineConfig.solidCrossUTurnEnabled`.
+//
+// So the exception is pinned here, where the rule it is an exception to lives:
+//  · WHO may read it — a census of every compiled rung; a second lesson arming
+//    the key reddens this file and has to be argued for here;
+//  · THAT it reads it — with the key on, lying about the record moves the
+//    reducer's state on a real two-way drive (otherwise «opt-in reader» would
+//    be a comment);
+//  · and that under the key it still bills NOTHING on these streams — none of
+//    them crosses an authored solid axis — so the reader is an observer until
+//    the one thing it is for actually happens.
+
+describe("the ONE opt-in reader of edgeAlignment — solidCrossUTurnEnabled", () => {
+  const all = streams();
+  const ARMED = { solidCrossUTurnEnabled: true };
+
+  it("CENSUS: exactly one lesson arms it, on every rung it has", () => {
+    const armed = new Set<string>();
+    for (const spec of SCENARIO_TEMPLATES) {
+      for (const { level } of spec.levels) {
+        const cfg = compileScenario(spec, level as ScenarioLevel).ruleConfig as Record<string, unknown> | undefined;
+        if (cfg?.solidCrossUTurnEnabled === true) armed.add(`${spec.id}@L${level}`);
+      }
+    }
+    expect([...armed].sort()).toEqual([1, 2, 3, 4, 5].map((l) => `sc-mv-uturn-ban@L${l}`));
+  });
+
+  it("the key is OFF by default — which is what every fold above ran under", () => {
+    expect((createRuleEngine().config as unknown as Record<string, unknown>).solidCrossUTurnEnabled).toBe(false);
+  });
+
+  it("with the key ON the record IS read: lying about it moves the reducer's state on the real two-way drive", () => {
+    const twoWay = all.find((s) => s.name.startsWith("two-way road"))!;
+    expect(twoWay.ticks.some((t) => t.oneway === false)).toBe(true);
+    const truthful = foldRules(twoWay.ticks, ARMED);
+    const lied = foldRules(corrupted(twoWay.ticks), ARMED);
+    expect(lied.map((f) => f.state)).not.toEqual(truthful.map((f) => f.state));
+    // …while with the key off the same lie is invisible (the suite above).
+    expect(foldRules(corrupted(twoWay.ticks))).toEqual(foldRules(twoWay.ticks));
+  });
+
+  it("…and `axisClearM` is read too (round 3; re-pinned in round 4, when the pull-out's metres went): on that drive the car runs up the opposing bank with its whole body across — were the axis solid there, the crossing's bill would say «изцяло» — and lying about the body ALONE changes that bill's reason", () => {
+    const twoWay = all.find((s) => s.name.startsWith("two-way road"))!;
+    // Give the tracker a reference first: the same road, taken lawfully (the
+    // geometry bank), then the stream itself (the opposing bank, same nose) —
+    // with the axis declared SOLID under it, which no stream of this file has
+    // (the test below), so that there is a bill for the body to choose the
+    // reason of.
+    const lawful = driveEdge("e672186635.0", 40, 160, 1, 1.6);
+    const t0 = lawful[lawful.length - 1].t + 0.05;
+    const drive: SimTick[] = [...lawful, ...twoWay.ticks.map((t) => ({ ...t, t: t.t + t0, solidCenterLine: true }))];
+    const astride = drive.map((t) =>
+      t.edgeAlignment?.axisClearM === undefined
+        ? t
+        : { ...t, edgeAlignment: { ...t.edgeAlignment, axisClearM: -0.5 } },
+    );
+    const billActs = (ticks: SimTick[], cfg?: typeof ARMED) =>
+      foldRules(ticks, cfg)
+        .flatMap((f) => f.events as Array<{ kind: string; code?: string; detail?: string }>)
+        .filter((e) => e.kind === "violation" && e.code === "CROSSED_SOLID_LINE")
+        .map((e) => e.detail ?? "pooled");
+    expect(billActs(drive, ARMED)).toEqual(["pooled"]);
+    expect(billActs(astride, ARMED)).toEqual(["astride"]);
+    // With the key off the same lie moves nothing.
+    expect(foldRules(astride)).toEqual(foldRules(drive));
+    expect(billActs(drive)).toEqual(["pooled"]);
+  });
+
+  it("…and it still bills nothing here: no stream crosses an authored solid axis, so the events are the default fold's", () => {
+    for (const s of all) {
+      expect({ run: s.name, events: foldRules(s.ticks, ARMED).map((f) => f.events) }).toEqual({
+        run: s.name,
+        events: foldRules(s.ticks).map((f) => f.events),
       });
     }
   });

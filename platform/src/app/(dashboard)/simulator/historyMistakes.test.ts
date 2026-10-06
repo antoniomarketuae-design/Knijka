@@ -24,7 +24,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { VIOLATIONS, WRONG_WAY_ROAD_COPY, WRONG_WAY_ROAD_MOTORWAY } from "@/modules/sim/rules";
+import { VIOLATIONS, WRONG_WAY_ROAD_COPY, WRONG_WAY_ROAD_MOTORWAY, actCopy } from "@/modules/sim/rules";
 import { historyMistakeGroups } from "./historyMistakes";
 
 /** A stored wire event, exactly the shape `serializeRuleEvents` writes. */
@@ -111,5 +111,30 @@ describe("the session history groups a stored drive by act, not only by code", (
       ev("WRONG_WAY", 12, WRONG_WAY_ROAD_MOTORWAY),
     ]);
     expect(rows.map((r) => r.severityClass)).toEqual(["opasna", "vtorostepenna"]);
+  });
+});
+
+describe("the stored drive keeps the ACT's corrective, not only its name (sc-mv-uturn-ban:6d60c160)", () => {
+  // The row above pins that the title and the citation follow the act. The
+  // corrective did not: it was read off the pooled row, so a U-turn across a
+  // solid line was filed under its own name with the OVERTAKE's advice under
+  // it («Изпреварвай или заобикаляй чак където линията стане прекъсната»).
+  const UTURN = "u-turn";
+  const actCorrective = (actCopy("CROSSED_SOLID_LINE", UTURN) as { correctiveBg?: string } | null)
+    ?.correctiveBg;
+
+  it("files the U-turn under its own name WITH its own corrective", () => {
+    const rows = historyMistakeGroups([ev("CROSSED_SOLID_LINE", 20.3, UTURN)]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.titleBg).toBe("Обратен завой през непрекъсната осева линия");
+    expect(actCorrective).toMatch(/Обратен завой/u);
+    expect(rows[0]!.correctiveBg).toBe(actCorrective);
+    expect(rows[0]!.correctiveBg).not.toMatch(/Изпреварвай или заобикаляй/u);
+  });
+
+  it("keeps the pooled corrective for the bare event and for a detail that names no act", () => {
+    const pooled = VIOLATIONS.CROSSED_SOLID_LINE.correctiveBg;
+    expect(historyMistakeGroups([ev("CROSSED_SOLID_LINE", 20.3)])[0]!.correctiveBg).toBe(pooled);
+    expect(historyMistakeGroups([ev("CROSSED_SOLID_LINE", 20.3, "forged")])[0]!.correctiveBg).toBe(pooled);
   });
 });

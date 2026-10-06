@@ -1132,8 +1132,11 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     // INCLUDING while he sits behind the truck, and the gust peaks on a 5 s
     // clock that knows nothing about the cab line. This step told him the
     // opposite — «завет зад камиона» — and step 6 told him the blow would
-    // arrive at a place. tuning.ts:236-243 measures the cost of believing it:
-    // 1200 N drifts a hands-fixed car ≈ 1.0 m in 5 s and ≈ 2.7 m in 10 s, and
+    // arrive at a place. tuning.ts measures the cost of believing it (re-
+    // measured 2026-10-04 with the wind's yaw pull, founder ruling «Stronger
+    // wind»; re-measured again in round 2 under the pull law that makes step 5
+    // true): at this drill's 70–78 км/ч a hands-fixed car is carried 0.5 m in
+    // 1 s and 1.8–1.9 m in 2 s, and
     // POOR_LANE_KEEPING is live here at laneKeepMaxOffsetM 3.25 m. A student
     // who relaxes his grip on the strength of the old step 3 is convicted by a
     // wind the briefing promised him he was sheltered from — the founder's
@@ -1311,22 +1314,72 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-blown-out.trace.json" },
       titleBg: "Изненадан от порива — към разделителната ивица",
       whatWentWrongBg:
-        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. В мига, в който носът мина пред кабината, заветът изчезна и поривът блъсна колата към разделителната ивица — тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
+        // WAS «…В мига, в който носът мина пред кабината, заветът изчезна и поривът
+        // блъсна колата…» — round 2 of sc-ac-crosswind:a9db1738 (verifier V-13).
+        // This drive has no lee to vanish (step 3 above says so to the student's
+        // face, and the note at `teach.whyBg` has the measurement), so the card
+        // now names what did happen in the demo it sits under — the loose hand,
+        // the gust, half a lane — and keeps the rule about a lorry's lee as the
+        // rule it is.
+        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. Поривът я блъсна към разделителната ивица и тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-clip-truck.trace.json" },
       titleBg: "Порив в тясната пролука — удар в камиона",
+      // WAS «…поривът я хвърли обратно към камиона…» — round 3 of
+      // sc-ac-crosswind:a9db1738 (verifier V2-01). The wind on this lesson
+      // blows WEST on every sample (−700 … −1700 N) and the truck's lane is to
+      // the EAST, so the gust carries a car away from the truck, never at it
+      // (a 2 s loose wheel in the overtaking lane: 2.8 m toward the median).
+      // What throws it at the truck on this car is the hand — a sharp
+      // correction toward the truck against the gust: 3.0–3.8 m east within
+      // 2 s (`crosswind-live-lane-hold.test.ts` §7), which is also what
+      // `teach.whyBg` names. The rest of the card is unchanged.
       whatWentWrongBg:
-        "Точно докато колата беше до кабината, в тясната пролука между нея и ремаркето, поривът я хвърли обратно към камиона — и последва удар. Изпреварването в силен вятър иска и по-широк страничен просвет, и по-ниска скорост: тръгне ли колата, за да намери просвета е нужно време, а вятърът не чака. По-бавно, здрав хват и повече място встрани (чл. 20, ал. 2).",
+        "Точно докато колата беше до кабината, в тясната пролука между нея и ремаркето, рязката корекция срещу порива я хвърли обратно към камиона — и последва удар. Изпреварването в силен вятър иска и по-широк страничен просвет, и по-ниска скорост: тръгне ли колата, за да намери просвета е нужно време, а вятърът не чака. По-бавно, здрав хват и повече място встрани (чл. 20, ал. 2).",
       codeRefs: ["COLLISION"],
     },
   ],
   teach: {
     whenBg:
       "Винаги когато изпреварваш висок автомобил — камион, автобус, бус — при силен страничен вятър, най-често на магистрала и по откритите извънградски пътища. Разпознава се предварително: ветропоказателят или клоните се навеждат в една посока, а самата кола „плава“ при поривите. Докато си в завета на камиона вятърът мълчи — но точно затова ударът при излизане е двоен.",
+    // THE LEE IS TAUGHT AS WHAT IT IS — KNOWLEDGE ABOUT THE ROAD — AND THE CARD
+    // NOW SAYS WHAT THIS DRIVE DOES. Round 2 of sc-ac-crosswind:a9db1738,
+    // verifier V-13. It read «докато си зад него и до него, си в неговия завет
+    // и поривът не те бута», flat, on the „why" card of a lesson whose car is
+    // pushed by the full wind from the first frame. That was already untrue of
+    // the physics (the 2026-08-27 note at step 3), but nothing in the car made
+    // it perceptible; since the founder rulings of 2026-10-04 / 10-05 it is. The
+    // wind now turns the car, so MEASURED on this lesson's own stack
+    // (`crosswind-live-lane-hold.test.ts`): the wheel that holds the lane is
+    // held into the wind behind the truck (1.1 % of the lock, still gathering
+    // speed) and in the overtaking lane (2.1 %) alike, a 2 s lapse in that
+    // lane carries the car 1.8 m in the mean wind, and the staged rig is
+    // 37–73 m AHEAD for the whole drive, never abeam.
+    //
+    // WHY THE TEXT AND NOT A REAL LEE. The brief preferred a real one „if the
+    // staging can carry it". It cannot: ACTS_WIND_TRUCK is `matchPlayer`, so
+    // the car is never behind-and-near or beside the rig, and a shelter keyed
+    // on the truck would be a predicate nothing ever reads; one keyed on a
+    // stretch of road would shelter the student beside empty tarmac. A rig he
+    // can really pass (`paceMode: "scheduledCruise"`) plus a shelter term in
+    // the wind is a restage of the whole lesson — its ticks, its gates and the
+    // briefing's steps 3 and 6 — and is routed to the founder, not smuggled in.
+    //
+    // So: the doctrine keeps its sentence, marked as the road's («На пътя…»);
+    // the next sentence says what THIS drive delivers, which is step 3 again;
+    // «поривът те отмества повече» is a property of the car since round 2 (the
+    // hands-off displacement over a fixed reaction time rises with speed over
+    // the whole 8–110 км/ч range, `vehicle/crosswind.test.ts`); the drift is
+    // named on the side it really goes (the wind blows west — LEFT, toward the
+    // median); and the throw back toward the truck is attributed to the thing
+    // that does it on this car, the over-held correction (measured: a wheel
+    // sized for the gust and kept into the lull moves the car toward the truck
+    // by 0.4 m in 1 s and 1.5 m in 2 s at 74 км/ч). The law reference is
+    // unchanged — nothing is recalled here.
     whyBg:
-      "Камионът е стена, която спира вятъра — докато си зад него и до него, си в неговия завет и поривът не те бута. В секундата, в която носът ти излезе пред кабината, тази стена изчезва и целият вятър те удря наведнъж, странично. При висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася — или към разделителната ивица отляво, или обратно към камиона отдясно. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
+      "На пътя камионът е стена, която спира вятъра: плътно до него си в завета му, а в секундата, в която носът ти излезе пред кабината, стената изчезва и целият вятър те удря наведнъж, странично. В това упражнение на завет не се разчита — камионът остава далеч пред теб и вятърът те натиска през цялото време, затова корекцията се държи още от началото. При висока скорост изминаваш повече метри, докато реагираш, и поривът те отмества повече — към разделителната ивица отляво. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна, обратно към камиона — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
     lawRef: "ЗДвП чл. 20, ал. 2",
     examinerBg:
       "Изпитващият следи контрола на волана при вятър и при изпреварване на високи превозни средства: очаква по-ниска скорост преди маневрата, стабилна лента през целия участък и спокойни, постоянни корекции. Лъкатушенето в лентата е грешка, а изхвърлянето към разделителната ивица или към изпреварвания камион — тежка: две ръце на волана и смъкната скорост.",

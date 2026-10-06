@@ -164,6 +164,11 @@ const SIGN_GLB: Record<SignKind, string> = {
   // В28 rides the В27 body — byte-identical plate circle in the source art, one
   // diagonal instead of two (see signFaces.ts). No new GLB.
   noParking: "sign_no_stopping", // В28 — v28.svg face
+  // В23 rides the В26 body — byte-identical white disc + red ring in the source
+  // art, only the face differs (see signFaces.ts). No new GLB; and because this
+  // is one of the four CORE GLBs (loaded strictly), the plate the lesson is
+  // named after cannot silently go missing with an optional asset.
+  uTurnBan: "sign_speed_limit_50", // В23 — v23.svg face
   slippery: "sign_slippery",
   curve: "sign_warning_bend", // А1 — the shipped v1 asset serves curveAdvisory
   railGuarded: "sign_rail_guarded",
@@ -231,6 +236,7 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   passRight: { art: "g9" },
   children: { art: "a19" },
   noParking: { art: "v28" },
+  uTurnBan: { art: "v23" },
   livingZoneStart: { art: "d15" },
   livingZoneEnd: { art: "d16" },
   motorwayStart: { art: "d5" },

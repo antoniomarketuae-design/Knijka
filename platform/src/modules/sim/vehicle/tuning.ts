@@ -112,6 +112,9 @@ export const WHEEL_POSITIONS = [
   { x: 0.76, y: -0.1, z: -1.28 }, // RL
   { x: -0.76, y: -0.1, z: -1.28 }, // RR
 ] as const;
+/** Front-to-rear axle distance (m) — read off the attachment points above, so
+ *  the two cannot drift apart. */
+export const WHEELBASE_M = WHEEL_POSITIONS[0].z - WHEEL_POSITIONS[2].z;
 /** Indices of steered wheels (front axle). */
 export const STEERED_WHEELS = [0, 1] as const;
 /** Indices of driven wheels — FWD like most compacts. */
@@ -234,19 +237,26 @@ export const ICE_PATCH_GRIP_FACTOR = 0.15;
  *    (a gust nearer 18 m/s) because the raycast tyre model bleeds part of
  *    any sub-clamp lateral force each step — the honest number must survive
  *    the model to stay teachable.
- *  - MEASURED (crosswind.test.ts, the wet-braking-distance discipline): at
- *    a hands-fixed ~70–80 km/h cruise, 1200 N drifts the car laterally
- *    ≈ 0.5 m in 3 s, ≈ 1.0 m in 5 s, ≈ 2.7 m in 10 s (the drift compounds —
- *    the heading itself slowly blows downwind); at a gust peak (1200 + 500)
- *    ≈ 3.8 m in 10 s. Crossing a ~200 m exposed segment uncorrected
- *    therefore drifts HALF A DRAWN LANE (8.125 m / 2) — exactly the AC-12
- *    story („a gust shoves the car half a lane"). Wind accel = 1200/1220 ≈
- *    0.98 m/s² ≈ 0.1 g vs the ≈ 13 m/s² tyre grip ceiling — the equilibrium
- *    counter-steer measures BELOW 0.01 of full input (steer −0.01 already
- *    out-pulls the wind ~4× at 80 km/h), so the duty the lesson teaches
- *    (firm grip, gentle steady correction, reduced speed) genuinely works
- *    and over-correction genuinely overshoots — the doc-72 second-swerve
- *    killer is reproducible in the live car.
+ *  - WHAT THIS FORCE DOES BY ITSELF, MEASURED (crosswind.test.ts — a car
+ *    brought to speed on a held line, then left alone): almost nothing, and
+ *    that is the finding the founder ruled on (2026-10-04, «Stronger wind»,
+ *    sc-ac-crosswind:a9db1738). It enters at the centre of mass, and the
+ *    raycast tyre cancels sideways velocity at each contact patch every
+ *    step, so below the grip clamp only a one-step remainder gets through:
+ *    0.13 m of drift in 5 s at the lesson's 34 km/h, 0.27 m at 78 km/h, and a
+ *    lane held with 0.05 % of full steering input. A student could finish
+ *    sc-ac-crosswind without touching the wheel. (The three figures this
+ *    paragraph used to carry — ≈1 m in 5 s, „half a lane", „below 0.01 of
+ *    input" — were measured on a car left hands-fixed THROUGH ITS WHOLE
+ *    ACCELERATION: the accumulated heading error of a ten-second launch, not
+ *    the wind at cruise.)
+ *  - AND MAKING IT BIGGER DOES NOT HELP: 0.27 % of input at 6000 N, 0.54 % at
+ *    12 kN, and at 16 kN — the tyres' whole grip ceiling, a 1.3 g „wind" —
+ *    the car is simply gone. The ruled 3–5 % is not on that line. So THIS
+ *    NUMBER STAYS the honest aerodynamic one, and the correction the ruling
+ *    asks for comes from the wind's other effect, which this car did not
+ *    have: `CROSSWIND_STEER_PULL_RAD_PER_N` below. Every figure for what
+ *    the shipped wind now does to a car lives in that docblock.
  * Hurricane forces, tyre blowouts and the doc-65 Phase-4 wind-zone model
  * (per-segment exposure) are NOT this constant and stay out of the slice.
  */
@@ -261,6 +271,155 @@ export const CROSSWIND_BRIDGE_N = 1200;
 export const CROSSWIND_GUST_AMPLITUDE_N = 500;
 /** Gust sine period (s) — the slow breathing of a bridge-deck wind. */
 export const CROSSWIND_GUST_PERIOD_SEC = 5;
+/**
+ * CROSSWIND YAW PULL — what the wind does to the car's HEADING, in radians of
+ * road-wheel angle per newton of side force. Founder ruling 2026-10-04
+ * («Stronger wind», sc-ac-crosswind:a9db1738): holding the lane must take a
+ * VISIBLE STEADY CORRECTION, about 3–5 % of full steering input.
+ *
+ * WHY A SECOND CHANNEL AND NOT A BIGGER FIRST ONE. `CROSSWIND_BRIDGE_N` above
+ * carries the measurement: the side force alone asks for 0.05 % of input, and
+ * no magnitude below the tyres' own grip ceiling reaches 1 %. The force was
+ * never the missing part. What a real crosswind does that this car's did not
+ * is TURN IT: the aerodynamic centre of pressure sits ahead of the centre of
+ * gravity and the tyres run a slip angle under side load, so the nose goes
+ * DOWNWIND and the driver holds the wheel INTO the wind for as long as it
+ * blows. That held angle is the „лека, ПОСТОЯННА корекция" of sc-ac-crosswind
+ * step 5, the thing step 6 tells the student to release, and the thing whose
+ * sudden surplus is step 7's «втори замах». The stiff raycast tyre cannot
+ * produce it, so it is expressed where it ends up — `VehicleSim` turns the
+ * steered pair downwind by
+ *
+ *     pull = F_lateral · min( THIS , WHEELBASE_M / (CHASSIS_MASS · (v² + v_s²)) )
+ *
+ * (`crosswindPull.ts`; v_s is `CROSSWIND_PULL_SATURATION_MS` below, which
+ * carries the round-2 half of this law). Two clauses:
+ *  · BELOW ≈ 35.5 km/h the pull is this many radians per newton at any speed
+ *    — the linear bicycle model's result that the steady correction a side
+ *    force asks for is a slip-angle difference, independent of speed.
+ *  · ABOVE it the second term is the smaller, and it is always under
+ *    L/(m·v²): the sideways acceleration of the arc a hands-fixed car is
+ *    turned onto, v²·pull/L, never reaches F/m. The wind cannot bend the
+ *    car's path harder than its own force could have pushed it — which is
+ *    what keeps the motorway sibling (sc-ac-wind-truck-pass, 70–78 km/h) a
+ *    lesson and not a spin: an uncapped constant angle there would be
+ *    3.2 m/s² out of a 1 m/s² wind.
+ *
+ * VALUE, AND WHICH „FULL STEERING INPUT". 1.46e-5 rad/N is 0.84° of road
+ * wheel per kN — several times a real compact's side-force compliance: a
+ * teaching exaggeration, and the size the ruling asks for. „3–5 % of full
+ * input" has two honest readings and the value was picked to satisfy both
+ * where the product ships by default: the WHEEL — the share of the lock
+ * available at that speed, which is what `VehicleSim` calls full input and
+ * what the cockpit rim shows — and the student's HAND, which on a learner
+ * tier is the wheel over that tier's steering sensitivity (`difficulty.ts`:
+ * 0.6 beginner / 0.8 normal, the default / 1 advanced).
+ *
+ * ALL MEASURED ON THE LIVE CAR (crosswind.test.ts for the bare car — the
+ * closed-loop lane hold and the release are both in that file;
+ * scenario/__tests__/crosswind-live-lane-hold.test.ts for the lesson itself,
+ * through the product's input shaping, runtime and engine):
+ *  · the wheel that holds the lane, constant CROSSWIND_BRIDGE_N: 3.5 % at the
+ *    taught 34 km/h, 3.1 % at the objective's 40 km/h ceiling (3.7 % before
+ *    round 2), 3.0–3.5 % everywhere from 10 to 40 km/h; then SMALLER — 2.5 %
+ *    at the street's posted 50, 1.7 % at the sibling's 78;
+ *  · on the lesson's own street, shipped gusts, default tier: wheel 3.6 %,
+ *    hand 4.5 % (advanced 3.4 % / 3.4 %; beginner 3.7 % / 6.2 % — the one
+ *    reading outside the band, disclosed in that test);
+ *  · on the gust the wheel breathes 1.9 % → 5.1 % around that mean at
+ *    34 km/h (1.7 % → 4.6 % at 40) — step 6 made true: more wheel as the
+ *    canopies bend, less as they straighten;
+ *  · a car released at 34 km/h is carried 0.38 m in 1 s, 1.4 m in 2 s and
+ *    3.0 m in 3 s (was 0.006 / 0.02 / 0.05 m), and 0.45 / 1.7 / 3.7 m at
+ *    50 km/h — step 4, „колкото по-бавно караш, толкова по-малко те мести
+ *    поривът", is now a property of the car and not only of the sentence;
+ *  · and it stays a CORRECTION, NOT A CRASH: a driver who notices a full
+ *    second late and answers with no more than a tenth of the wheel is back
+ *    on his line having left it by 0.5 m; two seconds late, 1.9 m — still
+ *    inside the 3.25 m lane-keep band. A twentieth of the wheel out-pulls the
+ *    wind outright (2.2 m upwind in 4 s).
+ *
+ * OPT-IN BY THE SAME GATE AS THE FORCE. No wind, no pull: `VehicleSim` adds
+ * it inside `windActive` only, so the calm car is bit-identical (the
+ * crosswind identity test). And the wheel the student SEES still turns with
+ * his hands alone (`VehicleSim.steerRad`) — the rim never moves by itself;
+ * what changed is that a correct drive now has something to show on it.
+ */
+export const CROSSWIND_STEER_PULL_RAD_PER_N = 1.46e-5;
+/**
+ * THE SPEED AT WHICH THE YAW PULL STARTS TO ROLL OFF, m/s — the `v_s` of
+ *
+ *     pull = F_lateral · min( RAD_PER_N , WHEELBASE_M / (CHASSIS_MASS · (v² + v_s²)) )
+ *
+ * ROUND 2 OF sc-ac-crosswind:a9db1738 (2026-10-06), and the sentence it was
+ * built for is the motorway sibling's step 5: «Помни: по-бавно покрай камиона
+ * значи по-малко отместване от порива».
+ *
+ * WHAT ROUND 1 SHIPPED had no `v_s`: its second clause was L/(m·v²), which
+ * puts the arc a hands-off car is turned onto at EXACTLY the wind's own F/m
+ * from 43 km/h up. Exactly F/m at every speed means the displacement over a
+ * reaction time stops depending on speed — and the round-1 verifier measured
+ * that it in fact FELL a little (2.049 m in 2 s at 70 km/h, 2.037 at 78,
+ * 2.012 at 100, 2.004 at 110; the car's centre is ahead of its rear axle, so
+ * part of the first second's sideways travel is the yaw itself, which is
+ * smaller at speed). The sibling is driven at 54–92 км/ч. Its step 5 had
+ * become false of the car.
+ *
+ * WHAT `v_s` DOES. The share of F/m the arc gets above the crossover is
+ * v²/(v² + v_s²) (`crosswindPathShareOfWind`): it RISES STRICTLY with speed at
+ * every speed, and it is BELOW 1 at every speed. Those are the two properties
+ * the repair was specified by, and the third — the ruled 3–5 % at the lesson's
+ * own conditions — is what picks the number. The clause-1 constant above is
+ * the ratified one and is untouched: below the crossover (35.5 km/h) nothing
+ * changed, so every figure round 1 measured at the taught 34 км/ч stands.
+ *
+ * WHY 6.8, AND WHY THERE IS NO BETTER VALUE. Above the crossover the law does
+ * not contain the clause-1 constant at all, so `v_s` ALONE sets two margins
+ * that pull against each other:
+ *   · the held wheel at the 40 км/ч ceiling falls as v_s rises — measured
+ *     3.21 / 3.18 / 3.13 / 3.03 % at v_s 6.5 / 6.6 / 6.8 / 7.2 (the band's
+ *     floor is 3 %);
+ *   · the rise of the displacement with speed at the top of the range grows
+ *     as v_s rises — the 1 s figure from 100 to 110 км/ч steps by
+ *     +0.6 / +0.7 / +1.0 / +1.4 mm for the same four values.
+ * And the budget is fixed by the two rules themselves: the band asks the arc
+ * for 0.70 of F/m already at 40 км/ч, and the ceiling is 1.00 — the arc can
+ * grow by 43 % between 40 км/ч and infinity, however that rise is shaped.
+ * 6.8 keeps 4 % of margin over the band's floor and leaves the rise strict.
+ *
+ * WHY NOT THE VERIFIER'S OWN FORM, pull = F·K/(1 + (v/v_x)²) with one clause.
+ * Retuned to keep 3 % at 40 км/ч it needs v_x ≈ 25 км/ч and K ≈ 4e-5 — three
+ * times the ratified constant at walking speed: 0.079 rad at a gust peak on a
+ * standing car (the «втори замах» detector's whole threshold is 0.10), and a
+ * launch that veers on a 46 m radius. The `min()` is that form above the knee
+ * and the ratified constant below it.
+ *
+ * MEASURED ON THE LIVE CAR (crosswind.test.ts §2 — settled on a held line at
+ * each speed, then released; constant CROSSWIND_BRIDGE_N):
+ *
+ *   км/ч   held wheel   carried in 1 s / 2 s / 3 s   arc, share of F/m
+ *     20     3.13 %       0.16 / 0.54 / 1.14 m           0.22
+ *     30     3.39 %       0.31 / 1.10 / 2.39 m           0.49
+ *     34     3.51 %       0.38 / 1.38 / 3.00 m           0.63
+ *     40     3.13 %       0.43 / 1.57 / 3.42 m           0.72
+ *     50     2.49 %       0.45 / 1.70 / 3.74 m           0.80
+ *     60     2.08 %       0.47 / 1.78 / 3.93 m           0.85
+ *     78     1.70 %       0.48 / 1.86 / 4.12 m           0.90
+ *    100     1.67 %       0.486 / 1.90 / 4.24 m          0.93
+ *    110     1.85 %       0.487 / 1.91 / 4.27 m          0.94
+ *
+ * STATED LIMITS, so nobody reads more into the table than is in it:
+ *   · on the motorway the effect is real and SMALL — 4 % less displacement
+ *     in 2 s at 60 км/ч than at 78, a millimetre per 10 км/ч at 1 s above 90.
+ *     Step 5 is true of the car; it is not a large lever there, and under
+ *     these two rules it cannot be made one;
+ *   · it holds for reaction times of a second and more. In the first half
+ *     second the displacement is 12–13 cm at every speed from 50 to 110 км/ч
+ *     and falls by 2 mm across that range (the yaw term above);
+ *   · the wheel that holds the lane is SMALLER above 40 км/ч than below it —
+ *     2.5 % at 50, 1.7 % at 78. The ruling is about the lesson's conditions.
+ */
+export const CROSSWIND_PULL_SATURATION_MS = 6.8;
 
 // ---------------------------------------------------------------------------
 // Drivetrain

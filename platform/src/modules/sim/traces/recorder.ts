@@ -19,6 +19,7 @@ import { obbOverlap, type Obb2D } from "../collision";
 import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
 import { createScenarioDirector } from "../orchestrator";
 import {
+  applyActAmendments,
   createRuleEngine,
   reduceTick,
   type HeadlightState,
@@ -29,7 +30,12 @@ import {
 import { createWorldRuntime, type SignalClusterMode } from "../runtime";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
-import { CHASSIS_HALF_EXTENTS, ESTIMATE_WHEELBASE } from "../vehicle";
+import {
+  CHASSIS_HALF_EXTENTS,
+  crosswindForceAtN,
+  crosswindSteerPullRad,
+  ESTIMATE_WHEELBASE,
+} from "../vehicle";
 import {
   TRACE_SAMPLE_HZ,
   TRACE_VERSION,
@@ -398,6 +404,123 @@ export interface RecordScriptedDriveOptions {
    * the config the live lesson would run. Absent = DEFAULT_RULE_CONFIG.
    */
   ruleConfig?: Partial<RuleEngineConfig>;
+  /**
+   * THE HELD WHEEL OF A CROSSWIND DEMO — the wind the LIVE car of this lesson
+   * is driven under (`vehicle/lessonWind.ts` `lessonRigPhysics(spec.physics)`,
+   * the very object the scene hands the rig). Present, the recording's
+   * `steerRad` channel — and NOTHING else: no pose, no tick, no event, no
+   * grade — is rewritten by `heldWheelChannel` below, so the correct demo of a
+   * lesson about a held correction shows one. Absent (every other lesson, and
+   * the mistake demos whose whole point is a loose hand): the channel is the
+   * bicycle estimate it has always been, byte for byte.
+   */
+  heldWheel?: HeldWheelWind;
+}
+
+/** The three numbers of `LessonRigPhysics` the held wheel is computed from. */
+export interface HeldWheelWind {
+  /** Constant wind force, N along district +x / world +X (negative = west). */
+  windLateralN: number;
+  windGustAmplitudeN: number;
+  windGustPeriodSec: number;
+}
+
+/** Half-width (s) of each of the two windows a path's heading change is read
+ *  over — a turn made in one frame is spread over ±2× this, as a triangle. */
+export const HELD_WHEEL_PATH_WINDOW_SEC = 0.5;
+/** Below this speed (m/s) the held correction is faded in — nothing needs
+ *  holding on a car that is not moving. */
+export const HELD_WHEEL_FULL_SPEED_MS = 2;
+
+/**
+ * THE WHEEL A DRIVER HOLDS ALONG A RECORDED PATH IN A CROSSWIND — the
+ * `steerRad` channel of a crosswind lesson's CORRECT demo, recomputed from
+ * its own poses. Pure: samples in, one angle per sample out.
+ *
+ * WHY — `sc-ac-crosswind:a9db1738`, round-1 verifier V-06. The recorder is
+ * kinematic: it never runs `VehicleSim`, so the wind never touches a demo and
+ * the wheel channel is only „what a bicycle would need to follow this
+ * polyline". On sc-ac-crosswind's shadow that was 0.000 rad on average along
+ * the taught stretch, under the caption «лека, ПОСТОЯННА корекция надясно»,
+ * while the live car on the same street needs 3.5 % of its lock held for as
+ * long as the wind blows (founder rulings 2026-10-04 / 2026-10-05). A student
+ * who copied the demo's wheel left the carriageway.
+ *
+ * WHAT IT IS. Per sample,
+ *
+ *     steerRad = pathSteer − ramp(v) · crosswindSteerPullRad(F_lat(t), v)
+ *
+ *  · `F_lat(t)` is the lesson's own wind on the demo's own clock
+ *    (`crosswindForceAtN` — the function `VehicleSim` pushes the chassis
+ *    with), projected on the car's left axis from the sample's heading. The
+ *    live gust clock also starts at 0 with the attempt, so the ghost's
+ *    correction swells on the gust and is RELEASED in the lull at the moments
+ *    the student's own wind does it (briefing step 6);
+ *  · the pull is the angle the wind turns the live car's steered pair by, so
+ *    minus the pull is exactly the wheel that cancels it: with it the road
+ *    wheels stand at `pathSteer`, and the car follows the recorded line;
+ *  · `pathSteer` is the bicycle estimate of the path's own curvature, taken
+ *    from the heading change over a window instead of over one script frame:
+ *    the yaw rate across ±`HELD_WHEEL_PATH_WINDOW_SEC`, averaged again over
+ *    the same window (a triangle two seconds wide, so the wheel eases into a
+ *    turn and out of it). The kinematic drive turns the car at a polyline
+ *    vertex inside a single 1/60 s frame, and the per-frame estimate made of
+ *    that a one-sample spike — +0.23, −0.06, +0.55 and −0.52 rad on the
+ *    committed sc-ac-crosswind shadow, on the four of its seven vertices that
+ *    happened to land on a sampled frame (the other three are simply absent).
+ *    Those were recorder artefacts, not steering; spread over the window the
+ *    same turns peak at 0.005–0.009 rad, which is what a wheel does for them.
+ *
+ * The estimate keeps the recorder's own conventions: positive = left,
+ * heading clockwise-positive, zero below 0.4 m/s, clamped to ±0.6 rad, and
+ * mirrored in reverse.
+ */
+export function heldWheelChannel(
+  samples: readonly TraceSample[],
+  wind: HeldWheelWind,
+): number[] {
+  const n = samples.length;
+  const out = new Array<number>(n).fill(0);
+  const W = HELD_WHEEL_PATH_WINDOW_SEC;
+  // Pass 1: the yaw rate (rad/s, cw-positive) across ±W around each sample.
+  const boxed = new Array<number>(n).fill(0);
+  for (let i = 0, lo = 0, hi = 0; i < n; i++) {
+    const tSec = samples[i]!.tSec;
+    while (samples[lo]!.tSec < tSec - W - 1e-9) lo++;
+    while (hi + 1 < n && samples[hi + 1]!.tSec <= tSec + W + 1e-9) hi++;
+    const a = samples[lo]!;
+    const b = samples[hi]!;
+    const span = b.tSec - a.tSec;
+    boxed[i] = span > 0 ? (wrap180(b.headingDeg - a.headingDeg) * Math.PI) / 180 / span : 0;
+  }
+  // Pass 2: its mean over the same window — the triangle. Summed afresh per
+  // sample (a window is ~21 samples): no running total, so no residue.
+  for (let i = 0, lo = 0, hi = 0; i < n; i++) {
+    const s = samples[i]!;
+    while (samples[lo]!.tSec < s.tSec - W - 1e-9) lo++;
+    while (hi + 1 < n && samples[hi + 1]!.tSec <= s.tSec + W + 1e-9) hi++;
+    const speedMps = Math.abs(s.speedKmh) / 3.6;
+    if (speedMps <= 0.4) continue;
+    let sum = 0;
+    for (let k = lo; k <= hi; k++) sum += boxed[k]!;
+    const yawRate = sum / (hi - lo + 1);
+    // headingDeg is cw-positive; steer is POSITIVE-LEFT (ccw) → negate.
+    let pathSteer = Math.atan((ESTIMATE_WHEELBASE * -yawRate) / speedMps);
+    if (s.speedKmh < 0) pathSteer = -pathSteer;
+    // District heading h (0 = north, cw): the car's left axis is (−cos h, sin h),
+    // and the wind blows along district x.
+    const leftX = -Math.cos((s.headingDeg * Math.PI) / 180);
+    const lateralN =
+      crosswindForceAtN(wind.windLateralN, wind.windGustAmplitudeN, wind.windGustPeriodSec, s.tSec) *
+      leftX;
+    const ramp = Math.min(1, speedMps / HELD_WHEEL_FULL_SPEED_MS);
+    const steer = Math.max(
+      -0.6,
+      Math.min(0.6, pathSteer - ramp * crosswindSteerPullRad(lateralN, speedMps)),
+    );
+    out[i] = steer === 0 ? 0 : steer;
+  }
+  return out;
 }
 
 export interface RecordedDrive {
@@ -757,6 +880,14 @@ export function recordScriptedDrive(
     const reduced = reduceTick(rules, tick);
     rules = reduced.state;
     ruleEvents.push(...reduced.events);
+    // An act named after its bill (`rules/types.ts ActAmendment` — the U-turn
+    // across a solid axis, known once the car has turned round): the logged
+    // row is re-labelled in place, so this log names the act exactly as the
+    // lesson ledger does. Absent on every frame of every other drive.
+    if (reduced.amendments !== undefined) {
+      const named = applyActAmendments(ruleEvents, reduced.amendments);
+      if (named !== ruleEvents) ruleEvents.splice(0, ruleEvents.length, ...named);
+    }
   };
 
   const advanceFrame = () => {
@@ -892,6 +1023,14 @@ export function recordScriptedDrive(
   if (t > lastT + 1e-6) {
     frame = 0; // force-record
     record(lastGear, lastBrake, lastThrottle, lastReverse);
+  }
+
+  // A crosswind lesson's correct demo carries the wheel its live car needs
+  // (see `heldWheelChannel`). The wheel channel ONLY, after the drive is over:
+  // nothing the stack above stepped, sampled or graded ever saw it.
+  if (options.heldWheel !== undefined) {
+    const held = heldWheelChannel(samples, options.heldWheel);
+    for (let i = 0; i < samples.length; i++) samples[i].steerRad = held[i]!;
   }
 
   const durationSec = samples.length > 0 ? samples[samples.length - 1].tSec : 0;

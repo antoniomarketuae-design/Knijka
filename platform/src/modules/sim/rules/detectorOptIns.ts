@@ -89,6 +89,24 @@ export const DETECTOR_OPT_IN_CODES: Readonly<
   junctionScanObservationEnabled: ["JUNCTION_SCAN_INCOMPLETE"],
   turnObservationEnabled: ["TURN_WITHOUT_OBSERVATION"],
   laneEntryForcedBrakingEnabled: ["LANE_ENTRY_FORCED_BRAKING"],
+  // sc-mv-uturn-ban, round 2. Default `false`, authored `true`: it ARMS a bill.
+  // CROSSED_SOLID_LINE's plain detector needs the car on the bank its nose
+  // OPPOSES for 0.6 s, so a U-turn that reaches the axis already pointing
+  // across the road (the natural arc from the outer lane) was never billed.
+  // With this key the crossing is billed by POSITION — the centre across a
+  // solid axis for the sustain — where the plain detector stayed silent, and a
+  // completed reversal that nothing billed (a crossing made in reverse gear)
+  // is itself the bill: `engine.ts` „THE REVERSAL ACROSS THE SOLID AXIS". (It
+  // also NAMES the act of a bill already made, which grades nothing.) The code
+  // was already that lesson's target through its mistake demo, so the target
+  // set does not change.
+  //
+  // Round 3: under the same key the plain detector also STANDS DOWN while the
+  // centre is on the bank the car last travelled with (its «the nose opposes
+  // its bank» is true there once the nose is past 90°, and it billed a
+  // crossing the centre had not made). So the key removes a false bill as well
+  // as arming a missing one — of the same code, which is why it stays here.
+  solidCrossUTurnEnabled: ["CROSSED_SOLID_LINE"],
 };
 
 /**

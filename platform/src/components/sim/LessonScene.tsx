@@ -45,7 +45,6 @@ import {
 import {
   CROSSWIND_BRIDGE_N,
   CROSSWIND_GUST_AMPLITUDE_N,
-  CROSSWIND_GUST_PERIOD_SEC,
   FIXED_DT,
   GRAVITY,
   SPAWN,
@@ -62,8 +61,8 @@ import {
   // legend has to know: the same two caps mean different things on the two
   // boxes, and until 2026-08-30 it described only one of them.
   transmissionModeFor,
-  SNOW_GRIP_FACTOR,
-  WET_GRIP_FACTOR,
+  // The authored `physics` → grip + crosswind props for the rig (V-08).
+  lessonRigPhysics,
   // AC-12: the «втори замах» read — the observable trigger instruction 7 of
   // sc-ac-crosswind warns about (vehicle/secondSwing.ts). Inert without the
   // authored wind, and it grades nothing.
@@ -683,6 +682,17 @@ const TOUCH_HINT_SCRIM_ALPHA = 1;
    give it back in a moment" is a decision this lesson asks for twice every
    five seconds.
 
+   THAT QUOTED NOTE STOPPED BEING TRUE ON 2026-10-04, and the cue stays for a
+   better reason than the one above. The founder ruled «Stronger wind»: the
+   wind now TURNS the car (`tuning.CROSSWIND_STEER_PULL_RAD_PER_N`), holding
+   the lane takes a held 3.5 % of the wheel at this lesson's 34 км/ч and
+   1.9–5.1 % across a gust, and the rim shows it — because the driver is
+   holding it. So the wheel is now an instrument, but of what he DID. Which
+   way the air is taking him and whether the gust is still building are what
+   it is ASKING for next, and the rim cannot say that before the car has
+   moved. The newtons this cue reads are unchanged by the ruling (the envelope
+   is still 700 → 1700 N), so neither threshold below was re-picked.
+
    SO THE CUE STATES THE TWO THINGS THE STUDENT CANNOT DERIVE.
    · WHICH SIDE the air is taking him, read from `windLatAccelMs2` — the
      CAR-LOCAL projection, so it means „you are being pushed right" and not „the
@@ -987,6 +997,12 @@ class GatedSimInput extends SimInput {
    *  a throttle press on a ready driveline performs "move-off". */
   rawThrottle = 0;
   rawBrake = 0;
+  /** The driver's HAND on the last read: his steering input, −1..1 (+ = left),
+   *  before the learner tier shapes it into a wheel — a key (±1 or 0), the
+   *  stick past its dead zone, the thumb on the pad. `vehicle/secondSwing.ts`
+   *  reads it to tell a correction that is being HELD from a wheel that is
+   *  merely falling back after a key was released. */
+  rawSteer = 0;
   private blockedThrottleAttempt = false;
 
   override read(): VehicleInput {
@@ -994,6 +1010,7 @@ class GatedSimInput extends SimInput {
     this.reverseMapper.apply(out, this.reversePedalRemap, this.reversePedalRemapSource);
     this.rawThrottle = out.throttle;
     this.rawBrake = out.brake;
+    this.rawSteer = out.steer;
     if (this.driveLocked) {
       if (out.throttle > 0) this.blockedThrottleAttempt = true;
       out.throttle = 0;
@@ -1998,6 +2015,12 @@ export function ReadyScene({
     [lesson.id],
   );
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
+  // What the lesson's AUTHORED physics becomes on the car — grip, and the
+  // crosswind's sign, amplitude and period. One pure function
+  // (`vehicle/lessonWind.ts`) that the live-lane test harness and the trace
+  // recorder call too, so a test's „product car" cannot drift from this one
+  // (sc-ac-crosswind:a9db1738, round-1 verifier V-08).
+  const rigPhysics = useMemo(() => lessonRigPhysics(lesson.physics), [lesson.physics]);
   // A7: district-space spawn pose — the start of the FIRST guidance route
   // (before the physics sample goes live). Inverse of the spawnPose mapping.
   const guidanceSpawnStart = useMemo(
@@ -2833,10 +2856,7 @@ export function ReadyScene({
                 // environment.rain/snow (shipped weather lessons were tuned
                 // against dry physics). Both authored = the MOST RESTRICTIVE
                 // factor wins (min — the condition-factor discipline).
-                gripFactor={Math.min(
-                  lesson.physics?.wetGrip ? WET_GRIP_FACTOR : 1,
-                  lesson.physics?.snowGrip ? SNOW_GRIP_FACTOR : 1,
-                )}
+                gripFactor={rigPhysics.gripFactor}
                 // SURFACE-PATCH slice: waterPatch/icePatch rects from the
                 // DISTRICT's authored zone spans (the map is the opt-in) —
                 // VehicleRig modulates the live grip as the chassis crosses
@@ -2848,10 +2868,12 @@ export function ReadyScene({
                 // vehicleSample.ts axis map): on the northbound drill street
                 // it shoves the car toward the center line — the taught
                 // danger. Constants stay in tuning.ts (the single truth the
-                // authored ghost story is written against).
-                windLateralN={lesson.physics?.crosswind ? -CROSSWIND_BRIDGE_N : 0}
-                windGustAmplitudeN={lesson.physics?.crosswind ? -CROSSWIND_GUST_AMPLITUDE_N : 0}
-                windGustPeriodSec={lesson.physics?.crosswind ? CROSSWIND_GUST_PERIOD_SEC : 0}
+                // authored ghost story is written against), and the mapping
+                // from the authored flag to these three numbers is
+                // `lessonRigPhysics` — `rigPhysics` above.
+                windLateralN={rigPhysics.windLateralN}
+                windGustAmplitudeN={rigPhysics.windGustAmplitudeN}
+                windGustPeriodSec={rigPhysics.windGustPeriodSec}
                 // N11 (VP-06): director→cluster warning-lamp channels (red +
                 // amber — the triage needs both to be visible).
                 telltaleLitRef={telltaleLitRef}
@@ -3309,13 +3331,17 @@ export function ReadyScene({
           downwind side — and this is where the student is told what he just
           did and why it is worse than the gust was.
 
-          THE SENTENCE IS THE TEMPLATE'S OWN. Instruction 7 reads «Пази се от
-          рязката „втора корекция“ — тя изхвърля колата към бордюра», and the
-          mistake demo's `whatWentWrongBg` says the same in the past tense. The
-          chip repeats that vocabulary rather than inventing a second one, so
-          the warning and the consequence are recognisably one lesson, and it
-          adds the WHY doc 64 THEO-4 requires of every verdict this product
-          gives: the wind and the correction ended up pushing the same way. It
+          THE SENTENCE NAMES WHAT THE DETECTOR SEES (round 3 of the row,
+          verifier V2-02). It used to borrow instruction 7's «…изхвърля колата
+          към бордюра», but instruction 7 warns of a DIFFERENT movement — a
+          correction held into the lull, which does carry the car upwind, to
+          the kerb. What fires this chip is the correction thrown through
+          centre to the other side, and that throws the car the way the wind
+          pushes: toward the centre line on the street, toward the median on
+          the motorway sibling, which has no kerb at all (measured at every
+          rung of both, `crosswind-live-lane-hold.test.ts` §7). «натам,
+          накъдето бута вятърът» is true on both; it adds the WHY doc 64 THEO-4
+          requires of every verdict this product gives. It
           cites no article, because it decides nothing that a law grades — the
           drift's own consequence is still CENTER_LINE_TOUCHED /
           POOR_LANE_KEEPING with their catalogue citations, untouched.
@@ -3334,7 +3360,7 @@ export function ReadyScene({
         >
           <div className="rounded-2xl border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
             Втори замах! Отпускай корекцията плавно — рязко назад изхвърля
-            колата към бордюра.
+            колата натам, накъдето бута вятърът.
           </div>
         </div>
       ) : null}
@@ -5238,6 +5264,9 @@ function RuntimeDriver({
         {
           tSec: tRef.current,
           steerRad: simRef.current?.steerRad ?? 0,
+          // The HAND beside the wheel (`SecondSwingSample.steerInput`): a key
+          // tap's wheel outlives the finger, and that tail is not a hold.
+          steerInput: inputRef.current?.rawSteer ?? 0,
           speedKmh: sample.speedKmh,
           // 0 on every lesson that authors no `physics.crosswind` — the gate
           // is the authored physics itself, never a lesson-id branch.
@@ -5253,7 +5282,14 @@ function RuntimeDriver({
         recorder?.addEvent(
           "annotation",
           tRef.current,
-          "Втори замах: воланът се върна рязко срещу порива, който вече бе отслабнал — вятърът и корекцията избутаха колата в една и съща посока.",
+          // WAS a line saying the wheel went back against a gust that had
+          // already eased — round 3 (verifier V2-02): the detector never reads the gust's phase,
+          // and it fires while the gust is still building. It reads a held
+          // correction thrown to the other side; this line says exactly that,
+          // and the side is the wind's on both lessons (the car is carried west
+          // of where it was, and of a hand that let go — §7 of
+          // `crosswind-live-lane-hold.test.ts`).
+          "Втори замах: воланът мина рязко от задържаната корекция на другата страна, натам, накъдето бута вятърът — вятърът и воланът избутаха колата в една и съща посока.",
         );
       }
     }

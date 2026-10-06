@@ -164,8 +164,14 @@ describe("routing: the air reaches the student, and the sim is what moves it", (
     expect(sceneFeedsTheSim(SCENE_SRC)).toBe(true);
     expect(sceneGatesOnAuthoredPhysics(SCENE_SRC)).toBe(true);
     // The SAME field that arms the force on the chassis, so the picture cannot
-    // be mounted on a lesson the wind is not actually blowing on.
-    expect(SCENE_SRC).toContain("windLateralN={lesson.physics?.crosswind ? -CROSSWIND_BRIDGE_N");
+    // be mounted on a lesson the wind is not actually blowing on. The force's
+    // own mapping from that field moved into `vehicle/lessonWind.ts` on
+    // 2026-10-06 (one function for the scene, the rig, the test harness and
+    // the demo recorder — `vehicle/lessonWind.test.ts` holds the routing), so
+    // the two legs asserted here are: the scene derives the rig's physics from
+    // `lesson.physics`, and the wind it hands the rig is that derivation's.
+    expect(SCENE_SRC).toContain("const rigPhysics = useMemo(() => lessonRigPhysics(lesson.physics), [lesson.physics]);");
+    expect(SCENE_SRC).toContain("windLateralN={rigPhysics.windLateralN}");
   });
 
   it("cutting any leg out of the REAL source turns the guard red", () => {

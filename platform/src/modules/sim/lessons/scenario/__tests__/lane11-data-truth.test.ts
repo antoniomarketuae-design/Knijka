@@ -165,7 +165,10 @@ const GAP_DRILLS = [
     // Unchanged by this lane, and asserted so the ledger's claim stays checked:
     // T18 called this drill's fault UNREACHABLE (fires above 205 km/h). It is
     // not — the band saturates at maxMatchSpeedMps 34, the real gap collapses to
-    // ~46 m, and the demo grades. Measured: shadow 2.10 s, demo 1.15 s.
+    // ~46 m, and the demo grades. Measured: shadow 2.10 s, demo 1.15 s — which
+    // sat on the 1.26 s line and went unbilled at the live L1/L3/L4 seeds; the
+    // demo now settles ~33-35 m back at 122 км/ч, about one second
+    // (sc-fo-motorway-gap:11e56254).
     shadowFloorSec: 2.0,
     guiltyDemo: "mistake-one-second",
     guiltyCode: "FOLLOWING_TOO_CLOSE",

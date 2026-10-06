@@ -37,8 +37,25 @@ export {
 
 // The cockpit head-lean's lateral input — the kinematic corner estimate PLUS
 // whatever else is pushing the car sideways (sc-ac-crosswind:a9db1738).
-export { cockpitLatAccelMs2 } from "./cockpitLean";
-export type { CockpitLeanInput } from "./cockpitLean";
+export { cockpitLatAccelMs2, cockpitLeanFromSim } from "./cockpitLean";
+export type { CockpitLeanInput, CockpitLeanSource } from "./cockpitLean";
+
+// The crosswind's yaw pull — the road-wheel angle the wind turns the steered
+// pair by, which is what makes holding the lane take a held correction
+// (founder ruling 2026-10-04, sc-ac-crosswind:a9db1738). Pure arithmetic;
+// `VehicleSim` is its only product caller.
+export {
+  crosswindPathShareOfWind,
+  crosswindSteerPullRad,
+  CROSSWIND_PULL_CROSSOVER_MS,
+} from "./crosswindPull";
+
+// What a lesson's authored `physics` becomes on the car — grip, and the
+// crosswind's sign, amplitude and period — as ONE pure mapping that the scene,
+// the rig, the live-lane test harness and the trace recorder's held-wheel
+// channel all call (sc-ac-crosswind:a9db1738, round-1 verifier V-08).
+export { crosswindForceAtN, lessonRigPhysics, rigSimOptions } from "./lessonWind";
+export type { LessonPhysicsFlags, LessonRigPhysics, RigSimWindOptions } from "./lessonWind";
 
 // The «втори замах» read — the observable trigger sc-ac-crosswind's instruction
 // 7 warns about and nothing could see (sc-ac-crosswind:a9db1738). A read, not a

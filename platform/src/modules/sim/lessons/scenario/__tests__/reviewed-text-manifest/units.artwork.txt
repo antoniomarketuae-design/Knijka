@@ -83,6 +83,7 @@ platform/public/sim/signs/faces/d5.svg	57f03509cd81 d853abcd8f1e
 platform/public/sim/signs/faces/g2.svg	57f03509cd81 96cdc29dc2a1
 platform/public/sim/signs/faces/g3.svg	57f03509cd81 593a85d4e001
 platform/public/sim/signs/faces/g9.svg	57f03509cd81 873be5de8836
+platform/public/sim/signs/faces/v23.svg	57f03509cd81 10fb3c448cb4
 platform/public/sim/signs/faces/v26.svg	0a465f66efe9 c9bfe6554cab 39fa9ec190ee
 platform/public/sim/signs/faces/v28.svg	57f03509cd81 ce7a0d9a4cdc
 platform/public/sim/signs/faces/v33.svg	0a465f66efe9 aa7831d8b0c8 39fa9ec190ee

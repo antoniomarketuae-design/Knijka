@@ -342,6 +342,85 @@ describe("on a two-way road the record says WHICH BANK the car occupies", () => 
 });
 
 // ---------------------------------------------------------------------------
+// 4b · THE BODY AND THE AXIS · kills a dropped, hardcoded or centre-only
+//      `axisClearM`
+// ---------------------------------------------------------------------------
+//
+// `travelDir` says which bank the CENTRE is on. `axisClearM` (2026-10-05) says
+// how far the BODY is from the axis between the two banks: the centre's
+// distance from the centreline, less how far the chassis rectangle reaches
+// across the road at this yaw. It is checked here against a figure built from
+// two OTHER channels of the same tick — `distM` (the committed fix's distance
+// to the centreline, published for the audit harness) and `deg` — and the
+// chassis's own half-extents, so the runtime's arithmetic (which goes through
+// the lane id and the lane offset) is not compared with itself.
+
+describe("on a two-way road the record says how far the BODY is from the axis", () => {
+  const H = 0.85; // collision/bodies PLAYER_HALF_WIDTH_M
+  const L = 2.02; // collision/bodies PLAYER_HALF_LENGTH_M
+  const reach = (deg: number) => {
+    const psi = (deg * Math.PI) / 180;
+    return H * Math.abs(Math.cos(psi)) + L * Math.abs(Math.sin(psi));
+  };
+  const at = (rightOffsetM: number, headingOffsetDeg = 0) =>
+    driveEdge({ edgeId: TWO_WAY_EDGE, s0: TWO_WAY_S0, s1: TWO_WAY_S1, stepM: 1, rightOffsetM, headingOffsetDeg });
+
+  it("the chassis is the product's", async () => {
+    const bodies = await import("../../collision/bodies");
+    expect([bodies.PLAYER_HALF_WIDTH_M, bodies.PLAYER_HALF_LENGTH_M]).toEqual([H, L]);
+  });
+
+  for (const [name, off, yaw] of [
+    ["1.6 m into the geometry bank, nose along the road", 1.6, 0],
+    ["1.6 m into the OPPOSING bank, nose along the road", -1.6, 0],
+    ["0.3 m into the geometry bank — astride the axis", 0.3, 0],
+    ["0.3 m into the opposing bank — astride the axis", -0.3, 0],
+    ["1.6 m in, square across the road — the tail is over the axis", 1.6, 90],
+    ["3 m in, 30° off the road", 3, 30],
+  ] as const) {
+    it(`${name}: axisClearM = distance to the centreline − the body's reach across`, () => {
+      const ticks = at(off, yaw);
+      expect(ticks.length).toBeGreaterThan(50);
+      for (const t of ticks) {
+        const ea = alignment(t);
+        expect(ea.edgeId).toBe(TWO_WAY_EDGE);
+        expect(ea.travelDir).toBe(off > 0 ? 1 : -1);
+        expect(typeof ea.axisClearM).toBe("number");
+        expect(ea.axisClearM).toBeCloseTo((t.distM as number) - reach(ea.deg as number), 6);
+        // …and the centre really is where the fixture put it.
+        expect(t.distM as number).toBeCloseTo(Math.abs(off), 1);
+      }
+    });
+  }
+
+  it("the SIGN is the fact a reader takes from it: the whole body on its bank ≥ 0, astride the axis < 0", () => {
+    /** The member, FAILING ON AN ASSERTION if the runtime published none. */
+    const clearOf = (t: SimTick): number => {
+      const c = alignment(t).axisClearM;
+      expect(typeof c).toBe("number");
+      return c as number;
+    };
+    for (const t of at(1.6)) expect(clearOf(t)).toBeGreaterThan(0.6);
+    for (const t of at(-1.6)) expect(clearOf(t)).toBeGreaterThan(0.6);
+    for (const t of at(0.3)) expect(clearOf(t)).toBeLessThan(-0.4);
+    for (const t of at(-0.3)) expect(clearOf(t)).toBeLessThan(-0.4);
+    // A centre 1.6 m in is clear of the axis nose-along and NOT clear square
+    // across: the yaw is half of the measurement.
+    for (const t of at(1.6, 90)) expect(clearOf(t)).toBeLessThan(-0.3);
+  });
+
+  it("a ONE-WAY has no axis between two banks: the member is absent there, and absent with no edge fix", () => {
+    for (const t of driveEdge({ edgeId: STREET_EDGE, s0: STREET_S0, s1: STREET_S1 })) {
+      expect("axisClearM" in alignment(t)).toBe(false);
+    }
+    const rt = createWorldRuntime(loadDistrict());
+    rt.update(0.05);
+    const nowhere = alignment(rt.sample(mkVehicle(OFF_NETWORK, { speedKmh: 10 }), 0.05, false));
+    expect("axisClearM" in nowhere).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 5 · PAST THE KERB · kills `edgeId: offCarriageway ? null : …` and
 //     `offCarriageway: false`
 // ---------------------------------------------------------------------------

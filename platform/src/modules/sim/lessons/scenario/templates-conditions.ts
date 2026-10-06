@@ -1133,12 +1133,18 @@ export const SC_AC_SNOW: ScenarioSpec = {
  * THE WIND IS THE LESSON (the first opt-in crosswind template):
  *  - `physics.crosswind` compiles to LessonSpec.physics.crosswind → the LIVE
  *    student car takes a WESTWARD lateral force (−tuning.CROSSWIND_BRIDGE_N
- *    along world X) plus the deterministic gust sine (CROSSWIND_GUST_*):
- *    measured ≈1 m of downwind drift per 5 s hands-fixed at speed,
- *    compounding as the heading blows over (vehicle/crosswind.test.ts). On
- *    this northbound street „downwind" = toward the осева — the exact AC-12
- *    danger. A small steady counter-steer holds the lane; an over-correction
- *    genuinely overshoots.
+ *    along world X) plus the deterministic gust sine (CROSSWIND_GUST_*),
+ *    AND the wind's yaw pull (founder ruling 2026-10-04, «Stronger wind» —
+ *    tuning.CROSSWIND_STEER_PULL_RAD_PER_N): the nose is turned downwind, so
+ *    a car left alone at the taught 34 км/ч is carried 0.4 m in 1 s and
+ *    1.4 m in 2 s, and holding the lane takes a HELD 3.5 % of the wheel (1.9 %
+ *    in the lull, 5.1 % on the gust — vehicle/crosswind.test.ts). On this
+ *    northbound street „downwind" = toward the осева — the exact AC-12
+ *    danger. Steps 4–7 below are now properties of the car: slower is less
+ *    drift, the correction is constant, there is something to release when
+ *    the canopies straighten, and a correction kept past the gust throws the
+ *    car the other way (scenario/__tests__/crosswind-live-lane-hold.test.ts
+ *    drives all four rungs on the real car).
  *  - DUAL-CHANNEL HONESTY (the 4a law, wind edition): the recorded demos are
  *    KINEMATIC (the recorder never runs VehicleSim), so the wind story is
  *    AUTHORED into the ghost polylines — the shadow's small held-and-released

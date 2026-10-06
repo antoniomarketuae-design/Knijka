@@ -27,6 +27,7 @@ import {
   applyDifficulty,
   createDriveAssistState,
   DEFAULT_DIFFICULTY,
+  rigSimOptions,
   transmissionModeFor,
   type DifficultyMode,
 } from "@/modules/sim/vehicle";
@@ -492,14 +493,15 @@ export function VehicleRig({
       // dormant — same identity discipline as gripFactor.
       // F2/F3 (doc 82 §4.2): the same identity discipline again — false / 0
       // are the pre-F defaults and construct the pre-F car exactly.
+      //
+      // The grip/wind packing is `rigSimOptions` (`vehicle/lessonWind.ts`) —
+      // the function the live-lane test harness builds ITS car with, so the
+      // gust object's own rule (present only with an amplitude AND a period)
+      // is not retyped anywhere (sc-ac-crosswind:a9db1738, verifier V-08).
       {
-        gripFactor,
-        windLateralN,
+        ...rigSimOptions({ gripFactor, windLateralN, windGustAmplitudeN, windGustPeriodSec }),
         engineBraking,
         roadRoughness,
-        ...(windGustAmplitudeN !== 0 && windGustPeriodSec > 0
-          ? { windGust: { periodSec: windGustPeriodSec, amplitudeN: windGustAmplitudeN } }
-          : {}),
       },
     );
     simRef.current = sim;

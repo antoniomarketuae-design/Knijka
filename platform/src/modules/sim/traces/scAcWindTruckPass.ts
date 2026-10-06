@@ -43,6 +43,7 @@
 
 import type { StagedEventSpec } from "../contracts";
 import { SC_AC_WIND_TRUCK_PASS } from "../lessons/scenario/templates-conditions2";
+import { lessonRigPhysics } from "../vehicle";
 import {
   recordScriptedDrive,
   type DriveScript,
@@ -75,19 +76,38 @@ export function scAcWindTruckPassShadowScript(): DriveScript {
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "drive", points: [[X_CRUISE, 120], [X_OVERTAKE, 200]], targetKmh: 74, stopAtEnd: false },
-      { kind: "annotation", textBg: "Докато сме до камиона, сме в неговия завет — вятърът мълчи. Точно затова следващата секунда е коварна." },
-      // The cab-line gust, AUTHORED: as the nose clears the cab the lee ends and
-      // the wind shoves — the correct driver meets it with a small STEADY
-      // correction toward the truck (drift to x ≈ −9.2, ≈ 1.1 m, far inside the
-      // 3.25 m band), held, then released smoothly. Passes the sc-acw-pass zone
-      // (−8.12, 340) at ~70 km/h.
+      // WAS «Докато сме до камиона, сме в неговия завет — вятърът мълчи. Точно
+      // затова следващата секунда е коварна.» — round 2 of sc-ac-crosswind:
+      // a9db1738 (verifier V-13 / V-06). Two things made it untrue of what is on
+      // the screen. The staged rig is `matchPlayer`: it paces 60 m AHEAD for the
+      // whole drive (templates-conditions2.ts, ACTS_WIND_TRUCK), so the ghost is
+      // never beside it; and the live wind has no shelter term at all, so the
+      // car this demo teaches holds its wheel into the wind on this very
+      // stretch (measured: 2.1 % of the lock at ~70 км/ч, and a 2 s lapse here
+      // carries it 1.8 m in the mean wind). The shadow's wheel channel now CARRIES that held
+      // correction (`heldWheel` below), and a caption saying «вятърът мълчи»
+      // over a wheel held against the wind would contradict its own picture.
+      // The line now says what the drive delivers — the briefing's step 3,
+      // in the demo's voice. The lee itself stays taught, as knowledge about
+      // the road, in `teach.whenBg` / `teach.whyBg`.
+      { kind: "annotation", textBg: "В лявата лента сме, а завет няма — вятърът натиска през цялото време. Държим леката корекция към камиона." },
+      // The gust, AUTHORED into the polyline: the wind shoves LEFT and the
+      // correct driver meets it with a small STEADY correction toward the
+      // truck (drift to x ≈ −9.2, ≈ 1.1 m, far inside the 3.25 m band), held,
+      // then released smoothly. Passes the sc-acw-pass zone (−8.12, 340) at
+      // ~70 km/h.
       {
         kind: "drive",
         points: [[X_OVERTAKE, 200], [X_OVERTAKE, 290], [-9.2, 320], [-8.9, 345], [X_OVERTAKE, 380]],
         targetKmh: 70,
         stopAtEnd: false,
       },
-      { kind: "annotation", textBg: "Носът излезе пред кабината — поривът удари, посрещаме го с лека, ПОСТОЯННА корекция, не с рязко дръпване." },
+      // WAS «Носът излезе пред кабината — поривът удари, …» — same finding: the
+      // gust is a 5 s sine on the session clock and knows nothing about a cab
+      // line (and the rig is 60 m ahead of this nose). What the polyline above
+      // shows is the car moved a metre LEFT and brought back, which is what a
+      // gust does to the live car too.
+      { kind: "annotation", textBg: "Поривът ни измести наляво — посрещаме го с лека, ПОСТОЯННА корекция, не с рязко дръпване." },
       // Return: RIGHT indicator + glance, then the lane change back to the
       // cruise lane (→ SAFE_LANE_CHANGE), only once the truck is behind.
       { kind: "indicator", setting: "right" },
@@ -108,12 +128,17 @@ export function scAcWindTruckPassShadowScript(): DriveScript {
 export function scAcWindTruckPassMistakeBlownOutScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешката: изпреварване с пътна скорост и отпусната ръка — точно в мига на излизане от завета." },
+      // The two lines of this demo that placed the gust «в мига на излизане
+      // от завета» / «пред кабината» were retargeted with the shadow's (round 2,
+      // V-13): this drive has no lee — the wind presses from the first metre —
+      // and the rig is never abeam. The loose hand and the road speed are the
+      // mistake, and they are what the lines now name.
+      { kind: "annotation", textBg: "Грешката: изпреварване с пътна скорост и отпусната ръка в силен страничен вятър." },
       { kind: "drive", points: [[X_CRUISE, 15], [X_CRUISE, 120]], targetKmh: 80, stopAtEnd: false },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "drive", points: [[X_CRUISE, 120], [X_OVERTAKE, 200]], targetKmh: 80, stopAtEnd: false },
-      { kind: "annotation", textBg: "Носът излиза пред кабината — заветът изчезва и поривът блъска колата към мантинелата." },
+      { kind: "annotation", textBg: "Поривът идва — и с отпусната ръка колата тръгва наляво, към мантинелата." },
       // Loose hands at the cab line: the gust walks the car to x ≈ −11.6 (offset
       // ≈ 3.48 m, past the 3.25 m band) and it rides the median side from
       // y ≈ 323 to 420 — ~4.3 s at 80 km/h, past the 3 s POOR_LANE_KEEPING
@@ -124,7 +149,13 @@ export function scAcWindTruckPassMistakeBlownOutScript(): DriveScript {
         targetKmh: 80,
         stopAtEnd: false,
       },
-      { kind: "annotation", textBg: "Колата се понесе през половин лента към мантинелата — вятърът я държи там, докато водачът се събуди." },
+      // WAS «…— вятърът я държи там, докато водачът се събуди» — round 3
+      // (verifier V2-01): the wind holds a car nowhere. Six seconds of loose
+      // wheel in the overtaking lane and the live car never once moves back
+      // east; it is past the lane's median-side edge in 4 s. 2.5 s of it is
+      // the half lane this caption names (4.3–4.5 m), and the driver who
+      // takes the wheel back then finishes clean.
+      { kind: "annotation", textBg: "Колата се понесе през половин лента към мантинелата, докато водачът се събуди." },
       { kind: "drive", points: [[-11.6, 420], [X_OVERTAKE, 470], [X_OVERTAKE, 540]], targetKmh: 76 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "При излизане от завета на камион скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2)." },
@@ -139,14 +170,23 @@ export function scAcWindTruckPassMistakeBlownOutScript(): DriveScript {
 export function scAcWindTruckPassMistakeClipTruckScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешката: тясна пролука до ремаркето и висока скорост — вятърът не оставя място за реакция." },
+      // Round 3 (verifier V2-01): the gust pushes AWAY from the trailer, so it
+      // is not what eats this gap. What the wind does here is ask for a held
+      // correction toward the truck (2.1 % of the lock in this lane; let go, the
+      // car is carried 2.8 m toward the median in 2 s), and in a narrow gap an
+      // error with that correction has nowhere to go — the next caption.
+      { kind: "annotation", textBg: "Грешката: тясна пролука до ремаркето и висока скорост — вятърът иска корекция, а пролуката не оставя място за грешка с нея." },
       { kind: "drive", points: [[X_CRUISE, 15], [X_CRUISE, 120]], targetKmh: 80, stopAtEnd: false },
       { kind: "indicator", setting: "left" },
       { kind: "glance", mirror: "left" },
       { kind: "drive", points: [[X_CRUISE, 120], [X_OVERTAKE, 200]], targetKmh: 80, stopAtEnd: false },
       { kind: "drive", points: [[X_OVERTAKE, 200], [X_OVERTAKE, 280]], targetKmh: 80, stopAtEnd: false },
-      { kind: "annotation", textBg: "До кабината, в тясната пролука между колата и ремаркето — поривът я хвърля обратно към камиона." },
-      // The gust throws the car back toward the trailer: a small in-band lurch
+      // WAS «…— поривът я хвърля обратно към камиона» — round 3 (verifier
+      // V2-01): the westward wind cannot throw a car east, at the truck. A
+      // sharp correction against it can, and does: 3.0–3.8 m east within 2 s
+      // on the live car at every rung (`crosswind-live-lane-hold.test.ts` §7).
+      { kind: "annotation", textBg: "До кабината, в тясната пролука между колата и ремаркето — рязката корекция срещу порива я хвърля обратно към камиона." },
+      // The sharp correction throws the car back toward the trailer: a small in-band lurch
       // (to x ≈ −6.0, offset ≈ 2.1 m, still laneId 2) coincident with the
       // AUTHORED collision consequence — the тясна-пролука sideswipe. NOT a
       // geometric contact with the paced rig (8 m away in its own lane); the
@@ -192,6 +232,12 @@ export function recordScAcWindTruckPassDrive(
     kind,
     seed: 7,
     stagedEvents: [...(SC_AC_WIND_TRUCK_PASS.staged ?? [])] as StagedEventSpec[],
+    // THE CORRECT DEMO HOLDS THE WHEEL THE LIVE CAR NEEDS (round 2, verifier
+    // V-06): the shadow's `steerRad` channel carries the correction that
+    // cancels the lesson's own wind — the rig physics the scene derives from
+    // `physics.crosswind` — and releases it in each lull. The mistake demos do
+    // not opt in: a loose hand is their story, and their bytes are untouched.
+    ...(kind === "shadow" ? { heldWheel: lessonRigPhysics(SC_AC_WIND_TRUCK_PASS.physics) } : {}),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

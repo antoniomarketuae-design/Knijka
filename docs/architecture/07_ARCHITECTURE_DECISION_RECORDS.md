@@ -283,3 +283,40 @@ billed — by the letter of the ruling (integrator-ratified, owed to the founder
 AFTER the car has cleared the mouth is billed by nothing here. The barge demos were re-staged and re-recorded so their
 offence is real; clip `sc-roundabout-entry__m0` must be re-captured. Owed to the founder as reads: the 0.3 m/s size, and the
 voice line said shortly before a later cost.
+
+## ADR-012: A crosswind steers the front wheels — the «yaw pull» (Founder ruling, 2026-10-05 «Ship the pull»)
+
+**Status.** Accepted. Founder rulings 2026-10-04 «Stronger wind» and 2026-10-05 «Ship the pull»; lane `crosswind`, rounds 1–3, each
+adversarially verified; landed with the commit that carries this entry.
+
+**Context.** The crosswind lessons teach «лека, ПОСТОЯННА корекция», but the side force enters the vehicle at the centre of mass and the raycast
+tyre cancels sideways velocity every step, so holding the lane asked for 0.054 % of steering at the shipped 1,200 N — no correction a student can
+see or feel. Measured: 0.54 % at 12 kN (1 g), 0.63 % at 14 kN, the car lost at 16 kN. The founder's «stronger wind» could not be built by force.
+
+**Decision.** A second wind channel steers the front wheels: `pull = F_lateral · min(K, L / (m·(v² + v_s²)))`, K = 1.46e-5 rad/N
+(`CROSSWIND_STEER_PULL_RAD_PER_N`, «a teaching exaggeration» of a real compact's compliance), v_s = 6.8 m/s. The driver's wheel is untouched;
+the steered pair gets steer + pull. Holding the lane needs 3.5 % of the wheel at the taught 34 км/ч and 3.1 % at the 40 км/ч ceiling; the hands-off
+displacement rises strictly with speed from 8 to 110 км/ч and the hands-off path acceleration never exceeds the wind's own F/m. Keyboard driving
+is included (the founder declined «analog only»).
+
+**Supporting decisions.** One shared wind mapping for LessonScene, VehicleRig and the test harness; the cockpit lean read through
+`cockpitLeanFromSim` on the road wheels, so a lane-holder still feels the wind; the recorder writes the held correction into the correct demos'
+wheel channel (`heldWheel`); the second-swing cue reads the student's hand.
+
+**Consequences.** Hands-off is now OFF_CARRIAGEWAY on every rung of both wind lessons; the audit harness's right legs must hold a correction.
+Owed: the founder's own drive on keyboard and phone; the truck-pass lesson's staging (row `sc-ac-wind-truck-pass:ff1d4290`).
+
+## ADR-013: The U-turn act is decided from the car's heading and the road
+
+**Status.** Accepted. Lane `uturn`, rounds 1–6, each adversarially verified; landed with the commit that carries this entry.
+
+**Decision.** In the armed lesson (`solidCrossUTurnEnabled`) a billed crossing of a SOLID centre line is named «Обратен завой през непрекъсната
+осева линия» if and only if a turn-round — one continuous yaw excursion that takes the nose from within 45° of one road direction to within 45° of
+the other, judged from the heading against the road alone — completed at or after that crossing on the same excursion, and the axis is solid
+where the turn-round BEGAN. A turn-round made over the dashes never names or renames anything. The tracker follows the road, not the edge,
+and the car's travel direction is read from its heading. One act, one bill, until the swing ends; a car then across the solid axis from the half
+of its new direction is a new crossing. The crossing reason never says «насрещната половина» for a half that runs the car's own way.
+
+**A new member on SimTick.edgeAlignment.** `axisClearM` — how far the car's body is from the road axis (≥ 0 = wholly on one bank, < 0 =
+astride). Published on every two-way edge frame, read only under `solidCrossUTurnEnabled`; it decides «изцяло» versus «Застъпи…» on the bill.
+This extends the 2026-09-20 ruling that published the signed direction signal.

@@ -82,6 +82,7 @@ import {
   pointsEachBg,
   pointsOutOfBg,
   pointsWordsBg,
+  violationCorrectiveBg,
   type FailReason,
   type ViolationCode,
 } from "../rules";
@@ -171,9 +172,12 @@ function clock(tSec: number): string {
 }
 
 /** A15: the catalog's authored corrective action; null for unknown codes. */
-function correctiveFor(code: string): string | null {
+function correctiveFor(code: string, detail?: string): string | null {
   if (!(code in VIOLATIONS)) return null;
-  return VIOLATIONS[code as ViolationCode].correctiveBg;
+  // Act first, pooled second — the same resolver the debrief text uses, so the
+  // card and the paragraph under it give one piece of advice for one act
+  // (sc-mv-uturn-ban:6d60c160).
+  return violationCorrectiveBg(code as ViolationCode, detail);
 }
 
 /**
@@ -2053,7 +2057,7 @@ export function SessionEndScreen({
                 >
                   <FaultCard
                     event={m}
-                    correctiveBg={correctiveFor(m.code)}
+                    correctiveBg={correctiveFor(m.code, m.detail)}
                     atBg={clock(m.t)}
                     billing={roadBilling[i]}
                     examBilled={examBilling[i]}

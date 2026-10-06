@@ -22,12 +22,15 @@
  *    the 2 s convict bar on a 2+2. That single fact decides where the template's
  *    stream must be staged, and it is asserted here rather than trusted.
  *
- * PINNED GAP — the ban nobody paints. The markings builder renders no solid
- * осева along an М1 span, and the world's sign pass has no В23 SignKind: the
- * whole ban is invisible today. That is RENDER-only (grading reads authored
- * spans, never paint), and it is pinned below rather than left as a comment so
- * the day the builder learns М1 or В23, this test fails loudly and tells its
- * author what to check.
+ * THE BAN IS NOW DRAWN, BOTH HALVES (sc-mv-uturn-ban:e98407b1). This header
+ * used to read „PINNED GAP — the ban nobody paints": no solid осева along the
+ * М1 span and no В23 SignKind. The first half had been out of date for a while
+ * (markings.ts paints `solidCenterLine` spans — measured below, not trusted),
+ * and the second is what the pin existed to announce: zoneSigns.ts now posts
+ * the В23 the map declares in `meta.scenario.uturnBanSign`, at the first metre
+ * of the М1 span it travels with. Still RENDER-only — grading reads the
+ * authored span (`graded: false` on the sign says so) — but the lesson no
+ * longer names a plate the student cannot see.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -38,6 +41,7 @@ import { buildLaneGraph } from "../../traffic/graph";
 import { resolveStagedVehiclePath } from "../../traffic/staged";
 import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../traffic/types";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import { SCENARIO_SIGN_SCALE } from "../builders/constants";
 import { assertDistrict, type District, type WorldGeometry } from "../types";
 
 const ID = "mv-uturn-v1";
@@ -255,19 +259,81 @@ describe(`${ID} through the world builder`, () => {
     expect(zoneAt(finish.y)).toBeUndefined();
   });
 
-  it("PINNED RENDER GAP: no М1 paint, no В23 post — the ban is graded, not drawn", () => {
-    // Honest scope (the gen_ov_solid2 precedent): the markings builder paints no
-    // solid осева along an М1 span and the sign pass has no В23 SignKind, so
-    // this map's entire ban is invisible in the scene today. Grading reads the
-    // authored span and is exact regardless; the template copy carries the
-    // teaching. When either builder learns this vocabulary, THIS test fails and
-    // its author gets told to re-check the template's „знакът В23" copy.
-    const banSigns = world.signs.filter((s) => String(s.kind).toLowerCase().includes("uturn"));
-    expect(banSigns).toHaveLength(0);
-    // The stem's derived Б2 IS placed (props.ts maxRank >= 5 → kind "stop") —
-    // graded control and visuals agree there, which is the contrast that makes
-    // the М1's absence a gap rather than a policy.
+  it("THE В23 THE MAP DECLARES IS POSTED: one plate at the first metre of the ban, on the driver's kerb, facing him", () => {
+    // The flip of „PINNED RENDER GAP: no М1 paint, no В23 post". The map authors
+    // { signRef: "В23", atY: 40, spanY: 40→220 } and the template is NAMED after
+    // that sign; until zoneSigns.ts learned to read the declaration, nothing
+    // stood at y = 40 and the lesson taught „не се обръща под знак В23" on a
+    // road with no В23 on it.
+    const declared = (district.meta.scenario as { uturnBanSign: { signRef: string; atY: number } })
+      .uturnBanSign;
+    expect(declared.signRef).toBe("В23");
+    const posts = world.signs.filter((s) => s.kind === "uTurnBan");
+    // ONE — the map declares one plate. No repeat is invented: the М1 line is
+    // the control that stays in frame down the span, and it is drawn.
+    expect(posts).toHaveLength(1);
+    const [post] = posts;
+    // World frame: x = district x, z = −district y (builders/mesh.toWorld).
+    // The RIGHT-hand kerb of the northbound driver: outside the carriageway
+    // (|x| ≤ 16.25) and on the very line the map's own northbound posts stand
+    // on — the entry В26 «50» and the Б3 — i.e. 0.8 m past the drawn ribbon
+    // (travel lanes + the 4 m parking band), the convention every post follows.
+    const kerbLine = world.signs.filter((x) => x.kind === "limit50" && x.yaw === 0).map((x) => x.position[0]);
+    expect(kerbLine.length).toBeGreaterThan(0);
+    expect(new Set(kerbLine).size).toBe(1);
+    expect(post.position[0]).toBeGreaterThan(16.25);
+    expect(post.position[0]).toBeCloseTo(kerbLine[0], 5);
+    expect(post.position[0]).toBeCloseTo(16.25 + 4 + 0.8, 2);
+    // …at the declared station, which is the first metre of the М1 span.
+    expect(-post.position[2]).toBeCloseTo(declared.atY, 2);
+    expect(-post.position[2]).toBeCloseTo(BAN_FROM_Y, 2);
+    // Facing the driver who ARRIVES (northbound): the same yaw the zone posts
+    // on every x = 0 northbound map carry (zone-signs.test.ts expectPost).
+    expect(post.yaw).toBeCloseTo(0, 5);
+    // Lesson-critical prominence on a scenario micro-map, like every zone post.
+    expect(post.scale).toBe(SCENARIO_SIGN_SCALE);
+    // BEFORE the tempting spot and before the spawn's first decision: the
+    // student drives PAST it on the way to the place it forbids.
+    expect(-post.position[2]).toBeGreaterThan(SPAWN_Y);
+    expect(-post.position[2]).toBeLessThan(TEMPTING_Y);
+    // Its own object — no other post within the distinct-post floor.
+    for (const other of world.signs) {
+      if (other === post) continue;
+      const d = Math.hypot(other.position[0] - post.position[0], other.position[2] - post.position[2]);
+      expect(d, `${other.kind} stands ${d.toFixed(2)} m from the В23`).toBeGreaterThanOrEqual(1.2);
+    }
+    // The stem's derived Б2 IS placed too (props.ts maxRank >= 5 → kind "stop").
     expect(world.signs.some((s) => s.kind === "stop")).toBe(true);
+  });
+
+  it("…and the М1 it stands beside is PAINTED: a solid осева across the span, dashes after it", () => {
+    // The other half of the old pin („no М1 paint") had been false since
+    // markings.ts learned `solidCenterLine`; measured here so the header can
+    // never go stale in that direction again. A solid span paints strictly
+    // more centre-line than the same district with its zone removed (dashes
+    // have gaps; the М1 has none).
+    const withoutZone = buildWorldGeometry(assertDistrict({ ...(loadRaw(ID) as object), zones: [] }), { seed: 7 });
+    expect(world.markings.indices.length).not.toBe(withoutZone.markings.indices.length);
+    // …and with the zone gone the declared plate has no graded wall to stand
+    // on, so it is NOT posted: a В23 beside a dashed line would announce a ban
+    // nothing enforces.
+    expect(withoutZone.signs.filter((s) => s.kind === "uTurnBan")).toHaveLength(0);
+  });
+
+  it("a declaration that does not sit on its М1 span posts NOTHING — a plate is never guessed onto a road", () => {
+    const raw = loadRaw(ID) as { meta: { scenario: { uturnBanSign: Record<string, unknown> } } };
+    const moved = JSON.parse(JSON.stringify(raw)) as typeof raw;
+    // 90 m into the span: no longer the first metre of anything authored.
+    moved.meta.scenario.uturnBanSign.atY = 130;
+    expect(
+      buildWorldGeometry(assertDistrict(moved), { seed: 7 }).signs.filter((s) => s.kind === "uTurnBan"),
+    ).toHaveLength(0);
+    // A different sign under the same key is not a В23 either.
+    const other = JSON.parse(JSON.stringify(raw)) as typeof raw;
+    other.meta.scenario.uturnBanSign.signRef = "В22";
+    expect(
+      buildWorldGeometry(assertDistrict(other), { seed: 7 }).signs.filter((s) => s.kind === "uTurnBan"),
+    ).toHaveLength(0);
   });
 
   it("produces no NaN/infinite coordinates in any buffer or placement", () => {

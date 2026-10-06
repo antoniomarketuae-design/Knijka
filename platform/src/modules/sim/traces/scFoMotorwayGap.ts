@@ -12,9 +12,11 @@
  *     2-second gap — then absorbs the lead's firm 6 m/s² brake and rolls to rest
  *     with metres to spare (stoppedInTime), then resumes to the finish;
  *   - „Една секунда зад водещия": the impatient driver RACES into the gap (a
- *     burst at 144 — under the 145 km/h grace of the posted 140) and sits ~40 m
- *     back at 130 — the lead has no headroom to escape — grading EXACTLY
- *     FOLLOWING_TOO_CLOSE. It ends BEFORE the slam: the fault is the gap,
+ *     burst at 144 — under the 145 km/h grace of the posted 140) and sits ~35 m
+ *     back at the lead's 122 (≈ 1.0 s) — the lead has no headroom to escape —
+ *     grading EXACTLY FOLLOWING_TOO_CLOSE, once, at every rung and live seed
+ *     (sc-fo-motorway-gap:11e56254: at 42-44 m it sat ON the engine's 42.9 m
+ *     fire line and went unbilled at L1/L3/L4). It ends BEFORE the slam: the fault is the gap,
  *     nothing else. The burst USED to be authored at 149, which was legal only
  *     because of the audit's M-14 dead band (a 10% grace of 154 sitting above
  *     the +10 опасна line made second-degree speeding unreachable on every
@@ -68,18 +70,44 @@ export function scFoMotorwayGapShadowScript(): DriveScript {
 // Mistake demo 1 — „Една секунда зад водещия при 130" (FOLLOWING_TOO_CLOSE)
 // ---------------------------------------------------------------------------
 
+/**
+ * Where the closing burst ends and the car lifts to the lead's 122.
+ *
+ * WHY THIS NUMBER (sc-fo-motorway-gap:11e56254). The burst used to end at
+ * y = 500 and the car settled ~42.4-44.0 m back at 122.6 км/ч — against the
+ * engine's FOLLOWING_TOO_CLOSE fire line of 42.9 m there (followSafeSeconds
+ * 1.8 × followFireRatio 0.7 = 1.26 s). That is 1.18 s, not one second, and the
+ * under-the-line stretch lasted 1.6-1.7 s against the 2 s sustain: at the live
+ * L1/L3/L4 seeds the demo named for the mistake was billed NOTHING. Closing
+ * ~56 m further at 144 settles it 33.8-35.5 m back — 0.99-1.04 s, ≥ 7 m under
+ * the line, under it for ~5 s — at every rung and seed.
+ *
+ * WHY THE DECIMALS. The recorder clamps a step's last frame to the polyline
+ * end, so a boundary that does not land on a whole frame stalls the car for
+ * part of one frame (0.35 m at y = 560). The tick reads that as the gap
+ * OPENING at ~21 m/s, the engine's cut-in recovery guard resets the episode,
+ * and the one continuous act is billed twice. 556.25 is a boundary the 144
+ * burst reaches on a whole frame (the clean window is 556.22-556.26), so the
+ * car never stalls and the act is billed once — pinned by
+ * fo-motorway-gap-one-second-demo-live-rungs.test.ts.
+ */
+const ONE_SECOND_LIFT_Y = 556.25;
+
 export function scFoMotorwayGapMistakeOneSecondScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешка: нетърпение — колата се засилва и се залепва на около 40 метра зад водещия." },
+      { kind: "annotation", textBg: "Грешка: нетърпение — колата се засилва и се залепва на около 35 метра зад водещия." },
       { kind: "glance", mirror: "rear" },
       // Race into the pinned gap (a burst under the 145 km/h grace line), then
-      // sit at ~40 m at flow — one second where two are needed.
-      { kind: "drive", points: [[X, 15], [X, 300]], targetKmh: 144, stopAtEnd: false },
-      { kind: "drive", points: [[X, 300], [X, 500]], targetKmh: 144, stopAtEnd: false },
-      { kind: "drive", points: [[X, 500], [X, 660]], targetKmh: 122, stopAtEnd: false },
+      // sit ~35 m back at the lead's own 122 — one second where two are needed.
+      { kind: "drive", points: [[X, 15], [X, ONE_SECOND_LIFT_Y]], targetKmh: 144, stopAtEnd: false },
+      // Hold it to y = 665: the lead (~39 m of centres ahead) is still short of
+      // its staged brake at y = 720 when the drive ends, so the fault stays the
+      // gap alone. The closing pause puts the car at rest, under the runner's
+      // 60 km/h cut floor, so the brake cannot arm inside this demo either.
+      { kind: "drive", points: [[X, ONE_SECOND_LIFT_Y], [X, 665]], targetKmh: 122, stopAtEnd: false },
       { kind: "pause", sec: 1, brake: true },
-      { kind: "annotation", textBg: "40 метра на тази скорост е под секунда и половина — по-малко от времето дори само да реагираш." },
+      { kind: "annotation", textBg: "35 метра на тази скорост са около една секунда — едва колкото да реагираш, преди изобщо да натиснеш спирачката." },
     ],
   };
 }

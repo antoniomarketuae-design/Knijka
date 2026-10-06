@@ -8,6 +8,7 @@ platform/public/sim/signs/faces/d5.svg	9d0fd452285f 0adea7fe6ec8
 platform/public/sim/signs/faces/g2.svg	9d0fd452285f c193fda30096
 platform/public/sim/signs/faces/g3.svg	9d0fd452285f aa747742b0f6
 platform/public/sim/signs/faces/g9.svg	9d0fd452285f b7ed13cbac96
+platform/public/sim/signs/faces/v23.svg	9d0fd452285f 530c38f6a54a
 platform/public/sim/signs/faces/v26.svg	9d0fd452285f e72ec017e021
 platform/public/sim/signs/faces/v28.svg	9d0fd452285f 6baa5bbacb6f
 platform/public/sim/signs/faces/v33.svg	9d0fd452285f c7b12a176118

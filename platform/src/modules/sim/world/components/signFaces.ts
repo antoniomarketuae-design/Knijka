@@ -12,7 +12,7 @@
  * is swapped.
  *
  * WHERE THE ART COMES FROM. `public/sim/signs/faces/*.svg` are byte-copies of
- * `content/signs/svg/{v26,v33,d4}.svg` — the same reviewed, `lawRefs`-carrying
+ * `content/signs/svg/{v26,v33,d4,…}.svg` — the same reviewed, `lawRefs`-carrying
  * files `content/signs/signs.json` indexes and the theory surface serves
  * through `/api/signs/<code>`. So the В26 a student meets in the simulator is
  * pixel-identical to the В26 in his theory question, which is the whole
@@ -88,6 +88,16 @@ const FACE_PX = 512;
  *  Д15: the motorway rules apply on a road „обозначен като автомагистрала …
  *  СЪС СЪОТВЕТНИЯ ПЪТЕН ЗНАК". It carries no `<text>` node, so `withNumeral`
  *  refuses it — correct, it states no number. */
+/*  `v23` (В23 „Забранено е завиването в обратна посока") rides the В26 body —
+ *  the plate thirteen speed numerals already share. The proof is a byte match
+ *  again: v23.svg and v26.svg both open with
+ *  `<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f"
+ *  stroke-width="20" data-plate="true"/>` and differ only in the face (В26 a
+ *  numeral, В23 the U-arrow under the prohibition bar). It is the plate
+ *  sc-mv-uturn-ban is NAMED after and mv-uturn-v1 declares at the first metre
+ *  of its М1 span; before this entry nothing could post it
+ *  (sc-mv-uturn-ban:e98407b1). No `<text>` node, so `withNumeral` refuses it —
+ *  correct, it states no number. */
 export type SignFaceArt =
   | "v26"
   | "v33"
@@ -96,6 +106,7 @@ export type SignFaceArt =
   | "g3"
   | "a19"
   | "v28"
+  | "v23"
   | "g9"
   | "d15"
   | "d16"

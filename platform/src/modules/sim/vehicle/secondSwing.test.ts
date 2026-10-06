@@ -20,6 +20,7 @@ import {
   type SecondSwingRead,
   type SecondSwingState,
 } from "./secondSwing";
+import { crosswindSteerPullRad } from "./crosswindPull";
 import {
   CHASSIS_MASS,
   CROSSWIND_BRIDGE_N,
@@ -125,6 +126,141 @@ describe("secondSwing — the whip that instruction 7 warns about", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 1b. THE HAND — a correction is HELD only while the driver is holding it
+//     (round 2 of sc-ac-crosswind:a9db1738, „KEYBOARD")
+// ---------------------------------------------------------------------------
+
+/** One frame with the driver's raw input beside the wheel. */
+function frame(r: Rig, steerRad: number, steerInput: number | undefined): boolean {
+  r.tSec += DT;
+  r.last = stepSecondSwing(
+    r.state,
+    {
+      tSec: r.tSec,
+      steerRad,
+      ...(steerInput !== undefined ? { steerInput } : {}),
+      speedKmh: DRILL_KMH,
+      windLatAccelMs2: WIND_MS2,
+    },
+    DT,
+  );
+  return r.last.fired;
+}
+
+/**
+ * A KEY TAP as the product delivers it: the key is full input or none, and the
+ * default tier's low-pass (`difficulty.ts`: sensitivity 0.8, tau 0.15 s) is
+ * what turns it into a wheel — which goes on FALLING BACK after the finger is
+ * up. `pressSec` of key, then `tailSec` of nothing. Returns whether it fired.
+ * `withHand: false` replays the same wheel with no input channel — the reading
+ * the detector had before round 2.
+ */
+function tap(r: Rig, key: 1 | -1, pressSec: number, tailSec: number, withHand: boolean, wheel = { rad: 0 }): boolean {
+  const lock = 0.508; // the lock at 34 км/ч
+  const alpha = 1 - Math.exp(-DT / 0.15);
+  let fired = false;
+  const run = (sec: number, input: number) => {
+    for (let i = 0; i < Math.round(sec / DT); i++) {
+      wheel.rad += (input * 0.8 * lock - wheel.rad) * alpha;
+      fired = frame(r, wheel.rad, withHand ? input : undefined) || fired;
+    }
+  };
+  run(pressSec, key);
+  run(tailSec, 0);
+  return fired;
+}
+
+describe("secondSwing — a hold is a hand ON the correction, not a wheel falling back", () => {
+  it("A PAIR OF 250 ms KEY TAPS IS NOT A SECOND SWING — it fired on the wheel alone, and that was the false sentence", () => {
+    // Upwind key 250 ms (the wheel passes 0.10 rad and stays past it for
+    // ~0.39 s, of which the finger was down 0.25), a beat, then the other key.
+    // This is how a keyboard holds a lane: it has no smaller movement.
+    const wheelOnly = rig();
+    const w1 = { rad: 0 };
+    let firedOnTheWheel = tap(wheelOnly, 1, 0.25, 0.25, false, w1);
+    firedOnTheWheel = tap(wheelOnly, -1, 0.25, 0.4, false, w1) || firedOnTheWheel;
+    expect(firedOnTheWheel, "the pre-round-2 reading").toBe(true);
+
+    const withHand = rig();
+    const w2 = { rad: 0 };
+    let fired = tap(withHand, 1, 0.25, 0.25, true, w2);
+    fired = tap(withHand, -1, 0.25, 0.4, true, w2) || fired;
+    expect(fired, "with the hand read").toBe(false);
+    expect(withHand.last.cue).toBe(false);
+  });
+
+  it("…at every press a finger makes — 50, 100, 150, 200, 250, 300 ms — and however long he keeps tapping", () => {
+    for (const pressSec of [0.05, 0.1, 0.15, 0.2, 0.25, 0.3]) {
+      const r = rig();
+      const w = { rad: 0 };
+      let fired = false;
+      for (let i = 0; i < 20; i++) {
+        fired = tap(r, 1, pressSec, 0.15, true, w) || fired;
+        fired = tap(r, -1, pressSec, 0.3, true, w) || fired;
+      }
+      expect(fired, `${pressSec * 1000} ms taps`).toBe(false);
+    }
+  });
+
+  it("A KEY HELD INTO THE WIND AND THEN THE OTHER KEY STILL FIRES — the real swing, on a keyboard", () => {
+    // No threshold moved: the wheel past HOLD_RAD with the key DOWN for
+    // HOLD_SEC is a held correction on any device.
+    const r = rig();
+    const w = { rad: 0 };
+    expect(tap(r, 1, 0.6, 0, true, w)).toBe(false); // holding is not the mistake
+    expect(tap(r, -1, 0.4, 0, true, w)).toBe(true);
+    expect(r.last.cue).toBe(true);
+  });
+
+  it("a proportional hand holding the wheel fires exactly as it did — the hand is on it the whole time", () => {
+    // The first test of this file, with the input a stick or a thumb gives:
+    // the wheel over the lock and the tier's sensitivity.
+    const r = rig();
+    let fired = false;
+    for (let i = 0; i < 60; i++) fired = frame(r, 0.2, 0.2 / (0.508 * 0.8)) || fired;
+    expect(fired).toBe(false);
+    for (let i = 0; i < 12; i++) fired = frame(r, -0.2, -0.2 / (0.508 * 0.8)) || fired;
+    expect(fired).toBe(true);
+  });
+
+  it("the hold needs the hand on the UPWIND side — a wheel still upwind while he is already asking for the other way is not held", () => {
+    const r = rig();
+    let fired = false;
+    // The wheel is past HOLD_RAD upwind for a full second, but the driver's
+    // input has been on the DOWNWIND side throughout: he is not holding it
+    // there, he is already bringing it back. (An input of any size on either
+    // side would arm this — the side is part of the read.)
+    for (let i = 0; i < 60; i++) fired = frame(r, 0.2, -1) || fired;
+    for (let i = 0; i < 20; i++) fired = frame(r, -0.2, -1) || fired;
+    expect(fired).toBe(false);
+    // The same wheel with the input on the upwind side for that second IS a
+    // hold, and the same swing fires.
+    const held = rig();
+    let firedHeld = false;
+    for (let i = 0; i < 60; i++) firedHeld = frame(held, 0.2, 1) || firedHeld;
+    for (let i = 0; i < 20; i++) firedHeld = frame(held, -0.2, -1) || firedHeld;
+    expect(firedHeld).toBe(true);
+    // …and the floor is a presence test, not a size: any real input counts.
+    expect(SECOND_SWING.HAND_ON_MIN).toBeGreaterThan(0);
+    expect(SECOND_SWING.HAND_ON_MIN).toBeLessThan(0.05);
+  });
+
+  it("with NO input channel the hold is judged on the wheel alone — a replayed trace keeps the old reading", () => {
+    const r = rig();
+    expect(hold(r, 0.2, 1.0)).toBe(false);
+    expect(hold(r, -0.2, 0.2)).toBe(true);
+  });
+
+  it("no threshold a real swing needs was moved to get there", () => {
+    expect(SECOND_SWING.HOLD_RAD).toBe(0.1);
+    expect(SECOND_SWING.SWING_RAD).toBe(0.1);
+    expect(SECOND_SWING.HOLD_SEC).toBe(0.35);
+    expect(SECOND_SWING.WINDOW_SEC).toBe(1.2);
+    expect(SECOND_SWING.COOLDOWN_SEC).toBe(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2. THE GATES — the opt-in, the speed floor, and the no-nag rule
 // ---------------------------------------------------------------------------
 
@@ -195,12 +331,28 @@ describe("secondSwing — silent everywhere it has no business speaking", () => 
 
 describe("secondSwing — the constants answer to the shipped car", () => {
   it("a swing is a large fraction of the lock the car will actually give", () => {
-    // At the drill speed the limit leaves ~0.5 rad; the steady counter-steer
-    // that out-pulls this wind in crosswind.test.ts is ~0.025 rad. The
-    // threshold has to sit far above the correction and well below full lock.
+    // At the drill speed the limit leaves ~0.5 rad. The threshold has to sit
+    // far above the correction and well below full lock.
     expect(SECOND_SWING.SWING_RAD).toBeGreaterThan(0.05);
     expect(SECOND_SWING.SWING_RAD).toBeLessThan(STEER_MAX_ANGLE / 2);
     expect(SECOND_SWING.HOLD_RAD).toBe(SECOND_SWING.SWING_RAD);
+  });
+
+  it("…and far above the correction the wind really asks for — RE-MEASURED 2026-10-04", () => {
+    // The founder's «Stronger wind» ruling gave the wind its yaw pull, and
+    // with it a correction that is no longer ~0: the wheel that holds the lane
+    // is the pull itself (crosswind.test.ts measures the equality on the live
+    // car). The detector must still call that the DUTY and not the mistake —
+    // at the gust's peak, at every speed it is armed at, with room to spare
+    // for a driver who over-meets a gust by half.
+    const peakN = CROSSWIND_BRIDGE_N + CROSSWIND_GUST_AMPLITUDE_N;
+    let largest = 0;
+    for (let kmh = SECOND_SWING.MIN_SPEED_KMH; kmh <= 140; kmh += 1) {
+      largest = Math.max(largest, crosswindSteerPullRad(peakN, kmh / 3.6));
+    }
+    expect(largest).toBeGreaterThan(0.02); // a real correction (0.025 rad)…
+    expect(SECOND_SWING.HOLD_RAD).toBeGreaterThan(largest * 3); // …and a third of a swing
+    expect(SECOND_SWING.SWING_RAD).toBeGreaterThan(largest * 3);
   });
 
   it("the whole shipped gust cycle is above the wind floor, and calm is below it", () => {
@@ -252,6 +404,16 @@ describe("routing: the line reaches the student, and the sim is what raises it",
     expect(scenePublishesOnEdges(SCENE_SRC)).toBe(true);
   });
 
+  it("…with the driver's HAND beside the wheel — the raw input the gated reader captured this frame", () => {
+    // Without this leg the detector falls back to the wheel alone and a
+    // keyboard student holding his lane by taps is told he over-corrected.
+    expect(SCENE_SRC).toContain("steerInput: inputRef.current?.rawSteer ?? 0,");
+    // …and `rawSteer` is the input BEFORE the tier shapes it: captured in the
+    // gated reader's own `read()`, next to the raw pedals.
+    expect(/this\.rawBrake = out\.brake;\s+this\.rawSteer = out\.steer;/.test(SCENE_SRC)).toBe(true);
+    expect(/steerInput: inputRef\.current\?\.rawSteer \?\? 0,[\s\S]{0,120}?speedKmh: sample\.speedKmh/.test(SCENE_SRC)).toBe(true);
+  });
+
   it("…and the chip is actually rendered, with the explanation in it", () => {
     expect(sceneRendersTheChip(SCENE_SRC)).toBe(true);
     // THEO-4: never a bare verdict. The line names the act AND the remedy.
@@ -267,7 +429,10 @@ describe("routing: the line reaches the student, and the sim is what raises it",
         SCENE_SRC,
       ),
     ).toBe(true);
-    expect(SCENE_SRC).toContain("Втори замах: воланът се върна рязко срещу порива");
+    // Round 3 (verifier V2-02): the line names what the detector measures —
+    // a held correction thrown to the other side — and the wind's side, which
+    // is true on both lessons; it no longer claims the gust had eased.
+    expect(SCENE_SRC).toContain("Втори замах: воланът мина рязко от задържаната корекция на другата страна");
   });
 
   it("it is gated on exam mode, never on an aid tier", () => {

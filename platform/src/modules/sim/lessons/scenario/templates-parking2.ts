@@ -1122,7 +1122,8 @@ export const SC_PARK_BAY_EXIT_REV: ScenarioSpec = {
 //
 // THE TWO DEMOS ARE THE TWO HALVES OF чл. 38, and they fail differently on
 // purpose: „Обръщане през плътната линия" grades EXACTLY CROSSED_SOLID_LINE
-// (опасна) — the WHERE; „Обратен завой пред насрещния поток" grades
+// (основна, 3 т. since the 2026-08-09 Наредба № 38 grounding — rules/n38.ts
+// б. „а") — the WHERE; „Обратен завой пред насрещния поток" grades
 // FAILED_TO_YIELD + COLLISION at the LAWFUL gap — the WHEN. A student who reads
 // only the first learns to drive to the opening and turn into a moving car.
 // ---------------------------------------------------------------------------
@@ -1191,10 +1192,12 @@ const MVU_STREAM: OncomingStreamSpec = {
 };
 
 /**
- * OV-17 / PK-12 — „Къде обратният завой е забранен" (ЗДвП чл. 38: обратен завой
- * се извършва там, където не е забранен и водачът има видимост; Наредба
+ * OV-17 / PK-12 — „Къде обратният завой е забранен" (ЗДвП чл. 38: HOW the
+ * U-turn is made — to the left from the leftmost lane, the oncoming go first;
+ * чл. 39 and чл. 58, т. 2: the places where it is banned outright; Наредба
  * № 2/2001 М1: непрекъснатата осева не се пресича — вж. и знак В23 „Забранено е
- * завиването в обратна посока", Наредба № РД-02-21-1/2023, прил. № 3).
+ * завиването в обратна посока", Наредба № РД-02-21-1/2023, прил. № 3, which the
+ * world now posts at the first metre of the span).
  */
 export const SC_MV_UTURN_BAN: ScenarioSpec = {
   id: "sc-mv-uturn-ban",
@@ -1204,12 +1207,13 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     "забрана",
     "плътна осева",
     "плътна осева М1",
+    "знак В23",
     "широк булевард",
     "изпитни упражнения",
   ],
   titleBg: "Къде обратният завой е забранен",
   objectiveBg:
-    "Разчети мястото: плътната осева значи НЕ — продължи до разрешения участък, където тя се прекъсва, и обърни там с пълен оглед.",
+    "Разчети мястото: знак В23 и плътната осева значат НЕ — продължи до разрешения участък, където осевата се прекъсва, и обърни там с пълен оглед.",
   archetypeIds: ["OV-17", "PK-12"],
   conceptIds: [
     "c-u-turn",
@@ -1229,28 +1233,33 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // THE В23 THAT IS DECLARED AND NEVER BUILT (sweep161 sc-mv-uturn-ban).
-    // MEASURED: mv-uturn-v1's `meta.scenario.uturnBanSign` really does author
-    // { signRef: "В23", atY: 40, spanY: 40→220, graded: false } — and
-    // `grep -rn uturnBanSign src/` returns NOTHING outside tests. The only
-    // builder that posts signs from map data is world/builders/zoneSigns.ts and
-    // it reads `district.zones`; this district's single zone is
-    // { kind: "solidCenterLine", signRef: "М1" }, which `ZONE_SIGN_KIND` does
-    // not list because it is marking-only. So no post ever stands at y = 40.
+    // THE В23 WAS DECLARED AND NEVER BUILT — AND NOW IT IS (sc-mv-uturn-ban:
+    // e98407b1). History, because this block has been true in both directions:
+    // sweep161 measured that mv-uturn-v1's `meta.scenario.uturnBanSign`
+    // { signRef: "В23", atY: 40, spanY: 40→220, graded: false } had NO reader,
+    // so no post stood at y = 40, and the copy that pointed at the sign was
+    // struck and the ban taught off the М1 line alone. The note ended «Routed:
+    // zoneSigns.ts should post `meta.scenario.uturnBanSign`. On the day it
+    // does, this copy earns the sign back.»
     //
-    // WHAT IS REAL IS THE LINE. markings.ts draws the М1 solid centre line over
-    // 40→220 m, the student can see it, and the `graded: false` on the sign
-    // says out loud that the ban is enforced off the MARKING, not off a post.
-    // The lesson is unchanged in substance — „плътна осева значи НЕ" is the
-    // whole чл. 63 skill — it simply stops asking him to read furniture that
-    // is not there.
+    // That day: world/builders/zoneSigns.ts `declaredUTurnBanStation` posts the
+    // plate at the first metre of the М1 span, on the driver's kerb, facing him
+    // (world/__tests__/mv-uturn-districts.test.ts «THE В23 THE MAP DECLARES IS
+    // POSTED»; lane-world-claims.test.ts §0 census `uTurnBan: 1`). So the
+    // briefing names the sign again — and names WHERE it stands, because one
+    // plate at the 40th metre is what the world shows, not a sign at every
+    // metre of the ban.
     //
-    // Routed: zoneSigns.ts should post `meta.scenario.uturnBanSign` (world
-    // lane). On the day it does, this copy earns the sign back.
+    // WHAT STAYS TAUGHT OFF THE LINE: instruction 2. At the tempting spot the
+    // plate is 90 m behind the car; the thing under the wheels there is the
+    // М1, and it is the М1 the reducer grades (`graded: false` on the sign).
+    // How far a В23 reaches is not in the content bank, so no sentence here
+    // says the SIGN is still in force at the 130th metre — the line is, and
+    // the student can see it.
     {
       n: 1,
       textBg:
-        "Тръгни по булеварда в дясната лента. Още от 40-ия метър осевата линия е ПЛЪТНА — а плътната осева сама по себе си забранява обратния завой.",
+        "Тръгни по булеварда в дясната лента. На 40-ия метър вдясно стои знак В23 „Забранено е завиването в обратна посока“ и оттам осевата линия е ПЛЪТНА — а плътната осева и сама забранява обратния завой.",
     },
     {
       n: 2,
@@ -1330,13 +1339,23 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     },
   ],
   teach: {
+    // THE LIST OF PLACES IS RETRIEVED (ADR-002), and one figure in it was wrong.
+    // The sentence used to end «…на магистрала, на мост, в тунел или при
+    // видимост под 100 м». content/law/acts/zdvp.json чл. 39 reads: «Завиването
+    // в обратна посока е забранено на пешеходна пътека, железопътен прелез,
+    // мост, надлез, в тунел, в подлез, при ограничена видимост или при намалена
+    // видимост под 50 метра.» — FIFTY, and four places the sentence left out;
+    // the motorway is чл. 58, т. 2 («да завива в обратна посока…»). The sign is
+    // named as signs.json `sign-v23` names it. «на кръстовище със знак В23»
+    // went: it repeated the clause before it and added a claim about junctions
+    // the bank does not make.
     whenBg:
-      "Винаги, когато ти трябва обратна посока в града. Обратният завой не се прави „където има място“, а където законът го позволява: не се пресича непрекъсната осева, не се обръща под знак В23, на кръстовище със знак В23, на магистрала, на мост, в тунел или при видимост под 100 м.",
+      "Винаги, когато ти трябва обратна посока в града. Обратният завой не се прави „където има място“, а където не е забранен: не се пресича непрекъсната осева, не се обръща при знак В23 „Забранено е завиването в обратна посока“, на автомагистрала, на пешеходна пътека, на железопътен прелез, на мост и надлез, в тунел и подлез, при ограничена видимост или при намалена видимост под 50 метра (ЗДвП чл. 39; за автомагистралата — чл. 58, т. 2).",
     whyBg:
       "Обръщането е най-бавната маневра, която пресича насрещното движение — колата стои напряко на платното секунди наред. Затова забраните стоят точно там, където няма как да те видят навреме или няма как да те заобиколят. Плътната осева и знакът не са формалност: те казват „тук ще те ударят“. Който ги прочете и потърпи 150 метра, прави същата маневра на място, където тя е безопасна.",
     lawRef: "ЗДвП чл. 38",
     examinerBg:
-      "Изпитващият гледа: прочете ли маркировката и знака и подмина ли забраненото място без колебание; избра ли вътрешната лента с мигач и оглеждане; спря ли на отвора и пропусна ли ЦЕЛИЯ насрещен поток, а не първата кола; една плавна дъга с пешеходна скорост и обърната посока в дясната лента. Обръщане през плътна осева е опасна грешка и се оценява като такава.",
+      "Изпитващият гледа: прочете ли маркировката и знака и подмина ли забраненото място без колебание; избра ли вътрешната лента с мигач и оглеждане; спря ли на отвора и пропусна ли ЦЕЛИЯ насрещен поток, а не първата кола; една плавна дъга с пешеходна скорост и обърната посока в дясната лента. Обръщане през плътна осева е основна грешка (3 т.).",
   },
   levels: [
     { level: 1, toleranceScale: 1.5 },
@@ -1374,6 +1393,68 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     },
   ],
   staged: [MVU_STREAM],
+  // THE U-TURN ACROSS THE SOLID AXIS, DECIDED FROM THE ROAD (sc-mv-uturn-ban:
+  // 6d60c160 «the debrief explains overtaking after a U-turn», and e98407b1's
+  // «the lesson's own rule is never the ground of the verdict»). With this key
+  // the reducer follows one question on the М1 span: the car was travelling
+  // WITH one half of the road — is it now on the OTHER half, travelling with
+  // that one, having crossed the axis where it is solid? (rules/types.ts
+  // `solidCrossUTurnEnabled`; rules/engine.ts „THE REVERSAL ACROSS THE SOLID
+  // AXIS".) That completed reversal
+  //   · NAMES the crossing already billed — title, «Защо» and «Правилното
+  //     действие» speak of the обратен завой instead of the pooled overtaking
+  //     advice («остани в своята лента, дори предният да пълзи. Изпреварвай или
+  //     заобикаляй…»), whatever the radius, the lane it began in or the speed;
+  //   · and the crossing itself is billed where the plain detector stays
+  //     silent: the natural arc from the OUTER lane reaches the axis already
+  //     pointing across the road, was not billed at all, and the debrief
+  //     praised «чисто каране».
+  // A drift, an overtaking pull-out that returns or carries on, and a crossing
+  // that is abandoned keep the crossing's own title and advice; the lawful
+  // U-turn at the gap crosses a DASHED axis and is the start of whatever
+  // follows it, never evidence for it. Same code, class and points throughout
+  // (основна, 3 т.).
+  //
+  // ROUND 3 — under the same key the reducer also reads WHERE THE BODY IS
+  // (`EdgeAlignment.axisClearM`) and which half the car was travelling with:
+  //   · nothing bills a crossing while the centre is still on the half the car
+  //     was travelling with — a tight turn from the outer lane used to be shown
+  //     the crossing card 4 m short of the axis, and a turn-round that never
+  //     reached the line was billed as a crossing and the lesson refused;
+  //   · a bill that lands with the tail still over the line says «Застъпи … и
+  //     навлезе с повече от половината автомобил …», and «Пресече изцяло» is
+  //     kept for a car that is wholly across;
+  //   · easing over the line and then turning round is the U-turn.
+  //
+  // ROUND 5 — ONE DEFINITION OF THE ACT (it replaces «now on the OTHER half,
+  // travelling with that one» above, and round 4's place): a turn-round is the
+  // nose going from within 45° of the way the car was travelling to within 45°
+  // of the opposite way — on whichever half the car is — and a billed crossing
+  // of the solid axis is the U-turn iff it was made before or during a
+  // turn-round that BEGAN where the axis is solid. So:
+  //   · turned round at the opening on his own half, then over the solid axis
+  //     on the way back → the crossing's own title and advice (he turned where
+  //     turning is allowed; nothing tells him to go and turn there);
+  //   · pulled out, then round to the right back over the solid axis, ending
+  //     on his own half → the U-turn;
+  //   · astride the line, the turn begun 4 m before the solid line ends → the
+  //     U-turn; begun past its end → the crossing.
+  //
+  // ROUND 4 — WHERE the turn-round is made decides, and nothing before it:
+  //   · a turn-round made where the axis is DASHED is the lawful U-turn even
+  //     for a car that straddled the line or stayed across it since inside
+  //     the span — the crossing it was billed for keeps its own title and
+  //     advice, and the turn is billed by nothing and renames nothing;
+  //   · a turn-round made inside the solid span by a car across or astride
+  //     the axis is the U-turn whatever came before it — a straddle, a full
+  //     pull-out along the oncoming lane, a shallow diagonal — never the
+  //     overtaking advice: he turned round where it is forbidden.
+  //
+  // WHY THIS LESSON MAY SAY IT: the М1 span (40→220 m) has no side road and no
+  // driveway on either side — the only stem is at 280 m, past the dashes — so a
+  // car that ends up travelling the other way on the far half inside it cannot
+  // have been turning INTO anything.
+  ruleConfig: { solidCrossUTurnEnabled: true },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

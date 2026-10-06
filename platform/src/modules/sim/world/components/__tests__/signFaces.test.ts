@@ -60,6 +60,7 @@ const ARTS: SignFaceArt[] = [
   "g3",
   "a19",
   "v28",
+  "v23",
   "g9",
   "d15",
   "d16",

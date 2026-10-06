@@ -13,8 +13,10 @@
  *   - The LIVE student session runs REAL wind physics: LessonSpec.physics
  *     .crosswind → VehicleRig → VehicleSim windLateralN = −CROSSWIND_BRIDGE_N
  *     (west, toward the center line on this northbound street) + the
- *     deterministic gust sine. Measured: ≈1 m of downwind drift per 5 s
- *     hands-fixed at speed, compounding (vehicle/crosswind.test.ts).
+ *     deterministic gust sine, plus the wind's yaw pull (founder ruling
+ *     2026-10-04). Measured at the taught 34 км/ч: a car left alone is
+ *     carried 0.4 m in 1 s and 1.4 m in 2 s, and the lane is held with a
+ *     steady 3.5 % of the wheel (vehicle/crosswind.test.ts).
  *   - These RECORDED demos are KINEMATIC (recorder.ts authored envelopes —
  *     the recorder never runs VehicleSim), so the wind truth must be
  *     AUTHORED: the drift-and-correct story is drawn INTO the polylines
@@ -50,6 +52,7 @@
  */
 
 import { SC_AC_CROSSWIND } from "../lessons/scenario/templates-conditions";
+import { lessonRigPhysics } from "../vehicle";
 import {
   recordScriptedDrive,
   type DriveScript,
@@ -134,7 +137,13 @@ export function scAcCrosswindMistakeFullSpeedScript(): DriveScript {
         targetKmh: 50,
         stopAtEnd: false,
       },
-      { kind: "annotation", textBg: "Колата язди осевата линия в насрещното — вятърът я държи там, докато водачът не се събуди." },
+      // WAS «…— вятърът я държи там, докато водачът не се събуди» — round 3 of
+      // sc-ac-crosswind:a9db1738 (verifier V2-01): the wind holds a car
+      // nowhere. With a loose hand the live car, once at the centre line,
+      // never once moves back toward its lane and is 7 m further across 2 s
+      // later (OFF_CARRIAGEWAY at every rung); a driver who wakes up there
+      // brings it back — which is what the caption still says.
+      { kind: "annotation", textBg: "Колата язди осевата линия в насрещното, докато водачът не се събуди." },
       { kind: "drive", points: [[0.55, 250], [LANE_X, 285], [LANE_X, 345]], targetKmh: 50 },
       { kind: "pause", sec: 1, brake: true },
       { kind: "annotation", textBg: "Срещу страничен вятър скоростта се смъква ПРЕДИ порива — при 50 км/ч вятърът те мести с метри, преди да реагираш." },
@@ -241,6 +250,18 @@ export function recordScAcCrosswindDrive(
     ...(SC_AC_CROSSWIND.staged && SC_AC_CROSSWIND.staged.length > 0
       ? { stagedEvents: [...SC_AC_CROSSWIND.staged] }
       : {}),
+    // THE CORRECT DEMO HOLDS THE WHEEL THE LIVE CAR NEEDS (round 2 of
+    // sc-ac-crosswind:a9db1738, verifier V-06). The shadow's caption says «лека,
+    // ПОСТОЯННА корекция надясно» and its wheel channel averaged 0.000 rad on
+    // the taught stretch — the recorder is kinematic and the wind never
+    // touched it — while a student who copies a centred wheel on the live car
+    // leaves the carriageway. `heldWheel` is the lesson's own wind
+    // (`lessonRigPhysics`, the object the scene hands the rig): the recorder
+    // rewrites the `steerRad` channel, and nothing else, to the wheel that
+    // cancels it — 3.5 % of the lock at 34 км/ч, more on each gust, RELEASED in
+    // each lull, on the same clock the live gust runs on. The two mistake
+    // demos do not opt in: «отпусната ръка» and the yank are their stories.
+    ...(kind === "shadow" ? { heldWheel: lessonRigPhysics(SC_AC_CROSSWIND.physics) } : {}),
     ...(extra?.onTick ? { onTick: extra.onTick } : {}),
   });
 }

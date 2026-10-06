@@ -28,7 +28,7 @@ import {
   COCKPIT_EYE,
   COCKPIT_FOV_MAX,
   cockpitVFovForAspect,
-  cockpitLatAccelMs2,
+  cockpitLeanFromSim,
   COCKPIT_LEAN_LATERAL,
   COCKPIT_LEAN_LONGITUDINAL,
   COCKPIT_ROLL_GAIN,
@@ -37,7 +37,6 @@ import {
   COCKPIT_LOOK_INTO_TURN,
   COCKPIT_LEAN_DAMPING,
   COCKPIT_HFOV_RAD,
-  ESTIMATE_WHEELBASE,
   STEER_MAX_ANGLE,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
@@ -1113,16 +1112,27 @@ export function CameraRig({
       // zero on the one lesson built around it. `cockpitLean.ts` carries the
       // reasoning and the magnitudes; `VehicleSim.windLatAccelMs2` returns the
       // literal 0 on every lesson that authors no wind, so every other cockpit
-      // is unchanged. -------------------------------------------------------
+      // is unchanged.
+      //
+      // …AND THE ESTIMATE IS TAKEN ON THE ROAD WHEELS (round-1 verifier V-05).
+      // The wind also turns the steered pair (`windSteerPullRad`), and the
+      // driver who holds the lane holds his wheel against that. Fed his wheel
+      // alone, the estimate read the correction as a corner the other way and
+      // cancelled the wind term: the better he held the lane, the less the
+      // head told him — a third of the push at 34 км/ч, none at 78. With the
+      // pull beside his wheel a held lane reads 0 here and the head gets the
+      // wind whole; 0 on every calm lesson, like the term above.
+      //
+      // …AND IT IS HANDED THE WHOLE CAR (round-2 verifier V2-04). The lean
+      // reads the DRIVER'S wheel beside the pull; `roadWheelRad` already has
+      // the pull in it, and an edit that fed it here counted the pull twice
+      // with no test noticing. `cockpitLeanFromSim` picks the fields, and it
+      // is the function `crosswind.test.ts` drives on the real car. `steer`
+      // below is the look-into-turn's, and it too is the driver's wheel. ----
       const lean = leanRef.current;
       const vMps = (sim?.speedKmh ?? 0) / 3.6;
       const steer = sim?.steerRad ?? 0;
-      const latAccel = cockpitLatAccelMs2({
-        speedMps: vMps,
-        steerRad: steer,
-        wheelbaseM: ESTIMATE_WHEELBASE,
-        disturbanceMs2: sim?.windLatAccelMs2 ?? 0,
-      });
+      const latAccel = cockpitLeanFromSim(sim);
       const longAccel = (vMps - lean.prevSpeedMps) / Math.max(delta, 1e-3);
       lean.prevSpeedMps = vMps;
       const latGTarget = clampAbs(latAccel / 9.81, 1.2);

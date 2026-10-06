@@ -232,6 +232,11 @@ const SIM_SRC = readFileSync(
   path.resolve(__dirname, "../../vehicle/VehicleSim.ts"),
   "utf8",
 );
+/** Where the gust sine is written — once (see the one-number test below). */
+const WIND_FN_SRC = readFileSync(
+  path.resolve(__dirname, "../../vehicle/lessonWind.ts"),
+  "utf8",
+);
 
 function sharedMaterialFactory(src: string): string {
   const start = src.indexOf("function makeSharedMaterials(");
@@ -293,7 +298,22 @@ describe("routing: the bend reaches the shipped canopies and something drives it
     // `step()` and `windLateralNow` both go through `currentWindN()`. If a
     // later change recomputes the gust sine anywhere else, the two can drift
     // out of phase exactly where the lesson asks the student to read the gust.
-    expect(SIM_SRC.match(/Math\.sin\(\(2 \* Math\.PI \* this\.windClockSec\)/g)?.length).toBe(1);
+    //
+    // Since 2026-10-06 the sine itself lives in `vehicle/lessonWind.ts`
+    // (`crosswindForceAtN` — the trace recorder's held-wheel channel reads the
+    // same function on a demo's clock), so the one-number law is now: the sim
+    // reads its own wind clock in exactly ONE place, that place is the shared
+    // function, and the sim writes no sine of its own.
+    expect(SIM_SRC.match(/this\.windClockSec,\s*\);/g)?.length).toBe(1);
+    expect(
+      /private currentWindN\(\): number \{[\s\S]{0,400}?return crosswindForceAtN\(\s*this\.windLateralN,\s*this\.windGustAmplitudeN,\s*this\.windGustPeriodSec,\s*this\.windClockSec,\s*\);/.test(
+        SIM_SRC,
+      ),
+    ).toBe(true);
+    expect(SIM_SRC.match(/Math\.sin\(\(2 \* Math\.PI \* this\.windClockSec\)/g)).toBeNull();
+    expect(
+      WIND_FN_SRC.match(/Math\.sin\(\(2 \* Math\.PI \* clockSec\) \/ gustPeriodSec\)/g)?.length,
+    ).toBe(1);
     expect(SIM_SRC).toContain("this.body.addForce({ x: this.currentWindN(), y: 0, z: 0 }, true);");
     expect(SIM_SRC).toContain("get windLateralNow(): number {");
   });

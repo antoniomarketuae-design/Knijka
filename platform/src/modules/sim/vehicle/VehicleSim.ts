@@ -46,6 +46,8 @@ import {
   GRIP_SIGNAL_MIN_KMH,
 } from "./gripSignal";
 import { ROAD_ROUGHNESS_MAX, roadRoughnessForceN } from "./roadNoise";
+import { crosswindSteerPullRad } from "./crosswindPull";
+import { crosswindForceAtN } from "./lessonWind";
 import { approach, clamp, dot, lerp, rotateInto, yawQuat, type Quat, type Vec3 } from "./math";
 
 /** The rapier module object (default export of @dimforge/rapier3d-compat). */
@@ -237,6 +239,15 @@ export class VehicleSim {
   /** Wind clock (s) for the deterministic gust sine; reset() rewinds it. */
   private windClockSec = 0;
   /**
+   * Road-wheel angle (rad, + = left) the crosswind is turning the steered
+   * pair by this step — the wind's YAW PULL (`crosswindPull.ts`; founder
+   * ruling 2026-10-04). Written only inside the `windActive` gate, so it is
+   * the literal 0 for the whole life of every calm car. It is NOT part of
+   * `steer`: that field stays the driver's own wheel, which is what the rim
+   * in the cockpit shows.
+   */
+  private windPullRad = 0;
+  /**
    * TRIP DISTANCE since spawn, metres — the cluster's odometer
    * (sc-pk-stop-vs-park:e788ce46). Integrated here and nowhere else because
    * this is the only object that owns BOTH the fixed timestep and `reset()`;
@@ -395,7 +406,25 @@ export class VehicleSim {
     const returning = Math.abs(steerTarget) < Math.abs(this.steer);
     const rate = returning ? T.STEER_RETURN_SPEED : T.STEER_SPEED;
     this.steer = approach(this.steer, steerTarget, rate * dt);
-    for (const i of T.STEERED_WHEELS) c.setWheelSteering(i, this.steer);
+    // --- Crosswind, first half (AC-12, opt-in): the YAW PULL ------------------
+    // The wind turns the steered pair downwind; the driver's wheel (`steer`,
+    // the rim the student sees) is untouched, so holding the lane now takes a
+    // held correction INTO the wind — the founder ruling of 2026-10-04, and
+    // `tuning.CROSSWIND_STEER_PULL_RAD_PER_N` has the measurement that says
+    // the side force below could not ask for one at any magnitude. The gust
+    // clock advances HERE, once per step, so the pull and the force further
+    // down read the same `currentWindN()` — one number, the law
+    // `windLateralNow` states. Gate: `windActive` is false on every default
+    // construction, so the calm car sets exactly `this.steer`, as it always
+    // has (the crosswind identity test).
+    let roadWheel = this.steer;
+    if (this.windActive) {
+      this.windClockSec += dt;
+      const left = rotateInto(this.body.rotation(), 1, 0, 0, this.tmpV);
+      this.windPullRad = crosswindSteerPullRad(this.currentWindN() * left.x, speedMs);
+      roadWheel += this.windPullRad;
+    }
+    for (const i of T.STEERED_WHEELS) c.setWheelSteering(i, roadWheel);
 
     // --- Throttle / brake / reverse state machine ---------------------------
     // Driveline gating (A1): force flows only when the engine runs AND a
@@ -517,13 +546,14 @@ export class VehicleSim {
       );
     }
 
-    // --- Crosswind (AC-12, opt-in): world-frame lateral force ----------------
+    // --- Crosswind, second half (AC-12, opt-in): world-frame lateral force ---
     // Constant + optional pure-sine gust along world +X (see the options doc).
     // Applied like the aero forces above (accumulates onto the same per-step
     // force reset). Gate: windActive is false on every default construction,
-    // so calm sessions never touch this branch — bit-identity preserved.
+    // so calm sessions never touch this branch — bit-identity preserved. The
+    // gust clock was advanced by the yaw pull at the top of this step, so the
+    // newtons here are the ones that pull was computed from.
     if (this.windActive) {
-      this.windClockSec += dt;
       this.body.addForce({ x: this.currentWindN(), y: 0, z: 0 }, true);
     }
 
@@ -605,7 +635,9 @@ export class VehicleSim {
   get demandedGripUtilisation(): number {
     const speedMs = this.forwardSpeedMs();
     if (Math.abs(speedMs) * 3.6 < GRIP_SIGNAL_MIN_KMH) return 0;
-    return demandedGripUtilisation(speedMs, this.steer, this.gripFactor);
+    // The angle the ROAD WHEELS stand at — the driver's wheel plus the
+    // crosswind's pull, which is the literal 0 on every calm car.
+    return demandedGripUtilisation(speedMs, this.roadWheelRad, this.gripFactor);
   }
 
   /** The single number the tyre-protest audio layer and the debrief read:
@@ -651,6 +683,7 @@ export class VehicleSim {
     this.aLatGripSmooth = 0; // F1: the tyre stops protesting on a restart
     this.aLongGripSmooth = 0;
     this.windClockSec = 0; // gust sine restarts with the attempt (determinism)
+    this.windPullRad = 0; // …and the pull it drives is recomputed on the first step
     this.tripMetres = 0; // …and so does the trip meter: a retry starts at 0 m
     this.prevVel.x = 0;
     this.prevVel.y = 0;
@@ -682,13 +715,15 @@ export class VehicleSim {
    */
   private currentWindN(): number {
     if (!this.windActive) return 0;
-    let windN = this.windLateralN;
-    if (this.windGustAmplitudeN !== 0) {
-      windN +=
-        this.windGustAmplitudeN *
-        Math.sin((2 * Math.PI * this.windClockSec) / this.windGustPeriodSec);
-    }
-    return windN;
+    // `lessonWind.ts` — the same function the trace recorder's held-wheel
+    // channel reads on a demo's clock, so the ghost's correction breathes on
+    // the gust this car is pushed by.
+    return crosswindForceAtN(
+      this.windLateralN,
+      this.windGustAmplitudeN,
+      this.windGustPeriodSec,
+      this.windClockSec,
+    );
   }
 
   /**
@@ -721,9 +756,13 @@ export class VehicleSim {
    * own steering. A crosswind is by definition a lateral acceleration that the
    * steering does NOT explain, so on the lesson built around it that estimate
    * returned exactly 0 for the whole drive: the head sat dead level while the
-   * chassis was being shoved a metre downwind every five seconds
-   * (`crosswind.test.ts`'s measured band). `cockpitLean.ts` adds this term to
-   * that estimate and `CameraRig` reads the sum.
+   * wind was on the chassis. `cockpitLean.ts` adds this term to that estimate
+   * and `CameraRig` reads the sum. Since the wind also TURNS the car
+   * (`crosswindPull.ts`) the estimate is taken on the ROAD wheels
+   * (`windSteerPullRad` goes in beside the driver's wheel), so a driver who
+   * holds the lane with the correction still gets THIS term whole — the wind
+   * on his head, breathing with the gust — and one who lets go gets it plus
+   * the arc the car is really turned onto.
    *
    * NEWTONS → METRES PER SECOND SQUARED BY THE CAR'S OWN MASS, and the same
    * `currentWindN()` the chassis is pushed with — the „one number" law
@@ -756,9 +795,38 @@ export class VehicleSim {
     return this.tripMetres;
   }
 
-  /** Current road-wheel steering angle (rad, + = left). */
+  /**
+   * The DRIVER'S wheel as a road-wheel angle (rad, + = left) — his input after
+   * the speed-sensitive limit and the rate limiter, and nothing else. This is
+   * what the cockpit rim turns with and what `secondSwing.ts` watches: the
+   * hands. On a crosswind lesson the road wheels themselves stand at
+   * `roadWheelRad`.
+   */
   get steerRad(): number {
     return this.steer;
+  }
+
+  /**
+   * Road-wheel angle the crosswind is adding right now (rad, + = left), 0 on
+   * every lesson that authors no wind. The wind's yaw pull — see
+   * `crosswindPull.ts`. PURE READ: the value `update()` last applied.
+   */
+  get windSteerPullRad(): number {
+    return this.windPullRad;
+  }
+
+  /**
+   * Where the steered wheels actually stand (rad, + = left): the driver's
+   * wheel plus the crosswind's pull. Equal to `steerRad` on every calm car.
+   * This is the angle the car's PATH follows — a driver holding 3.5 % into the
+   * wind has these at zero and is going straight — so it is what the
+   * demanded-grip signal reads, and what the head lean's kinematic term is
+   * taken on (`cockpitLean.ts`: the driver's wheel and `windSteerPullRad`
+   * passed side by side, so the path's own acceleration is counted once and
+   * the wind's push — `windLatAccelMs2` — is added to it whole).
+   */
+  get roadWheelRad(): number {
+    return this.windActive ? this.steer + this.windPullRad : this.steer;
   }
 
   /** Chassis centre height (m) — kill-plane checks. */

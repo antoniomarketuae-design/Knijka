@@ -61,6 +61,7 @@ import {
   pointsEachBg,
   pointsLabelBg,
   roadConsequenceFor,
+  violationCorrectiveBg,
   withEurBg,
   type ConditionalPenalty,
   type ControlPointsFigure,
@@ -134,7 +135,7 @@ export interface DebriefContext {
    * than trusting the caller to. A code the sheet charged is dropped from here
    * and stays where its points are, in the mistakes block.
    */
-  coachedMistakes?: ReadonlyArray<{ code: string; titleBg: string }>;
+  coachedMistakes?: ReadonlyArray<{ code: string; titleBg: string; detail?: string }>;
 }
 
 interface MistakeGroup {
@@ -288,6 +289,14 @@ export function buildDebrief(
    * file; a Set keyed on the code is the cheapest thing that cannot get it
    * wrong. Filled in reading order, and the foot of the text is read last.
    */
+  //
+  // KEYED ON THE ACT SINCE sc-mv-uturn-ban ROUND 5 (`actKeyOf`): the corrective
+  // is authored per ACT where the catalogue authors one, so «already on the
+  // page» has to be asked of the act. Keyed on the code, a drive that made a
+  // U-turn across the solid axis and later drifted over it was told at the
+  // foot «повтори урока и този път без „Обратен завой …“» with the U-turn's
+  // corrective printed nowhere — the only advice on the page was the
+  // overtaking one, given for the drift.
   const actionGivenForCode = new Set<string>();
   /**
    * Shown, deliberately unscored — see DebriefContext.coachedMistakes.
@@ -303,8 +312,19 @@ export function buildDebrief(
    */
   // `Set<string>` and not the inferred `Set<ViolationCode>`: the channel carries
   // plain strings (DebriefContext.coachedMistakes), exactly like MistakeGroup.code.
-  const scoredCodes = new Set<string>(summary.mistakes.map((m) => m.code));
-  const coached = (context.coachedMistakes ?? []).filter((c) => !scoredCodes.has(c.code));
+  //
+  // …AND BY ACT, NOT BY CODE (sc-mv-uturn-ban round 5, integrator ruling R5-4).
+  // The mistakes block prints one row per (code, act) — `groupMistakes` — so
+  // «the sheet already carries it» is a fact about an ACT. Asked of the code, a
+  // drive holding two acts of one code lost the uncharged one altogether: the
+  // lesson's own U-turn (taught, free) followed by a drift over the same line
+  // (charged) printed «не е взет: допусна „Обратен завой през непрекъсната
+  // осева линия“» in the headline and then gave no reason and no corrective
+  // for it — the only «Правилното действие» on the page was the overtaking
+  // advice of the drift (verifier Y3). One key, the block's own: `actKeyOf`.
+  // A code that authors no acts keys exactly as before.
+  const scoredActs = new Set<string>(summary.mistakes.map((m) => actKeyOf(m.code, m.detail)));
+  const coached = (context.coachedMistakes ?? []).filter((c) => !scoredActs.has(actKeyOf(c.code, c.detail)));
   /**
    * HOW MANY TEACH MOMENTS THE STUDENT WILL ACTUALLY SEE, hoisted out of the
    * „издържан" branch because a SECOND verdict branch now has to consult it.
@@ -1099,10 +1119,10 @@ export function buildDebrief(
       // violation catalog (ADR-002: authored copy, never generated). Part of
       // the grounding draft for the post-Alpha LLM debrief: the LLM may
       // rephrase this line but must not invent corrective advice.
-      const corrective = correctiveFor(g.code);
+      const corrective = correctiveFor(g.code, g.actKey);
       if (corrective !== null) {
         mistakeBlock.push(`  → Правилното действие: ${corrective}`);
-        actionGivenForCode.add(g.code);
+        actionGivenForCode.add(actKeyOf(g.code, g.actKey));
       }
       // The debrief is PLAIN TEXT — it has no FaultCard to carry the rider, and
       // it is what /review/my-drive replays weeks later. So the one fault that
@@ -1360,10 +1380,13 @@ export function buildDebrief(
    * tree: 622 of the 654 hit drives have a coached hit row that lands here.
    *
    * The remaining 32 are the ones whose hit was also CHARGED (a genuine repeat,
-   * founder answer F1): `scoredCodes` drops those because the mistakes block
+   * founder answer F1): `scoredActs` drops those because the mistakes block
    * prints them with their points and their law, which is where a charged act
    * belongs. So this block prints only what was withheld, and nothing is said
-   * twice.
+   * twice. («Charged» is asked of the ACT — `scoredActs` above, ruling R5-4: a
+   * hit whose own act was taught and free while ANOTHER act of the same code
+   * was charged later is still this block's, with its own reason and its own
+   * corrective; the charged act has its row in the mistakes block.)
    *
    * DRIVEN OFF `hits` AND NOT OFF THE COACHED ROWS, which is the one place this
    * implementation is wider than doc 92 §5.6.8's wording («coached rows whose
@@ -1387,7 +1410,7 @@ export function buildDebrief(
    */
   const hitCodes = new Set(hits.map((h) => h.code));
   /** Hits the изпитен лист did NOT charge — the ones this block owns. */
-  const withheldHits = hits.filter((h) => !scoredCodes.has(h.code));
+  const withheldHits = hits.filter((h) => !scoredActs.has(actKeyOf(h.code, h.detail)));
   const coachedIncidental = coached.filter((c) => !hitCodes.has(c.code));
   if (withheldHits.length > 0) {
     lines.push("");
@@ -1407,7 +1430,7 @@ export function buildDebrief(
       lines.push(`• ${copy.titleBg}`);
       lines.push(`  → Защо: ${copy.explanationBg}`);
       lines.push(`  → Правилното действие: ${copy.correctiveBg}`);
-      actionGivenForCode.add(hit.code);
+      actionGivenForCode.add(actKeyOf(hit.code, hit.detail));
       // The same chip the teach card printed at the moment of the mistake
       // (`TeachMomentOverlay.tsx` «правило: …»), so the card and the debrief
       // cite one article in one form. Retrieved, never written here.
@@ -1600,7 +1623,7 @@ export function buildDebrief(
      * when the action for this very act is already on the page, and the full
      * form when nothing else has given it.
      */
-    const actionAlreadyGiven = actionGivenForCode.has(first.code);
+    const actionAlreadyGiven = actionGivenForCode.has(actKeyOf(first.code, first.detail));
     lines.push("");
     if (focusTitle) {
       lines.push(
@@ -1786,18 +1809,23 @@ function unfinishedTaskPhrase(result: LessonResult): string {
  * not made and no law is quoted: the price stays withheld, the corrective is
  * given. An uncatalogued code degrades to the bare row exactly as before.
  */
-function coachedLines(coached: ReadonlyArray<{ code: string; titleBg: string }>): string[] {
-  /** First code seen per title — the corrective is authored per code. */
-  const counts = new Map<string, { n: number; code: string }>();
+function coachedLines(
+  coached: ReadonlyArray<{ code: string; titleBg: string; detail?: string }>,
+): string[] {
+  /** First code (and act) seen per title — the corrective is authored per
+   *  code, and per ACT where the catalogue authors one: the title is already
+   *  the act's own (`wire.ts` retitles from `(code, detail)`), so the first
+   *  row under a title carries the act that title names. */
+  const counts = new Map<string, { n: number; code: string; detail: string | undefined }>();
   for (const c of coached) {
     const prev = counts.get(c.titleBg);
-    if (prev === undefined) counts.set(c.titleBg, { n: 1, code: c.code });
+    if (prev === undefined) counts.set(c.titleBg, { n: 1, code: c.code, detail: c.detail });
     else prev.n += 1;
   }
   const rows: string[] = [];
   for (const [title, g] of [...counts.entries()].slice(0, MAX_COACHED_NAMED)) {
     rows.push(`• ${title}${g.n > 1 ? ` ×${g.n}` : ""}`);
-    const corrective = correctiveFor(g.code);
+    const corrective = correctiveFor(g.code, g.detail);
     // Indented „→" exactly as the mistakes block indents its own corrective, so
     // the two halves of one drive read as one instructor and not as two.
     if (corrective !== null) rows.push(`  → Правилното действие: ${corrective}`);
@@ -1962,9 +1990,12 @@ function pts(n: number): string {
  * Guarded lookup — MistakeGroup.code is a plain string (pre-drive machine and
  * future codes flow through here), so an unknown code degrades to no line.
  */
-function correctiveFor(code: string): string | null {
+function correctiveFor(code: string, detail?: string): string | null {
   if (!(code in VIOLATIONS)) return null;
-  return VIOLATIONS[code as ViolationCode].correctiveBg;
+  // Act first, pooled second (`rules/catalog.ts violationCorrectiveBg`). Read
+  // by code alone until sc-mv-uturn-ban:6d60c160, which is how a U-turn across
+  // a solid line came to be answered with advice about overtaking.
+  return violationCorrectiveBg(code as ViolationCode, detail);
 }
 
 /** MistakeGroup.code is a plain string; only catalogued codes have a basis. */
@@ -2504,6 +2535,20 @@ function excessOf(detail: string | undefined): number | null {
  *    and it is the SHOWN rows that make the list long, so `count` still counts
  *    every row and only the money follows the ledger.
  */
+/**
+ * THE KEY OF ONE ACT — `(code, act)` where the catalogue authors per-act copy
+ * for this `detail`, the bare code otherwise (a speeding row's `detail` is its
+ * measurement, not an act). ONE function, because three questions have to
+ * agree on it or the debrief contradicts itself: which rows the mistakes block
+ * merges (`groupMistakes`), which taught-and-free rows that block already
+ * covers (`scoredActs`), and whose corrective is already on the page
+ * (`actionGivenForCode`).
+ */
+function actKeyOf(code: string, detail: string | undefined): string {
+  const act = codeIsKnown(code) ? actCopy(code as ViolationCode, detail) : null;
+  return `${code}|${act === null ? "" : (detail ?? "")}`;
+}
+
 function groupMistakes(
   mistakes: ReadonlyArray<ViolationEvent>,
   billed: ReadonlyArray<boolean>,
@@ -2514,7 +2559,7 @@ function groupMistakes(
     const actKey = act === null ? undefined : m.detail;
     const paid = billed[i] === true ? m.points : 0;
     const withheld = billed[i] === true ? 0 : m.points;
-    const key = `${m.code}|${actKey ?? ""}`;
+    const key = actKeyOf(m.code, m.detail);
     const g = byAct.get(key);
     if (g) {
       g.count += 1;
@@ -2604,7 +2649,7 @@ function groupMistakes(
  * ADR-009 CONSIDERED A SECOND EXEMPT CLASS AND DID NOT TAKE IT (2026-09-18),
  * which is recorded here because the next reader will think of it too. A
  * CHARGED hit — a repeat, founder answer F1 — is on the sheet, so «Грешката на
- * този урок» below skips it (`withheldHits` filters by `scoredCodes`), and cut
+ * този урок» below skips it (`withheldHits` filters by `scoredActs`), and cut
  * from here it loses its «Защо» and its article. Three measurements said no:
  * the act and its corrective are still on the page (the «Какво да упражниш»
  * line's full form is reachable for EXACTLY this state and prints both, §5.6.10

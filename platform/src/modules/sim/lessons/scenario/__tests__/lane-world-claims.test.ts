@@ -30,13 +30,14 @@
  *     this map — and ONLY the ravine („над дерето") is still refused, as its
  *     own claim, because no builder draws one.
  *
- *   mv-uturn-v1   { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2 }
+ *   mv-uturn-v1   { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2, uTurnBan: 1 }
  *     sc-mv-uturn-ban told the student to read „знак В23" and carried it as a
- *     tagsBg chip. The district really does author `meta.scenario.uturnBanSign`
- *     — and `grep -rn uturnBanSign src/` finds no reader outside tests: the one
- *     sign-placing builder (zoneSigns.ts) reads `district.zones`, whose single
- *     member here is `solidCenterLine`, a marking-only kind. The М1 line IS
- *     drawn, and the ban is now taught off the line.
+ *     tagsBg chip while NOTHING built it: the district authored
+ *     `meta.scenario.uturnBanSign` and no builder read it, so the copy was
+ *     struck and the ban taught off the М1 line alone. `uTurnBan` joined the
+ *     census with sc-mv-uturn-ban:e98407b1 — zoneSigns.ts now posts the
+ *     declared plate at the first metre of the М1 span — and the copy earned
+ *     the sign back. §3 keeps the refusal alive on every map that has no post.
  *
  *   jx-equal-v1   { limit40: 8 }
  *     sc-jx-equal-left opened „няма никакви знаци и никакъв светофар" beside
@@ -226,11 +227,12 @@ const WORLD_CLAIMS: readonly WorldClaim[] = [
   {
     noun: "знак В23 „забранен обратен завой“",
     re: /В23/u,
-    // There is no `uTurnBan` SignKind and nothing reads
-    // `meta.scenario.uturnBanSign`. Asked of the CENSUS, so authoring the
-    // reader is what lifts the refusal — not editing this line.
+    // Asked of the CENSUS, so it was authoring the reader that lifted the
+    // refusal on mv-uturn-v1 (zoneSigns.ts posts `meta.scenario.uturnBanSign`)
+    // — not editing this line. Every map that declares no such plate still
+    // refuses the sentence.
     carriedBy: (_d, spec) => signsOf(spec.map.districtId, "uTurnBan") > 0,
-    how: 'a built sign of kind "uTurnBan" (world/builders/zoneSigns.ts reads district.zones only; meta.scenario.uturnBanSign has no reader)',
+    how: 'a built sign of kind "uTurnBan" (world/builders/zoneSigns.ts posts it only where the district declares meta.scenario.uturnBanSign)',
   },
   {
     noun: "указателни табели с метрите до изхода",
@@ -335,7 +337,14 @@ const specById = (id: string): ScenarioSpec => {
 describe("§0 the sign census the fixes were measured against", () => {
   const EXPECTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
     "ac-bridge-v1": { limit50: 2, slippery: 1 },
-    "mv-uturn-v1": { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2 },
+    // uTurnBan (В23) joined the census with sc-mv-uturn-ban:e98407b1, and it
+    // is a REPAIR, not drift: the map has always DECLARED the plate
+    // (`meta.scenario.uturnBanSign`, atY 40) and the lesson is named after it,
+    // while the built world posted none. The face is the bank's own art —
+    // content/signs/svg/v23.svg, signs.json `sign-v23` (Наредба
+    // № РД-02-21-1/23.11.2023, прил. № 3, знак В23) — retrieved, never
+    // recalled (ADR-002).
+    "mv-uturn-v1": { stop: 1, priorityRoad: 2, limit50: 5, limit30: 2, uTurnBan: 1 },
     "jx-equal-v1": { limit40: 8 },
     // motorwayStart (Д5) joined the census in repair wave 20, and it is a
     // REPAIR, not drift. Finding sc-ac-truck-spray:c042440d — „no motorway
@@ -425,6 +434,16 @@ describe("§2 the claims these lessons HAVE earned are still said, and still bac
     expect(
       (DISTRICTS.get("mv-uturn-v1")!.zones ?? []).some((z) => z.kind === "solidCenterLine"),
     ).toBe(true);
+  });
+
+  it("sc-mv-uturn-ban names the В23 again, now that the world posts it", () => {
+    // The sign the template is named after, struck while nothing built it and
+    // earned back with the post. If a later lane deletes the sentence to quiet
+    // §1, this fails: the student would drive past a plate nobody told him to
+    // read.
+    const spec = specById("sc-mv-uturn-ban");
+    expect(said(spec, /знак В23/u)).toBe(true);
+    expect(signsOf("mv-uturn-v1", "uTurnBan")).toBe(1);
   });
 
   it("sc-jx-equal-left still says what makes the junction равнозначно", () => {
@@ -554,17 +573,27 @@ describe("§3 the struck sentences are refused by this gate, and only where they
     expect(misses[0]).toContain("ravine");
   });
 
-  it("„знак В23“ on mv-uturn-v1 → refused (the map declares it; nothing builds it)", () => {
+  it("„знак В23“ on mv-uturn-v1 → ACCEPTED now (the map declares it AND the world posts it)", () => {
+    // This case used to read „→ refused (the map declares it; nothing builds
+    // it)". The sentence did not change; the WORLD did — which is the proof
+    // that the refusal was a fact about the map and not about the word.
     const rolledBack = withInstruction(specById("sc-mv-uturn-ban"), 1, STRUCK_V23);
-    const misses = unbackedClaims(rolledBack, DISTRICTS.get("mv-uturn-v1")!);
-    expect(misses).toHaveLength(1);
-    expect(misses[0]).toContain("uTurnBan");
-    // The metadata really is there — which is the point: a declared sign and a
-    // built sign are different facts, and only the second one a student can read.
+    expect(unbackedClaims(rolledBack, DISTRICTS.get("mv-uturn-v1")!)).toEqual([]);
     expect(
       (DISTRICTS.get("mv-uturn-v1")!.meta!.scenario!.uturnBanSign as { signRef: string }).signRef,
     ).toBe("В23");
-    expect(signsOf("mv-uturn-v1", "uTurnBan")).toBe(0);
+    expect(signsOf("mv-uturn-v1", "uTurnBan")).toBe(1);
+  });
+
+  it("„знак В23“ on a map that posts none → still refused (jx-equal-v1)", () => {
+    // The mutation half, kept: a predicate hard-wired to `true` dies here. The
+    // SAME sentence on a district whose census carries no `uTurnBan` is a
+    // promise nothing backs.
+    const rolledBack = withInstruction(specById("sc-jx-equal-left"), 1, STRUCK_V23);
+    const misses = unbackedClaims(rolledBack, DISTRICTS.get("jx-equal-v1")!);
+    expect(misses).toHaveLength(1);
+    expect(misses[0]).toContain("uTurnBan");
+    expect(signsOf("jx-equal-v1", "uTurnBan")).toBe(0);
   });
 
   it("„няма никакви знаци“ on jx-equal-v1 → refused (eight limit40 posts)", () => {

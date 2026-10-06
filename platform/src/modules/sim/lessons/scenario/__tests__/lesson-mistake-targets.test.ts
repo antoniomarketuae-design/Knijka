@@ -274,6 +274,11 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
       "leadClosingEnabled",
       "moveOffObservationEnabled",
       "needlessStopEnabled",
+      // sc-mv-uturn-ban, round 2 — arms the road-referenced reversal across a
+      // solid axis: a U-turn the plain CROSSED_SOLID_LINE detector cannot see
+      // (the natural arc from the outer lane) is billed, and the one it can
+      // see is named.
+      "solidCrossUTurnEnabled",
       "turnObservationEnabled",
     ]);
   });
@@ -321,7 +326,11 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
     // and sc-merge-roadworks-shift) — 12, plus needlessStopJunctionExcuse and
     // needlessStopPerStop (founder ruling 2026-10-04 «Add stops together»;
     // sc-jx-priority-confidence, both default true, authored false: they TUNE
-    // the armed STOPPED_WITHOUT_CAUSE and arm nothing) — 14.
+    // the armed STOPPED_WITHOUT_CAUSE and arm nothing) — 14, plus
+    // solidCrossUTurnEnabled (sc-mv-uturn-ban, round 2; default false, authored
+    // true: it ARMS a bill — the crossing of a solid axis that the plain
+    // CROSSED_SOLID_LINE detector cannot see, billed by position — so it sits
+    // in DETECTOR_OPT_IN_CODES, not in the non-arming set) — 15.
     expect([...authored.keys()].sort()).toEqual([
       "conditionSpeedNightFactor",
       "followMinSpeedKmh",
@@ -336,6 +345,7 @@ describe("T8b — a ruleConfig key is classified by its VALUE, never by its name
       "needlessStopEnabled",
       "needlessStopJunctionExcuse",
       "needlessStopPerStop",
+      "solidCrossUTurnEnabled",
       "townCrawlEnabled",
     ]);
   });

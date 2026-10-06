@@ -25,8 +25,12 @@
  *    at the line (5 m before the band — where the runtime grades the stop),
  *    and on guarded maps the striped barrier arm (STATIC DOWN pose; the
  *    timetable animates grading-side only).
- *  - marking-only kinds (solidCenterLine М1, busLane, emergencyLane М2,
- *    noParking) and unknown future kinds place nothing (forward compat).
+ *  - marking-only kinds (solidCenterLine М1, busLane, emergencyLane М2) and
+ *    unknown future kinds place nothing (forward compat).
+ *  - В23 „Забранено е завиването в обратна посока" is the ONE post here that no
+ *    zone kind implies: it is placed only where the district DECLARES it
+ *    (`meta.scenario.uturnBanSign`) at the first metre of an authored М1 span
+ *    — see `declaredUTurnBanStation`.
  */
 
 import { speedLimitSignKind } from "../types";
@@ -237,6 +241,90 @@ export function zonePostsPlate(zone: Pick<DistrictZone, "kind" | "basis">): bool
   return !(zone.kind === "noStopping" && zone.basis === "law-bus-stop");
 }
 
+/**
+ * THE В23 THAT WAS DECLARED AND NEVER BUILT (sc-mv-uturn-ban:e98407b1).
+ *
+ * mv-uturn-v1 authors, in `meta.scenario`,
+ *
+ *     uturnBanSign: { signRef: "В23", nameBg: "Забранено е завиването в обратна
+ *                     посока", atY: 40, spanY: { fromY: 40, toY: 220 },
+ *                     graded: false }
+ *
+ * and the lesson on it is NAMED after that sign («Къде обратният завой е
+ * забранен», teach: «не се обръща под знак В23»). Nothing read the declaration:
+ * this pass posts from `district.zones`, the map's only zone is the
+ * `solidCenterLine` М1 — a marking-only kind — and so no plate ever stood at
+ * y = 40. `world/__tests__/mv-uturn-districts.test.ts` pinned that as «PINNED
+ * RENDER GAP … no В23 post» and `templates-parking2.ts` routed it here.
+ *
+ * WHY IT IS NOT A ZONE KIND. `graded: false` is the map's own statement that
+ * no detector reads this sign: the wall the reducer grades is the М1 beside it
+ * (CROSSED_SOLID_LINE). A `noUTurn` zone kind would be a graded-looking span
+ * with nothing behind it — the dead-predicate shape. So the plate stays what
+ * the map says it is: FURNITURE that announces the ban the line enforces.
+ *
+ * WHERE IT STANDS, AND WHY THAT IS MEASURED RATHER THAN TRUSTED. The
+ * declaration gives a district Y and no edge. This resolver accepts it only
+ * when that Y is the FIRST METRE OF AN AUTHORED М1 SPAN — it finds the
+ * `solidCenterLine` zone whose start, walked along its own edge, lands on
+ * `atY` (within `UTURN_BAN_STATION_TOL_M`) — and posts on that edge at that
+ * arclength, with the same kerb offset, facing and scale as every prohibition
+ * here. Anything else posts NOTHING:
+ *   · no declaration, or a `signRef` that is not „В23" → nothing (every other
+ *     district in the corpus: byte-identical geometry);
+ *   · a declared Y that sits on no М1 start → nothing. A В23 beside a dashed
+ *     line would announce a ban nothing enforces, and a plate guessed onto the
+ *     nearest road is the „pretty lie" this file refuses elsewhere;
+ *   · two spans starting on that Y → nothing (the sign cannot say which
+ *     carriageway it governs — the `warningStation` rule 4).
+ *
+ * ONE PLATE, NO REPEAT. В24 restates itself deep in its span because nothing
+ * else in frame says „no overtaking" there. Here the М1 line itself runs the
+ * whole 180 m under the driver, so the control IS in frame at the fault; and
+ * the map declares one plate. How far a В23 reaches is not in the content bank
+ * (signs.json `sign-v23` states the meaning, not the extent), so this pass
+ * does not invent a cadence for it.
+ *
+ * The face: content/signs/svg/v23.svg, byte-copied to public/sim/signs/faces
+ * (signFaces.ts) — signs.json `sign-v23`, Наредба № РД-02-21-1/23.11.2023,
+ * прил. № 3, знак В23. Retrieved, never redrawn (ADR-002).
+ */
+const UTURN_BAN_SIGN_REF = "В23";
+/** How far the declared Y may sit from the М1 span's first metre, m. */
+const UTURN_BAN_STATION_TOL_M = 0.5;
+
+/** The zone a declared В23 travels with, or null when the district declares
+ *  none or the declaration does not sit on an authored М1 start. Exported for
+ *  the district battery, which asserts both directions. */
+export function declaredUTurnBanStation(
+  district: District,
+  network: RoadNetwork,
+): { zoneId: string; edgeId: string; s: number } | null {
+  const scenario = (district.meta as { scenario?: unknown }).scenario as
+    | { uturnBanSign?: { signRef?: unknown; atY?: unknown } }
+    | undefined;
+  const declared = scenario?.uturnBanSign;
+  if (!declared || declared.signRef !== UTURN_BAN_SIGN_REF) return null;
+  const atY = declared.atY;
+  if (typeof atY !== "number" || !Number.isFinite(atY)) return null;
+
+  let found: { zoneId: string; edgeId: string; s: number } | null = null;
+  for (const zone of district.zones ?? []) {
+    if (zone.kind !== "solidCenterLine") continue;
+    const eb = network.edgeById.get(zone.edgeId);
+    if (!eb) continue;
+    const g = eb.edge.geometry as Vec2[];
+    const total = polylineLength(g);
+    if (total <= 2) continue;
+    const start = pointAlong(g, Math.min(Math.max(zone.fromM, 0), total)).point;
+    if (Math.abs(start[1] - atY) > UTURN_BAN_STATION_TOL_M) continue;
+    // Ambiguity is a refusal, not a coin toss.
+    if (found) return null;
+    found = { zoneId: zone.id, edgeId: zone.edgeId, s: zone.fromM };
+  }
+  return found;
+}
+
 /** Which of those are WARNINGS (posted in advance) rather than prohibitions
  *  (posted at the first metre they govern). Doc 86 T14. */
 const HAZARD_WARNING_AHEAD_OF: Partial<Record<DistrictZoneKind, number>> = {
@@ -312,6 +400,8 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
   const zones = district.zones;
   if (!zones || zones.length === 0) return out;
   const scale = scenarioSignScale(district);
+  /** The declared В23, resolved once (null on every district but mv-uturn-v1). */
+  const uTurnBan = declaredUTurnBanStation(district, network);
   /**
    * Ground points already occupied by a post, so two zones whose furniture
    * lands on the same spot become two posts instead of one silhouette (the
@@ -432,6 +522,11 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
         if (repeatAt < zone.toM - ZONE_SIGN_REPEAT_END_CLEAR_M) placeAt(repeatAt, kind);
       }
     }
+
+    // The declared В23 (see `declaredUTurnBanStation`): a prohibition, so it
+    // stands at the first metre it governs — which is the first metre of THIS
+    // М1 span, on the same edge, kerb offset, facing and scale as В24/В27.
+    if (uTurnBan !== null && zone.id === uTurnBan.zoneId) placeAt(uTurnBan.s, "uTurnBan");
 
     // Founder R3 #36 („Скорост в завой"): the copy promises „знак А1 с табела
     // „50"" — pair the curve warning with its В26 plate, 2 m before the А1 and

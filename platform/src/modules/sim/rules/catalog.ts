@@ -3484,10 +3484,261 @@ export const NEEDLESS_STOP_ACT_COPY: Record<
   },
 };
 
+/**
+ * CROSSED_SOLID_LINE — THE U-TURN (sc-mv-uturn-ban:6d60c160, «the debrief
+ * explains overtaking after a U-turn»; and the «never mentions … turning
+ * against a solid axis line» clause of e98407b1).
+ *
+ * WHEN AN EVENT CARRIES THIS ACT (round 2 — decided from the ROAD, never from
+ * how far the nose swung recently). Only where the lesson authors
+ * `solidCrossUTurnEnabled` — the author's statement that this М1 span has
+ * nothing on its far side to turn INTO — and only when `engine.ts` „THE
+ * REVERSAL ACROSS THE SOLID AXIS" has seen the whole thing: the car was
+ * travelling WITH one bank of the road, its centre crossed the axis where the
+ * axis is solid, and it is now on the other bank travelling with THAT one
+ * (nose within 45° of the far bank's direction, held for the crossing
+ * detector's own sustain) — HAVING MADE THE TURN-ROUND WHERE THE AXIS IS SOLID
+ * (round 4, R4-1: the road's record of the axis on the first frame the car,
+ * across the axis, was no longer travelling its original way). Today that is
+ * sc-mv-uturn-ban alone, and inside it only the drive that turned round inside
+ * the solid span: a drift, an overtaking pull-out that returns or carries on,
+ * and a crossing that is abandoned or parked at the far kerb keep the
+ * crossing's row (A12); a lawful U-turn made earlier is evidence for nothing;
+ * and a turn-round made over the dashes — by a car that had straddled the line
+ * or stayed across since inside the span — is a lawful U-turn that renames
+ * nothing. (Round 4, R4-2: a pull-out that DOES turn round inside the span is
+ * the U-turn like any other; the 5 m / 10° carve-out of rounds 2–3 is gone.)
+ *
+ * ROUND 5 — ONE DEFINITION OF THE ACT (integrator ruling R5-1 … R5-3; it
+ * replaces «now on the other bank, travelling with it» and «the first frame
+ * the centre is across» above, which named a crossing made by a car that had
+ * ALREADY turned round, on its own half, where the axis is dashed — verifier
+ * Y1). A TURN-ROUND is an event of the heading against the road: the nose goes
+ * from within 45° of the direction the car was travelling to within 45° of the
+ * opposite one and stays there for the sustain, on whichever half the centre
+ * is. It BEGINS where the swing that carries the nose out of the first band
+ * begins, and it COMPLETES when that swing ends. An event carries this act iff
+ * (i) the centre crossed the axis where it is solid, (ii) a turn-round
+ * completed at or after that crossing — the crossing is made before or during
+ * the turn-round, never after it — and (iii) the axis is solid where that
+ * turn-round begins. So a pull-out followed by a round to the right that ends
+ * on the car's own half IS this act; a turn-round at the gap followed by a
+ * crossing on the way back is NOT, and no earlier row is renamed by it.
+ *
+ * IT REACHES AN EVENT IN ONE OF TWO WAYS, and on both the copy is shown only
+ * AFTER the reversal:
+ *  · the crossing was billed first — by the plain detector, or by position
+ *    where that detector is blind (the natural arc from the outer lane, a turn
+ *    at walking pace) — under the CROSSING's title (true at that frame: he
+ *    has crossed; he has not yet turned round; round 3: on the pooled reason
+ *    if the whole body is across, on `SOLID_CROSS_ACT_ASTRIDE`'s if it is
+ *    not), and the completed reversal NAMES that same bill
+ *    (`types.ts ActAmendment`);
+ *  · nothing billed the crossing (the centre went over in reverse gear, or the
+ *    car was already travelling with the far bank as it crossed) and the
+ *    completed reversal IS the bill.
+ *
+ * WHY THE POOLED ROW CANNOT SAY IT. The pooled corrective is the overtake's:
+ * «остани в своята лента, дори предният да пълзи. Изпреварвай или заобикаляй
+ * чак където линията стане прекъсната». After a U-turn there is no «предният»
+ * and nothing was overtaken, so the one line that tells the student what to do
+ * instead answered a question he had not asked.
+ *
+ * EVERY SENTENCE CHECKED AGAINST THE FRAMES IT CAN SHOW ON (all of them after
+ * the turn-round was confirmed):
+ *  · «Пресече непрекъснатата осева линия» — the centre passed from one bank to
+ *    the other on a frame where `tick.solidCenterLine` held (round 5: in
+ *    either direction — out over the solid axis, or out over the dashes and
+ *    back over the solid axis during the turn-round).
+ *  · «и зави в обратна посока» — the law's own name for the manoeuvre (ЗДвП
+ *    чл. 38: „завиването в обратна посока"), said of a car whose nose is
+ *    within 45° of the direction OPPOSITE to the one it was travelling, i.e.
+ *    at least 135° round, and has held that for the sustain (round 5: against
+ *    the road's two directions — it no longer has to be on the far half, so a
+ *    round to the right that ends on its own half is said to have turned
+ *    round too, which it has). Round 1's «Зави наляво …
+ *    навлезе напряко … така се започва обратен завой» is gone with its
+ *    evidence: it was written for a bill that landed mid-turn, and it claimed
+ *    a direction of turn («наляво») and a line of approach («напряко») that
+ *    the new evidence does not measure — a three-point turn reverses in the
+ *    middle.
+ *  · «това е обратен завой, а на това място той е забранен» — forbidden by the
+ *    line the same sentence goes on to explain; nothing here says a sign
+ *    stands anywhere. The corrective names В23 only as part of the RULE for
+ *    where a U-turn may be made, which is true on every map. «НА ТОВА МЯСТО»
+ *    is a claim about where the TURN was made, and since round 4 it is
+ *    measured: the axis was solid under the car where it began to turn round
+ *    (the round-3 verifier's X1 was this clause printed for a turn made
+ *    48.7 m past the end of the solid line; the round-4 verifier's Y1 was it
+ *    printed for a turn made at the gap by a car that crossed the solid axis
+ *    only on its way back — round 5 reads the place where the turn-round
+ *    BEGINS, and names only a crossing made before or during it).
+ *  · the corrective's «Подмини мястото и продължи … докато осевата стане
+ *    прекъсната … Там обърни» — advice the student did NOT follow, for the
+ *    same reason: a turn made where the axis is dashed is never given it.
+ *  · no oncoming car is claimed (none is required and none is queried).
+ *
+ * WHAT IS RETRIEVED (ADR-002), and what is deliberately NOT written:
+ *  · ЗДвП чл. 38, ал. 1: „Завиването в обратна посока се извършва наляво от
+ *    най-лявата пътна лента по посока на движението."; ал. 2: „При завиване в
+ *    обратна посока водачът пропуска насрещно движещите се пътни превозни
+ *    средства." (content/law/acts/zdvp.json) — paraphrased with the citation,
+ *    not quoted: the bank's ал. 1 carries a typographic slip („най- лявата")
+ *    that a verbatim quote would have to reproduce.
+ *  · the sign's name from content/signs/signs.json `sign-v23`: „Забранено е
+ *    завиването в обратна посока" (Наредба № РД-02-21-1/23.11.2023, прил. № 3,
+ *    знак В23).
+ *  · NO `lawRef`: the rule that was BROKEN is still the М1's, so the event
+ *    inherits the pooled citation. чл. 38 says how a U-turn is made, not that
+ *    the line may not be crossed, and filing it as the broken rule would be a
+ *    new legal claim nobody retrieved.
+ *  · NO `peekBg`: «Плътната линия е стена.» is true here too.
+ *  · HOW FAR a В23 reaches is not in the bank, so nothing here says where a
+ *    sign's ban ends — only that a place with the sign is not the place.
+ *
+ * `correctiveBg` IS THE FIRST PER-ACT CORRECTIVE IN THE CATALOGUE. Until this
+ * row the field was read BY CODE at display time on every surface (the note
+ * «correctiveBg HAS NO PER-EVENT CHANNEL» recurs above for that reason). The
+ * channel is `violationCorrectiveBg` below, and every surface that holds an
+ * event's `detail` now reads through it.
+ */
+export const SOLID_CROSS_ACT_UTURN = "u-turn";
+
+/**
+ * CROSSED_SOLID_LINE — THE BILL THAT LANDS WITH THE BODY ASTRIDE THE LINE
+ * (sc-mv-uturn-ban round 3, verifier W3).
+ *
+ * WHAT WAS FALSE. The pooled reason opens «Пресече ИЗЦЯЛО непрекъснатата осева
+ * линия и навлезе в насрещната половина на платното». The bill it is printed
+ * on is decided by the car's CENTRE (across the axis for the sustain), and on
+ * most crossings made at an angle or at walking pace the body is still astride
+ * the line on that frame: 0.6 s after the centre of a car turning round at
+ * 9 км/ч is across, its tail is still 0.6–0.8 m short of the line (measured:
+ * 0.76 m on the demo's own arc, 0.58 m on the natural arc from the outer
+ * lane); a creeping straddle never gets the body across at all. A centre
+ * across a solid axis IS a crossing whatever the speed — that stands — but
+ * «изцяло» was not true.
+ *
+ * WHEN AN EVENT CARRIES THIS ACT. Only where the lesson authors
+ * `solidCrossUTurnEnabled` (the one reader of the body's position,
+ * `EdgeAlignment.axisClearM`), on a CROSSED_SOLID_LINE bill whose frame has
+ * the body measured and NOT wholly across. A bill that lands with the whole
+ * body across keeps the pooled row and its «изцяло», which is true there. If
+ * the turn then completes, the row is named the U-turn like any other
+ * (`PROVISIONAL_ACTS` below).
+ *
+ * EVERY CLAUSE, AGAINST THE FRAME IT SHOWS ON (centre across the axis, body
+ * astride it):
+ *  · «Застъпи непрекъснатата осева линия» — the body is over the axis on this
+ *    frame, and the axis was solid where the centre went over it. The verb is
+ *    the bank's own: ППЗДвП чл. 63, ал. 2, т. 1 — „„Единична непрекъсната
+ *    линия" - М1. На пътните превозни средства е забранено да я застъпват и
+ *    пресичат." (retrieved from content/questions/signali-i-markirovka.json,
+ *    „ИЗТОЧНИК ППЗДвП чл. 63, ал. 2, т. 1"; the pooled row's second sentence
+ *    already paraphrases it: «не се застъпва и не се пресича»).
+ *  · «и навлезе с повече от половината автомобил в насрещната половина на
+ *    платното» — the centre of a rectangle is across a straight line exactly
+ *    when more than half of the rectangle is.
+ *  · the second sentence is the pooled row's, word for word.
+ *
+ * THE TITLE IS THE CROSSING'S OWN and there is NO `correctiveBg`, `lawRef` or
+ * `peekBg`: it is the same mistake with the same remedy and the same rule, so
+ * `violationCorrectiveBg`, `makeViolation` and `violationPeekBg` inherit the
+ * pooled ones. Only the sentence that describes what the car did differs.
+ */
+export const SOLID_CROSS_ACT_ASTRIDE = "astride";
+
+/**
+ * CROSSED_SOLID_LINE — THE CROSSING INTO THE HALF THAT RUNS THE CAR'S OWN WAY
+ * (sc-mv-uturn-ban round 6, integrator ruling R6-3; verifier C1).
+ *
+ * WHAT WAS FALSE. Both crossing reasons end their first sentence «…и навлезе …
+ * в насрещната половина на платното». That is true of every car the plain
+ * detector was written for: it pulls out of its own half into the oncoming
+ * one. Since round 5 the armed lesson also bills, as a crossing, a car that
+ * HAS ALREADY TURNED ROUND — at the lesson's own lawful gap, on its own half —
+ * and then goes over the solid axis on its way back. That car is travelling
+ * the other way, and the half it enters is the one whose traffic runs with it.
+ * «Насрещната» is false there: the verifier counted it on 63 rows of 35 acts
+ * (the cleanest: the bill 37.25 s into the drive, the centre 0.27 m over, the
+ * nose 170° round).
+ *
+ * WHEN AN EVENT CARRIES ONE OF THESE TWO ACTS. Only where the lesson authors
+ * `solidCrossUTurnEnabled`, on a CROSSED_SOLID_LINE bill whose frame has the
+ * body measured and the half the centre is on carrying traffic in the car's
+ * own TRAVEL DIRECTION — the road direction its nose was last within 45° of
+ * (`rules/engine.ts` R5-1, `solidCrossOwnWay`). `SOLID_CROSS_ACT_OWN_WAY`
+ * where the whole body is across, `SOLID_CROSS_ACT_ASTRIDE_OWN_WAY` where it
+ * is astride — the same split as the two reasons they are cut from. A car
+ * with no travel direction yet keeps the shipped reason.
+ *
+ * WHAT THEY SAY — NOTHING NEW. Each is the reviewed sentence it replaces with
+ * the false clause taken out, and the pooled row's second sentence word for
+ * word:
+ *  · «Пресече изцяло непрекъснатата осева линия.» — the centre went over the
+ *    axis where it is solid and the whole body is across on this frame;
+ *  · «Застъпи непрекъснатата осева линия.» — the body is over the axis on this
+ *    frame. Both verbs are the bank's own: ППЗДвП чл. 63, ал. 2, т. 1 — „На
+ *    пътните превозни средства е забранено да я застъпват и пресичат."
+ *    (retrieved from content/questions/signali-i-markirovka.json);
+ *  · «Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя
+ *    стои точно там, където насрещното движение или видимостта правят
+ *    навлизането отсреща опасно.» — a statement about the LINE, true of it
+ *    whichever way the car is going.
+ * Nothing says which half the car is on, because nothing reviewed says it for
+ * this case. THE TITLE IS THE CROSSING'S OWN; there is no `correctiveBg`,
+ * `lawRef` or `peekBg`, so the pooled ones are inherited (the pooled
+ * corrective speaks of overtaking — recorded, with the integrator).
+ *
+ * LIKE THE ASTRIDE ROW THEY DESCRIBE ONLY THE BILL FRAME (`PROVISIONAL_ACTS`):
+ * a car hugging the axis the wrong way that then rounds across it is billed
+ * with one of these and named the U-turn when the turn-round is confirmed.
+ */
+export const SOLID_CROSS_ACT_OWN_WAY = "own-way";
+export const SOLID_CROSS_ACT_ASTRIDE_OWN_WAY = "astride-own-way";
+
+export const SOLID_CROSS_ACT_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string; correctiveBg?: string }
+> = {
+  [SOLID_CROSS_ACT_ASTRIDE]: {
+    titleBg: "Пресичане на непрекъсната осева линия",
+    explanationBg:
+      "Застъпи непрекъснатата осева линия и навлезе с повече от половината автомобил в насрещната половина на платното. Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно.",
+  },
+  [SOLID_CROSS_ACT_OWN_WAY]: {
+    titleBg: "Пресичане на непрекъсната осева линия",
+    explanationBg:
+      "Пресече изцяло непрекъснатата осева линия. Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно.",
+  },
+  [SOLID_CROSS_ACT_ASTRIDE_OWN_WAY]: {
+    titleBg: "Пресичане на непрекъсната осева линия",
+    explanationBg:
+      "Застъпи непрекъснатата осева линия. Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно.",
+  },
+  [SOLID_CROSS_ACT_UTURN]: {
+    titleBg: "Обратен завой през непрекъсната осева линия",
+    explanationBg:
+      "Пресече непрекъснатата осева линия и зави в обратна посока — това е обратен завой, а на това място той е забранен. Единичната непрекъсната линия (М1) не се застъпва и не се пресича за никоя маневра, включително за обръщане: тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно. Колкото и широко и празно да изглежда платното, линията си остава в сила.",
+    correctiveBg:
+      "Обратен завой не се прави през плътна линия. Подмини мястото и продължи в лентата си, докато осевата стане прекъсната и няма знак В23 „Забранено е завиването в обратна посока“. Там обърни наляво от най-лявата лента и чак след като пропуснеш насрещните (ЗДвП чл. 38, ал. 1 и 2).",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
-    Record<string, { titleBg: string; explanationBg: string; lawRef?: string; peekBg?: string }>
+    Record<
+      string,
+      {
+        titleBg: string;
+        explanationBg: string;
+        lawRef?: string;
+        peekBg?: string;
+        /** „какво трябваше да направя" for THIS act — see `violationCorrectiveBg`. */
+        correctiveBg?: string;
+      }
+    >
   >
 > = {
   RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,
@@ -3506,6 +3757,8 @@ export const PER_ACT_COPY: Partial<
   HEADLIGHTS_OFF_IN_RAIN: SNOW_LIGHTS_ACT_COPY,
   // Founder ruling 2026-10-04 — the priority-road needless stop, stops added up.
   STOPPED_WITHOUT_CAUSE: NEEDLESS_STOP_ACT_COPY,
+  // sc-mv-uturn-ban:6d60c160 — the turn-round across the line, named as itself.
+  CROSSED_SOLID_LINE: SOLID_CROSS_ACT_COPY,
 };
 
 /**
@@ -3523,9 +3776,103 @@ export const PER_ACT_COPY: Partial<
 export function actCopy(
   code: ViolationCode,
   detail: string | undefined,
-): { titleBg: string; explanationBg: string; lawRef?: string; peekBg?: string } | null {
+): {
+  titleBg: string;
+  explanationBg: string;
+  lawRef?: string;
+  peekBg?: string;
+  correctiveBg?: string;
+} | null {
   if (detail === undefined) return null;
   return PER_ACT_COPY[code]?.[detail] ?? null;
+}
+
+/**
+ * THE CORRECTIVE FOR ONE EVENT — „какво трябваше да направя", act first and
+ * pooled second: the same order `makeViolation` uses for the title and the
+ * explanation and `violationPeekBg` uses for the peek.
+ *
+ * WHY THIS IS A FUNCTION AND WHY IT IS NEW. `correctiveBg` used to be read
+ * straight off `VIOLATIONS[code]` by every surface, so one code could give
+ * exactly one piece of advice whatever the student had done. That was true to
+ * the catalogue as long as no act needed different advice, and it stopped being
+ * true with the U-turn across a solid line (`SOLID_CROSS_ACT_COPY`): the pooled
+ * advice there is about overtaking. A surface that holds the event's `detail`
+ * reads through here; a surface that holds only a code (a theory chip, the
+ * tutor's retrieval, a hazard card) still gets the pooled row, which is what
+ * `detail === undefined` returns.
+ *
+ * It never returns null for a catalogued code: `ViolationSpec.correctiveBg` is
+ * required, so the pooled fallback always exists.
+ */
+export function violationCorrectiveBg(code: ViolationCode, detail: string | undefined): string {
+  return actCopy(code, detail)?.correctiveBg ?? VIOLATIONS[code].correctiveBg;
+}
+
+/**
+ * NAME A BILL THAT IS ALREADY OUT (`types.ts ActAmendment`) — the one function
+ * every holder of rule events uses, so «the row at `billT` is this act» means
+ * the same thing in the lesson ledger, in the coached channel and in a
+ * recorder's log.
+ *
+ * It finds the violation with the amendment's `code` and `t` whose act is
+ * still OPEN (`actIsOpen`: none yet, or one of `PROVISIONAL_ACTS` — what the
+ * bill frame alone could say), and gives it the act: `detail`, and the title,
+ * reason and citation `makeViolation` would have stamped had the act been
+ * known at the bill. Everything else on the row — time, class, points,
+ * re-grade marks — is the row's own and is kept, so an amendment can re-label
+ * a bill and can never re-price one. A row that is not there (the lesson
+ * engine dropped or rate-limited it), or that already names a settled act, is
+ * left alone.
+ *
+ * Returns THE SAME ARRAY when nothing matched, so a caller that compares by
+ * reference still sees «unchanged».
+ */
+/**
+ * ACTS THAT DESCRIBE ONLY THE BILL FRAME, and so may still be superseded by an
+ * `ActAmendment` when the whole manoeuvre is known. Today three, all of one
+ * code: a crossing billed with the body astride the solid axis
+ * (`SOLID_CROSS_ACT_ASTRIDE`), or into the half that runs the car's own way
+ * (`SOLID_CROSS_ACT_OWN_WAY`, `SOLID_CROSS_ACT_ASTRIDE_OWN_WAY` — round 6),
+ * can turn out to be a U-turn seconds later, exactly like one billed with the
+ * pooled row. An act that is NOT listed here is settled: no amendment touches
+ * a row that carries it.
+ */
+export const PROVISIONAL_ACTS: Partial<Record<ViolationCode, readonly string[]>> = {
+  CROSSED_SOLID_LINE: [SOLID_CROSS_ACT_ASTRIDE, SOLID_CROSS_ACT_OWN_WAY, SOLID_CROSS_ACT_ASTRIDE_OWN_WAY],
+};
+
+/** May an amendment still name a row of `code` that carries `detail`? */
+export function actIsOpen(code: ViolationCode, detail: string | undefined): boolean {
+  return detail === undefined || (PROVISIONAL_ACTS[code]?.includes(detail) ?? false);
+}
+
+export function applyActAmendments<E extends { kind: string }>(
+  events: readonly E[],
+  amendments: ReadonlyArray<{ code: ViolationCode; billT: number; detail: string }> | undefined,
+): readonly E[] {
+  if (amendments === undefined || amendments.length === 0) return events;
+  let out: E[] | null = null;
+  for (const a of amendments) {
+    const src: readonly E[] = out ?? events;
+    const i = src.findIndex((e) => {
+      if (e.kind !== "violation") return false;
+      const v = e as unknown as ViolationEvent;
+      return v.code === a.code && v.t === a.billT && actIsOpen(v.code, v.detail);
+    });
+    if (i < 0) continue;
+    const old = src[i] as unknown as ViolationEvent;
+    const named = makeViolation(a.code, a.billT, { detail: a.detail });
+    out ??= [...events];
+    out[i] = {
+      ...old,
+      detail: a.detail,
+      titleBg: named.titleBg,
+      explanationBg: named.explanationBg,
+      lawRef: named.lawRef,
+    } as unknown as E;
+  }
+  return out ?? events;
 }
 
 /**

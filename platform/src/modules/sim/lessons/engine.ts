@@ -29,6 +29,9 @@ import type {
   StagedEventOutcome,
 } from "../contracts";
 import {
+  actCopy,
+  actIsOpen,
+  applyActAmendments,
   buildSessionSummary,
   conditionsSpeedEnvelope,
   createRuleEngine,
@@ -50,6 +53,8 @@ import {
   type SimTick,
   type TaskCapArrival,
   type TaskSpeedCap,
+  type ActAmendment,
+  type ViolationCode,
   type ViolationEvent,
 } from "../rules";
 import { coachStep } from "../scenarios";
@@ -2343,7 +2348,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           ...(taskSpeedCap !== undefined ? { taskSpeedCap } : {}),
           ...(taskCapArrival !== undefined ? { taskCapArrival } : {}),
         };
-  const { state: rules, events: ruleEvents } = reduceTick(prev.rules, ruleTick);
+  const { state: rules, events: ruleEvents, amendments: actAmendments } = reduceTick(prev.rules, ruleTick);
 
   // A13: exam sessions bypass the whole teach-first layer — see coach.ts.
   // THEO-3: mistake-experience sessions ride the coach's learn-only
@@ -4056,7 +4061,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       currentObjectiveIndex: currentIndex,
       phase,
       endedAtSec,
-      events: scoredEvents.length > 0 ? [...prev.events, ...scoredEvents] : prev.events,
+      // AN ACT NAMED AFTER ITS BILL (`rules/types.ts ActAmendment` — today only
+      // the U-turn across a solid axis, which is known when the car has turned
+      // round, seconds after the crossing was billed). The row it names is in
+      // ONE of the two ledgers — charged here, or coached below — and is
+      // re-labelled in place: same code, time, class and points, so nothing is
+      // re-priced and nothing is billed twice. `actAmendments` is absent on
+      // every frame of every lesson that does not arm the reversal, and both
+      // helpers return their input untouched then.
+      events: applyActAmendments(
+        scoredEvents.length > 0 ? [...prev.events, ...scoredEvents] : prev.events,
+        actAmendments,
+      ) as ScorableEvent[],
       scenarioEncounters: encounters,
       penaltyEscalations: escalations,
       lastTeachMomentAtSec: lastTeachAt,
@@ -4067,7 +4083,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // Round 14: the cap's own pause clocks, written on the frame of a cap pause only.
       ...(lastCapTeachAt !== null && lastCapTeachAt === tick.t ? { lastCapTeachMomentAtSec: lastCapTeachAt } : {}),
       ...(lastCapHeavyTeachAt !== null && lastCapHeavyTeachAt === tick.t ? { lastCapHeavyTeachMomentAtSec: lastCapHeavyTeachAt } : {}),
-      coachedMistakes: coachedNew.length > 0 ? [...coachedPrev, ...coachedNew] : coachedPrev,
+      coachedMistakes: amendCoachedMistakes(
+        coachedNew.length > 0 ? [...coachedPrev, ...coachedNew] : coachedPrev,
+        actAmendments,
+      ),
       lastT: Math.max(prev.lastT, tick.t),
       // THE DRIVE'S LAST TESTIMONY, kept so the endings that carry no tick can
       // still ask it one question (types.ts `lastTick`, and
@@ -4463,4 +4482,35 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // Absent when none, the same shape rule.
     ...((state.taskCapBreaches ?? []).length > 0 ? { taskCapBreaches: state.taskCapBreaches } : {}),
   };
+}
+
+/**
+ * THE COACHED HALF OF `rules/catalog.ts applyActAmendments`.
+ *
+ * Under ADR-009 a lesson's own mistake is never charged the first time, so the
+ * only record of it is a `CoachedMistake` row — and that is the row an act
+ * known after the bill has to name (the U-turn across a solid axis at L1–L3 and
+ * L5: taught at the crossing with the crossing's card, named when the car has
+ * turned round). Same rule as the charged ledger: the row with the amendment's
+ * code and time whose act is still open (none yet, or a provisional one —
+ * `rules/catalog.ts actIsOpen`) gets the act and the act's title; a row that
+ * is not there is left alone; the same array comes back when nothing matched.
+ */
+function amendCoachedMistakes(
+  rows: CoachedMistake[],
+  amendments: readonly ActAmendment[] | undefined,
+): CoachedMistake[] {
+  if (amendments === undefined || amendments.length === 0) return rows;
+  let out: CoachedMistake[] | null = null;
+  for (const a of amendments) {
+    const src = out ?? rows;
+    const i = src.findIndex(
+      (c) => c.code === a.code && c.t === a.billT && actIsOpen(c.code as ViolationCode, c.detail),
+    );
+    if (i < 0) continue;
+    const act = actCopy(a.code as ViolationCode, a.detail);
+    out ??= [...rows];
+    out[i] = { ...src[i], detail: a.detail, ...(act !== null ? { titleBg: act.titleBg } : {}) };
+  }
+  return out ?? rows;
 }

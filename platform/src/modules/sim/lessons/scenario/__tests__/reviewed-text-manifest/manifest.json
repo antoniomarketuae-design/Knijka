@@ -3,9 +3,9 @@
  "command": "RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts",
  "surfaces": {
   "catalog": {
-   "fingerprint": "9ed66feb54e8c7bfbf03ea3f59ecf0f17e7079e9a57c38a963fd3eb5d8563d0b",
-   "units": 13,
-   "strings": 570
+   "fingerprint": "f93e908c811e995cf459b37b32e1869ea045adabdac1d0febc760226eb995f69",
+   "units": 14,
+   "strings": 588
   },
   "consequences": {
    "fingerprint": "a9827e20b7e5941fb8941d47ba49040cc69104de6f17d3cf3027bc949a056b72",
@@ -18,17 +18,17 @@
    "strings": 138
   },
   "template": {
-   "fingerprint": "770006ff7720ab3b24f4bd754084173543e46f27798e763b98040fd467986ab1",
+   "fingerprint": "0a42baf207543fa0e8bf3a434d55ec0ecfc426a55d7568f905629b1983b43f48",
    "units": 167,
-   "strings": 4297
+   "strings": 4298
   },
   "compiled": {
-   "fingerprint": "a59988c9ccb0150072aafd629e37381b7b19ef65f5f3e23b108997f7dbb4b677",
+   "fingerprint": "7d0be40916d78327eda7851849aa024b35fbb2eefac734f733042537ff1e2313",
    "units": 808,
    "strings": 9083
   },
   "caption": {
-   "fingerprint": "9b1e5260e98a06e8a419496032065a685bcef6f4e9465616f72b255c556264b7",
+   "fingerprint": "fe3aec9cd5e7b84e1afe27eb2ce3c18c71257981b92f2fbd0a7395e1bb135c7f",
    "units": 503,
    "strings": 1870
   },
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "23fc2d0304aae2e98fd32e83146dc4b536a4d3e85052275f749cfac28b5d7c23",
-   "units": 486,
-   "strings": 13215
+   "fingerprint": "7e94e0e07e195ed9e87a3b9bf8a5478d3d4c940743290b5b07471dbe43292918",
+   "units": 487,
+   "strings": 13226
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",
@@ -58,9 +58,9 @@
    "strings": 1391
   },
   "public": {
-   "fingerprint": "2c4e940d03296a4f1f0763367eebe2f8a0b749d4fa90e578335bd918a889603a",
-   "units": 14,
-   "strings": 105
+   "fingerprint": "f11c425e311ec15a3bf52743b3c6d5b9ae9e0cb65bfcaacb162e8532bc420c57",
+   "units": 15,
+   "strings": 106
   },
   "law": {
    "fingerprint": "9b829b35f5c7b4bd9a4913320e9772d18c34a2b57c34da1a9b0f09f60c7faae3",
@@ -68,9 +68,9 @@
    "strings": 2145
   },
   "artwork": {
-   "fingerprint": "8e58fcdd4e681cd25142e09ed09e221adb69785930f2fea58e2178dc1c2e4d4c",
-   "units": 88,
-   "strings": 115
+   "fingerprint": "72415471c664703e5780a8f58c0ef9a0bea0b9471fce1829785fe051d49e9de2",
+   "units": 89,
+   "strings": 116
   }
  }
 }

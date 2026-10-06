@@ -3165,28 +3165,51 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // `edgeTangent`, `v.headingDeg`, `fix` and `edgeRt` are the verdict's own
       // inputs, and `signedDeltaDeg`/`bearingDeg` are already imported.
       //
-      // NOTHING GRADES IT. No rule, objective, card, score or HUD field reads
-      // `tick.edgeAlignment`, and `runtime/__tests__/edge-alignment-not-graded
-      // .test.ts` fails by EXECUTION the moment one does. See the field's
-      // contract in rules/types.ts and the register entry in
-      // docs/simulation/93_INSTRUMENT_GAPS.md (GAP-2).
-      tick.edgeAlignment =
-        edgeRt === null || edgeTangent === null
-          ? {
-              deg: null,
-              reason: "no-edge-fix",
-              wrongWayArmed,
-              edgeId: null,
-              offCarriageway,
-            }
-          : {
-              deg: signedDeltaDeg(bearingDeg(edgeTangent[0], edgeTangent[1]), v.headingDeg),
-              wrongWayArmed,
-              edgeId: edgeRt.edge.id,
-              offCarriageway,
-              travelDir: fix.travelDir,
-              roundabout: edgeRt.edge.roundabout,
-            };
+      // NOTHING GRADES IT under `DEFAULT_RULE_CONFIG`: no rule, objective, card,
+      // score or HUD field reads `tick.edgeAlignment`, and `runtime/__tests__/
+      // edge-alignment-not-graded.test.ts` fails by EXECUTION the moment one
+      // does. ONE OPT-IN READER exists since 2026-10-05 — `rules/engine.ts` „THE
+      // REVERSAL ACROSS THE SOLID AXIS" (which also reads the body's distance
+      // from the axis, published just below), armed only by a lesson that authors
+      // `solidCrossUTurnEnabled` (sc-mv-uturn-ban) — and the same test pins it:
+      // unread with the key off, read with it on, and a census of who authors
+      // the key. See the field's contract in rules/types.ts and the register
+      // entry in docs/simulation/93_INSTRUMENT_GAPS.md (GAP-2).
+      if (edgeRt === null || edgeTangent === null) {
+        tick.edgeAlignment = {
+          deg: null,
+          reason: "no-edge-fix",
+          wrongWayArmed,
+          edgeId: null,
+          offCarriageway,
+        };
+      } else {
+        const alignDeg = signedDeltaDeg(bearingDeg(edgeTangent[0], edgeTangent[1]), v.headingDeg);
+        tick.edgeAlignment = {
+          deg: alignDeg,
+          wrongWayArmed,
+          edgeId: edgeRt.edge.id,
+          offCarriageway,
+          travelDir: fix.travelDir,
+          roundabout: edgeRt.edge.roundabout,
+        };
+        // HOW FAR THE BODY IS FROM THE AXIS (`EdgeAlignment.axisClearM`, two-way
+        // edges only) — the centre's distance from the centreline into its
+        // bank, in the locator's own lateral coordinate (lane j's centre sits
+        // (L−1−j+½)·W from the axis and `laneOffsetM` is measured from it
+        // toward the axis), less how far the chassis rectangle reaches across
+        // the road at this yaw. The same body, the same two half-extents and
+        // the same reach as the lane-entry tracker below (`reachAcross`); it
+        // is restated here rather than shared because that block runs only on
+        // frames it can measure a lane entry on, and this record is published
+        // on every frame that has an edge.
+        if (!edgeRt.edge.oneway) {
+          const dAxis = (edgeRt.lanesPerDir - 1 - fix.laneId + 0.5) * LANE_WIDTH_M - fix.laneOffsetM;
+          const yaw = (alignDeg * Math.PI) / 180;
+          tick.edgeAlignment.axisClearM =
+            dAxis - (PLAYER_HALF_WIDTH_M * Math.abs(Math.cos(yaw)) + PLAYER_HALF_LENGTH_M * Math.abs(Math.sin(yaw)));
+        }
+      }
       // FOG condition (doc 72 AC-03) — flows onto the tick exactly like rain,
       // but stays ADDITIVE (set only when on) so pre-fog tick shapes are
       // untouched; the fog-lamp channel rides along the same way. SNOW

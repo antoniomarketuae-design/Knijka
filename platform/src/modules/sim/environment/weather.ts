@@ -723,6 +723,16 @@
 //    test failing, not passing. The instrument that can carry the quantity is
 //    the gauge above; the rim is not it, and no version of this row is owed a
 //    change in this file.
+//
+//    RULED 2026-10-04, AND NOT IN THIS FILE. The founder took the option this
+//    section could not: «Stronger wind» — the correction itself was made big
+//    enough to see. The measurement quoted above („below 0.01 of full input")
+//    described the SIDE FORCE, and it still does (0.05 % at the lesson's
+//    speed, and under 1 % at any force below the tyres' grip ceiling); what
+//    the ruling added is the wind's yaw pull, `vehicle/crosswindPull.ts`,
+//    under which a correctly driven leg holds 3.5 % of the wheel and the rim
+//    shows it because the DRIVER is holding it. The principle above is
+//    untouched — the rim still never moves by itself.
 
 import { useSyncExternalStore } from "react";
 

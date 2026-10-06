@@ -133,6 +133,10 @@
   "В лявата лента обаче вече имаше кола, която идваше отзад съвсем близо: тя се движи по своята лента, а твоята свършва — значи ти си този, който се съобразява (чл. 25, ал. 2).": {
    "class": "other"
   },
+  "В лявата лента сме, а завет няма — вятърът натиска през цялото време.": {
+   "class": "other",
+   "why": "a description of the recording (sc-ac-wind-truck-pass correct demo, during the overtake): where the car is while it passes and that the wind keeps pushing because the staged truck gives no shelter — the overtake lane in use, not the чл. 15, ал. 1 duty or the town lane choice"
+  },
   "В лявата лента съм, зелено е — оттук нататък само следвам стрелката.": {
    "class": "other"
   },
@@ -1041,6 +1045,10 @@
   "НЕ бързай да се прибираш: изпреварването не свършва при подминаването, а при безопасното връщане вдясно.": {
    "class": "other"
   },
+  "На 40-ия метър вдясно стои знак В23 „Забранено е завиването в обратна посока“ и оттам осевата линия е ПЛЪТНА — а плътната осева и сама забранява обратния завой.": {
+   "class": "other",
+   "why": "«вдясно» says where the В23 plate STANDS (the driver's kerb, at the 40th metre of mv-uturn-v1) — a description of the street, not a statement about which lane to travel in"
+  },
   "На булевард с две ленти в посока в лявата лента може да идва кола, която те настига по-бързо, отколкото предполагаш, а мигачът само обявява намерението ти — не проверява дали лентата е свободна.": {
    "class": "other"
   },
@@ -1617,6 +1625,10 @@
   },
   "Същият текст решава и обратния случай: когато две коли от съседни ленти трябва да се преместят едновременно, предимство има тази в дясната лента.": {
    "class": "other"
+  },
+  "Там обърни наляво от най-лявата лента и чак след като пропуснеш насрещните (ЗДвП чл. 38, ал. 1 и 2).": {
+   "class": "other",
+   "why": "the U-turn's own start position — ЗДвП чл. 38, ал. 1 («наляво от най-лявата пътна лента по посока на движението»), retrieved from content/law/acts/zdvp.json and cited in the sentence — not the чл. 15 keep-right duty and not a claim about travelling in the left lane"
   },
   "Твоята лента свърши — значи ти се съобразяваш: никой в лявата лента не бива да спира или да отбива заради теб.": {
    "class": "other"

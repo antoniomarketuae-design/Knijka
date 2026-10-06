@@ -77,10 +77,15 @@ import {
   makeCommendation,
   makeViolation,
   NEEDLESS_STOP_ACT_PRIORITY_ROAD,
+  SOLID_CROSS_ACT_ASTRIDE,
+  SOLID_CROSS_ACT_ASTRIDE_OWN_WAY,
+  SOLID_CROSS_ACT_OWN_WAY,
+  SOLID_CROSS_ACT_UTURN,
   WRONG_WAY_ROAD_MOTORWAY,
 } from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
 import {
+  type ActAmendment,
   DEFAULT_RULE_CONFIG,
   KEEP_RIGHT_TOWN_MAX_KMH,
   type LaneArrow,
@@ -685,6 +690,18 @@ export interface RuleEngineState {
    * rest of the excursion (one act, one code).
    */
   solidCross: EpisodeState;
+  /**
+   * THE REVERSAL ACROSS THE SOLID AXIS — what the reducer remembers in order to
+   * answer «was this crossing a U-turn?» from the ROAD (see the block of that
+   * name above `stepEpisode`, and `SolidCrossTurnState`).
+   *
+   * THE INITIAL VALUE, AND NEVER WRITTEN, unless the lesson authors
+   * `solidCrossUTurnEnabled` — so on every other lesson the reducer's state is
+   * what it was, and `SimTick.edgeAlignment` (which this is derived from) is
+   * not read at all. Replaced, never mutated in place: the clone shares the
+   * reference.
+   */
+  solidCrossTurn: SolidCrossTurnState;
   /** Sustained car travel in an authored bus lane (SN-05). */
   busLane: EpisodeState;
   /**
@@ -2453,6 +2470,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     banZoneStop: { ...IDLE_EPISODE },
     banZoneStopRegrade: { ...IDLE_EPISODE },
     solidCross: { ...IDLE_EPISODE },
+    solidCrossTurn: SOLID_CROSS_TURN_IDLE,
     busLane: { ...IDLE_EPISODE },
     busLaneCruiseSec: 0,
     busLaneRegrade: { ...IDLE_EPISODE },
@@ -2556,6 +2574,1042 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     warningLampRecent: [...s.warningLampRecent],
     warningLampRegrade: { ...s.warningLampRegrade },
   };
+}
+
+// ---------------------------------------------------------------------------
+// THE REVERSAL ACROSS THE SOLID AXIS — THE U-TURN (sc-mv-uturn-ban, rounds 2–6)
+// ---------------------------------------------------------------------------
+//
+// THE QUESTION. A lesson that authors `solidCrossUTurnEnabled` asks, of a
+// two-way road with an authored М1 span and of every crossing it bills there:
+// «is THIS crossing the lesson's U-turn — did the car go over the solid axis
+// and turn round, where turning round is forbidden?» A yes names the bill
+// (`catalog.ts SOLID_CROSS_ACT_UTURN`); a no leaves it the crossing's own true
+// copy. The code, the class and the points are the crossing's either way.
+//
+// ROUND 5 — ONE DEFINITION OF THE ACT (integrator ruling R5-1 … R5-3). Rounds
+// 2–4 asked «is the car now on the OTHER bank, travelling with it?» and read
+// the turn's place on the first frame the CENTRE was across. A car that turned
+// round on its own half over the DASHES, drove fifty metres back and only then
+// eased over the solid axis arrived «across, travelling with the far bank» on
+// its crossing frame, and was told — at the lesson's own lawful gap — that it
+// had made «обратен завой, а на това място той е забранен» (verifier Y1, 17 of
+// 17). The reference followed the bank, not the heading. So:
+//
+// R5-1  A TURN-ROUND IS AN EVENT OF THE HEADING, measured against the road
+//       alone (`SimTick.edgeAlignment.deg`, the nose against the edge's own
+//       direction) — on whichever half the centre is, crossing or not.
+//
+//       · THE TRAVEL DIRECTION (`dir`) is the road direction the nose was last
+//         within SOLID_CROSS_WITH_BANK_DEG (45°) of. It changes only when a
+//         turn-round is confirmed, so there is a 90° dead band between the two
+//         directions and a car square across the road has reversed nothing.
+//       · THE SWING is a RATE OVER A WINDOW (round 6, R6-5 — stated once at
+//         the constants below): the nose's counted degrees keep arriving one
+//         way at a mean of at least 1° per 2.5 m. It begins on the frame the
+//         nose leaves the heading it stood at, ends 2 m after its last degree,
+//         and resumes as the same swing if the next degree arrives at the rate. A
+//         standing car is still mid-swing (no metres pass); steering back the
+//         other way, or running straight for 2 m, ends it.
+//       · THE TURN-ROUND is the yaw excursion that takes the nose out of the
+//         45° band of `dir` and into the 45° band of the opposite direction
+//         without coming back into the first. Whatever happens in between — a
+//         stop, a diagonal, a three-point shuffle — is part of it.
+//       · ITS PLACE is where it BEGINS: the station of the last frame before
+//         the swing that carried the nose out of the band — the last frame on
+//         which the nose still stood at the heading it then turned away from
+//         (so the same path has the same place whatever step its heading is
+//         sampled in: round 6, verifier N4). (Not
+//         where the nose passes 45°: on full lock that is 4 m further on, and
+//         a turn begun 4 m before the end of the solid line was being placed
+//         over the dashes — verifier Y5.) The axis there is read off the built
+//         road (`tick.solidCenterLine`, the source the crossing bill reads).
+//       · IT IS CONFIRMED on the frame the nose has stayed within 45° of the
+//         opposite direction for `solidLineCrossSustainSec` (0.6 s — the same
+//         guard the crossing uses). `dir` flips there, wherever the centre is.
+//       · IT COMPLETES when the swing that carried the nose into the opposite
+//         band ENDS — or carries it on out of the new direction's band, which
+//         begins another excursion (a full circle is two turn-rounds, not one
+//         long one). A turn-round from the outer lane on a 6.5 m radius has
+//         its nose 135° round a metre before its centre reaches the axis;
+//         that crossing is made DURING the turn-round and is the U-turn. A
+//         crossing made after the swing has ended is made by a car that is
+//         already travelling the other way, and is a crossing.
+//
+// R5-2  WHAT A TURN-ROUND MAY NAME. A billed crossing of the solid axis is the
+//       U-turn if and only if ALL hold:
+//         (i)   the centre went over where the axis is SOLID
+//               (`crossedSolidAt`);
+//         (ii)  a turn-round completed at or after that crossing, the car not
+//               having gone back to the bank AND the direction it came from
+//               — nor settled, for the sustain, travelling WITH the bank it
+//               crossed to — before that turn-round began (the crossing is
+//               then over: `home` and the far-bank close below) — so the
+//               crossing is made before or during the turn-round, never after
+//               it (`crossLate`);
+//         (iii) the axis is SOLID where that turn-round begins (`turnPlace`).
+//       Otherwise the crossing keeps its own copy, and NO EARLIER ROW IS EVER
+//       RENAMED: a confirmed turn-round closes the manoeuvre, so a crossing
+//       made later is a new act with a new bill.
+//
+//       What follows, each pinned through the live rung:
+//         · turned round at the gap on his own half, then over the solid axis
+//           on the way back (Y1)            → the crossing; nothing renamed;
+//         · pulled out, then round to the RIGHT back over the solid axis,
+//           ending on his own half (Y4)     → the U-turn — where he ends does
+//           not matter, the heading alone says he turned round;
+//         · astride, the turn begun 4 m before the solid line ends (Y5)
+//                                           → the U-turn; begun 1 m past the
+//           end → the crossing;
+//         · astride to the gap, then the lawful turn (X1) → the crossing;
+//         · one arc from his own lane, the centre crossing over the solid
+//           axis → the U-turn, on any radius; crossing over the dashes → no
+//           solid crossing, nothing billed;
+//         · turned round wholly on his own half → nothing billed (recorded,
+//           owed to the founder with how far a В23 reaches).
+//
+// R5-3  A MEASURED PLACE IS KEPT (Y2). Round 4 threw a turn-round's place away
+//       on the first frame with no fix on this road, so one arc of 22 m radius
+//       begun on the carriageway over the solid axis lost its name in the
+//       field. Now:
+//         · PAST THE KERB BUT STILL FIXED TO THIS ROAD the heading is followed
+//           exactly as on the carriageway (`stepSolidCrossTurnOffRoad`): a
+//           turn-round made on the verge begins, is placed and is confirmed
+//           out there.
+//         · WITH NO FIX ON THIS ROAD (`stepSolidCrossTurnUnseen`) the bank,
+//           the crossing and its clocks hold, and the place already measured
+//           is KEPT. The nose is still followed — against the road's own
+//           bearing where it last had the car (`bearingDeg`): the tick always
+//           carries the heading, and a turn-round is an event of the heading.
+//           So one continuous turn through the field keeps the place it began
+//           at; a car that straightens up out there and turns round LATER has
+//           ended the first excursion and begun another one where no station
+//           is known — that one is UNPLACED and names nothing (A12: never a
+//           place the road did not measure).
+//         · NOTHING IS CONFIRMED OUT THERE. The turn-round is confirmed when
+//           the road next has a fix and the nose is within 45° of the opposite
+//           direction; a car that never comes back names nothing.
+//
+// ROUND 6 — THE CLOSING ROUND (integrator rulings R6-1 … R6-5, on the round-5
+// verifier's conditions C1 … C4 and N4):
+//
+// R6-1  THE TRACKER FOLLOWS THE ROAD, NOT THE EDGE (`solidCrossOnEdge`). The
+//       armed boulevard is two edges split at the gap. Everything below — the
+//       travel direction, the reference half, the swing, the place a
+//       turn-round began at, an open crossing and its bill — carries across a
+//       change of edge on the same road. And when a road sees a car for the
+//       FIRST time (the start of the drive; back from a side street), its
+//       travel direction is read off its heading and its reference half is the
+//       half its centre is ON: it has crossed nothing this road saw, so
+//       nothing — the plain detector included — bills it a crossing. A car
+//       travelling the wrong way down the half it has never left is the
+//       recorded, unbilled class.
+// R6-2  ONE ACT, ONE BILL ENDS WITH THE SWING (`solidCrossRehome`). A further
+//       crossing on the swing of a turn-round that has billed the U-turn is
+//       the same act and is not billed again (`tailBillT`, `billShared`).
+//       When that swing ENDS the manoeuvre is closed and HOME is the half of
+//       the car's NEW travel direction. A centre that is then across the solid
+//       axis from that half — the swing over-rotated and left it there, a
+//       round to the right ended on the half it set out from — is a NEW
+//       crossing: its sustain runs from the end of the swing, its bill is its
+//       own, and a later turn-round can name it like any other standing
+//       crossing. And two turn-rounds are two acts: if the car goes on round
+//       and a SECOND turn-round names a crossing that had only shared the
+//       first one's bill, that one is billed as the U-turn it is.
+// R6-3  THE CROSSING'S REASON NEVER NAMES THE WRONG HALF (`solidCrossBill`,
+//       `solidCrossOwnWay`): «…в насрещната половина на платното» is printed
+//       only where the half the centre is on runs AGAINST the travel
+//       direction; a car that has turned round and enters the half of its own
+//       direction gets the same sentence without that clause.
+// R6-4  THE WAY BACK IN THE TAIL (found by this round's fuzz, the same class as
+//       the verifier's m7/m14): a U-turn begun just before the solid line ends
+//       carries the centre out over the DASHES, is confirmed out there, and
+//       over-rotates back over the SOLID axis on the same swing. That way back
+//       is a crossing of the solid axis made during a turn-round begun where
+//       the axis is solid — the U-turn — and is named or billed there and then.
+// R6-5  THE SWING IS A RATE OVER A WINDOW — at the constants below.
+//
+// WHAT IS BILLED, AND BY WHAT — unchanged since round 3 except where stated:
+//   · THE CROSSING, BY POSITION. The plain detector needs the car on the bank
+//     its nose OPPOSES, above `movingSpeedKmh`; a car that reaches the axis
+//     already pointing across the road, or creeps over at walking pace, is
+//     never that (verifier V5: not billed at all, and praised). Here the
+//     crossing is the CENTRE on the far bank of a solid axis for the sustain,
+//     in a forward gear, with no bill yet in this excursion →
+//     CROSSED_SOLID_LINE on whichever reason the body has earned on that
+//     frame (`solidCrossBill`), or — where a turn-round already names it
+//     (`named`) — the U-turn's.
+//   · AND NOWHERE ELSE (round 3, W2): in an armed lesson the plain detector
+//     stands down while the centre is on the REFERENCE bank (`bank`: the bank
+//     the car was on when this road first saw it, last travelled with, was on
+//     when it last turned round — or, after a turn-round that billed the
+//     U-turn, the half of its new travel direction: R6-1, R6-2).
+//   · THE BANK-SIDE BOOKKEEPING. `bank` is the bank the crossing is measured
+//     FROM. A crossing is the frame the centre leaves it; it is over when the
+//     car is back on it travelling the way it came (`home`), when the car has
+//     travelled WITH the far bank for the sustain, or when a turn-round is
+//     confirmed — and the bank the car is on then becomes the reference.
+//   · ONE ACT, ONE BILL. `billedAt` silences a second bill until the car is
+//     back home AND in lane (the plain detector's own re-arm). `billLive`
+//     says that bill belongs to the crossing still standing — only such a
+//     bill can be named. A car that wobbled home off-lane and THEN made a
+//     U-turn across the axis gets the U-turn as a bill of its own.
+//
+// AND WHAT NO LONGER DECIDES ANYTHING: THE PULL-OUT (round 4, ruling R4-2 —
+// ANY turn-round made inside the span by a car across or astride the solid
+// axis is the U-turn, whatever came before it), and since round 5 the bank
+// the car ends on.
+//
+// WHAT IS NOT READ, ON PURPOSE: how far the nose swung in some window of
+// seconds, the radius, the speed, the lane the turn began in. Round 1 read
+// «≥ 45° left inside 10 s of movement» and was refuted in both directions —
+// `types.ts solidCrossUTurnEnabled` has the acts. The heading is read here as
+// a RELATION TO THE ROAD (which of its two directions the car is travelling),
+// never as an amount of recent rotation.
+
+/** THE ONE ANGLE. The nose is ALONG a road direction while it is within this
+ *  many degrees of it; a turn-round takes it from this band of one direction
+ *  into this band of the other (≥ 135° round — well clear of a car standing
+ *  square across the road, which has reversed nothing yet). The same band says
+ *  when a car is travelling WITH the bank it is on. */
+const SOLID_CROSS_WITH_BANK_DEG = 45;
+/**
+ * THE SWING, stated once — A RATE OVER A WINDOW (round 6, R6-5).
+ *
+ * Round 5 said «the nose is swinging while it never travels 2 m without
+ * turning 1° further». That is a count of samples, not a rate: a sweep on an
+ * 80 m radius drawn in 0.5° vertices delivers its degree after 2.09 m and the
+ * same sweep in 0.25° vertices after 1.40 m, so one path was one swing or
+ * many — and the PLACE of the turn it fed moved — with the step its heading
+ * happened to be sampled in (verifier N4). Now:
+ *
+ *  · YAW IS COUNTED IN WHOLE DEGREES (`ADVANCE_DEG`) from the heading the nose
+ *    last stood at; within `STILL_DEG` of that heading it is still standing
+ *    at it.
+ *  · THE RATE is one degree per `RATE_WINDOW_M` (2.5 m — every arc tighter
+ *    than a 143 m radius; 115 m, where round 5 drew the line, is inside it
+ *    with room for a sample step), measured over the window EACH DEGREE TOOK.
+ *  · A SWING BEGINS on the frame the nose LEAVES the heading it stood at,
+ *    provided the first degree arrives within that window. Nosing off slower
+ *    than that is not a swing: the standing heading is moved up to the nose
+ *    and the count starts again.
+ *  · IT ENDS `SETTLE_M` (2 m) after its last counted degree — decision 1,
+ *    unchanged. Counting a degree the other way ends it at once. A standing
+ *    car is still mid-swing (no metres pass).
+ *  · IT RESUMES AS THE SAME SWING, keeping the place it began at, when the
+ *    next degree the same way arrives within `RESUME_MAX_M` (6.5 m: three
+ *    degrees on a 115 m radius are 6.02 m apart) at that mean rate.
+ *
+ * So a path gives the same swing, and a turn the same place, at 0.25°, 0.5°,
+ * 1° and 3° vertices on every radius from 6 m to 115 m (pinned through the
+ * live rung); and on the tight arcs that turn a car round the swing still ends
+ * two metres after the lock comes off, as round 5 pinned.
+ *
+ * WHAT A RATE CANNOT DO, stated: the END is decided on the frame it happens. A
+ * heading drawn in 3° vertices on an 80 m radius runs straight for 4.2 m
+ * between them, and for its first 4.2 m nothing tells that from the straight
+ * run-out decision 1 pins — so a swing that eases from a full lock onto such a
+ * sweep is ENDED two metres into it and resumed (same place) at the next
+ * vertex. What a crossing made inside that first gap is part of can therefore
+ * differ between a 3° and a 0.25° drawing of the same tail; the PLACE cannot.
+ * Real steering turns the heading every frame and never meets the gap.
+ */
+const SOLID_CROSS_SWING_ADVANCE_DEG = 1;
+const SOLID_CROSS_SWING_SETTLE_M = 2;
+const SOLID_CROSS_SWING_RATE_WINDOW_M = 2.5;
+const SOLID_CROSS_SWING_RESUME_MAX_M = 6.5;
+const SOLID_CROSS_SWING_STILL_DEG = 0.05;
+/** A counted degree is a degree: one that arrives as 0.9999999 after four
+ *  quarter-degree vertices is counted on that vertex, not on the next. */
+const SOLID_CROSS_SWING_EPS_DEG = 1e-6;
+/**
+ * THE SAME ROAD (round 6, R6-1). A road is authored in edges — the armed
+ * boulevard is two, split at the gap — and the tracker follows the ROAD: when
+ * the car is handed to an edge whose bearing under it is within this many
+ * degrees of the bearing the tracker last read (or of its reverse — the same
+ * axis authored the other way round), everything it holds carries over. A
+ * side street meets the road at an angle and is another road.
+ */
+const SOLID_CROSS_SAME_ROAD_DEG = 15;
+
+export interface SolidCrossTurnState {
+  /** The edge every member below refers to; `null` = no reference anywhere. */
+  edgeId: string | null;
+
+  // -- the crossing, measured from a bank ------------------------------------
+  /** THE REFERENCE BANK (`EdgeAlignment.travelDir`): the bank the car last
+   *  travelled WITH on that edge, or was on when it last turned round;
+   *  `0` = none yet. A crossing is the centre leaving it. */
+  bank: 1 | -1 | 0;
+  /** The bank the centre was on at the previous measured frame (`0` = unknown). */
+  prevBank: 1 | -1 | 0;
+  /** The axis where the centre LAST passed from one bank to the other, in
+   *  either direction: `true` solid, `false` dashed, `null` = this road has
+   *  not seen it pass. What «across the SOLID axis» means for a car a swing has
+   *  left on the wrong half (R6-2, `solidCrossRehome`). */
+  lastPassSolid: boolean | null;
+  /** Session time the centre last left `bank` OVER A SOLID AXIS; `null` = it
+   *  has not, the axis there was not solid, or that crossing is over (the car
+   *  came home, or a turn-round was confirmed). */
+  crossedSolidAt: number | null;
+  /** R5-2 (ii): that crossing was made AFTER the swing of the turn-round then
+   *  in progress had ended — by a car already travelling the other way. */
+  crossLate: boolean;
+  /** Since when the centre has been on the far bank without a break. */
+  farSince: number | null;
+  /** Since when the car has been on the far bank and WITH it; `null` = it is not. */
+  reversedSince: number | null;
+  /** `t` of the CROSSED_SOLID_LINE bill that silences another; cleared when the
+   *  car is home AND in lane, or the manoeuvre closes. */
+  billedAt: number | null;
+  /** That bill belongs to the crossing still standing — it can be named. */
+  billLive: boolean;
+  /** …but it is not the crossing's OWN: the centre went over again on the swing
+   *  of a turn-round that had already billed the U-turn, and one act is one
+   *  bill (`tailBillT`). If ANOTHER turn-round then names this crossing, that
+   *  is a second act and it is billed as one. */
+  billShared: boolean;
+  /** A turn-round names the standing crossing and its bill is still to come
+   *  (the centre has not been across for the sustain yet). */
+  named: boolean;
+  /** A turn-round begun over the solid axis was confirmed with the centre OUT
+   *  OVER THE DASHES and a bill already standing (the plain detector's, for the
+   *  span it ran on the oncoming half): the manoeuvre is held open while that
+   *  turn-round's swing goes on, because its way back over the solid axis would
+   *  name that bill. Closed, as round 5 closed it at once, when the swing ends. */
+  wayBackOpen: boolean;
+
+  // -- R5-1: the heading against the road ------------------------------------
+  /** THE TRAVEL DIRECTION: +1 = with the edge's geometry (bank +1's
+   *  direction), −1 = against it, `0` = the nose has not been along the road
+   *  yet. Flips only where a turn-round is confirmed. */
+  dir: 1 | -1 | 0;
+  /** The nose is out of the 45° band of `dir`: an excursion is in progress. */
+  turning: boolean;
+  /** THE PLACE of that excursion (R5-2 iii): the axis at the station where it
+   *  began — `true` solid, `false` dashed, `null` unplaced (it left the band
+   *  where the road had no fix on the car). */
+  turnPlace: boolean | null;
+  /** Since when the nose has been within 45° of the opposite direction. */
+  oppSince: number | null;
+  /** The swing's sense on the frame the nose entered that band (`0` = none). */
+  oppSense: 1 | -1 | 0;
+  /** That swing has ended since: a crossing from here on is `crossLate`. */
+  swingOver: boolean;
+  /** A confirmed turn-round whose swing is STILL GOING (its sense; `0` = none):
+   *  a crossing made now is made during it. */
+  tailSense: 1 | -1 | 0;
+  /** …and that turn-round's place. */
+  tailPlace: boolean | null;
+  /** …and the `t` of the bill it NAMED when it was confirmed (`null` = it
+   *  named none). A crossing its swing goes on to make is the same act and is
+   *  not billed again: a round to the right from the oncoming outer lane that
+   *  ends 0.2 m back over the axis has crossed twice and turned round once. */
+  tailBillT: number | null;
+  /** R6-2 — A TURN-ROUND HAS BILLED THE U-TURN (named a bill, or been billed as
+   *  one) and its swing has not been seen to end yet. When it has, the
+   *  manoeuvre is closed and HOME is the half of the car's new travel
+   *  direction (`solidCrossRehome`). */
+  actOpen: boolean;
+  /** …and that swing's sense (`0` = it had already ended when the bill went out). */
+  actSense: 1 | -1 | 0;
+
+  // -- the swing (R6-5: a rate over a window) ---------------------------------
+  /** Which way the nose is swinging (`+1` = clockwise, as `deg` grows); `0` = it is not. */
+  swSense: 1 | -1 | 0;
+  /** THE STANDING HEADING: `deg` at the last counted degree, or where a slow
+   *  nosing-off was written off; `null` = no measured frame yet. */
+  swRefDeg: number | null;
+  /** The nose stood at that heading on the previous frame. */
+  swStill: boolean;
+  /** Which way it has left it (`0` = it has not). */
+  swLeftSense: 1 | -1 | 0;
+  /** Metres travelled since it left it. */
+  swLeftM: number;
+  /** The axis at the station it left it from (`null` = unknown) — where a
+   *  swing that begins now BEGAN. */
+  swLeftPlace: boolean | null;
+  /** …and whether the centre was then across a solid crossing that still stood. */
+  swLeftAcross: boolean;
+  /** Metres travelled since the last counted degree of the swing in progress,
+   *  or of the one that last ended (it may resume). */
+  swDegM: number;
+  /** `deg` at that degree; `null` = no degree has been counted. */
+  swDegAt: number | null;
+  /** The sense of the swing that last ended (`0` = none): only it can resume. */
+  swEndedSense: 1 | -1 | 0;
+  /** The axis at the station where the swing in progress began (`null` = unknown). */
+  swPlace: boolean | null;
+  /** It began with the centre across a solid crossing that still stood. */
+  swAcross: boolean;
+  /** The swing that was in progress when the centre crossed, while it is still
+   *  going (its sense; `0` = there was none, or it has ended). */
+  crossSwing: 1 | -1 | 0;
+  /** The axis under the car on the previous frame (`null` = the road had no fix on it). */
+  lastPlace: boolean | null;
+  /** The road's own bearing where it last had a fix on the car, degrees
+   *  (`SimTick.headingDeg` − `EdgeAlignment.deg`); `null` = it never had one.
+   *  What the nose is read against while the road cannot see the car (R5-3). */
+  bearingDeg: number | null;
+}
+
+const SOLID_CROSS_TURN_IDLE: SolidCrossTurnState = {
+  edgeId: null,
+  bank: 0,
+  prevBank: 0,
+  lastPassSolid: null,
+  crossedSolidAt: null,
+  crossLate: false,
+  farSince: null,
+  reversedSince: null,
+  billedAt: null,
+  billLive: false,
+  billShared: false,
+  named: false,
+  wayBackOpen: false,
+  dir: 0,
+  turning: false,
+  turnPlace: null,
+  oppSince: null,
+  oppSense: 0,
+  swingOver: false,
+  tailSense: 0,
+  tailPlace: null,
+  tailBillT: null,
+  actOpen: false,
+  actSense: 0,
+  swSense: 0,
+  swRefDeg: null,
+  swStill: true,
+  swLeftSense: 0,
+  swLeftM: 0,
+  swLeftPlace: null,
+  swLeftAcross: false,
+  swDegM: 0,
+  swDegAt: null,
+  swEndedSense: 0,
+  swPlace: null,
+  swAcross: false,
+  crossSwing: 0,
+  lastPlace: null,
+  bearingDeg: null,
+};
+
+/** What one frame of the tracker decided. */
+interface SolidCrossTurnStep {
+  state: SolidCrossTurnState;
+  /**
+   * A CROSSED_SOLID_LINE bill goes out on this frame: `"crossing"` on the
+   * crossing's own copy (`solidCrossBill`), `"u-turn"` where a turn-round
+   * already names it. `null` on every other frame.
+   */
+  bill: "crossing" | "u-turn" | null;
+  /**
+   * A TURN-ROUND NAMES THE BILL ALREADY OUT: its `t`. `null` on every other
+   * frame — a turn-round begun over a dashed axis, one that follows the
+   * crossing instead of containing it, and one with no live bill included.
+   */
+  names: number | null;
+}
+
+/** One frame, as the heading half needs it. */
+interface SolidCrossHeadingFrame {
+  /** The nose against the edge's own direction, degrees (`EdgeAlignment.deg`;
+   *  where the road has no fix, against the bearing it last had). */
+  deg: number;
+  /** The axis is solid at the car's station (`tick.solidCenterLine`);
+   *  `null` = the road has no fix on the car, so there is no station. */
+  solidHere: boolean | null;
+  /** Metres travelled since the previous frame. */
+  stepM: number;
+  t: number;
+}
+
+/** One measured frame on the carriageway, as the tracker needs it. */
+interface SolidCrossTurnFrame extends SolidCrossHeadingFrame {
+  solidHere: boolean;
+  /** The road's bearing under the car (`SimTick.headingDeg` − `deg`). */
+  bearingDeg: number;
+  edgeId: string;
+  /** The bank the centre is on (`EdgeAlignment.travelDir`). */
+  bank: 1 | -1;
+  /** A forward gear is engaged (the plain detector's own reverse exemption). */
+  forwardGear: boolean;
+  /** The plain detector's own «back in lane» — the predicate that ends its excursion. */
+  inLane: boolean;
+}
+
+/** `b − a` folded into (−180, 180]. */
+function solidCrossDeltaDeg(a: number, b: number): number {
+  let d = b - a;
+  while (d > 180) d -= 360;
+  while (d <= -180) d += 360;
+  return d;
+}
+
+/** The nose STANDS at `deg`: degrees are counted from here. MUTATES `s`. */
+function solidCrossStandAt(s: SolidCrossTurnState, deg: number): void {
+  s.swRefDeg = deg;
+  s.swStill = true;
+  s.swLeftSense = 0;
+  s.swLeftM = 0;
+}
+
+/**
+ * R6-1 — THE TRACKER FOLLOWS THE ROAD, NOT THE EDGE. What `prev` holds,
+ * re-expressed on the edge the car is fixed to on this frame:
+ *
+ *  · the same edge → `prev` itself;
+ *  · another edge OF THE SAME ROAD (its bearing under the car within
+ *    SOLID_CROSS_SAME_ROAD_DEG of the bearing last read) → everything carries:
+ *    the travel direction, the reference half, the swing, the place a
+ *    turn-round began at, an open crossing and its bill. Round 5 began a
+ *    fresh tracker there, so a car that turned round past the junction came
+ *    back into the span with no reference half at all — the plain detector
+ *    then billed it «Застъпи…» half a second BEFORE its centre reached the
+ *    axis, or «Пресече изцяло…» when it never did, and a real U-turn made
+ *    afterwards was neither billed nor named (verifier C2);
+ *  · the same axis authored the other way round (the bearing reversed) → the
+ *    same, with the two directions and the two halves swapped;
+ *  · ANOTHER ROAD, or no road before this → THE ROAD SEES THE CAR FOR THE
+ *    FIRST TIME (`firstSight`): its reference half is the half its centre is
+ *    ON — it has crossed nothing this road saw — and its travel direction
+ *    will be read off its heading on this very frame, never assumed. (Round 3
+ *    waited for «the first half it travels WITH», and until then let the plain
+ *    detector convict a car of a crossing nobody had seen it make.) `null`
+ *    where the caller may not begin a tracker here (a frame past the kerb).
+ */
+function solidCrossOnEdge(
+  prev: SolidCrossTurnState,
+  edgeId: string,
+  bearingDeg: number,
+  bank: 1 | -1,
+  firstSight: boolean,
+): SolidCrossTurnState | null {
+  if (prev.edgeId === edgeId) return prev;
+  if (prev.edgeId !== null && prev.bearingDeg !== null) {
+    const off = Math.abs(solidCrossDeltaDeg(prev.bearingDeg, bearingDeg));
+    if (off <= SOLID_CROSS_SAME_ROAD_DEG) return { ...prev, edgeId };
+    if (off >= 180 - SOLID_CROSS_SAME_ROAD_DEG) {
+      const flip = (v: 1 | -1 | 0): 1 | -1 | 0 => (v === 0 ? 0 : v === 1 ? -1 : 1);
+      const turn = (v: number | null): number | null => (v === null ? null : solidCrossDeltaDeg(0, v + 180));
+      return {
+        ...prev,
+        edgeId,
+        bank: flip(prev.bank),
+        prevBank: flip(prev.prevBank),
+        dir: flip(prev.dir),
+        swRefDeg: turn(prev.swRefDeg),
+        swDegAt: turn(prev.swDegAt),
+      };
+    }
+  }
+  return firstSight ? { ...SOLID_CROSS_TURN_IDLE, edgeId, bank, prevBank: bank } : null;
+}
+
+/**
+ * R6-2 — A TURN-ROUND HAS BILLED THE U-TURN. From here to the end of its
+ * swing a further crossing is the same act (`tailBillT`: not billed again);
+ * when the swing ends, `solidCrossRehome`. MUTATES `s`.
+ */
+function solidCrossActBilled(s: SolidCrossTurnState, billT: number): void {
+  s.actOpen = true;
+  s.actSense = s.tailSense;
+  if (s.tailSense !== 0) s.tailBillT = billT;
+}
+
+/**
+ * R6-2 — THE SWING OF A BILLED TURN-ROUND HAS ENDED: the manoeuvre is closed,
+ * and HOME is the half of the car's NEW travel direction, wherever its centre
+ * is. If the centre is on that half, that is all. If it is not — the swing
+ * over-rotated and left it back across, or a round to the right ended on the
+ * half it set out from — it is ACROSS THE AXIS FROM HOME from this frame: a
+ * new crossing, with its own sustain (counted from HERE: the swing's own
+ * crossings are the U-turn's and are not billed again) and its own bill, open
+ * to a later turn-round like any other. It is a crossing of the SOLID axis
+ * only if the centre last passed the axis where it is solid (`lastPassSolid`):
+ * a round begun over the solid axis whose centre went over two metres past
+ * the end of it has crossed no solid line, and is told of none.
+ *
+ * Round 5 left home on whichever half the centre was on, so a U-turn that
+ * over-rotated back over the solid axis could run twenty seconds against the
+ * traffic of the half it ended on with no bill but the U-turn's (verifier C3).
+ * MUTATES `s`.
+ */
+function solidCrossRehome(s: SolidCrossTurnState, f: SolidCrossTurnFrame): void {
+  s.actOpen = false;
+  s.actSense = 0;
+  const home: 1 | -1 = s.dir === -1 ? -1 : 1;
+  closeSolidCross(s, home);
+  if (f.bank === home) return;
+  s.prevBank = f.bank;
+  s.crossedSolidAt = s.lastPassSolid === true ? f.t : null;
+  s.farSince = f.t;
+}
+
+/**
+ * R5-1 ON ONE FRAME — the swing, the travel direction and the excursion.
+ * MUTATES `s` (always the caller's fresh copy). Returns `true` on the frame a
+ * turn-round is CONFIRMED; the caller reads `s.turnPlace` and then calls
+ * `confirmSolidCrossTurn`.
+ */
+function stepSolidCrossHeading(s: SolidCrossTurnState, f: SolidCrossHeadingFrame, sustainSec: number): boolean {
+  // THE SWING (R6-5 — the block above the constants has the rule).
+  if (s.swRefDeg === null) {
+    solidCrossStandAt(s, f.deg);
+  } else {
+    s.swDegM += f.stepM;
+    const d = solidCrossDeltaDeg(s.swRefDeg, f.deg);
+    const sense = d > 0 ? 1 : -1;
+    if (Math.abs(d) <= SOLID_CROSS_SWING_STILL_DEG) {
+      s.swStill = true;
+      s.swLeftSense = 0;
+      s.swLeftM = 0;
+    } else {
+      if (s.swStill || s.swLeftSense !== sense) {
+        // THE NOSE LEAVES THE HEADING IT STOOD AT — on the previous frame it
+        // was still there (`lastPlace`): if a swing comes of this, that frame
+        // is where it began.
+        s.swLeftSense = sense;
+        s.swLeftM = 0;
+        s.swLeftPlace = s.lastPlace;
+        s.swLeftAcross = s.bank !== 0 && s.prevBank !== s.bank && s.crossedSolidAt !== null;
+      }
+      s.swStill = false;
+      s.swLeftM += f.stepM;
+      if (Math.abs(d) >= SOLID_CROSS_SWING_ADVANCE_DEG - SOLID_CROSS_SWING_EPS_DEG) {
+        // A COUNTED DEGREE.
+        if (sense === s.swSense) {
+          // …of the swing in progress.
+        } else if (
+          s.swSense === 0 &&
+          sense === s.swEndedSense &&
+          s.swDegAt !== null &&
+          s.swDegM <= SOLID_CROSS_SWING_RESUME_MAX_M &&
+          sense * solidCrossDeltaDeg(s.swDegAt, f.deg) * SOLID_CROSS_SWING_RATE_WINDOW_M >= s.swDegM
+        ) {
+          // …of the swing that had ended, arriving at the rate: THE SAME SWING
+          // (its place and whether it began across are the ones it began with).
+          s.swSense = sense;
+        } else {
+          // …the first of a NEW swing, which began where the nose left its heading.
+          s.swSense = sense;
+          s.swPlace = s.swLeftPlace;
+          s.swAcross = s.swLeftAcross;
+        }
+        s.swDegM = 0;
+        s.swDegAt = f.deg;
+        solidCrossStandAt(s, f.deg);
+      } else if (s.swLeftM >= SOLID_CROSS_SWING_RATE_WINDOW_M) {
+        // Slower than the rate: not a swing. The count starts again from here.
+        solidCrossStandAt(s, f.deg);
+      }
+    }
+    // THE SWING ENDS — two metres after its last degree.
+    if (s.swSense !== 0 && s.swDegM >= SOLID_CROSS_SWING_SETTLE_M) {
+      s.swEndedSense = s.swSense;
+      s.swSense = 0;
+    }
+  }
+  // A confirmed turn-round is still going only while its swing is — and so is
+  // the swing the centre crossed on.
+  if (s.tailSense !== 0 && s.swSense !== s.tailSense) {
+    s.tailSense = 0;
+    s.tailBillT = null;
+  }
+  if (s.crossSwing !== 0 && s.swSense !== s.crossSwing) s.crossSwing = 0;
+
+  let confirmed = false;
+  const abs = Math.abs(f.deg);
+  if (s.dir === 0) {
+    if (abs <= SOLID_CROSS_WITH_BANK_DEG) s.dir = 1;
+    else if (abs >= 180 - SOLID_CROSS_WITH_BANK_DEG) s.dir = -1;
+  } else {
+    const off = s.dir === 1 ? abs : 180 - abs;
+    if (off <= SOLID_CROSS_WITH_BANK_DEG) {
+      // Along the road again: no excursion (one that did not turn round is forgotten).
+      s.turning = false;
+      s.turnPlace = null;
+      s.oppSince = null;
+      s.oppSense = 0;
+      s.swingOver = false;
+    } else {
+      if (!s.turning) {
+        // THE EXCURSION BEGINS — and its place is where the swing that carried
+        // the nose out of the band began. With no swing in progress (a creep
+        // slower than 1° in 2 m) it is the previous frame's station; after a
+        // stretch the road could not see, `lastPlace` is null: unplaced.
+        s.turning = true;
+        s.turnPlace = s.swSense !== 0 ? s.swPlace : s.lastPlace;
+        // …and whatever turn-round was confirmed before it is over, even if the
+        // car is still on the same swing (a full circle is two turn-rounds).
+        s.tailSense = 0;
+        s.tailBillT = null;
+      }
+      if (off >= 180 - SOLID_CROSS_WITH_BANK_DEG) {
+        if (s.oppSince === null) {
+          s.oppSince = f.t;
+          s.oppSense = s.swSense;
+          s.swingOver = s.swSense === 0;
+        } else if (!s.swingOver && s.swSense !== s.oppSense) {
+          s.swingOver = true;
+        }
+        confirmed = f.t - s.oppSince >= sustainSec;
+      } else {
+        s.oppSince = null;
+        s.oppSense = 0;
+        s.swingOver = false;
+      }
+    }
+  }
+  s.lastPlace = f.solidHere;
+  return confirmed;
+}
+
+/** A turn-round is confirmed: the travel direction is the new one, and the
+ *  turn-round lives on only as long as its swing does. MUTATES `s`. */
+function confirmSolidCrossTurn(s: SolidCrossTurnState): void {
+  s.tailSense = s.swingOver ? 0 : s.oppSense;
+  s.tailPlace = s.turnPlace;
+  s.tailBillT = null;
+  s.dir = s.dir === 1 ? -1 : 1;
+  s.turning = false;
+  s.turnPlace = null;
+  s.oppSince = null;
+  s.oppSense = 0;
+  s.swingOver = false;
+}
+
+/** The manoeuvre is over: the bank the car is on is the one the next crossing
+ *  is measured from. MUTATES `s`. */
+function closeSolidCross(s: SolidCrossTurnState, bank: 1 | -1): void {
+  s.bank = bank;
+  s.prevBank = bank;
+  s.crossedSolidAt = null;
+  s.crossLate = false;
+  s.farSince = null;
+  s.reversedSince = null;
+  s.billedAt = null;
+  s.billLive = false;
+  s.billShared = false;
+  s.named = false;
+  s.wayBackOpen = false;
+  s.crossSwing = 0;
+}
+
+/**
+ * THE CAR HAS NOT FINISHED WHAT IT IS DOING: it is still on the swing it
+ * crossed on, or on one begun since, across the standing crossing. If that
+ * swing turns out to be the turn-round, the crossing belongs to it (R5-2 ii) —
+ * so the crossing is not «over» on such a frame, on either bank: a right-hand
+ * round from astride the line has its centre back home 20° round, and a round
+ * from a car that has just crossed over has its nose «with the far bank» for
+ * its first 45°.
+ */
+function solidCrossMidSwing(s: SolidCrossTurnState): boolean {
+  return s.crossSwing !== 0 || (s.swSense !== 0 && s.swAcross);
+}
+
+/** A turn-round begun where the axis is SOLID has been confirmed and its swing
+ *  is still going: a crossing made now is made during it. */
+function solidCrossOutInTail(s: SolidCrossTurnState): boolean {
+  return s.tailSense !== 0 && s.tailPlace === true;
+}
+
+/** One measured frame of the tracker. Pure: `prev` is not mutated. */
+function stepSolidCrossTurn(
+  prev: SolidCrossTurnState,
+  f: SolidCrossTurnFrame,
+  sustainSec: number,
+): SolidCrossTurnStep {
+  const { bank, t } = f;
+  // `prev` is already on this frame's edge and has a reference half
+  // (`solidCrossOnEdge`, called by the reducer before anything reads it).
+  const s: SolidCrossTurnState = { ...prev };
+  s.bearingDeg = f.bearingDeg;
+  const confirmed = stepSolidCrossHeading(s, f, sustainSec);
+  // The nose against the direction of the bank the centre is ON.
+  const withBank = (bank === 1 ? Math.abs(f.deg) : 180 - Math.abs(f.deg)) <= SOLID_CROSS_WITH_BANK_DEG;
+
+  // R6-2 — the swing of a turn-round that billed the U-turn has ended (here,
+  // or while the road could not see the car): the manoeuvre is closed and home
+  // is the half of the new travel direction.
+  if (s.actOpen && (s.actSense === 0 || s.swSense !== s.actSense)) solidCrossRehome(s, f);
+  // …and a manoeuvre held open for a way back that did not come is closed where
+  // round 5 closed it: on the bank the centre is on.
+  if (s.wayBackOpen && !solidCrossOutInTail(s)) closeSolidCross(s, bank);
+
+  // Where the centre passes the axis, whichever way: the axis under it there.
+  if (s.prevBank !== 0 && bank !== s.prevBank) s.lastPassSolid = f.solidHere;
+
+  // THE CROSSING — the frame the centre leaves the reference bank. Decided
+  // afresh every time it does, UNLESS a solid crossing of this same manoeuvre
+  // still stands (the car went back over the axis without coming HOME — a
+  // three-point turn backs onto its own half with the nose still across the
+  // road): that crossing, and the bill it carries, are this act's already.
+  if (s.prevBank === s.bank && bank !== s.bank && s.crossedSolidAt === null) {
+    s.crossedSolidAt = f.solidHere ? t : null;
+    // (ii) made after the turn-round in progress had already completed…
+    s.crossLate = s.turning && s.oppSince !== null && s.swingOver;
+    // …or DURING one already confirmed, begun over a solid axis: the bill,
+    // when the sustain brings it, is the U-turn's.
+    s.named = f.solidHere && s.tailSense !== 0 && s.tailPlace === true;
+    // The swing it crossed on may yet be the turn-round — unless that swing IS
+    // a turn-round already confirmed, to which this crossing then belongs.
+    s.crossSwing = s.tailSense !== 0 ? 0 : s.swSense;
+    // …and if that turn-round has already named a bill, this crossing is the
+    // same act: its bill is out (ONE ACT, ONE BILL).
+    if (s.tailSense !== 0 && s.tailBillT !== null) {
+      s.billedAt = s.tailBillT;
+      s.billLive = true;
+      s.billShared = true;
+    }
+  }
+  // …AND THE WAY BACK COUNTS TOO. A car that went out where the axis is DASHED
+  // and comes back over it where it is SOLID has crossed the solid axis (R5-2
+  // i asks where the centre crossed, not which way). Coming home along the
+  // road forgets it at once (`home` below); coming back mid-turn-round — out
+  // over the dashes before the span, up the oncoming half into it, and round
+  // to the right back over the solid axis — is the U-turn like any other, and
+  // the bill that manoeuvre already carries is named when it is confirmed.
+  if (s.prevBank !== 0 && s.prevBank !== s.bank && bank === s.bank && s.crossedSolidAt === null && f.solidHere) {
+    s.crossedSolidAt = t;
+    s.crossLate = s.turning && s.oppSince !== null && s.swingOver;
+    if (solidCrossOutInTail(s)) {
+      // …AND IN THE TAIL OF A TURN-ROUND ALREADY CONFIRMED, begun where the
+      // axis is solid, it is the U-turn there and then (round 6: a U-turn begun
+      // a metre before the solid line ends carries the centre out over the
+      // dashes, is confirmed out there, and over-rotates back over the solid
+      // axis on the same swing — round 5 had no turn-round left to name it, so
+      // a crossing R5-2 calls the U-turn was billed as none, or not at all).
+      // One act, one bill: the bill that manoeuvre already carries is named; a
+      // centre that was out there for the sustain with no bill gets the
+      // U-turn's now; one that only grazed out and back gets nothing.
+      const names = s.billedAt !== null && s.billLive ? s.billedAt : null;
+      const billNow = names === null && s.farSince !== null && t - s.farSince >= sustainSec;
+      if (names !== null || billNow) {
+        closeSolidCross(s, bank);
+        s.prevBank = bank;
+        solidCrossActBilled(s, names ?? t);
+        return { state: s, bill: billNow ? "u-turn" : null, names };
+      }
+    }
+  }
+  s.prevBank = bank;
+
+  if (confirmed) {
+    // A TURN-ROUND IS CONFIRMED (R5-1) — and names the standing crossing iff
+    // (i) it was over a solid axis, (ii) it was not made after the turn-round,
+    // (iii) the turn-round began where the axis is solid (R5-2).
+    const naming = s.crossedSolidAt !== null && !s.crossLate && s.turnPlace === true;
+    confirmSolidCrossTurn(s);
+    if (naming && s.billShared) {
+      // ANOTHER TURN-ROUND names a crossing that so far only shared the bill of
+      // the one before it (the car went on round: a U-turn, over the axis again
+      // on the same swing, and a second U-turn back). Two turn-rounds are two
+      // acts: this one gets a bill of its own — below, by position.
+      s.billedAt = null;
+      s.billLive = false;
+      s.billShared = false;
+    }
+    if (naming && s.billedAt !== null && s.billLive) {
+      // One act, one bill: the one already out is NAMED, and the manoeuvre is over.
+      const names = s.billedAt;
+      closeSolidCross(s, bank);
+      solidCrossActBilled(s, names);
+      return { state: s, bill: null, names };
+    }
+    if (bank !== s.bank && s.crossedSolidAt !== null && !s.billLive) {
+      // Nothing has billed THIS crossing yet (the centre has not been across
+      // for the sustain, it went over in reverse gear, or the bill that stands
+      // is an earlier crossing's). It is billed by position below — as the
+      // U-turn where the turn-round names it, as the crossing where it does
+      // not (a turn-round begun over the dashes whose centre then went over
+      // the first metre of solid line).
+      if (naming) s.named = true;
+    } else if (
+      bank !== s.bank &&
+      s.crossedSolidAt === null &&
+      s.billedAt !== null &&
+      s.billLive &&
+      solidCrossOutInTail(s)
+    ) {
+      // OUT OVER THE DASHES when the turn-round is confirmed, WITH A BILL
+      // STANDING, its swing still going, begun where the axis is solid: the way
+      // back may yet be over the solid axis on this same swing, and would name
+      // that bill (above; one act, one bill). The manoeuvre stays open for as
+      // long as the swing does. (With no bill standing it is closed here, as in
+      // round 5: a way back over the solid axis is then a crossing from this
+      // bank, named and billed in the tail like any other.)
+      s.wayBackOpen = true;
+    } else {
+      // Nothing to name — or nothing to bill: the centre is back on the bank
+      // it left, or it went over where the axis is dashed. The manoeuvre is
+      // over, and NOTHING EARLIER IS RENAMED by whatever the car does next.
+      closeSolidCross(s, bank);
+      return { state: s, bill: null, names: null };
+    }
+  }
+
+  if (bank === s.bank) {
+    s.farSince = null;
+    s.reversedSince = null;
+    // HOME — back on the bank AND the direction it came from, and not still
+    // swinging on the swing it crossed on or one begun across
+    // (`solidCrossMidSwing`).
+    const home = !s.turning && !solidCrossMidSwing(s);
+    if (home) {
+      s.crossedSolidAt = null;
+      s.crossLate = false;
+      s.named = false;
+      s.billLive = false;
+      s.billShared = false;
+      // …and in lane: the bill is over too — where the plain detector re-arms.
+      if (f.inLane) s.billedAt = null;
+    }
+    return { state: s, bill: null, names: null };
+  }
+
+  // On the far half.
+  if (s.farSince === null) s.farSince = t;
+  if (withBank) {
+    if (s.reversedSince === null) s.reversedSince = t;
+  } else {
+    s.reversedSince = null;
+  }
+
+  // THE CROSSING, BILLED BY POSITION — the centre across a solid axis for the
+  // sustain. In a forward gear it is the crossing's own bill; where a
+  // turn-round names it, it is the U-turn's in any gear (the centre that went
+  // over while backing round) and even while an earlier crossing's bill
+  // stands (a U-turn made after a crossing that came home is a second act).
+  let bill: SolidCrossTurnStep["bill"] = null;
+  if (s.crossedSolidAt !== null && t - s.farSince >= sustainSec) {
+    if (s.named && (s.billedAt === null || !s.billLive)) bill = "u-turn";
+    else if (s.billedAt === null && f.forwardGear) bill = "crossing";
+    if (bill !== null) {
+      s.billedAt = t;
+      s.billLive = true;
+      if (bill === "u-turn") solidCrossActBilled(s, t);
+    }
+  }
+  // TRAVELLING WITH THE FAR BANK for the sustain: this bank is the reference
+  // now. (A turn-round that brought the car here was confirmed above, on this
+  // frame or an earlier one; a car that was ALREADY travelling this way when
+  // it crossed — Y1 — gets here with its crossing billed as a crossing.)
+  // And not while it is still mid-swing (`solidCrossMidSwing`): that swing may
+  // be the turn-round this crossing belongs to.
+  // …nor while the manoeuvre is held open for a way back (`wayBackOpen`).
+  if (s.reversedSince !== null && t - s.reversedSince >= sustainSec && !solidCrossMidSwing(s) && !s.wayBackOpen) {
+    closeSolidCross(s, bank);
+  }
+  return { state: s, bill, names: null };
+}
+
+/**
+ * A FRAME PAST THE KERB BUT STILL FIXED TO THIS ROAD (R5-3). The centre does
+ * not pass the axis from a verge, so the bank, the crossing and its clocks
+ * HOLD; the heading is followed exactly as on the carriageway — a turn-round
+ * made on the verge begins, is placed and is confirmed out there — and a
+ * confirmed turn-round names the live bill like any other.
+ */
+function stepSolidCrossTurnOffRoad(
+  prev: SolidCrossTurnState,
+  f: SolidCrossHeadingFrame & { bank: 1 | -1; bearingDeg: number },
+  sustainSec: number,
+): SolidCrossTurnStep {
+  const s: SolidCrossTurnState = { ...prev };
+  s.bearingDeg = f.bearingDeg;
+  if (!stepSolidCrossHeading(s, f, sustainSec)) return { state: s, bill: null, names: null };
+  const naming = s.crossedSolidAt !== null && !s.crossLate && s.turnPlace === true;
+  confirmSolidCrossTurn(s);
+  if (naming && s.billShared) {
+    // A second turn-round, a second act (as on the carriageway).
+    s.billedAt = null;
+    s.billLive = false;
+    s.billShared = false;
+  }
+  if (naming && s.billedAt !== null && s.billLive) {
+    const names = s.billedAt;
+    closeSolidCross(s, f.bank);
+    solidCrossActBilled(s, names);
+    return { state: s, bill: null, names };
+  }
+  if (f.bank !== s.bank && s.crossedSolidAt !== null && !s.billLive) {
+    // Unbilled so far: the bill, when the car is back on the carriageway and
+    // the sustain is met, is the U-turn's where the turn-round names it.
+    if (naming) s.named = true;
+    return { state: s, bill: null, names: null };
+  }
+  closeSolidCross(s, f.bank);
+  return { state: s, bill: null, names: null };
+}
+
+/**
+ * A FRAME ON WHICH THE ROAD HAS NO FIX ON THE CAR (R5-3). The bank, the
+ * crossing, its clocks and the place already measured HOLD. The nose is still
+ * followed, against the bearing the road had where it last saw the car — so a
+ * turn-round in progress stays in progress only while the nose stays out of
+ * the band, and one that begins out here has no station: `solidHere` is null,
+ * and with it `lastPlace`, the place of any swing that starts, and the place
+ * of any excursion that starts. Nothing is confirmed until the road sees the
+ * car again (the sustain is never met here; the clock keeps running, so the
+ * first frame back confirms a turn-round that is already 0.6 s old).
+ */
+function stepSolidCrossTurnUnseen(
+  prev: SolidCrossTurnState,
+  f: { headingDeg: number; stepM: number; t: number },
+): SolidCrossTurnState {
+  if (prev.bearingDeg === null) return prev;
+  const s: SolidCrossTurnState = { ...prev };
+  stepSolidCrossHeading(
+    s,
+    { deg: solidCrossDeltaDeg(prev.bearingDeg, f.headingDeg), solidHere: null, stepM: f.stepM, t: f.t },
+    Number.POSITIVE_INFINITY,
+  );
+  return s;
+}
+
+/**
+ * THE CROSSING'S BILL IN AN ARMED LESSON, ON THE REASON THE BODY HAS EARNED
+ * (round 3, verifier W3). The bill is decided by the CENTRE — across a solid
+ * axis for the sustain is a crossing whatever the speed — and the pooled reason
+ * says «Пресече ИЗЦЯЛО …», which is true only once the whole body is over:
+ *
+ *   · `bodyAcross === true`  → the pooled row, «изцяло» and all;
+ *   · `bodyAcross === false` → the same title and corrective with the reason
+ *     «Застъпи … и навлезе с повече от половината автомобил …»
+ *     (`catalog.ts SOLID_CROSS_ACT_ASTRIDE`) — what a centre across and a body
+ *     astride actually amount to;
+ *   · `null` (the body was not measured on this frame: a tick with no road
+ *     record, or one the tracker cannot place) → the pooled row, exactly as
+ *     shipped. Nothing is claimed that was not claimed before.
+ *
+ * Either row is still OPEN to being named a U-turn if the turn completes
+ * (`catalog.ts PROVISIONAL_ACTS`).
+ */
+function solidCrossBill(t: number, bodyAcross: boolean | null, ownWay: boolean): ViolationEvent {
+  if (bodyAcross === null) return makeViolation("CROSSED_SOLID_LINE", t);
+  if (ownWay) {
+    return makeViolation("CROSSED_SOLID_LINE", t, {
+      detail: bodyAcross ? SOLID_CROSS_ACT_OWN_WAY : SOLID_CROSS_ACT_ASTRIDE_OWN_WAY,
+    });
+  }
+  return bodyAcross
+    ? makeViolation("CROSSED_SOLID_LINE", t)
+    : makeViolation("CROSSED_SOLID_LINE", t, { detail: SOLID_CROSS_ACT_ASTRIDE });
+}
+
+/**
+ * R6-3 — DOES THE HALF THE CENTRE IS ON RUN THE CAR'S OWN WAY? The half `bank`
+ * carries traffic in direction `bank`; the car's travel direction is the one
+ * its nose was last along (`dir`, R5-1). Where they agree, the half the car
+ * has entered is NOT the oncoming one, and the crossing's reason may not say
+ * it is. `false` where either is unknown — the reason is then the shipped one,
+ * which is what a car that has never been along the road gets.
+ */
+function solidCrossOwnWay(s: SolidCrossTurnState, bank: 1 | -1 | null): boolean {
+  return bank !== null && s.dir !== 0 && s.dir === bank;
 }
 
 // ---------------------------------------------------------------------------
@@ -3568,6 +4622,13 @@ export function leadClosingNowMps(
 export interface ReduceResult {
   state: RuleEngineState;
   events: RuleEvent[];
+  /**
+   * Acts that became known on this frame for bills ALREADY emitted — see
+   * `types.ts ActAmendment`. ABSENT on every frame that names nothing, which is
+   * every frame of every lesson that does not author `solidCrossUTurnEnabled`,
+   * so the result's shape is exactly what it was everywhere else.
+   */
+  amendments?: ActAmendment[];
 }
 
 export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
@@ -3581,6 +4642,8 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const t = tick.t;
   const speed = tick.speedKmh;
   const events: RuleEvent[] = [];
+  /** Acts that became known this frame for bills already out (`ActAmendment`). */
+  let amendments: ActAmendment[] | undefined;
 
   /*
    * WITHDRAWN 2026-08-26 — WHY THIS FILE DOES *NOT* STAND ITS SPAN DETECTORS
@@ -4376,22 +5439,204 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // The episode is the EXCURSION: reset only once genuinely back in the own
   // lane (own bank AND clear of the line band), so one crossing bills once
   // even if the flag flickers at the paint on the way back.
+  //
+  // WHERE A LESSON ARMED THE REVERSAL (`solidCrossUTurnEnabled`), TWO THINGS
+  // ARE READ OFF THE ROAD FIRST — round 3; nothing in this block runs, and
+  // `tick.edgeAlignment` is not read, with the key off:
+  //  · `onReferenceBank` — the centre is on the bank the car last travelled
+  //    WITH (or was on when it last turned round — round 5), so it has
+  //    crossed nothing. «The nose opposes its bank» is true
+  //    there too once the nose is past 90° (a tight turn from the outer lane
+  //    is 100° round with its centre 4 m short of the axis), and that is the
+  //    frame this detector used to bill — «Пресече изцяло …» on a car that had
+  //    not reached the line, and on one that never did (verifier W2). A frame
+  //    the tracker cannot measure (past the kerb, no fix) HOLDS the last bank
+  //    it measured: the centre does not pass the axis from a verge. With no
+  //    reference yet, or a tick that carries no road record, this is false and
+  //    the detector is exactly the shipped one.
+  //  · `bodyAcross` — the whole body is across the axis on THIS frame
+  //    (`null` = not measured). It chooses the bill's reason: `solidCrossBill`.
+  let onReferenceBank = false;
+  let bodyAcross: boolean | null = null;
+  const solidCrossEa = cfg.solidCrossUTurnEnabled ? tick.edgeAlignment : undefined;
+  /** The bank the centre is on, where the road has a fix on the car on a
+   *  TWO-WAY edge — on its carriageway or past its kerb; `null` elsewhere. */
+  const solidCrossBank: 1 | -1 | null =
+    solidCrossEa !== undefined &&
+    solidCrossEa.deg !== null &&
+    solidCrossEa.edgeId !== null &&
+    solidCrossEa.travelDir !== undefined &&
+    tick.oneway === false
+      ? solidCrossEa.travelDir
+      : null;
+  const solidCrossMeasured = solidCrossBank !== null && solidCrossEa !== undefined && !solidCrossEa.offCarriageway;
+  /** This frame's tracker state refers to this frame's edge (`solidCrossOnEdge`). */
+  let solidCrossOnRoad = false;
+  if (solidCrossEa !== undefined) {
+    // R6-1 — FIRST, PUT THE TRACKER ON THE EDGE THE CAR IS ON: the same road
+    // handed to its next edge carries everything over; a road that sees the
+    // car for the first time takes the half it is on as the reference. Done
+    // before the plain detector below is asked anything, so that detector
+    // never reads a reference that belongs to another edge — or none at all.
+    if (solidCrossBank !== null && solidCrossEa.deg !== null && solidCrossEa.edgeId !== null) {
+      const onEdge = solidCrossOnEdge(
+        s.solidCrossTurn,
+        solidCrossEa.edgeId,
+        tick.headingDeg - solidCrossEa.deg,
+        solidCrossBank,
+        solidCrossMeasured,
+      );
+      if (onEdge !== null) {
+        s.solidCrossTurn = onEdge;
+        solidCrossOnRoad = true;
+      }
+    }
+    const ref = s.solidCrossTurn;
+    if (solidCrossMeasured) {
+      onReferenceBank = ref.bank === solidCrossBank;
+      if (solidCrossEa.axisClearM !== undefined) bodyAcross = solidCrossEa.axisClearM >= 0;
+    } else {
+      onReferenceBank = ref.bank !== 0 && ref.prevBank === ref.bank;
+    }
+  }
   const solidCrossCond =
     tick.solidCenterLine === true &&
     tick.oneway === false &&
     tick.opposingBank === true &&
     moving &&
-    forwardGear;
-  if (
-    stepEpisode(
-      s.solidCross,
-      solidCrossCond,
-      tick.opposingBank !== true && tick.laneOffsetM <= cfg.laneKeepMaxOffsetM,
-      t,
-      cfg.solidLineCrossSustainSec,
-    )
-  ) {
-    events.push(makeViolation("CROSSED_SOLID_LINE", t));
+    forwardGear &&
+    !onReferenceBank;
+  const solidCrossBackInLane =
+    tick.opposingBank !== true && tick.laneOffsetM <= cfg.laneKeepMaxOffsetM;
+  /** The plain detector's bill in an ARMED lesson, pushed below once the
+   *  tracker has stepped (its reason needs this frame's travel direction). */
+  let solidCrossPlainBill: "crossing" | "u-turn" | null = null;
+  if (stepEpisode(s.solidCross, solidCrossCond, solidCrossBackInLane, t, cfg.solidLineCrossSustainSec)) {
+    // THE PLAIN CROSSING, UNDER THE CROSSING'S OWN TITLE — on every lesson, the
+    // armed one included. At this frame the nose has opposed its bank for the
+    // sustain and that is ALL that is known: on a U-turn begun beside the axis
+    // the car is 34° round here, and the student may still steer back.
+    // «Пресичане на непрекъсната осева линия» is true of every car that gets
+    // this far; «обратен завой» is not, yet. If the turn completes, THIS bill
+    // is named below.
+    //
+    // (Where the lesson armed the reversal and this excursion ALREADY carries a
+    // bill — the position-based one below — this is the same act seen a second
+    // way, and one act is one bill. And there the reason is the one the body
+    // and the travel direction have earned on this frame — `solidCrossBill`.)
+    if (!cfg.solidCrossUTurnEnabled) {
+      events.push(makeViolation("CROSSED_SOLID_LINE", t));
+    } else if (
+      s.solidCrossTurn.billedAt === null &&
+      !(
+        s.solidCrossTurn.crossedSolidAt !== null &&
+        s.solidCrossTurn.farSince !== null &&
+        t - s.solidCrossTurn.farSince < cfg.solidLineCrossSustainSec
+      )
+    ) {
+      // (…and not while the tracker holds a solid crossing whose OWN sustain is
+      // still running — R6-2: a crossing that begins where a U-turn's swing
+      // ends is billed the sustain after THAT, by position, not the sustain
+      // after the nose first opposed this bank during the swing.)
+      //
+      // …unless a turn-round ALREADY names this crossing (round 5: the centre
+      // went over during the turn-round's own swing, the nose already round —
+      // and round far enough to oppose the bank it arrived on, which is what
+      // this detector fires on). Then this bill is the U-turn's.
+      const billed: SolidCrossTurnState = { ...s.solidCrossTurn, billedAt: t, billLive: true };
+      solidCrossPlainBill = billed.named ? "u-turn" : "crossing";
+      if (billed.named) solidCrossActBilled(billed, t);
+      s.solidCrossTurn = billed;
+    }
+  }
+  // THE REVERSAL ACROSS THE SOLID AXIS — one frame of the road-referenced
+  // tracker, and ONLY where the lesson armed it (`solidCrossUTurnEnabled`; the
+  // block of that name above `stepEpisode` has the whole rule). With the key
+  // off — every lesson but sc-mv-uturn-ban — nothing below runs,
+  // `tick.edgeAlignment` is not read and the state is never written.
+  //
+  // THREE KINDS OF FRAME (round 5, R5-3; round 6, R6-1 — «this road» is the
+  // ROAD, whichever of its edges the car is on):
+  //  · on the carriageway of a two-way road, measured — the whole tracker;
+  //  · past the kerb but still fixed to the SAME road — the heading half only
+  //    (`stepSolidCrossTurnOffRoad`): the bank and the crossing hold, and a
+  //    turn-round made out there begins, is placed and is confirmed out there;
+  //  · no fix on this road — the bank, the crossing and a place already
+  //    measured hold, the nose is followed against the road's last bearing
+  //    (`stepSolidCrossTurnUnseen`), and nothing is confirmed until the road
+  //    sees the car again.
+  if (cfg.solidCrossUTurnEnabled) {
+    const ea = tick.edgeAlignment;
+    if (ea === undefined) {
+      // A tick that did not come from the world runtime carries no road record
+      // at all, so the tracker never sees the car come home. The plain
+      // detector's own excursion is then all there is: where IT re-arms, the
+      // bill this excursion carried is over too — otherwise the first bill of
+      // such a drive would silence every later one.
+      if (solidCrossBackInLane && s.solidCrossTurn.billedAt !== null) {
+        s.solidCrossTurn = { ...s.solidCrossTurn, billedAt: null, billLive: false };
+      }
+    } else {
+      let turn: SolidCrossTurnStep | null = null;
+      // Metres since the previous frame — the swing's yardstick.
+      const stepM = (speed / 3.6) * Math.min(dt, 2);
+      if (solidCrossOnRoad && solidCrossBank !== null && ea.deg !== null && ea.edgeId !== null) {
+        const frame = {
+          bank: solidCrossBank,
+          deg: ea.deg,
+          bearingDeg: tick.headingDeg - ea.deg,
+          solidHere: tick.solidCenterLine === true,
+          stepM,
+          t,
+        };
+        turn = solidCrossMeasured
+          ? stepSolidCrossTurn(
+              s.solidCrossTurn,
+              { ...frame, edgeId: ea.edgeId, forwardGear, inLane: solidCrossBackInLane },
+              cfg.solidLineCrossSustainSec,
+            )
+          : stepSolidCrossTurnOffRoad(s.solidCrossTurn, frame, cfg.solidLineCrossSustainSec);
+      } else {
+        s.solidCrossTurn = stepSolidCrossTurnUnseen(s.solidCrossTurn, { headingDeg: tick.headingDeg, stepM, t });
+      }
+      if (turn !== null) {
+        s.solidCrossTurn = turn.state;
+        if (turn.bill === "crossing") {
+          // THE CROSSING THE PLAIN DETECTOR COULD NOT SEE — the centre across a
+          // solid axis for the sustain, whichever way the nose points and however
+          // slowly it got there. The crossing's own title: what was crossed is all
+          // that is known yet; how far across the body is, and whether the half
+          // it has entered runs against it, choose the reason.
+          events.push(
+            solidCrossBill(t, bodyAcross, solidCrossOwnWay(turn.state, solidCrossMeasured ? solidCrossBank : null)),
+          );
+        } else if (turn.bill === "u-turn") {
+          // A TURN-ROUND ALREADY NAMES THIS CROSSING and nothing had billed it:
+          // the centre went over during the turn-round's own swing with the nose
+          // already round, or in reverse gear. The bill carries the act.
+          events.push(makeViolation("CROSSED_SOLID_LINE", t, { detail: SOLID_CROSS_ACT_UTURN }));
+        } else if (turn.names !== null) {
+          // THE TURN-ROUND IS CONFIRMED and the crossing's bill is already out:
+          // it is NAMED (`ActAmendment`) — same code, time, class and points; the
+          // act's title, reason and corrective.
+          (amendments ??= []).push({
+            code: "CROSSED_SOLID_LINE",
+            billT: turn.names,
+            detail: SOLID_CROSS_ACT_UTURN,
+            t,
+          });
+        }
+      }
+    }
+    // …and the plain detector's bill of this frame, on the reason this frame
+    // has earned now that the tracker has read it (R6-3).
+    if (solidCrossPlainBill === "u-turn") {
+      events.push(makeViolation("CROSSED_SOLID_LINE", t, { detail: SOLID_CROSS_ACT_UTURN }));
+    } else if (solidCrossPlainBill === "crossing") {
+      events.push(
+        solidCrossBill(t, bodyAcross, solidCrossOwnWay(s.solidCrossTurn, solidCrossMeasured ? solidCrossBank : null)),
+      );
+    }
   }
   // One act, one code (the stage-2b ruling): while the crossing condition is
   // armed — or has already billed within this same excursion — the touch and
@@ -7109,7 +8354,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   s.prevT = t;
   s.prevSpeedKmh = speed;
   s.prevLeadGapM = leadGapM;
-  return { state: s, events };
+  return amendments === undefined ? { state: s, events } : { state: s, events, amendments };
 }
 
 // ---------------------------------------------------------------------------

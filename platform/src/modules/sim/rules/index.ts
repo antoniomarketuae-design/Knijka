@@ -41,6 +41,7 @@ export {
   type Vec2,
   type ViolationCode,
   type ViolationEvent,
+  type ActAmendment,
   type ViolationPoints,
 } from "./types";
 
@@ -92,6 +93,17 @@ export {
    * explanation exactly as before.
    */
   violationPeekBg,
+  violationCorrectiveBg,
+  /** Name a bill that is already out — `types.ts ActAmendment`. */
+  applyActAmendments,
+  /** May an amendment still name this row? — none yet, or a provisional act. */
+  actIsOpen,
+  PER_ACT_COPY,
+  PROVISIONAL_ACTS,
+  SOLID_CROSS_ACT_ASTRIDE,
+  SOLID_CROSS_ACT_ASTRIDE_OWN_WAY,
+  SOLID_CROSS_ACT_OWN_WAY,
+  SOLID_CROSS_ACT_UTURN,
   type CommendationSpec,
   type ViolationSpec,
 } from "./catalog";

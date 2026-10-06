@@ -73,7 +73,8 @@ export function historyMistakeGroups(
       severityClass: spec.severityClass,
       points: spec.points,
       count: 1,
-      correctiveBg: spec.correctiveBg,
+      // Act first, pooled second — same order as the title two lines up.
+      correctiveBg: act?.correctiveBg ?? spec.correctiveBg,
     });
   }
   return [...groups.values()].sort((a, b) => {

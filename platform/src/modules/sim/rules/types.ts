@@ -486,6 +486,50 @@ export interface EdgeAlignment {
    *  Not otherwise published on the tick, and the ring is the family the
    *  steering instrument exists for. */
   roundabout?: boolean;
+  /**
+   * HOW FAR THE CAR'S BODY IS FROM THE ROAD'S AXIS, metres — present iff
+   * `deg !== null` AND the committed edge is TWO-WAY (a one-way has no axis
+   * between two banks).
+   *
+   *   axisClearM = d − (h·|cos ψ| + l·|sin ψ|)
+   *
+   * `d` is the centre's distance from the edge's centreline into the bank it
+   * is on (`travelDir`) — the locator's own lateral coordinate, off the same
+   * committed fix as `laneId` / `laneOffsetM` — and the bracket is how far the
+   * chassis rectangle (`collision/bodies` half-width h, half-length l) reaches
+   * ACROSS the road when the nose is ψ = `deg` off the edge's direction: the
+   * same body the lane-entry tracker measures (`runtime/worldRuntime.ts`,
+   * „HIS BODY is the chassis rectangle turned to his heading").
+   *
+   *   ≥ 0  the WHOLE body is on the bank the centre is on, clear of the axis
+   *        by that much;
+   *   < 0  the body STRADDLES the axis — it reaches that far onto the other
+   *        bank.
+   *
+   * WHY IT IS HERE (sc-mv-uturn-ban, round 3). `travelDir` says which bank the
+   * CENTRE is on and flips the instant the centre passes the axis; it cannot
+   * tell a car whose centre is 0.15 m over the line — still with its right
+   * wheels on its own half — from one that has pulled wholly out into the
+   * oncoming lane. ONE decision of the one opt-in reader (`rules/engine.ts`
+   * „THE REVERSAL ACROSS THE SOLID AXIS") turns on exactly that difference:
+   * whether the crossing bill's reason may say «изцяло». It cannot be made
+   * from the nose or from the centre alone, and the reducer holds neither the
+   * lane width nor the chassis, so the runtime measures it and the reducer
+   * reads the number. (Round 3 read it for a second decision too — whether a
+   * run along the far half was a PULL-OUT; round 4, integrator ruling R4-2,
+   * removed that carve-out: a turn round made inside the span is the U-turn
+   * whatever came before it.)
+   *
+   * Same contract as the rest of the record: nothing reads it under
+   * `DEFAULT_RULE_CONFIG` (`runtime/__tests__/edge-alignment-not-graded.test.ts`
+   * lies about it with every other member), and it is published past the kerb
+   * too (`offCarriageway`), where `d` is clamped to the bank's width and the
+   * number means nothing — a consumer must filter on `offCarriageway`, as the
+   * one reader does. On a bend the axis under the body is not the straight
+   * line this assumes; the error is the bend's sagitta over a car length, and
+   * the one armed span is straight.
+   */
+  axisClearM?: number;
 }
 
 /**
@@ -931,8 +975,20 @@ export interface SimTick {
    *
    * OPTIONAL in the type and SET ON EVERY TICK the world runtime produces.
    * Absent therefore means „this tick did not come from the runtime", never
-   * „aligned" and never „unarmed". NOTHING GRADES IT — and a test fails if
-   * anything starts to.
+   * „aligned" and never „unarmed".
+   *
+   * NOTHING GRADES IT — WITH ONE OPT-IN EXCEPTION, added 2026-10-05 and stated
+   * here so it cannot be mistaken for drift. Under `DEFAULT_RULE_CONFIG` no
+   * rule, objective, card or score reads this record, and
+   * `runtime/__tests__/edge-alignment-not-graded.test.ts` still fails by
+   * execution if one starts to. The exception is `rules/engine.ts` „THE
+   * REVERSAL ACROSS THE SOLID AXIS", which reads `deg`, `travelDir`, `edgeId`,
+   * `offCarriageway` and `axisClearM` ONLY where a lesson authors
+   * `RuleEngineConfig.solidCrossUTurnEnabled` (today: sc-mv-uturn-ban) — «did
+   * this crossing reverse the car's direction along the road?» is a question
+   * about the car's relation to the ROAD, and this is the only signal on the
+   * tick that carries it. The same test pins both halves: unread with the key
+   * off, read (and a census of who authors the key) with it on.
    */
   edgeAlignment?: EdgeAlignment;
   // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and
@@ -1471,6 +1527,48 @@ export interface CommendationEvent {
 }
 
 export type RuleEvent = ViolationEvent | CommendationEvent;
+
+/**
+ * AN ACT THAT BECAME KNOWN AFTER ITS BILL — the reducer's second, much rarer
+ * output (`ReduceResult.amendments`).
+ *
+ * WHY IT EXISTS (sc-mv-uturn-ban, round 2). A U-turn across a solid осева is
+ * billed in two different places in time. CROSSED_SOLID_LINE fires where it
+ * always did — the centre across the line for `solidLineCrossSustainSec` — and
+ * at that frame the car is only part of the way round: 34° on a turn begun
+ * beside the axis, 67° on the demo's. Whether the crossing was a U-turn is not
+ * a fact about that frame; the student may still straighten up, or steer back.
+ * It becomes a fact when the car's travel direction relative to the road has
+ * REVERSED on the far half (`rules/engine.ts` „THE REVERSAL ACROSS THE SOLID
+ * AXIS"), which is seconds later.
+ *
+ * So the bill is not delayed and is not doubled. It goes out at its own frame
+ * under the crossing's own title — true there: he has crossed the line (on the
+ * pooled reason, or on the straddle's while the body is still astride it:
+ * `catalog.ts SOLID_CROSS_ACT_ASTRIDE`, a PROVISIONAL act) — and when the
+ * reversal completes the reducer says, once, „the CROSSED_SOLID_LINE billed at
+ * `billT` was this act". The consumer re-labels THAT row: same code, same
+ * time, same class and points, the act's own title, reason and corrective.
+ *
+ * NOT A `RuleEvent`, DELIBERATELY. An amendment is not a second violation and
+ * must never be countable as one: a consumer that has never heard of this
+ * field loses the act's name and nothing else, where a consumer that met a
+ * marked violation it did not understand would bill the turn twice. That
+ * failure direction is why it is a separate, optional array.
+ *
+ * `detail` is a SELECTOR into `catalog.ts PER_ACT_COPY`, exactly as
+ * `ViolationEvent.detail` is — no sentence travels here.
+ */
+export interface ActAmendment {
+  /** The code of the bill being named. */
+  code: ViolationCode;
+  /** `ViolationEvent.t` of that bill — the row's identity together with `code`. */
+  billT: number;
+  /** The act (`PER_ACT_COPY[code][detail]`). */
+  detail: string;
+  /** Session time the act became known, seconds (≥ `billT`). */
+  t: number;
+}
 
 /** Anything the session summary can score (violations + commendations). */
 export type ScorableEvent = ViolationEvent | CommendationEvent;
@@ -2173,6 +2271,142 @@ export interface RuleEngineConfig {
   solidLineCrossSustainSec: number;
 
   /**
+   * THE U-TURN ACROSS A SOLID AXIS — DECIDED FROM THE ROAD. **false = off** (the
+   * default): no state is kept, `SimTick.edgeAlignment` is not read, and every
+   * CROSSED_SOLID_LINE bill is byte for byte the one that shipped.
+   *
+   * WHERE A LESSON AUTHORS `true` (today: sc-mv-uturn-ban alone), the reducer
+   * follows ONE question on a two-way road with an authored М1 span — «the car
+   * was travelling WITH one bank of this road; is it now on the OTHER bank,
+   * travelling with THAT one, having crossed the axis where it is solid?» — and
+   * that completed reversal is the U-turn (`engine.ts` „THE REVERSAL ACROSS THE
+   * SOLID AXIS" carries the algorithm and its constants) — WHERE THE TURN-ROUND
+   * ITSELF WAS MADE OVER A SOLID AXIS (round 4, below). Two things follow:
+   *
+   *  · THE ACT IS NAMED. If the plain crossing detector already billed inside
+   *    this manoeuvre, that bill is re-labelled with the act
+   *    `catalog.ts SOLID_CROSS_ACT_UTURN` through `ReduceResult.amendments`
+   *    (`ActAmendment`): same code, class, points and time — the pooled
+   *    corrective is the OVERTAKE's («…дори предният да пълзи. Изпреварвай или
+   *    заобикаляй…») and after a U-turn it answers a question nobody asked
+   *    (sc-mv-uturn-ban:6d60c160).
+   *  · THE CROSSING IS BILLED WHERE THE PLAIN DETECTOR IS BLIND. `opposingBank`
+   *    is «the nose opposes the bank the car is on», so a car that reaches the
+   *    axis already pointing across the road — the natural arc from the outer
+   *    lane — is never on an „opposing" bank for 0.6 s and was not billed at
+   *    all, with the debrief praising «чисто каране» (verifier V5); and a turn
+   *    at walking pace is under `movingSpeedKmh`. Here the crossing is billed
+   *    by POSITION — the centre across a solid axis for the sustain — as
+   *    CROSSED_SOLID_LINE under the crossing's own title, once per excursion, and the
+   *    completed reversal then names it like any other. (A reversal nothing
+   *    billed — the centre crossed in reverse gear — is itself the bill, with
+   *    the act.) That makes this an ARMING key (`detectorOptIns.ts
+   *    DETECTOR_OPT_IN_CODES`).
+   *
+   * ROUND 3 — THREE THINGS THE CENTRE AND THE NOSE COULD NOT SAY, each now read
+   * off the BODY's position on the road (`EdgeAlignment.axisClearM`) or off the
+   * bank the car was travelling with:
+   *  · NOTHING BILLS A CROSSING THE CENTRE HAS NOT MADE. The plain detector's
+   *    `opposingBank` is true on the car's OWN half once its nose is past 90°,
+   *    so a tight U-turn from the outer lane was shown the crossing card up to
+   *    4.4 m short of the axis and 2.2 s before the centre crossed, and a
+   *    turn-round that never crossed at all was billed as a crossing and the
+   *    lesson refused for it (verifier W2; the same on the shipped tree). Here
+   *    the plain detector stands down while the centre is on the bank the car
+   *    last travelled WITH; the crossing is billed by position, 0.6 s after
+   *    the centre is across.
+   *  · THE REASON SAYS WHAT WAS MEASURED. A centre across a solid axis is a
+   *    crossing whatever the speed, but «Пресече ИЗЦЯЛО …» is false while the
+   *    tail is still on the own half (W3). A bill that lands with the body
+   *    astride the axis carries the act `catalog.ts SOLID_CROSS_ACT_ASTRIDE` —
+   *    the crossing's own title and corrective, and «Застъпи … и навлезе с
+   *    повече от половината автомобил …» for a reason; «изцяло» is printed
+   *    only when the whole body is across.
+   *  · A STRADDLE IS NOT A PULL-OUT. The carve-out that kept a pull-out's
+   *    crossing from being named a U-turn counted metres with no lateral test,
+   *    so a car that eased 0.4 m over the line and then turned round kept the
+   *    overtaking advice (W1 — the 6d60c160 complaint again). Round 3 counted
+   *    the metres only while the whole body was on the far half; round 4
+   *    removed the carve-out (next).
+   *
+   * ROUND 4 — TWO INTEGRATOR RULINGS, after the round-3 verifier's X1:
+   *  · R4-1, THE PLACE. Round 3 named any reversal while a solid crossing
+   *    stood, so a student whose centre sat 5 cm over the line for the last
+   *    six metres of the span and who then made the LAWFUL turn at the gap was
+   *    told his turn was forbidden «на това място» — 48.7 m past the end of
+   *    the solid line. A reversal is the U-turn only if the turn-round was
+   *    MADE where the axis is solid: the road's own record of the axis under
+   *    the car (`SimTick.solidCenterLine`, the source the crossing bill reads)
+   *    at THE TURN STATION — the centre's station on the first frame of the
+   *    last unbroken run, ending at the completed reversal, on which the
+   *    centre is on the far bank and the nose is more than 45° off the
+   *    direction the car was travelling. A reversal made over a dashed axis is
+   *    a lawful U-turn: billed by nothing, renaming nothing; the crossing or
+   *    straddle row billed inside the span keeps its own copy. The run is
+   *    followed past the kerb too, where the road still has a fix on the car
+   *    (a turn-round made on the verge is placed where it is made); with no
+   *    fix on this road at all the turn-round is UNPLACED and names nothing —
+   *    a station is never carried over from an earlier swing.
+   *  · R4-2, NO PULL-OUT CARVE-OUT. ANY reversal made inside the solid span by
+   *    a car across or astride the solid axis is the U-turn — a straddle, a
+   *    full pull-out that ran parallel for any distance, a continuous shallow
+   *    lead-in — because the corrective must explain the decision actually
+   *    made, and he turned round where it is forbidden; he did not overtake.
+   *    A pull-out that returns, carries on, or leaves the span and turns at
+   *    the gap keeps the crossing's copy — and R4-1 is what says so.
+   *
+   * ROUND 5 — ONE DEFINITION OF THE ACT (integrator ruling, after the round-4
+   * verifier's Y1: a turn-round made on the car's OWN half over the dashes,
+   * then fifty metres back and over the solid axis, was billed «обратен завой,
+   * а на това място той е забранен» — the tracker read «the turn» on the first
+   * frame the CENTRE was across). It replaces the question at the head of this
+   * note and R4-1's station; the code, the class and the points do not change:
+   *  · R5-1. A TURN-ROUND IS AN EVENT OF THE HEADING AGAINST THE ROAD — the
+   *    nose from within 45° of the direction the car was travelling to within
+   *    45° of the opposite one, held for the sustain, on whichever half the
+   *    centre is. Its PLACE is where it begins: the last frame before the
+   *    swing that carries the nose out of the band (a swing = never 2 m
+   *    travelled without 1° more the same way). It COMPLETES when that swing
+   *    ends.
+   *  · R5-2. A billed crossing is the U-turn iff the centre crossed where the
+   *    axis is solid, a turn-round completed at or after that crossing (never
+   *    before it), and the axis is solid where that turn-round begins. A
+   *    confirmed turn-round closes the manoeuvre: nothing billed earlier is
+   *    renamed by what the car does next.
+   *  · R5-3. A place measured on the road is kept while the road has no fix on
+   *    the car; the nose is followed out there against the road's last
+   *    bearing (`SimTick.headingDeg` — read, like the record, only under this
+   *    key), nothing is confirmed until the road sees the car again, and a
+   *    turn-round that begins out there has no place and names nothing.
+   *
+   * WHAT IS DELIBERATELY NOT EVIDENCE: how far the nose swung, how recently, the
+   * radius, the lane the turn began in, the speed. Round 1 of this repair read
+   * the car's own heading history («≥ 45° left inside 10 s of movement») and was
+   * refuted both ways: a whole U-turn begun 1 m from the axis is only 34° round
+   * when the bill lands and kept the overtaking advice, while a LAWFUL U-turn at
+   * the gap followed seven seconds later by a 14.7° drift was titled «Обратен
+   * завой». The heading history says what the CAR did; only its relation to the
+   * ROAD says what the crossing was.
+   *
+   * WHY PER LESSON. «A reversal completed on the far half of this span is a
+   * U-turn» is true where the span has no side road, driveway or property on
+   * the far side to turn INTO — a statement about one map, which is the
+   * author's to make. And it is the single place `SimTick.edgeAlignment` is
+   * read by a rule: see that field's contract.
+   *
+   * ROUND 6 (the closing round — `rules/engine.ts` has the rule): the tracker
+   * follows the ROAD across its edges and takes a car it sees for the first
+   * time from the half it is on (R6-1); after a turn-round that billed the
+   * U-turn, home is the half of the new travel direction once its swing has
+   * ended, and a centre left across the solid axis from it is a new crossing
+   * (R6-2); a crossing into the half that runs the car's own way is billed on
+   * a reason that does not call that half oncoming (R6-3, the acts `own-way`
+   * / `astride-own-way`); and the swing is a rate over a window, so a turn's
+   * place does not move with the step its heading is sampled in (R6-5).
+   */
+  solidCrossUTurnEnabled: boolean;
+
+  /**
    * SN-05 „бус лента" — seconds of sustained travel in an authored bus lane
    * before DRIVING_IN_BUS_LANE fires. The taught norm: crossing the bus lane
    * is LEGAL for the right turn / curb access, so a brief transit (≤ ~3 s)
@@ -2654,6 +2888,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // errs innocent (A12).
   // 0.6 s: paint-jitter flips can't hold it; the shortest real pull-out can.
   solidLineCrossSustainSec: 0.6,
+  solidCrossUTurnEnabled: false, // off — a lesson whose М1 span has nothing to turn into on the far side arms it (sc-mv-uturn-ban)
   // 4 s: a right-turn/curb transit crosses the bus lane in ~2-3 s; the cruise
   // the law targets holds it for blocks.
   busLaneSustainSec: 4,

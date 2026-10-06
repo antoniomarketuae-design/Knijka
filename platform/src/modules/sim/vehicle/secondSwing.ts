@@ -54,9 +54,17 @@
  *  · `HOLD_RAD` / `SWING_RAD` — 0.10 rad of road-wheel angle. At the ~34 km/h
  *    this drill is taught at, `tuning.ts`'s speed-sensitive limit leaves about
  *    0.51 rad of lock, so 0.10 is a fifth of everything the car will give and
- *    unmistakably a deliberate movement. For scale, the steady counter-steer
- *    that out-pulls this wind in `crosswind.test.ts` is ~0.025 rad — 5 % of
- *    input. A quarter of the wheel is not a correction; it is a swing.
+ *    unmistakably a deliberate movement. For scale — re-measured 2026-10-04,
+ *    when the founder's «Stronger wind» ruling gave the wind its yaw pull and
+ *    with it a correction worth the name — the wheel that HOLDS the lane in
+ *    this wind is 0.018 rad (3.5 % of the lock) on the steady term and
+ *    0.026 rad (5.1 %) at the gust's peak (`crosswind.test.ts`), and a
+ *    proportional driver who tracks the gusts on the lesson's own street
+ *    never passes 0.04 rad on any learner tier
+ *    (`crosswind-live-lane-hold.test.ts`, which also asserts this detector
+ *    stays silent on every correct drive, proportional and keyboard). The
+ *    threshold is two and a half times the largest correct movement. A fifth
+ *    of the wheel is not a correction; it is a swing.
  *  · `HOLD_SEC` — 0.35 s. `STEER_SPEED` is 3.2 rad/s, so a mere flick through
  *    0.10 rad occupies ~0.03 s. A third of a second is a HELD correction.
  *  · `WINDOW_SEC` — 1.2 s after the hold ends. `STEER_RETURN_SPEED` is
@@ -72,6 +80,11 @@
  *    (`CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_AMPLITUDE_N` over `CHASSIS_MASS`),
  *    so the whole gust cycle is above this and a calm lesson's exact 0 is below
  *    it. It is a guard against a future near-zero wind, not a live threshold.
+ *  · `HAND_ON_MIN` — 0.02 of full input. Not a size threshold: it only asks
+ *    WHETHER THE DRIVER IS STILL ASKING for the upwind wheel (see
+ *    `SecondSwingSample.steerInput`). A released key and a centred stick are
+ *    exactly 0; a hand that holds `HOLD_RAD` on a proportional control is
+ *    0.2–0.7 of full input at every speed this detector is armed at.
  *  · `CUE_SEC` / `COOLDOWN_SEC` — 4 s of reading time, then 8 s of silence. The
  *    advisor's first rule, verbatim: „a line that repeats every two seconds is
  *    worse than silence." A student sawing at the wheel gets one sentence per
@@ -90,6 +103,8 @@ export const SECOND_SWING = {
   MIN_SPEED_KMH: 20,
   /** Below this lateral acceleration (m/s²) there is no wind to correct for. */
   MIN_WIND_MS2: 0.3,
+  /** The driver's own input (0..1) above which his hand is ON the correction. */
+  HAND_ON_MIN: 0.02,
   /** How long the coaching line stays on the glass (s). */
   CUE_SEC: 4,
   /** Minimum silence between two lines (s) — the advisor's no-nag rule. */
@@ -102,6 +117,36 @@ export interface SecondSwingSample {
   tSec: number;
   /** Road-wheel steer angle, rad (+ = left) — `VehicleSim.steerRad`. */
   steerRad: number;
+  /**
+   * THE DRIVER'S HAND — his raw steering input, −1..1 (+ = left), BEFORE the
+   * learner tier's sensitivity and low-pass: the key, the stick, the thumb on
+   * the pad.
+   *
+   * WHY THE DETECTOR READS IT — round 2 of sc-ac-crosswind:a9db1738, „KEYBOARD".
+   * The wheel is what the car does; whether a correction is being HELD is what
+   * the driver does, and on the product's digital and dead-zoned controls the
+   * two come apart. A key is full input or none (`engine/input.ts`), and the
+   * tier's low-pass (`difficulty.ts`, 0.15 s on the default tier) lets the
+   * wheel FALL back after the key is up: one 200 ms tap puts the wheel past
+   * `HOLD_RAD` for about 0.35 s, of which the finger was down for 0.2. Read on
+   * the wheel alone, that tap was a „held correction", and the next tap the
+   * other way inside 1.2 s was «втори замах» — a sentence telling a student
+   * who was holding his lane with the only quantum his keyboard has that he
+   * had over-corrected. MEASURED on the lesson's own street, a driver tapping
+   * toward the correct wheel with 150 ms presses: 0 lines before the wind had
+   * a pull to answer, 1 after it (4 against 3 at 200 ms).
+   *
+   * So a hold counts only while the HAND IS ON IT: the wheel is past
+   * `HOLD_RAD` upwind AND this input is still asking for that side. A wheel
+   * merely falling back through 0.10 rad after a key is released is being
+   * held by nobody. No threshold a real swing needs has moved — a driver who
+   * holds the key (or the stick, or his thumb) into the wind for `HOLD_SEC`
+   * and then swings the wheel through centre fires this exactly as before.
+   *
+   * Optional: absent, the hold is judged on the wheel alone (callers that
+   * have no input channel — a replayed trace — keep the old reading).
+   */
+  steerInput?: number;
   /** Signed forward speed, km/h — `VehicleSim.speedKmh`. */
   speedKmh: number;
   /**
@@ -179,8 +224,15 @@ export function stepSecondSwing(
     state.heldSign = 0;
     state.armedUntilSec = Number.NEGATIVE_INFINITY;
   } else {
+    // The hand is ON the correction: still asking for the upwind side.
+    const handOnIt =
+      sample.steerInput === undefined ||
+      (Math.sign(sample.steerInput) === correctionSign &&
+        Math.abs(sample.steerInput) >= SECOND_SWING.HAND_ON_MIN);
     const holdingUpwind =
-      Math.sign(steerRad) === correctionSign && Math.abs(steerRad) >= SECOND_SWING.HOLD_RAD;
+      handOnIt &&
+      Math.sign(steerRad) === correctionSign &&
+      Math.abs(steerRad) >= SECOND_SWING.HOLD_RAD;
     if (holdingUpwind) {
       state.heldSec += dtSec;
       state.heldSign = correctionSign;

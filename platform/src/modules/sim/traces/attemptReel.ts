@@ -26,7 +26,7 @@
  * path — exactly as clipReplay and attemptStore do.
  */
 
-import { VIOLATIONS, type SeverityClass, type ViolationCode } from "../rules";
+import { VIOLATIONS, violationCorrectiveBg, type SeverityClass, type ViolationCode } from "../rules";
 import { sampleAt } from "./sample";
 import { createTracePoint, type ScenarioTrace } from "./types";
 
@@ -48,6 +48,9 @@ export interface StoredReelEvent {
   explanationBg?: unknown;
   lawRef?: unknown;
   severityClass?: unknown;
+  /** The act inside the code (`ViolationEvent.detail`) — a SELECTOR into the
+   *  catalogue's per-act copy, read only to pick the act's own corrective. */
+  detail?: unknown;
 }
 
 /** One stored event position, paired back to its event by (kind, code, t) —
@@ -191,7 +194,12 @@ export function buildAttemptReel(
       positionExact: stored !== null,
       titleBg: text(e.titleBg, spec?.titleBg ?? e.code),
       explanationBg: text(e.explanationBg, spec?.explanationBg ?? ""),
-      correctiveBg: spec?.correctiveBg ?? null,
+      // Act first, pooled second: the stored title and explanation above are
+      // already the act's own, so the corrective beside them must be too.
+      correctiveBg:
+        spec !== undefined && e.code in VIOLATIONS
+          ? violationCorrectiveBg(e.code as ViolationCode, typeof e.detail === "string" ? e.detail : undefined)
+          : null,
       lawRef: text(e.lawRef, spec?.lawRef ?? ""),
     });
   }

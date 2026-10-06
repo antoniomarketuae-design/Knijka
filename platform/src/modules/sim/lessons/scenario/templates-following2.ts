@@ -319,7 +319,8 @@ const MW_X_CRUISE = 0;
  *   cruise — so a disciplined player who settles at flow is simply held at 76 m
  *   (the shadow), while a tailgater who RACES into the gap (a burst under the
  *   150 km/h dangerous-speed line) finds the lead has no headroom to escape and
- *   sits on ~38 m / ~14 m of held gap (the mistakes). The pin works FOR the
+ *   sits on ~35 m (≈ 1.0 s, under the 42.9 m fire line at 122) / ~14 m of held
+ *   gap (the mistakes). The pin works FOR the
  *   disciplined driver and AGAINST the impatient one — exactly the road.
  *
  * At y = 720 the lead brakes firmly to a stop (cruise 0, ~4.5 m/s²): the shadow,
@@ -523,7 +524,7 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-fo-motorway-gap/mistake-one-second.trace.json" },
       titleBg: "Една секунда зад водещия при 130",
       whatWentWrongBg:
-        "Колата се залепи на около 40 метра зад водещия при 130 км/ч — една секунда дистанция там, където трябват две. На тази скорост изминаваш 36 метра за секунда: 40 метра са по-малко от времето, нужно дори само за да реагираш. Несъобразената дистанция е основна грешка, а на магистрала е и най-честата причина за верижни удари.",
+        "Колата се залепи на около 35 метра зад водещия при над 120 км/ч — една секунда дистанция там, където трябват две. На тази скорост изминаваш около 34 метра всяка секунда: 35 метра стигат едва колкото да реагираш, преди изобщо да натиснеш спирачката. Несъобразената дистанция е основна грешка, а на магистрала е и най-честата причина за верижни удари.",
       codeRefs: ["FOLLOWING_TOO_CLOSE"],
     },
     {

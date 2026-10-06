@@ -50,6 +50,7 @@ import {
   examMarkCitationBg,
   makeViolation,
   minusPointsBg,
+  violationCorrectiveBg,
   violationPeekBg,
   type ScorableEvent,
   type ViolationCode,
@@ -324,7 +325,12 @@ export function lessonMistakeCopy(hit: {
   return {
     titleBg: event.titleBg,
     explanationBg: event.explanationBg,
-    correctiveBg: spec.correctiveBg,
+    // Act-then-pool, like the title, the explanation and the peek around it.
+    // This line read `spec.correctiveBg` — BY CODE — until sc-mv-uturn-ban:
+    // 6d60c160: a hit whose title and «Защо» named the act could still print
+    // the pooled advice under them, which after a U-turn across a solid line
+    // was advice about overtaking.
+    correctiveBg: violationCorrectiveBg(code, hit.detail),
     lawRef: event.lawRef,
     // Act-then-pool, the same order as the title: `violationPeekBg` prefers the
     // ACT's own summary where `PER_ACT_COPY` authors one for this `detail`.

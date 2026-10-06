@@ -1089,10 +1089,19 @@ describe("wave-6 bot completion — sc-mv-uturn-ban at L3", () => {
     if (stream!.kind !== "oncomingStream") return;
     expect(stream!.actor.extraRightOffsetM).toBe(-8.125);
     expect(stream!.count).toBe(3);
-    // No ruleConfig and no physics by design: чл. 38 is graded here by SHIPPED
+    // No GRADING dial and no physics by design: чл. 38 is graded here by SHIPPED
     // detectors over district data (the authored М1 span + a real junction node).
     // A lesson that quietly grew a dial would fail here.
-    expect(lesson.ruleConfig).toBeUndefined();
+    //
+    // The one key it authors is not a tolerance dial and is pinned EXACTLY so a
+    // second one cannot ride in beside it: `solidCrossUTurnEnabled` arms the
+    // road-referenced reversal across the solid axis — it NAMES the U-turn on
+    // the CROSSED_SOLID_LINE already billed (its own title/reason/corrective
+    // instead of the pooled overtaking advice, sc-mv-uturn-ban:6d60c160) and it
+    // BILLS the crossing the plain detector cannot see (the natural arc from
+    // the outer lane). Same code, class and points throughout:
+    // rules/__tests__/solid-cross-uturn-act.test.ts §1–§1c.
+    expect(lesson.ruleConfig).toEqual({ solidCrossUTurnEnabled: true });
     expect(lesson.physics).toBeUndefined();
   });
 

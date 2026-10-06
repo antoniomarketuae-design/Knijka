@@ -67,6 +67,29 @@ export interface LiveRungOutcome {
   debrief: string;
   /** Codes the coach paused on with a card (first-encounter teach arm). */
   taught: string[];
+  /**
+   * The same cards, with what they SAID — the glass at the frame the pause
+   * opened (title, reason, session time); `taught` is this list's codes. Kept
+   * because an act can be named AFTER its card was shown (the U-turn across a
+   * solid line: `rules/types.ts ActAmendment`), and a witness must be able to
+   * read what the student saw at the bill, not only what the debrief says.
+   */
+  cards: Array<{ code: string; titleBg: string; explanationBg: string; t: number }>;
+  /**
+   * EVERYTHING THE GLASS SAID ABOUT A MISTAKE, with the frame it said it on —
+   * the pause card (`card`), the THEO-3 consequence moment (`mistakeMoment`)
+   * and the two toasts (`hud:violation` on a charged row, which is all an exam
+   * rung shows; `hud:lesson` on a coached one). `cards` is the first of the
+   * four. Kept because «is this sentence true on the frame it shows on» has to
+   * be asked of every surface that prints one, and L4 prints no card at all.
+   * `t` is the session time of the frame the surface was emitted on.
+   */
+  glass: Array<{
+    src: "card" | "mistakeMoment" | "hud:violation" | "hud:lesson";
+    titleBg: string;
+    explanationBg: string;
+    t: number;
+  }>;
   /** Codes on the изпитен лист (session.events violations), in order. */
   scored: string[];
   /** Codes shown and deliberately not charged (result.coachedMistakes). */
@@ -95,6 +118,8 @@ export function driveLiveRung(
   const env = lesson.environment ?? {};
   let session = createLessonSession(lesson);
   const taught: string[] = [];
+  const cards: LiveRungOutcome["cards"] = [];
+  const glass: LiveRungOutcome["glass"] = [];
   const ticks: SimTick[] = [];
   const keep = opts.keepTicks ?? true;
   const drive = recordScriptedDrive(loadDistrict(spec.map.districtId), script, {
@@ -114,7 +139,24 @@ export function driveLiveRung(
       if (keep) ticks.push(tick);
       const step = applyTick(session, tick);
       session = step.state;
-      for (const m of step.teachMoments ?? []) taught.push(m.code);
+      for (const m of step.teachMoments ?? []) {
+        taught.push(m.code);
+        cards.push({ code: m.code, titleBg: m.titleBg, explanationBg: m.explanationBg, t: m.t });
+        glass.push({ src: "card", titleBg: m.titleBg, explanationBg: m.explanationBg, t: tick.t });
+      }
+      if (step.mistakeMoment !== undefined) {
+        glass.push({
+          src: "mistakeMoment",
+          titleBg: step.mistakeMoment.titleBg,
+          explanationBg: step.mistakeMoment.explanationBg,
+          t: tick.t,
+        });
+      }
+      for (const h of step.hudEvents) {
+        if (h.kind === "violation" || h.kind === "lesson") {
+          glass.push({ src: `hud:${h.kind}`, titleBg: h.titleBg, explanationBg: h.explanationBg, t: tick.t });
+        }
+      }
     },
   });
   const result = buildLessonResult(session);
@@ -127,6 +169,8 @@ export function driveLiveRung(
     result,
     debrief,
     taught,
+    cards,
+    glass,
     scored: session.events.filter((e) => e.kind === "violation").map((e) => e.code),
     coached: (result.coachedMistakes ?? []).map((c) => c.code),
     done,

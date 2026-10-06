@@ -10718,3 +10718,40 @@ the mouth, or be touched — moving or standing (ADR-011).
 - **Conditions recorded:** three surviving verifier mutants (hygiene, on uncommitted inputs); the voice line is held and then
   dropped on 79 + 6 drives with no verdict change; the clip `sc-roundabout-entry__m0` needs re-capture; rungs with ambient
   cars are outside the oracle; 14 commended drives have a car outside the set brake for his tail at the exit (same on r4).
+
+## The U-turn lesson names the act it bills (ADR-013) — `sc-mv-uturn-ban:e98407b1`, `:6d60c160`
+
+Six rounds of the `uturn` lane, each adversarially verified; round 6 SIGNED OFF WITH CONDITIONS. Halves 1 and 3 of round 1 stand (the В23
+plate posted from the bank's own art; the severity sentence «основна грешка (3 т.)»). The U-turn act is decided from the heading and the road
+(ADR-013): a completed U-turn across the solid line inside the ban is named with the U-turn corrective from any lane, at any radius and after any
+lead-in (straddle, pull-out); a lawful turn at the gap is never billed and never renames an earlier row; the crossing card is never shown before the
+centre crosses, «изцяло» only when the body is wholly across, «насрещната» only for an oncoming half.
+- **Verified:** round 6 on the verifier's 597 round-5 drives plus 36 new junction and wrong-half acts, and a 2,744-drive composed fuzz judged by an
+  independent oracle from raw poses (3,263 rows agree, 0 disagree; the rest are recorded classes).
+- **Integrator confirmed:** a turn-round completes at the end of its swing; an own-half turn-round followed by a crossing is a crossing; an arc
+  begun over the dashes is a crossing; a right-hand round that ends on the half it set out from is the U-turn plus a second charged row for the
+  run on the oncoming half (at L4 that closes the exam).
+- **Conditions recorded:** X4 (a crossing over the dashes that runs into the span on the oncoming half is billed by the plain detector), W4 (a
+  session that ends between the bill and the turn-round keeps the crossing row), heading jitter of 1° or more mid-turn can move the turn-round's
+  place on tight radii in the kinematic recorder; the own-half turn-round that never crosses is billed by nothing (founder, V4). The В23 plate has
+  not yet been photographed in a live scene — the row stays open until it is.
+
+## The crosswind asks for a correction you can see (ADR-012, founder ruling «Ship the pull») — `sc-ac-crosswind:a9db1738`
+
+Three rounds of the `crosswind` lane; round 3 SIGNED OFF WITH CONDITIONS. Holding the lane takes 3.5 % of the wheel at 34 км/ч and 3.1 % at 40;
+a slower car is pushed less at every speed; the correct demos show the held wheel; a lane-holder's lean is the wind's own again; every sentence
+of both wind lessons that says what the wind, the gust or the second swing does was re-read and measured true on the car (six reworded).
+- **Conditions recorded:** the street mistake caption narrates a ride along the line no loose hand produces; «втори замах» now names two different
+  movements inside sc-ac-crosswind; two CameraRig mutants after the pinned call survive; the clip-truck demo's wheel is centred; the founder's own
+  drive on keyboard and phone is owed; the truck-pass staging is its own row (`sc-ac-wind-truck-pass:ff1d4290`).
+
+## The motorway lesson's «one second» demo really follows one second back — `sc-fo-motorway-gap:11e56254`
+
+The committed «mistake-one-second» demo settled 43.6–44.0 m behind the lead at 122 км/ч, outside the engine's 42.9 m FOLLOWING_TOO_CLOSE fire
+line, so at the live L1, L3 and L4 seeds it billed nothing — the demo shown as «the mistake» was not graded as one. A second, hidden defect: a
+recorder clamp at a step boundary stalled the car for part of a frame, the tick read the gap as opening, and the engine's cut-in guard billed one
+act twice. The demo now holds 33.1–34.8 m (0.97–1.02 s, at least 8 m inside the line) for an unbroken 5 s and bills FOLLOWING_TOO_CLOSE exactly
+once at every rung (coached at L1–L3 and L5 under ruling 16 and named under Ruling A; основна at L4). Three sentences that would have been false
+at 35 m were reworded (the reaction-time claim retrieved from c-reaction-time). Adversarially verified, including seeds 1–40 at every rung.
+Conditions: the lift point sits in a 4 cm window that sidesteps the recorder clamp (the clamp itself is owed); the «lesson not taken» assertion is
+vacuous for a demo that never completes its objectives.

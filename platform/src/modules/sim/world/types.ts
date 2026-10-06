@@ -526,6 +526,20 @@ export type SignKind =
   //    stroke-width="20" data-plate="true"/>` and differ only in the face
   //    (В27's X vs В28's single bar) — the Г2/Г3-on-the-Г12-plate precedent.
   | "noParking" // В28 (zones kind noParking)
+  // -- В23 „Забранено е завиването в обратна посока". NOT zone-driven: no
+  //    `DistrictZoneKind` carries a U-turn ban, and the one map that has the
+  //    sign DECLARES it in `meta.scenario.uturnBanSign` beside the М1 span the
+  //    reducer actually grades (`graded: false` — see builders/zoneSigns.ts
+  //    `declaredUTurnBanStation`). Until this kind existed that declaration had
+  //    no reader, so sc-mv-uturn-ban taught «не се обръща под знак В23» on a
+  //    boulevard with no В23 on it (sc-mv-uturn-ban:e98407b1). Rides the В26
+  //    body: content/signs/svg/v23.svg and v26.svg open with the byte-identical
+  //    `<circle cx="100" cy="100" r="88" fill="#fff" stroke="#c1121f"
+  //    stroke-width="20" data-plate="true"/>` and differ only in the face —
+  //    the thirteen-numerals-on-one-plate precedent. The face is the bank's own
+  //    art (signs.json `sign-v23`, Наредба № РД-02-21-1/23.11.2023, прил. № 3,
+  //    знак В23) — retrieved, never redrawn (ADR-002).
+  | "uTurnBan" // В23 (meta.scenario.uturnBanSign)
   | "slippery" // А15 (zones kinds waterPatch + icePatch)
   | "curve" // А1 (zones kind curveAdvisory — reuses sign_warning_bend.glb)
   | "railGuarded" // А32-style guarded rail warning (railCrossing + guarded)
@@ -627,6 +641,7 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "noOvertaking",
   "noStopping",
   "noParking",
+  "uTurnBan",
   "slippery",
   "curve",
   "railGuarded",
