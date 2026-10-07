@@ -3,9 +3,9 @@
  "command": "RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts",
  "surfaces": {
   "catalog": {
-   "fingerprint": "f93e908c811e995cf459b37b32e1869ea045adabdac1d0febc760226eb995f69",
+   "fingerprint": "bee51e9971ce4b7050b77f4baa1269d431193ecc678831844ca0fb320a77c1f7",
    "units": 14,
-   "strings": 588
+   "strings": 590
   },
   "consequences": {
    "fingerprint": "a9827e20b7e5941fb8941d47ba49040cc69104de6f17d3cf3027bc949a056b72",
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "7e94e0e07e195ed9e87a3b9bf8a5478d3d4c940743290b5b07471dbe43292918",
+   "fingerprint": "1ecf6525050f075a740b50c4fbacf8d8530af4444bbfe76cdef4991627519d01",
    "units": 487,
-   "strings": 13226
+   "strings": 13228
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",

@@ -36,6 +36,7 @@ import {
   conditionsSpeedEnvelope,
   createRuleEngine,
   isScorableEvent,
+  makeCommendation,
   parseSpeedMeasurement,
   reduceTick,
   settlePendingTaskArrival,
@@ -43,6 +44,7 @@ import {
   settleUnpaidSpeedingTeach,
   settleUnpaidTaskTeach,
   taskCapBillLineKmh,
+  uTurnPlaceRecord,
   violationPeekBg,
   type ConditionsCause,
   type RuleEngineConfig,
@@ -1669,6 +1671,86 @@ function isSolidLineCross(e: ScorableEvent): boolean {
  */
 function isCoachedSolidLineCross(m: CoachedMistake): boolean {
   return m.code === "CROSSED_SOLID_LINE";
+}
+
+/**
+ * THE CODES THAT MAKE A TURN-ROUND AT THE GAP NOT A LAWFUL ONE — what
+ * `uTurnPastSolidAxisEarned` refuses the praise on, wherever in the drive and
+ * on whichever channel they landed:
+ *  · CROSSED_SOLID_LINE, CENTER_LINE_TOUCHED — the axis the praise is about was
+ *    crossed or ridden: «обърна на прекъснатата осева» beside a row that says he
+ *    went over the solid one is praise of an act the drive did not keep;
+ *  · FAILED_TO_YIELD, COLLISION — the place was right and the act was not: the
+ *    U-turn crosses the oncoming lanes, and turning in front of the stream is
+ *    the lesson's own second mistake (ЗДвП чл. 38 asks the oncoming to go
+ *    first — the teach card's citation, retrieved there).
+ * The programme rule (e038493, 1cf6fff): the product never praises an act its
+ * own task refused or that someone else paid for.
+ */
+const UTURN_PRAISE_REFUSED_BY: ReadonlySet<string> = new Set([
+  "CROSSED_SOLID_LINE",
+  "CENTER_LINE_TOUCHED",
+  "FAILED_TO_YIELD",
+  "COLLISION",
+]);
+
+/**
+ * THE RIGHT SIDE OF sc-mv-uturn-ban — row e98407b1, clause 4: «the lesson's own
+ * rule is never the ground of the verdict on either the right or the wrong
+ * side». The w81 capture settled the wrong side (the turn across the solid axis
+ * is named «Обратен завой през непрекъсната осева линия», В23 and чл. 38 in its
+ * corrective). Its verifier measured the right side still open: on the lawful
+ * turn-round at the gap (axis crossed at y 275.01, outside the ban span y 40-220;
+ * ИЗДЪРЖАН, 0 т., ★★★) the debrief grounded the pass only on the points, the
+ * stars, the economy line and two generic commendations — nothing said that
+ * the student had passed the ban and turned where the axis is broken.
+ *
+ * So, on the ONE frame the drive completes, `UTURN_PAST_SOLID_AXIS` («Подмина
+ * забраната, обърна на прекъснатата осева» — `catalog.ts` has why each clause
+ * is true wherever it shows) is minted iff ALL hold:
+ *
+ *  G0  the lesson armed the reversal (`solidCrossUTurnEnabled` — today
+ *      sc-mv-uturn-ban alone, at every rung; the record below is never written
+ *      anywhere else);
+ *  G1  the rule engine's ADR-013 tracker confirmed at least one turn-round that
+ *      BEGAN where the axis is broken (`uTurnPlaceRecord(...).atBrokenAxis` —
+ *      the reducer's own confirmation, the one that names the illegal act; no
+ *      second definition of a turn-round exists here);
+ *  G2  it confirmed NONE that began where the axis is solid or where the road
+ *      could not place it (`.elsewhere === 0`): a student who turned round
+ *      inside the ban — even wholly on his own half, which nothing bills
+ *      (R5-2) — did not wait for its end;
+ *  G3  nothing in the drive was billed, coached or folded under a code of
+ *      `UTURN_PRAISE_REFUSED_BY` (both ledgers, every frame including this one,
+ *      whatever the mode: a THEO-3 sandbox coaches everything and is read the
+ *      same way);
+ *  G4  the drive completes on THIS frame with every task done — the lesson's
+ *      own «Обърни посоката на 180° в отвора» included, and its first task,
+ *      the inner lane past the span, before it (the chain is sequential) — and
+ *      no exam termination ended it.
+ *
+ * WHY HERE, AND NOT IN THE REDUCER. G3 reads the coached channel and G4 the
+ * lesson's tasks, and neither exists in `rules/`. Minting on the completing
+ * frame also means nothing can happen after it: `applyTick` returns early on a
+ * completed session, so the praise cannot be falsified by a later crossing (a
+ * mint on the confirming frame could). The pass/fail verdict and every score
+ * are untouched: a commendation carries no points, and `summary.ts` scores
+ * violations only.
+ */
+function uTurnPastSolidAxisEarned(args: {
+  rules: RuleEngineState;
+  events: readonly ScorableEvent[];
+  coached: readonly CoachedMistake[];
+  completesWithEveryTask: boolean;
+}): boolean {
+  if (args.rules.config.solidCrossUTurnEnabled !== true) return false; // G0
+  if (!args.completesWithEveryTask) return false; // G4
+  const place = uTurnPlaceRecord(args.rules);
+  if (place.atBrokenAxis < 1) return false; // G1
+  if (place.elsewhere !== 0) return false; // G2
+  if (args.events.some((e) => e.kind === "violation" && UTURN_PRAISE_REFUSED_BY.has(e.code))) return false; // G3
+  if (args.coached.some((m) => UTURN_PRAISE_REFUSED_BY.has(m.code))) return false; // G3
+  return true;
 }
 
 /**
@@ -4026,6 +4108,28 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     if (out.escalations.length > 0) escalations = [...escalations, ...out.escalations];
     // Round 7: a sign-bound arrival taught on the frame the drive completes.
     for (const c of out.coached) recordCoached(c);
+
+    // sc-mv-uturn-ban:e98407b1 clause 4 — THE RIGHT SIDE: the lawful turn-round
+    // is praised for the rule it obeyed, on the frame the drive completes and
+    // only then (`uTurnPastSolidAxisEarned` has the five gates). After the
+    // settlement above, so a bill it adds on this frame is read too; before the
+    // A15 position pass, so the row is placed on the map like any other.
+    if (
+      uTurnPastSolidAxisEarned({
+        rules,
+        events: [...prev.events, ...scoredEvents],
+        coached: [...coachedPrev, ...coachedNew],
+        completesWithEveryTask:
+          prev.phase === "driving" &&
+          objectives.length > 0 &&
+          currentIndex >= objectives.length &&
+          examTermination === undefined,
+      })
+    ) {
+      const praise = makeCommendation("UTURN_PAST_SOLID_AXIS", tick.t);
+      hudEvents.push({ kind: "commendation", titleBg: praise.titleBg });
+      scoredEvents.push(praise);
+    }
   }
 
   // A15: record WHERE each scored event happened — the tick in hand at

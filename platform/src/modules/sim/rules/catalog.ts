@@ -2319,6 +2319,30 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
     explanationBg: "Изпълни цялата процедура преди потегляне без пропуски и в правилния ред.",
     conceptId: "c-pre-drive-check",
   },
+  // THE RIGHT SIDE OF sc-mv-uturn-ban (row e98407b1, clause 4: «the lesson's own rule is never the ground of the
+  // verdict on either the right or the wrong side»). The w81 capture of the lawful turn at the gap grounded the pass
+  // only on «0 наказателни точки», the stars, a manoeuvre-quality line and two generic commendations; nothing said
+  // WHICH rule the student had obeyed. The TITLE is the sentence that says it, because a commendation's title is all
+  // any surface prints (the census above: the HUD toast, the phone re-map, «Похвали» and the debrief bullet).
+  //
+  // EVERY CLAUSE IS TRUE ON EVERY FRAME IT SHOWS ON, because of where and when it is minted
+  // (`lessons/engine.ts uTurnPastSolidAxisEarned`, on the frame the drive completes with every task done):
+  //  · «Подмина забраната» — the lesson's first task is the inner lane at y 250, past the М1 span (y 40-220), and the
+  //    chain is sequential, so no drive completes without having driven past the ban; and no turn-round of the drive
+  //    began where the axis is solid (the rule engine's ADR-013 tracker, `uTurnPlaceRecord`). «забраната» is the
+  //    briefing's own word for the span («…това е първият знак, че забраната свършва», instruction 3), and the line
+  //    names no В23 reach, which the content bank does not give (the template's own note).
+  //  · «обърна на прекъснатата осева» — a turn-round the same tracker confirmed began where the axis under the car is
+  //    broken (`tick.solidCenterLine === false` at its begin station: the source the crossing bill reads).
+  //  · and only on a drive with no crossing or touch of the axis, no failure to yield and no contact, billed or coached.
+  // No law is cited: the title names the rule, and the bank-retrieved citations (чл. 38, В23) stay on the U-turn's
+  // corrective and the lesson's teach card, where they already are (ADR-002). Two line boxes on the peek (25-27 ch.).
+  UTURN_PAST_SOLID_AXIS: {
+    titleBg: "Подмина забраната, обърна на прекъснатата осева",
+    explanationBg:
+      "Подмина участъка с непрекъсната осева линия и обърна чак там, където осевата е прекъсната — широчината на платното не те подлъга да обърнеш по-рано.",
+    conceptId: "c-u-turn",
+  },
 };
 
 /**
@@ -2352,6 +2376,8 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
  * stale on 2026-09-04, when `CONTROLLER_SIGNAL_OBEYED` landed in 85495fd —
  *   git log -S "CONTROLLER_SIGNAL_OBEYED" -- platform/src/modules/sim/rules/types.ts
  * recounted 2026-09-19 at seven union members and seven `COMMENDATIONS` rows;
+ * EIGHT since 2026-10-07, when `UTURN_PAST_SOLID_AXIS` landed — its body has no
+ * reader either, which is why its TITLE carries the whole claim;
  * neither number is the adversarial pass's „eleven", which was wrong for its
  * own reason), and the pooled junction sentence above is one of
  * them. THAT IS AN

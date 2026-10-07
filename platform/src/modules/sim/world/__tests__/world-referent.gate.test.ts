@@ -549,9 +549,17 @@ describe("scenario-world-referent gate", () => {
     // does NOT move: 50.
     // INTEGRATED (both of the above, each written against its own base): main checks LANE_ENTRY_FORCED_BRAKING,
     // the cap lane exempts TASK_SPEED_CAP_EXCEEDED — 51 checked + 16 exempted = 67.
-    expect(checked.size).toBe(51);
+    //
+    // 51 → 52 / 67 → 68 (2026-10-07, sc-mv-uturn-ban:e98407b1 clause 4 — the right side):
+    // UTURN_PAST_SOLID_AXIS, the PRAISE half of the U-turn act — «Подмина забраната, обърна на прекъснатата осева»,
+    // minted on the completing frame of a drive whose every turn-round began where the axis is broken (the ADR-013
+    // tracker's own record) with no axis, yield or contact fault. It is CHECKED, on the SAME demand the crossing makes
+    // (an authored solidCenterLine/noOvertaking span on the route — the CONTROLLER_SIGNAL_OBEYED precedent: both
+    // halves of one act ask the world for the same thing), and config-gated on solidCrossUTurnEnabled, so every lesson
+    // that does not arm the reversal is outside its fault surface. `NO_WORLD_REFERENT` does NOT move: 16.
+    expect(checked.size).toBe(52);
     expect(NO_WORLD_REFERENT.size).toBe(16);
-    expect(all.length).toBe(67);
+    expect(all.length).toBe(68);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

@@ -166,6 +166,9 @@ const CONFIG_GATED: ReadonlyArray<readonly [FaultCode, keyof RuleEngineConfig]> 
   ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "motorwayMinSpeedEnabled"],
   ["DRIVING_TOO_SLOW_IN_TOWN", "townCrawlEnabled"],
   ["STOPPED_WITHOUT_CAUSE", "needlessStopEnabled"],
+  // sc-mv-uturn-ban:e98407b1 clause 4 — the praise of the lawful turn-round is minted only where the lesson armed
+  // the reversal tracker whose record it reads (`lessons/engine.ts uTurnPastSolidAxisEarned`, G0).
+  ["UTURN_PAST_SOLID_AXIS", "solidCrossUTurnEnabled"],
 ];
 
 /**
@@ -1341,6 +1344,22 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   CROSSED_SOLID_LINE: {
     requires: "a solidCenterLine / noOvertaking zone spanning the route",
     fixIn: "content/world/<district>.json zones (already gated — the precedent)",
+    evidence: ["zoneSeamPaint"],
+    check(f) {
+      const z = routeZones(f, ["solidCenterLine", "noOvertaking"]);
+      return z.length > 0
+        ? ok(`authored solid spans on the route = ${z.length}`)
+        : inert("no solidCenterLine/noOvertaking span on any route edge");
+    },
+  },
+  // The PRAISE half of the same line (sc-mv-uturn-ban:e98407b1 clause 4): «Подмина забраната, обърна на
+  // прекъснатата осева» makes the identical demand of the world the crossing does — an authored solid span on the
+  // route to have passed, and to have turned where it is broken — so it takes the identical check, the
+  // CONTROLLER_SIGNAL_OBEYED precedent (one referent for both halves of one act). Config-gated as well, so only a
+  // lesson that arms the reversal is asked.
+  UTURN_PAST_SOLID_AXIS: {
+    requires: "a solidCenterLine / noOvertaking zone spanning the route (the span the turn-round must be made past)",
+    fixIn: "content/world/<district>.json zones (the CROSSED_SOLID_LINE precedent)",
     evidence: ["zoneSeamPaint"],
     check(f) {
       const z = routeZones(f, ["solidCenterLine", "noOvertaking"]);

@@ -43,6 +43,7 @@
 import type { LessonSpec } from "../contracts";
 import {
   COLLISION_CONSEQUENCE_BG,
+  COMMENDATIONS,
   EXAM_VS_CONTROL_POINTS_BG,
   SEVERITY_POINTS,
   VIOLATIONS,
@@ -224,6 +225,12 @@ const SEVERITY_RANK: Record<ViolationEvent["severityClass"], number> = {
 
 const MAX_MISTAKE_LINES = 4;
 const MAX_COMMENDATION_LINES = 3;
+/**
+ * The commendations that praise THE LESSON'S OWN ACT — the rule the drill exists to teach — rather than a skill any
+ * drive can show. `commendationLines` prints them first and outside `MAX_COMMENDATION_LINES` (see there). Keyed by
+ * title because that is what the debrief pools by; read off the catalogue, so the two cannot drift.
+ */
+const LESSON_ACT_PRAISE_TITLES: ReadonlySet<string> = new Set([COMMENDATIONS.UTURN_PAST_SOLID_AXIS.titleBg]);
 /** Unfinished route tasks quoted by name before the count takes over. */
 const MAX_UNFINISHED_NAMED = 2;
 /** Teach-moment rows listed by name in the „Учебни моменти" section before the count takes over. */
@@ -2252,8 +2259,14 @@ function commendationLines(result: LessonResult): string[] {
       prev.unclean = prev.unclean || unclean;
     }
   }
-  return [...seen.entries()]
-    .slice(0, MAX_COMMENDATION_LINES)
+  // THE LESSON'S OWN ACT LEADS, AND IS NEVER CUT (sc-mv-uturn-ban:e98407b1 clause 4). A praise that names the
+  // rule the lesson exists to teach is minted on the frame the drive completes, so it is always the LAST row in time —
+  // and the cap below kept the first three, which on the lawful turn at the gap are three generic rows: the one
+  // sentence that grounds the pass in the lesson's rule was the one the debrief dropped. It goes first, outside the
+  // cap; every other row keeps its place and the cap it had, so a drive without one is byte-identical.
+  const lessonAct = [...seen.entries()].filter(([title]) => LESSON_ACT_PRAISE_TITLES.has(title));
+  const rest = [...seen.entries()].filter(([title]) => !LESSON_ACT_PRAISE_TITLES.has(title));
+  return [...lessonAct, ...rest.slice(0, MAX_COMMENDATION_LINES)]
     .map(([title, g]) => {
       const rider = commendationRiderBg(result.summary, g, lessonMistakes, coachedMistakes, taskCapBreaches);
       // The dash is this medium's punctuation — see COMMENDATION_CONTRADICTED_BG.

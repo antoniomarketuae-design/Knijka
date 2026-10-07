@@ -1417,7 +1417,11 @@ export type CommendationCode =
   | "YIELDED_TO_PRIORITY" // gave way correctly at a priority situation
   | "CONTROLLER_SIGNAL_OBEYED" // crossed on the регулировчик's permission against a forbidding lamp (ЗДвП чл. 7, ал. 1)
   | "CLEAN_DRIVING" // sustained violation-free driving (positive reinforcement)
-  | "PREDRIVE_PERFECT";
+  | "PREDRIVE_PERFECT"
+  // sc-mv-uturn-ban:e98407b1 clause 4 (the right side): the turn-round began where the axis is broken, past the ban,
+  // on a drive with no axis/yield/contact fault. Minted by `lessons/engine.ts uTurnPastSolidAxisEarned` alone, on the
+  // frame the drive completes — never by the reducer, which cannot see the coached channel or the lesson's tasks.
+  | "UTURN_PAST_SOLID_AXIS";
 
 export interface ViolationEvent {
   kind: "violation";

@@ -313,6 +313,8 @@ export {
   // tolerance a posted limit gets. The lesson reads it to decide whether the mark was crossed over it.
   taskCapBillLineKmh,
   conditionsSpeedEnvelope,
+  // sc-mv-uturn-ban:e98407b1 clause 4: where the drive's turn-rounds began (the ADR-013 tracker's own record).
+  uTurnPlaceRecord,
   type AdaptationSettleTick,
   type ConditionsCause,
   type KinSettleTick,

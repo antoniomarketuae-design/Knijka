@@ -10867,3 +10867,61 @@ The correct demo of `sc-park-bay-exit-rev` reversed out of the bay on a 3.03 m a
 - **72 mistake demos** do the same.
 - **Why it matters:** a student copying the demo learns a path the car cannot follow, and any witness or harness that follows the demo cannot drive it either. Many of the 36 are lessons whose open rows say the correct drive is convicted or never credited.
 - **Handling:** the row is one finding, not 108. It is listed in `NO_SIMULATOR_ROUTE` (build-redrive.mjs) because no route drives it, and it moves lesson by lesson as each family’s demos are re-authored drivable through the same recipe.
+
+## Wave C verdicts — 2026-10-07
+
+This run retired 6 row(s). Their evidence frames were driven at (unattributable: 6 of 6) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`8579f1df8ed3`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 6 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 16 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 8 |
+
+**Open list: 31 → 25**, out of 1533 filed across the whole programme (1502 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w1: nine «correct drive convicted» criticals re-driven through the drive rig (integrator note, 2026-10-07)
+
+Workflow `rig-wave-w1` (wf_557b094a-822) ran at `8579f1d`. One capture agent at a time drove each lesson the careful, lawful way through `/dev/drive-rig`, which mounts the real `LessonPlayShell` and drives it with closed-loop pedals, steering, glances, indicator, belt and gear through the product input path. The drives ran at L1 and L3 on PC, and also at L3 on the phone lens for the rows filed on the phone. Frames are under `.audit-frames/rig-w1/<lesson>/`. Each row was judged on those frames, and every CLOSED was attacked by a verifier briefed to check from the telemetry that the drive really was careful and lawful by the lesson’s own instructions.
+
+All nine careful drives completed and passed (ИЗДЪРЖАН, 0 т.). **Six closures survived the verifier:**
+- sc-junction-stop:4cbe4552
+- sc-merge-motorway-exit:2b903830
+- sc-park-judge:6d88a05a
+- sc-rb-ped-exit:5f1217f9
+- sc-ed-d2-city-run:04f6f4d8
+- sc-park-bay-exit-rev:49af2940, the lesson that had «never once been observed working». It passed on its first live observation after its demo was made drivable in 8579f1d.
+
+**Open list 31 → 25 (critical 14 → 8).** What this says is narrower than «the product was broken and is fixed». Most of the filed convictions came from harness legs that could not steer or that followed demos the car cannot drive (`catalogue-demo-curvature`). The rig shows the product credits a correct drive on these lessons. The rig is an instrument the founder’s testimony limits never restricted, because it is not the audit harness.
+
+**Three were refuted to PARTIAL, each for a concrete reason:**
+- **sc-jx-giveway-b1:d7531206.** The phone clause was filed at L1, and the phone was driven only at L3.
+- **sc-ln-obstacle-meeting:114706e0.** The two kept drives are near-duplicates, so they say nothing about the width of the success corridor. The «1 pass in 8» harness legs were not re-run.
+- **sc-merge-from-property:ab353b86.** The rig drive exceeded the lesson’s own task caps (5 km/h at the pavement, 3 km/h in the Б2 zone), so it cannot stand for the correct drive. It also merged into an empty road, without judging a gap against moving cars.
+
+Each gets a targeted re-drive in the next rig wave.
+
+## Landed: the lawful U-turn is praised for the rule it obeyed (sc-mv-uturn-ban:e98407b1, right side) (2026-10-07)
+
+The w81 capture showed the passing debrief of `sc-mv-uturn-ban` never said why the drive was right.
+- **The new commendation.** Lane uturnpraise (wf_21169d9e-e67, adversarially signed off) adds `UTURN_PAST_SOLID_AXIS` «Подмина забраната, обърна на прекъснатата осева». It is minted on the completing frame only when every task is done and a confirmed turn-round began where the axis is broken. It is refused when no turn-round began in the solid span, or when the drive has any CROSSED_SOLID_LINE, CENTER_LINE_TOUCHED, FAILED_TO_YIELD or COLLISION, scored or coached.
+- **One definition of the act.** The rule engine counts each turn-round by where it began, on the same confirmation that names the illegal U-turn (ADR-013). No second definition of the act exists.
+- **The debrief cap.** The lesson’s own act praise now leads «Какво се получи добре» outside the three-line cap, so a minted praise can no longer be cut.
+- **No law text in the new copy.** The title names the rule, and чл. 38 and В23 stay on the retrieved corrective (ADR-002).
+- **Census:** 2,429 of 2,434 drives are byte-identical. Only this lesson’s correct demo changed, at L1–L5. No score, verdict, task or other commendation changed.
+- **Mutants:** 7 of 10 killed. The three survivors are on inputs no committed demo exercises: G1 alone, an unplaced turn-round, and the side-street re-sight carry.
+- **Owed:**
+  - the founder’s sign-off on the title;
+  - a re-photograph of the lawful drive through the rig, to re-judge e98407b1;
+  - a detector note: an uncoached brief touch of the solid axis is still praised, because CENTER_LINE_TOUCHED needs 3.5 s of contact. The praise title makes no claim about touching, so it stays true.

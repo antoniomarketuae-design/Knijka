@@ -2951,6 +2951,18 @@ export interface SolidCrossTurnState {
    *  (`SimTick.headingDeg` − `EdgeAlignment.deg`); `null` = it never had one.
    *  What the nose is read against while the road cannot see the car (R5-3). */
   bearingDeg: number | null;
+
+  // -- the record of where every turn-round of the drive began ----------------
+  // (sc-mv-uturn-ban:e98407b1 clause 4 — the RIGHT side.) Counted on the frame a
+  // turn-round is CONFIRMED (`confirmSolidCrossTurn`: the one confirmation that
+  // also names the illegal one — no second definition of the act), by its PLACE
+  // (`turnPlace`). Kept for the whole DRIVE, not per road: a side street and back
+  // carries them (`solidCrossOnEdge`). Read only through `uTurnPlaceRecord`.
+  /** Confirmed turn-rounds that began where the axis is BROKEN (`turnPlace === false`). */
+  turnsAtBrokenAxis: number;
+  /** Confirmed turn-rounds that began where the axis is SOLID, or where the road
+   *  could not place them (`turnPlace !== false`). */
+  turnsElsewhere: number;
 }
 
 const SOLID_CROSS_TURN_IDLE: SolidCrossTurnState = {
@@ -2993,6 +3005,8 @@ const SOLID_CROSS_TURN_IDLE: SolidCrossTurnState = {
   crossSwing: 0,
   lastPlace: null,
   bearingDeg: null,
+  turnsAtBrokenAxis: 0,
+  turnsElsewhere: 0,
 };
 
 /** What one frame of the tracker decided. */
@@ -3104,7 +3118,18 @@ function solidCrossOnEdge(
       };
     }
   }
-  return firstSight ? { ...SOLID_CROSS_TURN_IDLE, edgeId, bank, prevBank: bank } : null;
+  // A new road starts a fresh tracker, but the drive's record of where its
+  // turn-rounds began is the DRIVE's (`turnsAtBrokenAxis`, `turnsElsewhere`).
+  return firstSight
+    ? {
+        ...SOLID_CROSS_TURN_IDLE,
+        edgeId,
+        bank,
+        prevBank: bank,
+        turnsAtBrokenAxis: prev.turnsAtBrokenAxis,
+        turnsElsewhere: prev.turnsElsewhere,
+      }
+    : null;
 }
 
 /**
@@ -3269,6 +3294,9 @@ function stepSolidCrossHeading(s: SolidCrossTurnState, f: SolidCrossHeadingFrame
 /** A turn-round is confirmed: the travel direction is the new one, and the
  *  turn-round lives on only as long as its swing does. MUTATES `s`. */
 function confirmSolidCrossTurn(s: SolidCrossTurnState): void {
+  // The drive's record of where its turn-rounds began (read by `uTurnPlaceRecord`).
+  if (s.turnPlace === false) s.turnsAtBrokenAxis += 1;
+  else s.turnsElsewhere += 1;
   s.tailSense = s.swingOver ? 0 : s.oppSense;
   s.tailPlace = s.turnPlace;
   s.tailBillT = null;
@@ -3278,6 +3306,25 @@ function confirmSolidCrossTurn(s: SolidCrossTurnState): void {
   s.oppSince = null;
   s.oppSense = 0;
   s.swingOver = false;
+}
+
+/**
+ * WHERE THE DRIVE'S TURN-ROUNDS BEGAN — the read-only face of the record above,
+ * for `lessons/engine.ts uTurnPastSolidAxisEarned` (sc-mv-uturn-ban:e98407b1
+ * clause 4, the RIGHT side).
+ *
+ * It is the reducer's own ADR-013 act and nothing else: a turn-round is counted
+ * on the frame `confirmSolidCrossTurn` confirms it — the same confirmation that
+ * names a crossing the U-turn — by the place R5-1 gives it (the axis under the
+ * car where the swing that carried the nose out of the 45° band BEGAN). So the
+ * praise and the U-turn's name can never disagree about what a turn-round is,
+ * or where it was made.
+ *
+ * Both counts stay 0 on every lesson that does not arm `solidCrossUTurnEnabled`:
+ * the tracker never runs there.
+ */
+export function uTurnPlaceRecord(s: RuleEngineState): { atBrokenAxis: number; elsewhere: number } {
+  return { atBrokenAxis: s.solidCrossTurn.turnsAtBrokenAxis, elsewhere: s.solidCrossTurn.turnsElsewhere };
 }
 
 /** The manoeuvre is over: the bank the car is on is the one the next crossing
