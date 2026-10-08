@@ -287,6 +287,44 @@ export function readRestScrollTop(el: {
   return end > el.scrollTop ? end : null;
 }
 
+/**
+ * The fold cue of a sheet whose acknowledgement stands ALONE in its button —
+ * the phone's briefing sheet (`SimOverlayItem.sheetOnly`).
+ *
+ * «↓ още 4 реда — „Разбрах“ първо превърта до края».
+ *
+ * A FUNCTION AND NOT JSX TEXT, so the sentence a student reads is a string a
+ * test can hold whole — the count, its number agreement («1 ред», «2 реда»)
+ * and the button it names. `ackLabelBg` is the label the button beside it
+ * actually prints; the cue quotes it rather than retyping it, because a cue
+ * naming a control that is not on the glass is a false sentence about the one
+ * press that ends the briefing.
+ *
+ * WHAT IT PROMISES IS WHAT THE PRESS DOES, WORD FOR WORD. „First scrolls to
+ * the end" is `tapSheetAck`'s own branch while `readRestScrollTop` still
+ * answers: `el.scrollTo({ top: end })`, and no acknowledgement. The cue is
+ * painted from `foldLinesBelow` over the same window, so it is up exactly
+ * while that is the press's branch and gone on the frame where the next press
+ * acknowledges — the button left standing says «Разбрах» and that is then all
+ * it does.
+ *
+ * «ПРЕВЪРТА ДО КРАЯ» AND NOT «ГИ ПОКАЗВА», deliberately. „Shows them" is the
+ * friendlier verb and it is true only while what is under the fold is shorter
+ * than the window: the press goes to the END, so on a briefing two windows
+ * long it would pass over a middle nobody saw and the cue would have promised
+ * otherwise. No shipped briefing is that long on any audited phone (worst:
+ * 82 px under a 324 px window in WebKit; `briefing-sheet.test.tsx` § 8 pins the
+ * model's bound for every rung) — but a sentence whose truth rests on a census
+ * is a sentence one authored paragraph away from false. This one says what the
+ * control does and is true for any text.
+ *
+ * Why the 36 px button cannot carry these words itself is at
+ * `data-sim-overlay-sheet-foot`.
+ */
+export function sheetFootFoldBg(lines: number, ackLabelBg: string): string {
+  return `↓ още ${lines} ${lines === 1 ? "ред" : "реда"} — „${ackLabelBg}“ първо превърта до края`;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    …AND THE ROW IN THAT WINDOW THAT HAS NEVER HELD A WORD — 2026-09-11,
    sc-merge-accel-lane:b75b356e, „the briefing overlay clips its last line …
@@ -1687,7 +1725,8 @@ export function SimOverlay({
    *
    * An owner that RE-OFFERS an item the student may have sent away passes a
    * value it changes on every offer — `LessonPlayShell` bumps one counter in
-   * `recallBriefing` and `recallPreDriveOverlay`. Default 0: an owner with no
+   * `recallPreDriveOverlay` (and did in `recallBriefing` until 2026-10-08, when
+   * the briefing became a sheet with no ✕ to undo). Default 0: an owner with no
    * re-offer of its own (the dev rig) keeps exactly the old permanence, and its
    * ✕ is still never a dead control.
    */
@@ -1705,7 +1744,6 @@ export function SimOverlay({
   //    is a law citation that vanishes mid-sentence, which is a THEO-4 problem,
   //    not a cosmetic one.
   const [openItem, setOpenItem] = useState<SimOverlayItem | null>(null);
-  const open = openItem !== null;
 
   // A6: the line the student last sent away. Kept by ID and not as a boolean so
   // a NEW line (the objective changed, another mistake fired) speaks immediately
@@ -1724,6 +1762,23 @@ export function SimOverlay({
 
   // While a sheet is open it IS the one overlay; a newly arrived line waits.
   const shown = openItem ?? live;
+
+  // ── …AND SOME ITEMS ARE THE SHEET FROM THEIR FIRST FRAME — 2026-10-08.
+  //    sc-vu-emergency:2e634d4d · sc-sig-controller-postures:f7e046c4; the
+  //    frames and the decision are at `SimOverlayItem.sheetOnly`.
+  //
+  // DERIVED DURING RENDER, NOT LATCHED INTO `openItem` BY AN EFFECT, and the
+  // difference is one painted frame of exactly the surface this removes: an
+  // effect runs after the commit, so the first paint would be the PEEK — the
+  // unnumbered lead, «ПРОЧЕТИ ↓N», a live car — replaced by the sheet a frame
+  // later. `open` is therefore a fact about what is being shown: a sheet
+  // somebody opened with a tap (`openItem`), or an item that has no other
+  // presentation. Every consumer of `open` below — the read-mode attribute on
+  // <html>, `onOpenChange`, the peek's own mount, the two fold hooks' keys —
+  // gets the right answer on the commit that paints it, and the server render
+  // is the sheet too, which is what lets a node suite read it.
+  const sheetOnly = shown?.sheetOnly === true;
+  const open = openItem !== null || sheetOnly;
 
   // The acknowledgement handler behind a ref, refreshed after every render:
   // `acknowledge` then has a STABLE identity, which is what keeps the window
@@ -1782,7 +1837,11 @@ export function SimOverlay({
         if (!open) return;
         e.preventDefault();
         e.stopPropagation();
-        setOpenItem(null);
+        // A sheet-only item has no peek to fold back to, so „close" and
+        // „acknowledge" are one act — the same single exit its «Разбрах» is.
+        // Folding would be a swallowed key and a sheet that did not move.
+        if (sheetOnly) acknowledge();
+        else setOpenItem(null);
         return;
       }
       if (e.code !== "Space" && e.key !== "Enter") return;
@@ -1797,7 +1856,7 @@ export function SimOverlay({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [speaking, blocking, open, acknowledge]);
+  }, [speaking, blocking, open, sheetOnly, acknowledge]);
 
   // ── DOC 91 · C2 — THE CARD'S OWN CONTROLS WERE DEAD WHILE HE WAS DRIVING ──
   //
@@ -2453,6 +2512,15 @@ export function SimOverlay({
    * `blocking` and not `hasAck`: the button is rendered `{blocking ? …}`, so
    * on every other card the header is still the only place the count can go
    * and it keeps it.
+   *
+   * ── „ON THE ACKNOWLEDGEMENT" MEANS AT IT, NOT ALWAYS IN IT — 2026-10-08.
+   *    One predicate, two paintings. On a tap-opened sheet the count rides
+   *    INSIDE the 44 px button, as above. On the phone's briefing sheet
+   *    (`sheetOnly`) the button is 36 px and holds its label alone, so the same
+   *    predicate paints the count in the foot that button stands in — beside
+   *    it upright, above it in the landscape rail (`data-sim-overlay-sheet-
+   *    foot`, which has the frame that forced the split). Either way the
+   *    header's copy stands down on this one answer: one count per surface.
    * ══════════════════════════════════════════════════════════════════════════
    */
   const ackCarriesSheetFold = blocking && sheetFold.lines > 0;
@@ -3654,6 +3722,10 @@ export function SimOverlay({
         <div
           data-sim-overlay={shown.kind}
           data-sim-overlay-state="open"
+          // A FACT A DRIVE CAN PHOTOGRAPH: this sheet was not opened from a
+          // peek and has none to return to (`SimOverlayItem.sheetOnly`). Absent
+          // on every sheet a tap opened, so nothing else's DOM changes.
+          data-sim-overlay-sheet-only={sheetOnly ? "" : undefined}
           data-hud="overlay-read"
           className="pointer-events-none absolute inset-x-0 z-40 flex justify-center"
           // ── THE READ MODE'S ONE CLEARANCE: the instrument band, and nothing
@@ -4007,17 +4079,39 @@ export function SimOverlay({
                   size and the same size is the founder's own „a button that
                   does nothing and says nothing about why", and it was costing
                   the header a third of its width on a 360 px phone. */}
-              <button
-                type="button"
-                {...tapCloseSheet}
-                aria-label="Затвори"
-                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted landscape:ml-auto"
-              >
-                <span aria-hidden>✕</span>
-              </button>
+              {/* ── NO ✕ ON A SHEET THAT HAS NO PEEK — 2026-10-08.
+                     «Затвори» means „fold this back to the line it came from".
+                     A sheet-only item came from no line (`SimOverlayItem
+                     .sheetOnly`), so here the ✕ could only be one of two wrong
+                     things: a second way to END the briefing beside «Разбрах» —
+                     which skips that button's reveal-before-acknowledge rule
+                     (`tapSheetAck`) on the surface whose whole point is that
+                     the steps were read — or a control that does nothing. The
+                     decision the row was closed under names one dismiss control,
+                     and this is the other one not being painted. What is left
+                     in this row is the glyph and the chip, so upright it stands
+                     no taller than the chip: 15 px, rendered in WebKit at
+                     393 × 852 and 360 × 780 (round 2's rig — a browser, not a
+                     device; the device photograph is still owed).
+                     `briefing-sheet.test.tsx` § 8 deliberately still charges
+                     the full 44 px against the fit. */}
+              {sheetOnly ? null : (
+                <button
+                  type="button"
+                  {...tapCloseSheet}
+                  aria-label="Затвори"
+                  className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted landscape:ml-auto"
+                >
+                  <span aria-hidden>✕</span>
+                </button>
+              )}
             </div>
 
-            {blocking ? (
+            {/* THE ACKNOWLEDGEMENT EVERY TAP-OPENED BLOCKING SHEET HAS ALWAYS HAD:
+                44 px (`py-3` over a 20 px label), the fold cue riding inside it.
+                Untouched by the 2026-10-08 briefing sheet, which has its own
+                foot just below — a sheet-only item never renders this one. */}
+            {blocking && !sheetOnly ? (
               <button
                 type="button"
                 {...tapSheetAck}
@@ -4129,6 +4223,111 @@ export function SimOverlay({
                   </span>
                 ) : null}
               </button>
+            ) : null}
+
+            {/* ══ THE BRIEFING SHEET'S FOOT: A 36 px BUTTON THAT HOLDS ITS OWN
+                   WORD AND NOTHING ELSE, AND THE FOLD CUE BESIDE IT — 2026-10-08,
+                   round 2 of sc-vu-emergency:2e634d4d ·
+                   sc-sig-controller-postures:f7e046c4.
+
+                THE FRAME THAT REFUTED ROUND 1. That round made this sheet's
+                acknowledgement `h-9 py-0` — 36 px, founder ruling 2026-09-20 #4
+                — and left the fold cue riding INSIDE it, as it does in the
+                44 px button above. Rendered in WebKit at the audit's own phone
+                profiles (`briefsheet-verify/rig`, calibrated against the w79
+                real-shell capture: section 734 × 258 against 734 × 259), every
+                landscape rung that does not fit broke its one control: the cue
+                is `landscape:whitespace-normal` in an 88 px rail and wraps to 2
+                or 3 lines, so the button was asked to hold 44–54 px in 36.
+                «Разбрах» was sliced through the top of its glyphs and «ПОКАЖИ»
+                fell wholly below the button, dark on dark, under the section's
+                clip — 10 of 808 rungs at 852 × 393 (the longest briefing in the
+                catalogue among them) and 20 of 808 at 780 × 360 (the named
+                lesson sc-sig-controller-postures@L3/L4 among them). A fixed
+                height and a wrapping passenger cannot share a box.
+
+                RULING #4 BINDS THE BUTTON. It says the reading button is 36 px
+                and stays in the card; it does not ask for a sentence to be
+                squeezed inside it. So the button is `h-9` and its only child is
+                its label, on every frame, and the cue is a sibling with a box of
+                its own that grows to whatever its words need:
+
+                  · LANDSCAPE — the rail is a `justify-between` column the
+                    height of the section, with the chip at its head and this
+                    foot at its base; between them it is empty (218 px at 780 ×
+                    360, 251 px at 852 × 393 — a sheet only folds when the
+                    section is at its cap, so the rail is at its tallest). The
+                    cue stands directly ABOVE the button there, full rail
+                    width, and costs the text nothing.
+                  · PORTRAIT — the rail is `contents`, so this foot is the
+                    section's last row. The cue stands BESIDE the button in that
+                    row and the button gives it 3/5 of the width; a second row
+                    would take its own height plus the `gap-2` straight out of
+                    the scroller it is counting (the 2026-08-17 arithmetic at
+                    `data-sim-overlay-sheet-fold`, which is why the header's
+                    copy was put in the header). With no fold there is no cue
+                    and the button is the full row, exactly as round 1 left it.
+
+                AND IT SAYS WHAT THE PRESS DOES (THEO-4). Inside the button the
+                cue could end «— покажи», an imperative that names the press of
+                the control it rides in. Outside it that word would name nothing
+                — or worse, read as a second control — so the sentence names the
+                button and says what its press does: «↓ още N реда — „Разбрах“
+                първо превърта до края» (`sheetFootFoldBg`, which also has why
+                the verb is «превърта» and not «показва»). It is on the glass
+                exactly while `tapSheetAck` would scroll rather than
+                acknowledge (both read the same window; `foldLinesBelow` and
+                `readRestScrollTop` share their arithmetic), it reaches zero on
+                the press that reveals the lines, and the button that is left
+                says only «Разбрах» — which is then all the next press does.
+                The label is interpolated, not retyped, so the name the cue
+                quotes cannot drift from the name the button prints.
+
+                IN THE TONE'S COLOUR, ON THE SHEET'S OWN GROUND — the chip's
+                ink. It no longer rides on the accent fill, so it may not
+                inherit `--accent-foreground`: that is the dark-on-dark half of
+                the refuting frame. `aria-hidden` for the reason every fold cue
+                in this file is: assistive technology reads the whole list out
+                of the DOM whatever is scrolled into view, and the button's
+                accessible name stays «Разбрах» — now by construction.
+
+                MEASURED IN A BROWSER, NOT READ OFF A CLASS LIST (WebKit, the
+                audit's phone profiles, all 808 compiled rungs on each of 852 ×
+                393, 780 × 360, 393 × 852 and 360 × 780): the button is 88 × 36
+                in the rail / full width × 36 upright on every rung, its one
+                line box 9 px inside its top and bottom edges; on the 10 + 20
+                landscape rungs that fold, the cue is five 13.75 px lines in an
+                88 × 68.75 box that ends 6 px above the button, no line box
+                outside its own box, nothing under the section's clip, 7.9 : 1
+                against the sheet. No shipped briefing folds upright; a
+                synthetic one twice the longest puts the cue in two lines
+                (27.5 px) beside a 36 px button. The table is in the header of
+                `briefing-sheet.test.tsx`. NOT a device photograph. ══ */}
+            {blocking && sheetOnly ? (
+              <div
+                data-sim-overlay-sheet-foot=""
+                className="flex shrink-0 items-center gap-2 landscape:flex-col landscape:items-stretch landscape:gap-1.5"
+              >
+                {ackCarriesSheetFold ? (
+                  <p
+                    data-sim-overlay-foot-fold=""
+                    aria-hidden
+                    className="min-w-0 flex-1 break-words text-[11px] font-bold leading-tight landscape:flex-none"
+                    style={{ color }}
+                  >
+                    {sheetFootFoldBg(sheetFold.lines, shown.ackLabelBg ?? "Разбрах")}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  {...tapSheetAck}
+                  className={`btn-accent h-9 shrink-0 justify-center py-0 text-sm landscape:w-full landscape:px-2 ${
+                    ackCarriesSheetFold ? "w-2/5" : "w-full"
+                  }`}
+                >
+                  {shown.ackLabelBg ?? "Разбрах"}
+                </button>
+              </div>
             ) : null}
             </div>
           </section>

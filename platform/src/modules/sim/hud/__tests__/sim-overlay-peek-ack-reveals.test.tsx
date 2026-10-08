@@ -42,7 +42,7 @@ import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { overlayHasDetail, SimOverlay } from "../SimOverlay";
-import type { SimOverlayItem } from "../overlayQueue";
+import { briefingSheetItem, type SimOverlayItem } from "../overlayQueue";
 
 const SOURCE = readFileSync(resolve(__dirname, "../SimOverlay.tsx"), "utf8");
 
@@ -70,7 +70,13 @@ const HANDLER = ((): string => {
   return CODE.slice(at, end + "\n  });".length);
 })();
 
-/** The arrival briefing of the filed lesson, in the shape the shell feeds. */
+/**
+ * The filed lesson's five steps as A BLOCKING CARD WITH A BODY — the shape the
+ * shell fed for this briefing until 2026-10-08, and the shape a teach moment
+ * still has. The product no longer queues a briefing like this (it queues
+ * `briefingSheetItem`, see the last describe); the rule this file holds is about
+ * the card shape, so the fixture keeps it.
+ */
 const BRIEFING: SimOverlayItem = {
   id: "briefing",
   kind: "hint",
@@ -171,13 +177,56 @@ describe("the peek's «Разбрах» reveals before it ends (sc-vu-emergency:
   });
 });
 
-describe("the card the row was filed on still renders both ways out", () => {
-  it("paints «ПРОЧЕТИ» and «РАЗБРАХ» and no ✕, exactly as the frame shows", () => {
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CARD THE ROW WAS FILED ON IS NOT A PEEK ANY MORE — 2026-10-08.
+
+   This describe used to render the arrival briefing as a blocking peek and
+   assert it painted «ПРОЧЕТИ» and «РАЗБРАХ» „exactly as the frame shows". The
+   w79 capture is what that frame cost: 17 lines hidden behind «ПРОЧЕТИ ↓17»
+   and a car that moved under it. sc-vu-emergency:2e634d4d is now closed the
+   other way — the phone's briefing IS the read sheet, with no peek at all
+   (`briefingSheetItem`; `briefing-sheet.test.tsx` holds it on all 808 rungs).
+
+   THE RULE ABOVE DID NOT GO WITH IT. `tapAck`'s reveal-before-acknowledge
+   still stands for every blocking card that DOES have a peek — a teach moment
+   is one, with an authored WHY that folds on a 180 px column — so the handler
+   and its gates are unchanged and `BRIEFING` above stays as the fixture of
+   „a blocking card with a body", which is all those cases ask of it. Only the
+   claim about what the PRODUCT paints for a briefing moved, and it moved here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("a blocking card that has a peek still renders both ways out", () => {
+  it("paints its open control and «РАЗБРАХ» and no ✕", () => {
     const html = renderToStaticMarkup(<SimOverlay item={BRIEFING} queued={0} />);
+    expect(html).toContain('data-sim-overlay-state="peek"');
     expect(html).toContain("Прочети");
     expect(html).toContain("Разбрах");
     // A blocking card is answered, not dismissed — `closable` requires
     // `!blocking`, so nothing on this card loses a one-press exit it had.
     expect(html).not.toContain('aria-label="Скрий известието"');
+  });
+});
+
+describe("…and the briefing itself is the sheet, so there is no peek to be a teaser", () => {
+  const STEPS = [
+    { n: 1, textBg: BRIEFING.lineBg },
+    ...String(BRIEFING.detailBg)
+      .split("\n")
+      .map((line, i) => ({ n: i + 2, textBg: line.replace(/^\d+\.\s*/, "") })),
+  ];
+
+  it("PRECONDITION: the fixture above really is this lesson's five steps", () => {
+    expect(STEPS).toHaveLength(5);
+    expect(briefingSheetItem(STEPS)?.detailBg).toBe(BRIEFING.detailBg);
+  });
+
+  it("what the shell queues paints no «ПРОЧЕТИ», no peek, and one «РАЗБРАХ»", () => {
+    const html = renderToStaticMarkup(
+      <SimOverlay item={briefingSheetItem(STEPS, () => undefined)} queued={0} />,
+    );
+    expect(html).toContain('data-sim-overlay-state="open"');
+    expect(html).not.toContain('data-sim-overlay-state="peek"');
+    expect(html).not.toContain("Прочети");
+    expect(html.match(/<button\b/g) ?? []).toHaveLength(1);
+    expect(html).toContain("Разбрах");
   });
 });

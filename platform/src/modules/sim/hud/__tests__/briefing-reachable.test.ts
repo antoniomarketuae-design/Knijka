@@ -14,55 +14,47 @@
  *
  * ── WHAT WAS MEASURED (a0a3ac7, w61 sweep, `*mobile-right/run.log`) ─────────
  *
- * Two facts, and only together do they make a dead end:
- *
  *   1. `[data-hud="briefing-recall"]` — the «ⓘ Инструкции · N стъпки ▸» pill —
- *      is HELD BUT NOT PAINTED on every mobile leg (11× on sc-signal-hesitation
- *      at 01/03/04-*, beside the same line for its parent `notify-column` and
- *      its sibling `objective-banner`). It is a child of the SHELL's notify
- *      column, and that column carries `hidden` on compact. It is the ROOMY
- *      leg's recall and always was; the shell now says so through
- *      `briefingRecallPillShown`, with the numbers for why the phone's column
- *      cannot afford a second 44 px tenant beside the mount.
+ *      is HELD BUT NOT PAINTED on every mobile leg. It is a child of the SHELL's
+ *      notify column, and that column carries `hidden` on compact. It is the
+ *      ROOMY leg's recall and always was; the shell says so through
+ *      `briefingRecallPillShown`.
  *
  *   2. So the phone's ONLY painted route is the МЕНЮ row «Инструкции · N
- *      стъпки» (`recallBriefing`). And that row died after ONE ✕:
+ *      стъпки» (`recallBriefing`). And that row died after ONE ✕: the recalled
+ *      PEEK was non-blocking, so it painted a ✕; `SimOverlay.dismiss()` kept a
+ *      private record of it that `recallBriefing` could not reach; the second
+ *      recall offered the item and nothing appeared.
  *
- *        · the recalled peek is non-blocking (`blocking: !briefingRecalled`),
- *          so unlike the arrival showing it paints a ✕ (`closable`);
- *        · `SimOverlay.dismiss()` writes its own private record AND calls
- *          `onDismiss`, so the decision is recorded TWICE;
- *        · `recallBriefing` undoes the shell's copy — that is what it is for,
- *          and its docblock says it undoes „both of the phone's exits" — but it
- *          could not reach SimOverlay's, which had no undo of any kind.
+ * ── WHAT CHANGED 2026-10-08, AND WHY HALF OF THIS FILE WENT WITH IT ─────────
  *
- *      Second recall: the shell offers the item, `live` is null, nothing
- *      happens, and the student has no route to the lesson's authored steps for
- *      the rest of the session. Silent, and on the one surface the ruling was
- *      about.
- *
- * ── AND THE UNDO IS THE OWNER'S TO SPEND, NOT A GUESS ABOUT THE OWNER ───────
- *
- * The first repair suppressed the private record whenever `onDismiss` was
- * passed. `/dev/popup-rig` passes `onDismiss={() => undefined}` on FIVE mounts
- * — an owner that is told and does nothing — so that rule would have made the ✕
- * a dead control across the whole ADR-009 gallery, which is row A6 back. The
- * rule shipped instead is a RE-OFFER KEY: the ✕ always clears the card, and an
+ * The repair of (2) was a RE-OFFER KEY: the ✕ always clears the card, and an
  * owner that offers the same item again bumps the key it was stamped under.
- * Both legs are driven below, including the rig's.
+ * That rule is still the overlay's and is still driven below — the rig's ✕, the
+ * pure predicate, `recallPreDriveOverlay`.
+ *
+ * What is gone is the BRIEFING's use of it, because the surface that had the ✕
+ * is gone: sc-vu-emergency:2e634d4d closed with the phone's briefing as the
+ * read sheet from its first frame (`briefingSheetItem`; no peek, ONE exit,
+ * «Разбрах»). A sheet-only item paints no dismiss control, so neither the
+ * shell's `dismissedOverlayIds` nor `SimOverlay`'s private record can hold its
+ * id, and `recallBriefing` no longer undoes two things that cannot happen. The
+ * seven cases that drove „✕, then recall" on the briefing are replaced by the
+ * ones below, which drive the session the product now has — and by
+ * `briefing-sheet.test.tsx`, which reads the absence of that ✕ off the glass.
  *
  * ── WHY THIS FILE IS NOT ANOTHER SOURCE GREP ────────────────────────────────
  *
- * Because a grep is what let this through: every predicate above was already
- * pinned by name in three suites, and all three were green while the sequence
- * failed. The session below is DRIVEN — the start machine, the dismissal rule
- * and the peek's own candidate condition, in the order a thumb produces them —
- * so the mutation that matters (removing the undo) turns it red without anyone
- * having to think of it.
+ * Because a grep is what let the dead end through: every predicate was pinned
+ * by name in three suites, and all three were green while the sequence failed.
+ * The session below is DRIVEN — the start machine, the producer and the queue,
+ * in the order a thumb produces them.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -76,7 +68,14 @@ import {
   type BriefingStartState,
 } from "../briefingStart";
 import { briefingAutoDefault } from "../hudPreferences";
-import { overlayLocallySuppressed, type OverlayLocalDismissal } from "../overlayQueue";
+import {
+  briefingSheetItem,
+  overlayLocallySuppressed,
+  selectOverlay,
+  type BriefingStepBg,
+  type OverlayLocalDismissal,
+} from "../overlayQueue";
+import { SimOverlay } from "../SimOverlay";
 
 const SHELL_PATH = resolve(__dirname, "../../../../components/sim/lesson-ui/LessonPlayShell.tsx");
 const SHELL = readFileSync(SHELL_PATH, "utf8");
@@ -89,35 +88,29 @@ const CODE = SHELL.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 // ---------------------------------------------------------------------------
 
 /**
- * The four pieces of state a recall has to move, held exactly as the product
- * holds them:
- *
- *   `start`            — `LessonPlayShell`'s `briefingStart` reducer (REAL).
- *   `shellDismissed`   — its `dismissedOverlayIds`, the owner's authoritative
- *                        list, which it filters the overlay candidates through.
- *   `reofferKey`       — its `overlayReofferKey`, bumped by every re-offer.
- *   `overlayDismissal` — `SimOverlay`'s private record of the ✕, stamped with
- *                        the key it was pressed under.
+ * The ONE piece of state a recall has to move now: `LessonPlayShell`'s
+ * `briefingStart` reducer (REAL). The shell's `dismissedOverlayIds` and
+ * `SimOverlay`'s private ✕ record used to be modelled here beside it; a
+ * sheet-only item cannot enter either (no dismiss control is painted — asserted
+ * off the markup below), so a model that carried them would be modelling a
+ * gesture nobody can make.
  *
  * The one thing written out here rather than imported is the shell's candidate
- * expression (`briefingOpen && !briefingFold.folded && briefing.length > 0 &&
- * !mistakeMode && !ended`), because it lives inside a 200-line array literal in
- * a component `node` cannot render. It is pinned against the shell's source in
- * the last describe, so this model cannot drift from it quietly.
+ * gate (`briefingOpen && briefing.length > 0 && !mistakeMode && !ended`),
+ * because it lives inside a 200-line array literal in a component `node` cannot
+ * render. It is pinned against the shell's source in the last describe, so this
+ * model cannot drift from it quietly.
  */
 interface PhoneSession {
   readonly start: BriefingStartState;
-  readonly shellDismissed: ReadonlySet<string>;
-  readonly reofferKey: number;
-  readonly overlayDismissal: OverlayLocalDismissal | null;
 }
 
-const FRESH_PHONE: PhoneSession = {
-  start: BRIEFING_START_INITIAL,
-  shellDismissed: new Set<string>(),
-  reofferKey: 0,
-  overlayDismissal: null,
-};
+const FRESH_PHONE: PhoneSession = { start: BRIEFING_START_INITIAL };
+
+const STEPS: readonly BriefingStepBg[] = Array.from({ length: 7 }, (_, i) => ({
+  n: i + 1,
+  textBg: `Стъпка ${i + 1} от урока.`,
+}));
 
 /** The shell's mount + first-committed-render effect, with `compact` resolved. */
 function mountOnPhone(s: PhoneSession, stored: boolean | null = null): PhoneSession {
@@ -127,47 +120,34 @@ function mountOnPhone(s: PhoneSession, stored: boolean | null = null): PhoneSess
     if (event === null) break;
     start = briefingStartReducer(start, event);
   }
-  return { ...s, start };
+  return { start };
 }
 
-/** Is the briefing item OFFERED by the shell this render? */
-function offeredByShell(s: PhoneSession, steps = 7): boolean {
-  const candidate = briefingIsOpen(s.start) && steps > 0; // !folded, !mistakeMode, !ended
-  return candidate && !s.shellDismissed.has("briefing");
+/** What the student sees: the markup `SimOverlay` paints for the selection. */
+function glass(s: PhoneSession, steps: readonly BriefingStepBg[] = STEPS): string {
+  const candidate = briefingIsOpen(s.start) ? briefingSheetItem(steps) : null; // !mistakeMode, !ended
+  const selection = selectOverlay([candidate]);
+  return renderToStaticMarkup(
+    createElement(SimOverlay, { item: selection.active, queued: selection.queued }),
+  );
 }
 
-/** Is it actually LIVE inside SimOverlay — i.e. does the student see a peek? */
-function peekIsUp(s: PhoneSession, steps = 7): boolean {
-  if (!offeredByShell(s, steps)) return false;
-  return !overlayLocallySuppressed("briefing", s.overlayDismissal, s.reofferKey);
+/** Are the authored steps on the glass — every one of them? */
+function stepsAreUp(s: PhoneSession, steps: readonly BriefingStepBg[] = STEPS): boolean {
+  const html = glass(s, steps);
+  return (
+    html.includes('data-sim-overlay-state="open"') && steps.every((st) => html.includes(st.textBg))
+  );
 }
 
-/** МЕНЮ → «Инструкции · N стъпки» (`recallBriefing`): both undos, one gesture. */
+/** МЕНЮ → «Инструкции · N стъпки» (`recallBriefing`). */
 function menuRecall(s: PhoneSession): PhoneSession {
-  const shellDismissed = new Set(s.shellDismissed);
-  shellDismissed.delete("briefing");
-  return {
-    ...s,
-    start: briefingStartReducer(s.start, { type: "recall" }),
-    shellDismissed,
-    reofferKey: s.reofferKey + 1, // `reofferOverlay()`
-  };
+  return { start: briefingStartReducer(s.start, { type: "recall" }) };
 }
 
-/** The ✕ on the recalled (non-blocking) peek: `SimOverlay.dismiss()`. */
-function pressDismissGlyph(s: PhoneSession): PhoneSession {
-  const shellDismissed = new Set(s.shellDismissed);
-  shellDismissed.add("briefing"); // the owner's `onDismiss` → `dismissOverlayItem`
-  return {
-    ...s,
-    shellDismissed,
-    overlayDismissal: { id: "briefing", reofferKey: s.reofferKey },
-  };
-}
-
-/** «Разбрах» on the peek: `onAck` → `closeBriefing`. Sets no dismissal at all. */
+/** «Разбрах» — `onAck` → `closeBriefing`. The sheet's one exit. */
 function pressAck(s: PhoneSession): PhoneSession {
-  return { ...s, start: briefingStartReducer(s.start, { type: "dismiss" }) };
+  return { start: briefingStartReducer(s.start, { type: "dismiss" }) };
 }
 
 describe("a phone student can always get back to the authored steps (THEO-4)", () => {
@@ -175,80 +155,55 @@ describe("a phone student can always get back to the authored steps (THEO-4)", (
     const s = mountOnPhone(FRESH_PHONE);
     expect(briefingAutoDefault(true)).toBe(false);
     expect(briefingIsOpen(s.start)).toBe(false);
-    expect(peekIsUp(s)).toBe(false);
-    // `briefingRecallOffered` is the roomy pill's own term, and it is TRUE
-    // here: the decision exists and the card is not up. The phone does not
-    // paint the pill — `briefingRecallPillShown` says so, executed below — and
-    // the МЕНЮ row is its surface, gated `compact`.
+    expect(glass(s)).toBe("");
     expect(briefingRecallOffered(s.start)).toBe(true);
   });
 
-  it("МЕНЮ → «Инструкции» brings the steps back", () => {
+  it("МЕНЮ → «Инструкции» brings the steps back — all of them", () => {
     const s = menuRecall(mountOnPhone(FRESH_PHONE));
     expect(briefingIsOpen(s.start)).toBe(true);
-    expect(peekIsUp(s)).toBe(true);
+    expect(stepsAreUp(s)).toBe(true);
   });
 
   it("…and again after «Разбрах», as many times as the student asks", () => {
     let s = mountOnPhone(FRESH_PHONE);
     for (let i = 0; i < 3; i += 1) {
       s = menuRecall(s);
-      expect(peekIsUp(s), `recall ${i + 1} of 3 lost the steps`).toBe(true);
+      expect(stepsAreUp(s), `recall ${i + 1} of 3 lost the steps`).toBe(true);
       s = pressAck(s);
-      expect(peekIsUp(s)).toBe(false);
+      expect(glass(s)).toBe("");
     }
   });
 
-  it("THE REGRESSION — …and again after the ✕, which is where it died", () => {
-    // The ✕ only exists on a RECALLED peek: the arrival showing is blocking and
-    // `closable` requires `!blocking`. So this sequence needs the recall first,
-    // which is exactly why no arrival-only census could photograph it.
-    let s = menuRecall(mountOnPhone(FRESH_PHONE));
-    expect(peekIsUp(s)).toBe(true);
-
-    s = pressDismissGlyph(s);
-    expect(peekIsUp(s), "the ✕ must clear the card").toBe(false);
-
-    s = menuRecall(s);
-    expect(
-      offeredByShell(s),
-      "the shell must re-offer the item — `recallBriefing` clears its own list",
-    ).toBe(true);
-    expect(
-      peekIsUp(s),
-      "the second МЕНЮ recall reached the student with nothing: the phone's only " +
-        "painted route to the lesson's instructions is dead for the rest of the " +
-        "session, which is the ruling's THEO-4 condition failing silently.",
-    ).toBe(true);
+  it("THE DEAD END CANNOT BE REBUILT: the recalled sheet paints no ✕ to press", () => {
+    // The regression this file was written for needed a dismiss control on the
+    // RECALLED showing. Read off the glass, not off a flag: there is exactly one
+    // button, it is the acknowledgement, and neither dismiss shape is painted.
+    const html = glass(menuRecall(mountOnPhone(FRESH_PHONE)));
+    expect(html.match(/<button\b/g) ?? []).toHaveLength(1);
+    expect(html).toContain("Разбрах");
+    expect(html).not.toContain("Скрий известието");
+    expect(html).not.toContain('aria-label="Затвори"');
+    expect(html).not.toContain("data-hud-close");
+    expect(html).not.toContain("data-sim-overlay-dismiss-glyph");
   });
 
-  it("and it keeps working for the whole drive, ✕ and «Разбрах» interleaved", () => {
-    let s = mountOnPhone(FRESH_PHONE);
-    for (const exit of [pressDismissGlyph, pressAck, pressDismissGlyph, pressDismissGlyph]) {
-      s = menuRecall(s);
-      expect(peekIsUp(s)).toBe(true);
-      s = exit(s);
-      expect(peekIsUp(s)).toBe(false);
-    }
-  });
-
-  it("a student who opted IN still gets the card at arrival, and still gets it back", () => {
+  it("a student who opted IN gets the sheet at arrival, and still gets it back", () => {
     let s = mountOnPhone(FRESH_PHONE, true);
     expect(briefingAutoSetting(true, true)).toBe(true);
-    expect(peekIsUp(s)).toBe(true);
-    s = pressDismissGlyph(pressAck(menuRecall(s)));
-    expect(peekIsUp(s)).toBe(false);
-    expect(peekIsUp(menuRecall(s))).toBe(true);
+    expect(stepsAreUp(s)).toBe(true);
+    s = pressAck(s);
+    expect(glass(s)).toBe("");
+    expect(stepsAreUp(menuRecall(s))).toBe(true);
   });
 
-  it("the ✕ still SENDS IT AWAY — a way back is not a refusal to go", () => {
-    // The failure mode on the other side of this repair: an undo so eager that
-    // the card returns on the next 150 ms HUD poll. It must not. Nothing
-    // between the ✕ and the next re-offer may put it back up.
-    let s = menuRecall(mountOnPhone(FRESH_PHONE));
-    s = pressDismissGlyph(s);
+  it("«Разбрах» still SENDS IT AWAY — a way back is not a refusal to go", () => {
+    // The failure mode on the other side: an undo so eager that the sheet is
+    // back on the next 150 ms HUD poll. Nothing between «Разбрах» and the next
+    // recall may put it up again.
+    const s = pressAck(menuRecall(mountOnPhone(FRESH_PHONE)));
     for (let poll = 0; poll < 20; poll += 1) {
-      expect(peekIsUp(s), `poll ${poll} after the ✕ repainted a dismissed card`).toBe(false);
+      expect(glass(s), `poll ${poll} after «Разбрах» repainted the sheet`).toBe("");
     }
   });
 });
@@ -391,23 +346,30 @@ describe("the wiring, held — a rule nothing calls is the failure this repo nam
     expect(OVERLAY).not.toContain("ownerOwnsDismissal");
   });
 
-  it("the shell is the owner that IS told, and its recall spends BOTH undos", () => {
+  it("the shell is the owner that IS told — and the briefing has nothing left to undo", () => {
+    // The overlay's undo is still wired for every line that CAN be sent away…
     expect(CODE).toContain("onDismiss={dismissOverlayItem}");
     expect(CODE).toContain("reofferKey={overlayReofferKey}");
     expect(CODE).toContain("const reofferOverlay = useCallback(() => {");
     expect(CODE).toContain("setOverlayReofferKey((n) => n + 1);");
+    // …and `recallBriefing` re-offers the steps through the start machine.
     const at = CODE.indexOf("const recallBriefing = useCallback");
     expect(at, "unresolved: `recallBriefing` not found — re-anchor this file").toBeGreaterThan(-1);
-    const body = CODE.slice(at, at + 900);
+    const end = CODE.indexOf("}, [", at);
+    expect(end, "unresolved: `recallBriefing` does not close — re-anchor").toBeGreaterThan(at);
+    const body = CODE.slice(at, end);
     expect(body).toContain('dispatchBriefingStart({ type: "recall" })');
-    expect(body).toContain("setDismissedOverlayIds(");
-    expect(body).toContain('next.delete("briefing")');
-    expect(
-      body,
-      "`recallBriefing` clears the shell's own list and leaves SimOverlay's " +
-        "record standing — the second МЕНЮ recall is then silent, which is the " +
-        "dead end this whole file is about.",
-    ).toContain("reofferOverlay();");
+    // 2026-10-08: it spent TWO undos here for the recalled peek's ✕. The sheet
+    // paints none (driven in the first describe), so a ✕-undo in this callback
+    // would be an undo for a gesture that does not exist — and the day someone
+    // puts a dismiss control back on the briefing, „THE DEAD END CANNOT BE
+    // REBUILT" above is the case that goes red, not this one.
+    expect(body).not.toContain("setDismissedOverlayIds(");
+    expect(body).not.toContain("reofferOverlay();");
+    // The candidate gate this file's model writes out by hand:
+    expect(CODE).toMatch(
+      /briefingOpen && briefing\.length > 0 && !mistakeMode && !ended\s*\?\s*briefingSheetItem\(briefing, closeBriefing\)/,
+    );
   });
 
   it("the OTHER re-offer spends it too — `recallPreDriveOverlay`", () => {

@@ -186,11 +186,22 @@ describe("the briefing's way back · one rule, two legs", () => {
     // the roomy stage, open on a phone only if the student opted in), so the
     // retry dispatches the start machine's `arrive` with the resolved surface
     // and the stored choice; `briefing-start.test.ts` executes what it yields.
-    const at = CODE.indexOf("setBriefingRecalled(false)");
-    expect(at).toBeGreaterThan(-1);
-    expect(CODE.slice(at, at + 400)).toContain(
-      'dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })',
-    );
+    //
+    // RE-ANCHORED 2026-10-08. This case used to find the dispatch by looking
+    // 400 characters after `setBriefingRecalled(false)` — the reset of a latch
+    // that made a RECALLED phone peek non-blocking. That peek is gone (the
+    // phone's briefing is the read sheet; `hud/__tests__/briefing-sheet.test.tsx`)
+    // and the latch with it, so the landmark is now the function the dispatch
+    // lives in: it must be inside `retry`, and it must be the only `arrive`.
+    const retryAt = CODE.indexOf("const retry = () => {");
+    expect(retryAt, "unresolved: `retry` not found — re-anchor").toBeGreaterThan(-1);
+    const arrive = 'dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })';
+    const at = CODE.indexOf(arrive, retryAt);
+    expect(at, "the retry no longer re-arrives the briefing").toBeGreaterThan(retryAt);
+    expect(CODE.indexOf(arrive)).toBe(at);
+    // …inside `retry` itself, not in some later callback: the reset that is
+    // `retry`'s last briefing line follows it.
+    expect(CODE.slice(at, at + 400)).toContain("setBriefingFold({ folded: false, latched: false });");
   });
 
   it("the ✕ keeps its meaning — this adds a way back, it does not retire a control", () => {

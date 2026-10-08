@@ -17,9 +17,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   armedTelltaleWarnings,
-  briefingBodyBg,
-  briefingLineBg,
-  briefingLineOrdinal,
+  briefingSheetItem,
   capBg,
   clutchHeldObjBg,
   clutchObjBg,
@@ -53,6 +51,7 @@ import {
   BRIEFING_START_INITIAL,
   readStoredFlag,
   readStoredFlagOrNull,
+  overlaySheetHoldsDrive,
   selectOverlay,
   SessionEndScreen,
   SESSION_END_AUTO_DEFAULT,
@@ -3447,42 +3446,6 @@ export function briefingCardCeilingPx(
 }
 
 /**
- * …AND THE SAME RULE ON THE PHONE, WHERE THERE IS NO CARD TO HOLD IT
- * (sc-signal-hesitation:f5ffccf3 — the row, the census and the three quarters
- * of it that other waves already closed are at the effect that calls this).
- *
- * `briefingStandsDown` lives inside `BriefingCard`, and `BriefingCard` is the
- * ROOMY mount. The compact leg feeds the same authored steps through the overlay
- * rail instead, so the desktop's lifetime simply did not exist there: the item
- * stayed a candidate for the whole drive and returned to the rail every time a
- * higher-priority toast expired.
- *
- * A FUNCTION AND NOT THREE LINES IN THE EFFECT, for the reason `advisorEchoTrim`
- * gives at its own header — this suite runs in `node`, the shell cannot be
- * rendered, and the only thing a test can hold is an export. `null` means „leave
- * the memory alone", which is the overwhelmingly common answer and the one an
- * effect must not turn into a write.
- *
- * THE THREE REFUSALS ARE THE RULE, NOT GUARDS AROUND IT:
- *   · roomy is not this leg's business — the card owns its own fold there, and a
- *     second writer would be two readings of one state;
- *   · a SPENT latch is never re-armed — „once, and never against the student":
- *     a student who recalled the steps at 40 км/ч keeps them;
- *   · and a car that is not moving keeps its briefing, because the whole point
- *     of the surface is the standstill before the drive.
- */
-export function compactBriefingFold(
-  compact: boolean,
-  fold: { folded: boolean; latched: boolean },
-  speedKmh: number,
-): { folded: boolean; latched: boolean } | null {
-  if (!compact) return null;
-  if (fold.latched) return null;
-  if (!briefingStandsDown(speedKmh)) return null;
-  return { folded: true, latched: true };
-}
-
-/**
  * ═══════════════════════════════════════════════════════════════════════════
  * …AND THE FOLD HAS TO OUTLIVE THE CARD, BECAUSE A TEACH MOMENT UNMOUNTS IT
  * (sc-junction-rhr:486cad54, major, re-judged STILL on the w21 re-drive.)
@@ -5139,78 +5102,33 @@ export function LessonPlayShell({
    * the step count so a recall the student can see the state of is a recall he
    * will use.
    *
-   * TWO WRITERS TO UNDO, BECAUSE THERE ARE TWO WAYS OUT. «Разбрах» clears
-   * `briefingOpen`; the ✕ puts the item's id into `dismissedOverlayIds`
-   * (`dismissOverlayItem`) and leaves `briefingOpen` alone. A recall that
-   * cleared one of them would work for one of the two gestures and look broken
-   * after the other, which is the shape of dead-end this rule exists to end.
+   * ONE WRITER TO UNDO, SINCE 2026-10-08. There used to be two ways out of the
+   * phone's card — «Разбрах», and the ✕ a RECALLED peek painted because a latch
+   * made that showing non-blocking — so this callback also took the card's id
+   * back out of `dismissedOverlayIds` and bumped the overlay's re-offer key for
+   * `SimOverlay`'s own copy of that ✕. The phone's briefing is the read sheet
+   * now (`briefingSheetItem`, candidate 4c below): it has no peek and so no ✕,
+   * its one exit is «Разбрах» → `closeBriefing`, and neither record can ever
+   * hold its id. The latch and both undos went with the surface they served.
    *
-   * …AND THE RECALLED CARD DOES NOT FREEZE A MOVING CAR. `blocking: true` means
-   * „the item holds the drive" (`overlayHoldsDrive`), which is right at arrival
-   * — the drive has not started — and is a hazard mid-lesson: a student at
-   * 50 км/ч asking to re-read step 4 must not have the car taken off him, and a
-   * car frozen in a running lane is a fault the rule engine would then grade him
-   * for. The latch below is what the candidate reads to drop that one property;
-   * everything else about the card — the sheet, the numbering, «Прочети» — is
-   * the same surface it always was.
+   * …AND THE RECALLED SHEET STOPS THE CAR, as every read sheet in this product
+   * does (`paused`, „THE READ MODE STOPS THE CAR“). That latch existed so that a
+   * recalled PEEK would not «hold» a moving car — and it held nothing either
+   * way, `blocking` having no consumer. The stop is not new on this route: МЕНЮ
+   * has already frozen the scene before its row can be pressed, and «ПРОЧЕТИ» on
+   * the recalled peek froze it again. What is gone is the gap between the two.
    */
-  const [briefingRecalled, setBriefingRecalled] = useState(false);
   const recallBriefing = useCallback(() => {
-    setBriefingRecalled(true);
     dispatchBriefingStart({ type: "recall" });
     // …AND THE STAND-DOWN LATCH IS SPENT BY THE ASK. Same sentence the roomy
     // card's `unfold` writes: a student who asks for the steps back while the
     // car is moving has answered the question the speed rule is guessing at, so
     // the rule may not take them off him again. `latched: true` is what stops
-    // the poll below re-folding the card on the student's next metre.
+    // the roomy panel folding itself on his next metre — this callback is the
+    // roomy recall pill's too. (The phone's sheet has no stand-down to spend:
+    // the car does not move while it is up.)
     setBriefingFold({ folded: false, latched: true });
-    setDismissedOverlayIds((prev) => {
-      if (!prev.has("briefing")) return prev;
-      const next = new Set(prev);
-      next.delete("briefing");
-      return next;
-    });
-    // …and the overlay's own copy of the same ✕, which this shell cannot reach
-    // by deleting from its list. Without this line the second МЕНЮ recall is
-    // silent and the phone has no route left to the steps — `reofferOverlay`.
-    reofferOverlay();
-  }, [reofferOverlay]);
-
-  /**
-   * ── THE PHONE'S HALF OF THE SAME LIFETIME (sc-signal-hesitation:f5ffccf3) ──
-   *
-   * The row says the briefing „is a blocking modal on mobile and a persistent
-   * side panel on PC" — one lesson, two behaviours. Three quarters of that has
-   * been closed since it was filed: the numbering agrees (`briefingLineOrdinal`),
-   * the phone has a route back to the steps (`recallBriefing`), and `blocking`
-   * turns out to hold nothing at all — `overlayHoldsDrive` has no consumer, so
-   * neither platform freezes the car for it (`hud/overlayQueue.ts` says so in as
-   * many words).
-   *
-   * WHAT WAS LEFT IS THE LIFETIME, AND ONLY THE ROOMY LEG HAD ONE.
-   * `briefingStandsDown` folds the desktop panel to a labelled pill the first
-   * time the car is genuinely moving; the compact item had no such rule, so on a
-   * phone the seven authored steps stay a candidate for the whole drive and
-   * return to the rail every time a toast's TTL lapses — the census in
-   * `hud/overlayQueue.ts` («the instructions card is still open 13 seconds into
-   * the drive», «identical panel 105 seconds later») is that mechanism measured
-   * on three lessons.
-   *
-   * ONE RULE, TWO SURFACES. The predicate is the roomy card's own, the memory is
-   * the roomy card's own (`briefingFold`, which the compact leg never wrote
-   * because `BriefingCard` is not mounted there), and „once, and never against
-   * the student" is inherited whole: the latch fires at most once, `recallBriefing`
-   * spends it, and the МЕНЮ row that recalls the steps carries their count and is
-   * present for the entire drive. The phone's rail retires the card the way the
-   * desktop's column folds the panel — it moves, it does not disappear.
-   *
-   * IT IS WRITTEN FROM THE HUD POLL AND NOT FROM AN EFFECT OF ITS OWN. A
-   * `setState` in an effect body is a cascading render and this repo's lint says
-   * so; the poll is a timer callback that already runs at exactly the cadence
-   * this rule needs, already holds the cluster's own speed, and already carries
-   * a second guarded mirror beside it (`governorCapKmh`). The
-   * `compactBriefingFold(` call there is the whole of the writer.
-   */
+  }, []);
 
   // -- A6: DISMISSING THE ADVISOR PROMPT ---------------------------------------
   //
@@ -5814,18 +5732,9 @@ export function LessonPlayShell({
       // equality, so an unchanged cap costs no render.
       const cap = dashboardStatusRef.current?.governorCapKmh ?? null;
       setGovernorCapKmh((prev) => (prev === cap ? prev : cap));
-      // …AND THE PHONE'S BRIEFING LIFETIME, for the reasons at the docblock
-      // beside `recallBriefing`. The speed is `snapshotOf`'s own expression
-      // rather than `snap.speedKmh`, so the rail's idea of „he is driving now"
-      // is the cluster's reading and cannot be one poll stale; the functional
-      // updater is what lets this live in a `[compact]` interval without a
-      // stale `briefingFold` closed over it. `?? prev` on the overwhelmingly
-      // common answer — no write, no render.
-      const speedKmh = lastTickRef.current?.speedKmh ?? 0;
-      setBriefingFold((prev) => compactBriefingFold(compact, prev, speedKmh) ?? prev);
     }, HUD_POLL_MS);
     return () => window.clearInterval(id);
-  }, [compact]);
+  }, []);
 
   // -- manual endings --------------------------------------------------------------
   const ended = result !== null;
@@ -5853,16 +5762,12 @@ export function LessonPlayShell({
     setAdvisorDismissed(null);
     // I1: a fresh attempt is a fresh prediction — the gate asks again.
     setCalibrationDone(false);
-    // …and the briefing's recall latch belongs to ONE attempt: it exists only
-    // to say „this showing was asked for mid-drive, so it must not hold the
-    // car" (`recallBriefing`), and a retry's first showing is an arrival again.
-    setBriefingRecalled(false);
-    // …AND SO DOES THE PANEL ITSELF, which the line above asserts and nothing
-    // delivered: `briefingOpen` was reset nowhere, so a student who had read
+    // …AND THE BRIEFING ITSELF BELONGS TO ONE ATTEMPT — „a retry's first showing
+    // is an arrival again" — which was asserted here for a round and delivered
+    // by nothing: `briefingOpen` was reset nowhere, so a student who had read
     // the steps and pressed ✕ (or «Разбрах») started attempt 2 — and every
     // attempt after it — with no briefing on the glass at all, on both legs.
-    // „A retry's first showing is an arrival again" is the contract three lines
-    // up; this is the writer that makes it true. It is also what keeps the new
+    // This is the writer that makes the contract true. It is also what keeps the
     // roomy recall pill honest: without it a retry would open on the pill
     // instead of on the steps.
     //
@@ -5873,9 +5778,8 @@ export function LessonPlayShell({
     // …AND THE FOLD LATCH BELONGS TO ONE ATTEMPT FOR THE SAME REASON. It was
     // never reset, which on the roomy leg handed a retry its briefing already
     // folded — the previous run's answer to a question this run has not been
-    // asked. With the compact leg now reading the same memory it would have hidden
-    // the steps from t = 0 on every retry, so the omission had to be corrected
-    // before that read could be trusted.
+    // asked. (Roomy only since 2026-10-08: the phone's briefing is the read sheet
+    // and has no fold — candidate 4c.)
     setBriefingFold({ folded: false, latched: false });
     setTraceUploaded(false);
     setFlash(null);
@@ -6725,110 +6629,48 @@ export function LessonPlayShell({
             }
           : null,
 
-        // 4c. THE BRIEFING (`lesson.briefingBg`) — step 1 on the line, the REST
-        //     of the numbered list under it. Blocking: a briefing that scrolls
-        //     past is the compiled-away field all over again, so it waits for
-        //     „Разбрах" (Space on a keyboard) and then never returns. Not in the
-        //     sandbox — there the assignment is the mistake.
+        // 4c. THE BRIEFING (`lesson.briefingBg`) — ON A PHONE IT IS THE READ SHEET,
+        //     WHOLE, OR IT IS NOT ON THE GLASS (2026-10-08, sc-vu-emergency:2e634d4d ·
+        //     sc-sig-controller-postures:f7e046c4; the integrator's decision under
+        //     the founder's delegation of that day: «PHONE BRIEFING, OPTED IN → THE
+        //     FULL SHEET»). Not in the sandbox — there the assignment is the mistake.
         //
-        // ══ THE SAME SENTENCE WAS PRINTED TWICE — 2026-08-14, THE FOUNDER'S
-        //    OWN FRAMES, BOTH ORIENTATIONS, ALL SIX PROFILES. ══════════════════
+        // WHAT STOOD HERE WAS A PEEK, and the w79 capture (852 × 393, DPR 3,
+        // `.audit-frames/w79-capture/C-briefing-list`, `D-briefing-fold`) is what
+        // it looked like to a student who had ASKED for his instructions: step 1
+        // of 5 as an unnumbered lead, the other four under the fold behind
+        // «ПРОЧЕТИ ↓17» / «РАЗБРАХ» — and a car that moved 2.3–3.1 m on 1.5 s
+        // of throttle with that card still up. One tap on the counter
+        // opened the sheet, and the sheet was already the answer: every step
+        // 1.–N in one face, a modal dialog, the sim frozen.
         //
-        // HIS WORDS: „there are TWO copies of it on screen, in different
-        // styling, both cut." He was reading ONE card. `detailBg` used to be
-        // `briefing.map(...)`, i.e. the WHOLE list — and `lineBg` is
-        // `briefing[0]`, i.e. its first item. So `SimOverlay`'s row 2 printed
-        // step 1 in bold and row 2b re-printed it two millimetres lower, in the
-        // reading face, prefixed „1. ". Verbatim, character for character:
+        // SO BOTH ROUTES NOW ARRIVE THERE DIRECTLY — the stored opt-in at arrival
+        // («Показвай ги в началото») and МЕНЮ → «Инструкции · N стъпки»
+        // (`recallBriefing`). `briefingOpen` is the start machine's answer for
+        // either; `briefingSheetItem` is the one producer, in `hud/overlayQueue.ts`
+        // where `briefing-sheet.test.tsx` puts all 808 compiled rungs through the
+        // SAME code and reads the numbering off the rendered sheet. The item wins
+        // the slot over any priority and holds the drive while it is the active
+        // one (`paused`, below) — an instruction the student asked to read cannot
+        // be driven past, and cannot be taken off the glass by a 5 s toast.
         //
-        //   row 2   «Потегли по улицата и се движи спокойно в своята лента. По…»
-        //   row 2b  «1. Потегли по улицата и се движи спокойно в своята лента.
-        //            По тъмно първо провери късите светлини (чл. 70): пред
-        //            пешеходна пътека…»
+        // FOUNDER RULING 2026-09-20 #1 IS UNTOUCHED: with nothing stored a phone
+        // decides CLOSED (`hud/briefingStart.ts`), this is `null`, and the road
+        // is clean. The echo rule («the card may never print the same sentence
+        // twice», 2026-08-14) is untouched too: the producer still splits step 1
+        // from steps 2…N through `briefingLineBg` / `briefingBodyBg`, and the
+        // sheet joins them with `lineOrdinal` into one 1…N list.
         //
-        // IT IS A REGRESSION OF THE THEO-4 FIX, not an old bug. Until row 2b
-        // landed, `detailBg` rendered ONLY inside the read sheet — a different
-        // surface, one tap away, where a header and its list may repeat. The
-        // moment the body came onto the CARD to stop the phone hiding the
-        // reasoning, the card started saying everything twice, and nobody
-        // re-read this line. The sheet inherited it too (see the 2026-08-13
-        // «ЗАЩО» frame: its <h2> and its first body line are the same 219
-        // characters).
-        //
-        // WHAT IT COSTS, MEASURED ON THE SHIPPED CORPUS (probe over all 167
-        // scenario templates, compiled): the duplicate is 219 of the 556
-        // characters the card must hold on `sc-zebra-approach@L1` — 39 % — and
-        // 412 of 972 on the same scenario at L4, where step 1 is the exam
-        // complication. Deleting it is the single largest reduction available
-        // in what the card has to fit, and it loses NOTHING: every character
-        // still ships, once.
-        //
-        // STEP 1 STAYS ON THE LINE and the body starts at step 2. That ordering
-        // is a contract, not a preference — `compile.ts` puts the rung's
-        // complication at `briefingBg[0]` precisely so „the one sentence that
-        // says WHY the rung is harder is the one sentence nobody can skip", and
-        // the line is the row that cannot be scrolled away from. The numbering
-        // is preserved (2., 3., …) so the list still reads as a sequence whose
-        // first item is the bold sentence above it.
-        //
-        // `null` when a briefing has a single step: there is then no second
-        // surface to offer and «ПРОЧЕТИ» correctly does not render. No shipped
-        // template is in that case — the step-count histogram over all 167 is
-        // {4:5, 5:118, 6:30, 7:12, 8:2} — but a curriculum LessonSpec may be,
-        // and a sheet that opens onto nothing is worse than no sheet.
-        // `!briefingFold.folded` is the phone's half of the roomy panel's own
-        // lifetime — the docblock beside `recallBriefing` carries the row, the
-        // census and the „once, and never against the student" inheritance.
-        briefingOpen && !briefingFold.folded && briefing.length > 0 && !mistakeMode && !ended
-          ? {
-              id: "briefing",
-              kind: "hint" as const,
-              tone: "neutral" as const,
-              chipBg: "Инструкции",
-              // Both halves come from `hud/overlayQueue.ts` and not from an
-              // expression written here, so `briefing-no-echo.test.ts` can put
-              // every compiled rung of all 167 templates through the SAME code
-              // the card renders. A rule that lives only in a component is a
-              // rule six waves of measurement can walk past — this one did.
-              lineBg: briefingLineBg(briefing),
-              // …AND THE NUMBER THAT SAYS THE LINE IS ITEM 1. The paragraph
-              // above ends „the numbering is preserved (2., 3., …) so the list
-              // still reads as a sequence whose first item is the bold sentence
-              // above it" — which was true of the DATA and never of the glass.
-              // Twenty-one round-10 mobile `02-briefing.png` frames show the
-              // sheet painting an unnumbered lead over a list that opens at
-              // «2.», against a pc panel numbering the same steps 1–5. The
-              // ordinal travels as DATA, so the surface decides whether to
-              // paint it and the authored string stays byte-identical for the
-              // corpus gates that read it (the field's own declaration carries
-              // the frames, and the cost argument that was withdrawn).
-              //
-              // THIS LINE IS THE WHOLE WIRE, and it was ungated for one round:
-              // a verifier deleted it alone and `briefing-no-echo` +
-              // `sim-overlay-fold` + `overlay-queue` stayed 56/56 green while
-              // every phone lost the number. The two mutations that WERE run
-              // guarded the ends — a function that still returns 1, a `<span>`
-              // that still reads a field. `briefing-no-echo.test.ts`'s last
-              // describe now source-pins this property inside this item.
-              lineOrdinal: briefingLineOrdinal(briefing),
-              detailBg: briefingBodyBg(briefing),
-              // …and the control that reaches them says what it opens. «ЗАЩО» is
-              // the right word over a graded fault — „why was that wrong" — and
-              // the wrong word over an instruction the card could not finish
-              // printing. The student is not asking for a justification, he is
-              // asking for the rest of the sentence, and a control that names
-              // the wrong thing is why six waves of truncation went unreported.
-              openLabelBg: "Прочети",
-              // FIRST SHOWING ONLY — see `recallBriefing`. At arrival this card
-              // holds the drive, which is the behaviour it shipped with and the
-              // right one: the lesson has not begun and the steps are what it
-              // begins with. A card the student ASKED for mid-drive may not take
-              // the car off him — `overlayHoldsDrive` would stop a moving car in
-              // a running lane, which the rule engine then grades.
-              blocking: !briefingRecalled,
-              ackLabelBg: "Разбрах",
-              onAck: closeBriefing,
-            }
+        // WHAT WENT WITH THE PEEK, because it served nothing else:
+        //   · `!briefingFold.folded` and `compactBriefingFold` — the phone's
+        //     mid-drive stand-down. Under a sheet that freezes the car it could
+        //     fire only on a lesson that spawns MOVING, where it would take the
+        //     unread sheet, and the freeze with it, away by itself;
+        //   · `briefingRecalled` — the latch that made a recalled peek
+        //     non-blocking so it could paint a ✕. The sheet has one exit;
+        //   · `openLabelBg: "Прочети"` — the button that reached the sheet.
+        briefingOpen && briefing.length > 0 && !mistakeMode && !ended
+          ? briefingSheetItem(briefing, closeBriefing)
           : null,
 
         // 5. Pre-drive: the next step on the line, the whole checklist behind
@@ -8005,6 +7847,19 @@ export function LessonPlayShell({
               // explain the hard thing. The alternative shipping today is an
               // 88 px strip over a moving car with its own button cut off.
               overlaySheetOpen ||
+              // ══ …AND A SHEET NOBODY HAD TO TAP OPEN — 2026-10-08 ══
+              //
+              // The phone's briefing is the read sheet from its first frame
+              // (`SimOverlayItem.sheetOnly`; candidate 4c above). The flag one
+              // line up is `SimOverlay` reporting that through an EFFECT, so it
+              // arrives one commit after the sheet is painted — and on the МЕНЮ
+              // route that commit is the one where `playMenuOpen` has just gone
+              // false: a frame of live physics and mounted touch controls under
+              // a surface that says the drive is waiting for it. This is the
+              // same fact read off the SELECTION, in the render that paints it.
+              // `overlay.active` is `null` off compact (the queue is compact-
+              // only), so the roomy stage cannot be held by it.
+              overlaySheetHoldsDrive(overlay) ||
               // ══ …AND «МЕНЮ НА УРОКА», 2026-08-13, doc 91 §W3 ══
               //
               // The same seam, the same argument, and the defect the wave-9
@@ -8076,10 +7931,12 @@ export function LessonPlayShell({
             onOpenChange={setOverlaySheetOpen}
             // A6 — „those pop ups need to be able to be removed when clicked."
             onDismiss={dismissOverlayItem}
-            // …and the way back from that removal. Bumped by `recallBriefing` and
-            // `recallPreDriveOverlay`, the two controls that RE-OFFER a line the
+            // …and the way back from that removal. Bumped by
+            // `recallPreDriveOverlay`, the control that RE-OFFERS a line the
             // student sent away; without it the ✕ is permanent inside the
-            // overlay whatever this shell does with its own list.
+            // overlay whatever this shell does with its own list. (The
+            // briefing's recall bumped it too until 2026-10-08 — its sheet has
+            // no ✕ to undo.)
             reofferKey={overlayReofferKey}
             renderDetail={(item) =>
               item.kind === "predrive" ? (

@@ -141,6 +141,9 @@ export {
   briefingBodyBg,
   briefingLineBg,
   briefingLineOrdinal,
+  // 2026-10-08: the phone's briefing as ONE producer (the read sheet, no peek)
+  // and the freeze that goes with it — `SimOverlayItem.sheetOnly` has the row.
+  briefingSheetItem,
   hasWhy,
   isAmbientOverlay,
   overlayCentreBand,
@@ -150,6 +153,7 @@ export {
   // was the two being kept apart by hand in `LessonPlayShell`.
   overlayHoldsDrive,
   overlayPriority,
+  overlaySheetHoldsDrive,
   overlayQueueMaySpeak,
   overlaySilencesQueue,
   rectViewportFraction,

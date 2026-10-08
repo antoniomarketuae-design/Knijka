@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { briefingBodyBg, briefingLineBg, briefingLineOrdinal } from "../overlayQueue";
+import {
+  briefingBodyBg,
+  briefingLineBg,
+  briefingLineOrdinal,
+  briefingSheetItem,
+} from "../overlayQueue";
 import { SCENARIO_TEMPLATES } from "../../lessons/scenario/templates";
 import { compileScenario } from "../../lessons/scenario/compile";
 import type { ScenarioLevel } from "../../lessons/scenario/types";
@@ -386,13 +391,15 @@ describe("SimOverlay's card cannot go back to clipping its own text", () => {
    expensive recurring bill — `districtWorldEdge`, `worldEdgeClearanceM`,
    `touchHintShouldHide`, and round 8's value read only by its own test.
 
-   Source-pinned because the briefing item is an object literal inside a
-   5 000-line component: nothing importable, and nothing renderable without the
-   whole 3-D stage. `hud-card-fit.test.ts:220` reads this same file the same
-   way. Comments are stripped first, offsets are taken from the STRIPPED text,
-   and the match is scoped to the briefing item itself — a hit anywhere else in
-   5 000 lines would be some other card's field, not the sentence this number
-   counts from.
+   …AND SINCE 2026-10-08 THE WIRE IS A FUNCTION, SO IT IS EXECUTED.
+
+   The item is no longer an object literal in the component: the phone's
+   briefing became the read sheet (sc-vu-emergency:2e634d4d) and its item is
+   `briefingSheetItem` in `overlayQueue.ts`, which the shell calls in one line.
+   So the mutation that walked through this file — deleting `lineOrdinal:` and
+   nothing else — is now caught by running the producer over the whole corpus,
+   and the source pin shrinks to the one thing that still cannot be executed:
+   that the shell calls the producer at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 const SHELL_SRC = stripComments(
   readFileSync(
@@ -402,24 +409,36 @@ const SHELL_SRC = stripComments(
 );
 
 describe("the ordinal reaches the glass: § 4c wires it beside the line it numbers", () => {
-  it("the briefing overlay item carries `lineOrdinal`, not only `lineBg`", () => {
-    const at = SHELL_SRC.indexOf('id: "briefing",');
-    expect(at, "§ 4c's briefing item lost its id — re-anchor this test").toBeGreaterThan(0);
-    const end = SHELL_SRC.indexOf('openLabelBg: "Прочети"', at);
-    expect(end, "the briefing item's «ПРОЧЕТИ» control moved — re-anchor this test").toBeGreaterThan(
-      at,
-    );
-    const item = SHELL_SRC.slice(at, end);
-    // Both halves of the split, from the module and not from an expression
-    // written in the component — the reason `briefingLineBg`/`briefingBodyBg`
-    // were extracted in the first place, and the reason the corpus rows at the
-    // top of this file assert against the SAME code the card renders.
-    expect(item, "the line stopped coming from the module").toContain(
-      "lineBg: briefingLineBg(briefing)",
-    );
+  it("the briefing overlay item carries `lineOrdinal`, not only `lineBg` — on every rung", () => {
+    const cut: string[] = [];
+    for (const rung of RUNGS) {
+      const item = briefingSheetItem(rung.steps);
+      if (item === null) {
+        cut.push(`${rung.id}: no item at all`);
+        continue;
+      }
+      // Both halves of the split, from the module and not from an expression
+      // written beside them — the reason `briefingLineBg`/`briefingBodyBg` were
+      // extracted in the first place, and the reason the corpus rows at the top
+      // of this file assert against the SAME code the sheet renders.
+      if (item.lineBg !== briefingLineBg(rung.steps)) cut.push(`${rung.id}: lineBg`);
+      if (item.detailBg !== briefingBodyBg(rung.steps)) cut.push(`${rung.id}: detailBg`);
+      // THE WIRE. Without it the sheet reads a field nobody sets and every
+      // phone loses the number while the two ends of the wire stay green.
+      if (item.lineOrdinal !== 1 || item.lineOrdinal !== briefingLineOrdinal(rung.steps)) {
+        cut.push(`${rung.id}: lineOrdinal is ${String(item.lineOrdinal)}`);
+      }
+    }
+    expect(cut, cut.slice(0, 10).join("\n")).toEqual([]);
+  });
+
+  it("…and the shell queues THAT item, not a second one written by hand", () => {
     expect(
-      item,
-      "the wire is cut: the sheet would read a field nobody sets, and every gate would stay green",
-    ).toContain("lineOrdinal: briefingLineOrdinal(briefing)");
+      SHELL_SRC,
+      "§ 4c no longer calls the producer — re-anchor, and check what the phone now paints",
+    ).toMatch(/\?\s*briefingSheetItem\(briefing, closeBriefing\)\s*:\s*null,/);
+    expect(SHELL_SRC, "a hand-built briefing item is back in the component").not.toContain(
+      'id: "briefing",',
+    );
   });
 });

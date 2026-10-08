@@ -284,6 +284,14 @@ export interface SimOverlayItem {
    * missing «1.» to be missing FROM. That is a measurement, not a prohibition:
    * see the note on the test that used to forbid it.
    *
+   * ⚠ 2026-10-08: THERE IS NO BRIEFING PEEK ANY MORE, so the question in the
+   * paragraph above — which surface paints the number — has one answer left.
+   * The phone's briefing is `sheetOnly` (below): the sheet is its only
+   * presentation. The w79 peek frames agree with the measurement above (the
+   * lead alone is on the glass, the whole body under «ПРОЧЕТИ ↓17»), and they
+   * are also why the peek went: a lead with no number and no list is one step
+   * of five presented as the instruction.
+   *
    * `null`/absent for every item that is not one step of an authored list — a
    * fault card, a commendation, a task line. Do not invent one.
    *
@@ -392,6 +400,44 @@ export interface SimOverlayItem {
    * needs. Everything else on the glass stays one tap from gone.
    */
   noDismiss?: boolean;
+  /**
+   * ── THIS ITEM HAS NO PEEK: IT IS THE READ SHEET, WHOLE — 2026-10-08 ────────
+   *   sc-vu-emergency:2e634d4d · sc-sig-controller-postures:f7e046c4, and the
+   *   integrator's decision under the founder's delegation of that day:
+   *   «PHONE BRIEFING, OPTED IN → THE FULL SHEET.»
+   *
+   * THE FRAMES (`.audit-frames/w79-capture/C-briefing-list`, `D-briefing-fold`,
+   * 852 × 393 at DPR 3, tree 8b5a7f2). A student who had OPTED IN to the
+   * briefing — the stored «Показвай ги в началото», or МЕНЮ → «Инструкции ·
+   * N стъпки» — got a PEEK: step 1 of 5 as an unnumbered lead, and the other
+   * four (the list that opens at «2.») entirely under the fold behind «ПРОЧЕТИ
+   * ↓17» — «↓36» on sc-sig-controller-postures — beside «РАЗБРАХ». And the car
+   * DROVE with that peek up — 2.3–3.1 m on 1.5 s of throttle — so he could set
+   * off having seen one step of the five he had asked to read. One tap on the
+   * counter opened the sheet, and the sheet was already right: all five steps
+   * 1.–5. in one face, whole, a modal dialog, the sim frozen.
+   *
+   * SO THE TEASER IS REMOVED RATHER THAN IMPROVED. Every one of the peek's
+   * rows on this card — the unnumbered lead, the fold counter, the read button
+   * that exists only to reach the other surface — is the cost of printing a
+   * procedure in a 180 px column, and the student who asked for the procedure
+   * did not ask for a column. An item carrying this flag:
+   *
+   *   · is painted by `SimOverlay` as its open sheet from the first commit —
+   *     there is no state in which its peek exists;
+   *   · wins `selectOverlay` whatever its `kind` ranks, because an explicit
+   *     read is rule 4's «EXPLICIT pause» and a pause that a 5-second toast can
+   *     take the glass from is not one (`selectOverlay`, below);
+   *   · holds the drive while it is the active item (`overlaySheetHoldsDrive`);
+   *   · has ONE way out, its acknowledgement — no ✕, no fold-to-peek — so it
+   *     must also be `blocking`, which is what paints that button.
+   *
+   * IT IS NOT A DEFAULT. Founder ruling 2026-09-20 #1 stands: the phone's
+   * briefing is OFF until the student switches it on, and this flag says
+   * nothing about WHEN the item is offered — only what it looks like when it
+   * is. `briefingSheetItem` is the one producer.
+   */
+  sheetOnly?: boolean;
   /** The caller renders extra React inside the opened sheet (checklist, result). */
   hasRichDetail?: boolean;
   /**
@@ -893,6 +939,57 @@ export function isUsableLineOrdinal(n: number | null | undefined): n is number {
 }
 
 /**
+ * THE PHONE'S BRIEFING, AS THE ONE ITEM THE SHELL QUEUES — 2026-10-08.
+ *
+ * The frames, the decision and what `sheetOnly` means are on that field. This
+ * is the producer, and it is a function for the reason `briefingLineBg` gives
+ * about itself: the item was an object literal inside a 9 000-line component,
+ * so nothing could put a lesson through it. `briefing-sheet.test.tsx` now puts
+ * all 808 compiled rungs through THIS code and reads the numbering off the
+ * rendered sheet against the authored steps.
+ *
+ * WHAT IT NO LONGER CARRIES, because each served only the peek:
+ *   · `openLabelBg: "Прочети"` — the button that reached the sheet from the
+ *     teaser. There is no teaser to reach it from;
+ *   · a `blocking` that depended on HOW the card was asked for. The recalled
+ *     peek was non-blocking so that it could paint a ✕ and not «hold» a moving
+ *     car — and `blocking` held nothing (`overlayHoldsDrive` has no consumer).
+ *     The sheet freezes the sim on both routes, exactly as pressing «ПРОЧЕТИ»
+ *     on that recalled peek already did, and МЕНЮ — the only route to a recall —
+ *     has already stopped the car before the row can be pressed.
+ *
+ * THE SPLIT STAYS: `lineBg` is step 1 and `detailBg` is steps 2…N as authored,
+ * so every corpus gate that reads those two functions still reads the code the
+ * glass paints. The sheet closes the sequence with `lineOrdinal` — its lead is
+ * «1. …» in the items' own face (`SimOverlay`, `sheetLeadIsListItem`) — and no
+ * surface is left on this path that prints the lead without its number.
+ *
+ * `null` for an empty briefing: a sheet onto nothing would freeze the car to
+ * show a button. The shell's gate says `briefing.length > 0` as well; this is
+ * the same refusal where a test can execute it.
+ */
+export function briefingSheetItem(
+  steps: readonly BriefingStepBg[],
+  onAck?: () => void,
+): SimOverlayItem | null {
+  if (steps.length === 0) return null;
+  return {
+    id: "briefing",
+    kind: "hint",
+    tone: "neutral",
+    chipBg: "Инструкции",
+    lineBg: briefingLineBg(steps),
+    lineOrdinal: briefingLineOrdinal(steps),
+    detailBg: briefingBodyBg(steps),
+    sheetOnly: true,
+    // What paints «Разбрах» on the sheet, and the only way out of it.
+    blocking: true,
+    ackLabelBg: "Разбрах",
+    onAck,
+  };
+}
+
+/**
  * …AND THE RULE ABOVE IS STATED FOR EVERY CARD AND ENFORCED FOR ONE.
  * Sweep 161, 2026-08-19.
  *
@@ -1207,6 +1304,37 @@ export function overlayHoldsDrive(
 }
 
 /**
+ * IS THE READ SHEET UP BY ITSELF — AND THE CAR THEREFORE STOPPED? 2026-10-08.
+ *
+ * The narrow half of the question above, and the half that HAS a consumer:
+ * `LessonPlayShell`'s `paused` reads it beside `overlaySheetOpen`.
+ *
+ * WHY `overlaySheetOpen` ALONE IS NOT ENOUGH. That flag is `SimOverlay`
+ * reporting its open state up through an EFFECT (`onOpenChange`), so the shell
+ * learns of it one commit after the sheet is painted. For a sheet the student
+ * opened with a tap that lag is invisible — the car was already his to stop.
+ * For a `sheetOnly` item it is the commit on which МЕНЮ has just closed
+ * (`playMenuOpen` false) and the sheet has just appeared: one frame with the
+ * physics live and the touch controls mounted, under a surface whose whole
+ * claim is that the drive waits for it. This is the same fact read off the
+ * SELECTION, which the shell has in the render that paints the sheet.
+ *
+ * `active`, and not «any candidate»: `selectOverlay` puts a sheet-only item
+ * first by construction, so „it is a candidate" and „it is on the glass" are
+ * the same statement — and the one case where they are not (a different
+ * surface owns the screen, `screenOwners`) is a case where that surface is
+ * already holding the drive.
+ *
+ * NOT `selection.held`. That is true for every blocking candidate — a teach
+ * moment the shell already freezes for by name — and wiring it would be the
+ * census adoption the ⚠ block above describes, with the behaviour change it
+ * names. This answers for one presentation and changes nothing else.
+ */
+export function overlaySheetHoldsDrive(selection: Pick<OverlaySelection, "active">): boolean {
+  return selection.active?.sheetOnly === true;
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * A DISMISSAL NEEDS AN UNDO, NOT AN OWNER — the ✕ that killed the phone's only
  * route back to the lesson's instructions (THEO-4), measured 2026-09-23 on
@@ -1273,6 +1401,15 @@ export function overlayHoldsDrive(
  *
  * PURE, so the sequence above is executable in the node suite rather than
  * described in a comment — `__tests__/briefing-reachable.test.ts` drives it.
+ *
+ * ⚠ 2026-10-08 — THE SEQUENCE ABOVE CAN NO LONGER BE PRODUCED BY THE BRIEFING,
+ * and the rule stays for everything else. The phone's briefing is the read
+ * sheet now (`SimOverlayItem.sheetOnly`): it has no peek, therefore no ✕, so
+ * steps 1–3 have no step 2, and `recallBriefing` no longer bumps the key or
+ * clears the shell's list for it. The remaining re-offering owner is
+ * `recallPreDriveOverlay`; the rig's five mounts are still the owner that
+ * re-offers nothing. `briefing-reachable.test.ts` reads the absence of that ✕
+ * off the rendered sheet rather than trusting this paragraph.
  */
 export interface OverlayLocalDismissal {
   /** The id the ✕ sent away. By ID, so a NEW line speaks immediately — A6. */
@@ -1413,10 +1550,28 @@ export function selectOverlay(
   // of a function that was not the one doing the ordering. One call each fixes
   // that, and costs a property lookup per item on a list that is never longer
   // than the overlay kinds themselves.
+  //
+  // …AND ONE THING OUTRANKS PRIORITY: A SHEET THE STUDENT ASKED TO READ —
+  // 2026-10-08 (`SimOverlayItem.sheetOnly`). The briefing is a `hint` (60); an
+  // armed telltale is 70, a graded fault 80, a teach moment 90. On priority
+  // alone any of them takes the slot, the briefing's «Разбрах» leaves the
+  // glass, and the car is free under instructions nobody dismissed — the
+  // mechanism `OverlaySelection.held` records on three lessons, and the reason
+  // a peek could be driven past. `SimOverlay` has always said the rule for a
+  // sheet somebody opened with a tap: „while a sheet is open it IS the one
+  // overlay; a newly arrived line waits." A sheet-only item is open from its
+  // first frame, so the same rule has to hold from the same frame — here,
+  // because here is where „which one" is decided. Everything behind it keeps
+  // its order and is still counted, so the card that waited speaks the moment
+  // the sheet is acknowledged.
+  const sheetFirst = (item: SimOverlayItem): number => (item.sheetOnly === true ? 1 : 0);
   const ordered = items
     .map((item, index) => ({ item, index }))
-    .sort((a, b) =>
-      overlayPriority(b.item.kind) - overlayPriority(a.item.kind) || a.index - b.index,
+    .sort(
+      (a, b) =>
+        sheetFirst(b.item) - sheetFirst(a.item) ||
+        overlayPriority(b.item.kind) - overlayPriority(a.item.kind) ||
+        a.index - b.index,
     )
     .map((e) => e.item);
 

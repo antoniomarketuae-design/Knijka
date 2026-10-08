@@ -10925,3 +10925,105 @@ The w81 capture showed the passing debrief of `sc-mv-uturn-ban` never said why t
   - the founder’s sign-off on the title;
   - a re-photograph of the lawful drive through the rig, to re-judge e98407b1;
   - a detector note: an uncoached brief touch of the solid axis is still praised, because CENTER_LINE_TOUCHED needs 3.5 s of contact. The praise title makes no claim about touching, so it stays true.
+
+## Founder delegation, 2026-10-08: the pending founder decisions, decided by the integrator with his permission
+
+Asked how the programme stood, the founder was shown the items waiting on him and answered, verbatim: **«Do all of the things that you wait for me the best way you see it with my permission»**. The decisions below are the integrator’s, made under that permission. A later word from the founder overrides any of them.
+
+| # | Item (row) | Decision | How it is carried out |
+|---|---|---|---|
+| 1 | Phone briefing when opted in (sc-vu-emergency:2e634d4d, sc-sig-controller-postures:f7e046c4) | **The full sheet.** The whole numbered briefing, 1.–N in one face. No teaser with «ПРОЧЕТИ ↓N», and no unnumbered lead with a body that starts at «2.». The 2026-09-20 default-off ruling is unchanged. | Lane `briefsheet`, built and adversarially verified, then photographed on the phone lens. |
+| 2 | Truck-pass crosswind lesson (sc-ac-wind-truck-pass:ff1d4290) | **Restage it.** The truck holds its own speed so it can lawfully be passed. The lee beside it is real, and the wind returns past the cab. | Lane `truckpass`, built and adversarially verified, then driven through the rig. |
+| 3 | The praise title «Подмина забраната, обърна на прекъснатата осева» (43b4109) | **Approved.** | Nothing to build. |
+| 4 | His crosswind manual drive (ruling 2026-10-05; sc-ac-crosswind:a9db1738) | **Driven by the integrator through `/dev/drive-rig`**, on the keyboard input path, on the PC and phone lenses. | The next rig wave, judged and verified. |
+| 5 | How far one В23 reaches (V4) | **The product makes no claim about a В23’s reach.** The lesson’s ban is the solid-axis span it marks, with one plate at its start. The copy stays neutral. | Nothing to build; judges are told it is ruled. |
+| 6 | Roundabout (ADR-011): the 0.3 m/s «a circulating car paid» threshold and the voice-line gating | **Stand as built.** | Nothing to build. |
+
+**One item a delegation cannot settle: the lane-ends sign** (sc-merge-lane-end:ae6166e2; rulings 2026-09-27 «sign required», 2026-10-04 «I’ll supply the sign»).
+- It needs three facts from the founder’s copy of the ordinance: the sign’s code, its face, and the article.
+- The content bank has neither. It holds 77 signs, none of them a narrowing or lane-ends sign, and `content/law/acts` holds no РД-02-21-1.
+- ADR-002 forbids recalling them from memory, and the founder’s dismissal of the ordinance download stands.
+- The row stays PARTIAL. The ask is minimal: the code and a photograph of the face.
+
+## Wave C verdicts — 2026-10-08
+
+This run retired 4 row(s). Their evidence frames were driven at (unattributable: 4 of 4) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`43b410954a28`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 4 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 15 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 5 |
+
+**Open list: 25 → 21**, out of 1533 filed across the whole programme (1508 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w2: eleven rows re-driven through the drive rig, and what each PARTIAL rests on (integrator note, 2026-10-08)
+
+Workflow `rig-wave-w2` (wf_777909b4-b4b) ran at `43b4109`, with one capture at a time and a per-row drive spec. Each spec was written against what the rig-w1 verifiers had refuted: the filed level and lens, the lesson’s own task caps, a gap judged against moving cars, genuinely different drives, and the harness leg where the row is about it. Frames are under `.audit-frames/rig-w2/<lesson>/`. Every CLOSED was attacked by a verifier who read the telemetry.
+
+**Four closures survived. Open list 25 → 21 (critical 8 → 5).**
+- **sc-jx-giveway-b1:d7531206 (critical).** The phone at Ниво 1 (the filed level) passes at 0 т. with all three tasks, on the same controller as PC.
+- **sc-merge-from-property:ab353b86 (critical).** A drive under the 5 km/h and 3 km/h task caps that waits for a car of the stream and merges into the gap behind it passes.
+- **sc-junction-gap:63e4e93e (critical).** The careful drive is credited and not convicted.
+- **sc-ln-boulevard-discipline:939776d0.** One controller passes on both lenses, and nothing is force-closed on the phone.
+
+As in rig-w1, these show that the product credits a correct drive. The filed convictions came from harness legs that could not steer.
+
+**Seven stayed PARTIAL. This time each rests on a product defect the judge MEASURED, not on a missing frame.** Each has a repair lane in wave E (`repairs-wave-e.js`):
+| Row | The measured cause | Lane |
+|---|---|---|
+| sc-mv-uturn-ban:e98407b1 | The new praise «Подмина забраната, обърна на прекъснатата осева» is lost when the turn arc reaches y ≥ ~277, where the tick’s edge hands off to the side street. The lesson’s own instruction 4 says to stop «На 280-ия метър». Three lawful drives get the praise; two equally lawful ones do not. | uturnedge |
+| sc-rb-lane-choice:ffdffd55 (critical) | A correct exit at the instructed «около 12 км/ч» ends «НЕ Е ВЗЕТ» for POOR_LANE_KEEPING. After the car leaves the ring, the tick stays on the ring edge with the lane offset saturated at 4.06 m for 3.09–3.14 s, against the 3 s / 3.25 m rule. Only an unrequested acceleration to 20 km/h passes. | rbexit |
+| sc-ln-obstacle-meeting:114706e0 (critical) | The briefing says «Насреща идват ДВЕ коли», but the staging recycles each oncoming car about 12.7 s after it leaves. A student who waits more than ~11 s meets a third and a fourth. | meetcars |
+| sc-follow-tailgater:63c0c28c (critical) | A full-pedal brake check with the tailgater 8.5–8.9 m behind, from 32–35 km/h, escapes entirely: no card, ИЗДЪРЖАН ★★★, and «Чисто и спокойно каране». The detector’s floor is 35 km/h, while the lesson’s own task says «дръж под 36». | tailbrake |
+| sc-roundabout-entry:4ab693eb (critical) | The car can no longer mount the island (it is stopped at the kerb), and the crash card and chase cut are there. But the coach card «Излез от кръговото с десен мигач» stays up for about 5 s while the car stands crashed. | islandcoach |
+| sc-turn-left-oncoming:d079e687 | All four lens × level sheets are now identical and pass. But the phone debrief prints «Интервал: завоят не беше започнат…» under a turn it has ticked and commended, where PC prints the measured interval. | ltapnote |
+| sc-hz-brake-dont-swerve:f0023997 | The flash, shake and chase cut are there (no damage model, per the 2026-09-27 ruling). But for seven 60 fps frames at the chase/cockpit hand-over the camera is inside the car’s own body, and the first chase frames draw the cabin shell without the body. | crashcam |
+
+**An integrator decision inside wave E, told to the founder 2026-10-08.** The tailbrake lane bills a causeless hard brake in a lesson that stages a close follower when the follower was actually put at risk. That is the principle of his two «bill forced braking» rulings, derived from the follower’s own account. It introduces no new speed number, and the global 35 km/h floor stays for every lesson without a close follower.
+
+## Landed: an opted-in phone briefing is the full numbered sheet (sc-vu-emergency:2e634d4d, sc-sig-controller-postures:f7e046c4) (2026-10-08)
+
+Decided under the founder’s delegation of 2026-10-08 (item 1 above). Lane `briefsheet`, two rounds, each adversarially verified.
+
+**What changed.** For a phone student who has opted in, by the stored opt-in at arrival or through МЕНЮ → «Инструкции · N стъпки», the briefing is now the read sheet from its first painted frame:
+- every authored step, numbered 1.–N in one face, in a modal dialog;
+- the sim held while the sheet is up;
+- one control, «Разбрах», 36 px (ruling 2026-09-20 #4);
+- no peek, no «ПРОЧЕТИ ↓N», no unnumbered lead, no ✕.
+
+Nothing changes for a student who has not opted in (ruling 2026-09-20 #1), nor on the PC panel. The peek-only code that became unreachable is deleted.
+
+**Round 1 was refuted** on one ground. The fixed 36 px button also carried the fold cue, which wraps to 2–3 lines on landscape phones and spilled out of it: 10 of 808 rungs at 852×393, and 20 at 780×360.
+
+**Round 2** gives the cue its own place in the sheet’s foot: «↓ още N реда — „Разбрах“ първо превърта до края». The button holds «Разбрах» only. The round-2 verifier measured all 808 rungs in WebKit on four phone boxes (852×393, 780×360, 393×852, 360×780):
+- the sheet is open and the painted text equals the authored steps 1.–N on 808/808;
+- there is exactly one 36 px button on 808/808, with 0 rungs showing ink outside its box;
+- the cue is whole on the 10 + 20 folding rungs, and its count equals the lines not wholly visible;
+- the first press reveals everything without acknowledging, and the second acknowledges;
+- the four round-1 surviving mutants (the freeze term, the shell feeding N−1 steps, every sheet shrinking to 36 px, the ✕ removed everywhere) are now killed by EXECUTED tests that run the shell’s own statements.
+
+**Integrator decisions (the builder asked; accepted under the delegation):**
+- (a) the briefing sheet takes the overlay slot over any priority while it is up, so it cannot be driven past unread;
+- (b) Escape acknowledges;
+- (c) a МЕНЮ recall mid-drive holds the car until «Разбрах»;
+- (d) 36 px applies only to the briefing sheet, and teach and violation sheets keep 44 px and their ✕;
+- the cue wording above, which is literally what the press does.
+
+**Owed, and why the two rows are NOT closed by this landing:**
+- **A device capture.** Nothing was driven on the real shell. The capture must show that the sheet is the first painted frame on the phone lens for both lessons, that «Разбрах» measures 36 CSS px, and that the car reads 0 km/h under throttle until «Разбрах». It must also re-measure the folded case on sc-ov-crest-curve L4. Then judge both rows. f7e046c4 clause 4 also needs a completed careful drive on both lenses.
+- **The audit harness still expects the peek.** `tools/mobile/sheet-fold.mjs` `openTheSheet()` and `tools/mobile/lesson-audit.mjs` (~2216) wait for «ПРОЧЕТИ». Both must key on `[data-sim-overlay-state="open"]` / `[data-sim-overlay-sheet-only]` and press «Разбрах» until the dialog is gone. No standard sweep opts in (the phone briefing is off by default), so no current leg is affected. Fix it before any opted-in phone leg is driven.
+- **A stale dev-rig fixture.** `app/dev/popup-rig/Adr009Gallery.tsx` fixture «briefing-phone» still builds a peek the product no longer paints.
+- **To tell the founder (not decided under the delegation).** With the full sheet, an opted-in student’s reading time at arrival always counts toward par (stars only, ruling 21).
+- The cue appears from the second painted frame, because its count is measured by a ResizeObserver (as for every fold cue at base).

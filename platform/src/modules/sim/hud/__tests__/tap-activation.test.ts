@@ -671,7 +671,14 @@ describe("the second-finger census of the compact driving surface", () => {
     // the car, so there is no thumb band left for the panel to clear and no
     // height cap for a control to escape. A ratchet that only ever counts UP
     // would make deleting a control harder than adding one, which is backwards.
-    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 6, desktopOnly: 0 },
+    // 6 → 7 on 2026-10-08, and NOT a seventh control on the glass: the sheet's
+    // «Разбрах» is now written twice in the source — the 44 px one every
+    // tap-opened blocking sheet has, and the 36 px one in the phone briefing
+    // sheet's foot (`data-sim-overlay-sheet-foot`) — and exactly one of the two
+    // is ever mounted (`blocking && !sheetOnly` / `blocking && sheetOnly`). Both
+    // spread the same `tapSheetAck`, so the second arrived with its pointer
+    // path, which is what this row counts.
+    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 7, desktopOnly: 0 },
     { rel: "components/sim/lesson-ui/TraceTimeline.tsx", pointer: 5, desktopOnly: 2 },
   ];
   it("LessonScene · the demonstration's own open/close toggle", () => {

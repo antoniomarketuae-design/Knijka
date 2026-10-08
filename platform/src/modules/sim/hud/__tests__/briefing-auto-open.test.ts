@@ -208,9 +208,14 @@ describe("the shell decides against the RESOLVED surface (w60: the ruling did no
     expect(CODE).toMatch(/const closeBriefing = useCallback\(\(\) => dispatchBriefingStart\(\{ type: "dismiss" \}\)/);
     const recall = CODE.slice(CODE.indexOf("const recallBriefing = useCallback"));
     expect(recall.slice(0, 200)).toContain('dispatchBriefingStart({ type: "recall" })');
-    const at = CODE.indexOf("setBriefingRecalled(false)");
-    expect(at, "unresolved: the retry's recall-latch reset is gone").toBeGreaterThan(-1);
-    expect(CODE.slice(at, at + 400)).toContain(
+    // Anchored on `retry` itself since 2026-10-08: the old landmark was the
+    // reset of the recalled PEEK's non-blocking latch, which went with the peek
+    // (`briefing-sheet.test.tsx`).
+    const at = CODE.indexOf("const retry = () => {");
+    expect(at, "unresolved: `retry` not found — re-anchor").toBeGreaterThan(-1);
+    const next = CODE.indexOf("\n  };", at);
+    expect(next, "unresolved: `retry` does not close where its indent says").toBeGreaterThan(at);
+    expect(CODE.slice(at, next)).toContain(
       'dispatchBriefingStart({ type: "arrive", compact, stored: briefingAutoStored })',
     );
   });
