@@ -294,7 +294,15 @@ describe("T17 — the FOLLOWING drills' leads drive their own arc", () => {
     // `paceProfile`, so the approach is a following exercise and the count of
     // banded leads falls by exactly one. This number may only go DOWN for a
     // reason written next to it.
-    expect(banded.length).toBe(19);
+    // 19 → 18 (sc-ac-wind-truck-pass:ff1d4290, ADR-015): `sc-acw-truck`, the
+    // truck of sc-ac-wind-truck-pass, left the band. Under matchPlayer it kept
+    // station 37–73 m ahead of the student, so it could never be passed, never
+    // stood beside the car and never fell behind it — «до кабината» was
+    // certified on an empty lane. It now holds its own 40 км/ч
+    // `scheduledCruise` on its own arc and is overtaken for real; its two
+    // tasks are its runner's reports (`stagedPass`). It is the only lead that
+    // left the list: the other 18 are unchanged.
+    expect(banded.length).toBe(18);
   });
 });
 

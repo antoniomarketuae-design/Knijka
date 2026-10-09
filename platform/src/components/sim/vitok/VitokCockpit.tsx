@@ -55,6 +55,7 @@ import {
 } from "@/modules/sim/scene/vitok/mirrorStation";
 import { useCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
+import { CABIN_SHELL_NODE } from "@/modules/sim/scene/bodyViewCut";
 
 // ---------------------------------------------------------------------------
 // A3 authored interior — the Aurelis GT-E cabin (Draco GLB, 22.5k tris,
@@ -1698,9 +1699,11 @@ export function VitokCockpit({
 
   // Cockpit-view-only: the cabin is pure driver-seat perception; the chase
   // camera sees the exterior GLB instead. visible (not unmount) so the GLTF
-  // graph, canvas texture and mirror targets survive view toggles.
+  // graph, canvas texture and mirror targets survive view toggles. NAMED so
+  // CameraRig never poses an outside view while this open shell is drawn
+  // (f0023997 clauses 1/6, scene/bodyViewCut.ts).
   return (
-    <group visible={cockpitView}>
+    <group name={CABIN_SHELL_NODE} visible={cockpitView}>
       <primitive
         object={model}
         position={[0, INTERIOR_Y_OFFSET, 0]}

@@ -949,13 +949,32 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // sc-ac-wind-truck-pass — „Страничен вятър след камиона" (AC-12 crosswind, the
-// OVERTAKING beat) on mw-v1 (the 1000 m 2+2 motorway, REUSED, DAY DRY + WIND).
+// OVERTAKING beat) on mw-v1 (the 2600 m 2+2 motorway, REUSED, DAY DRY + WIND).
 // ---------------------------------------------------------------------------
 
 /** mw-v1 northbound OVERTAKING-lane center — laneId 2 (meta.scenario.laneLeftX;
  *  the L7 copy truth, asserted against the map by the trace gate). The cruise
  *  lane (laneId 1) is x = 0 (MW_X_CRUISE, above), the emergency lane x = 8.13. */
 const MW_X_OVERTAKE = -8.12;
+
+/**
+ * THE TRUCK'S OWN SPEED — 40 км/ч (11.11 m/s), held on a scheduled cruise.
+ *
+ * WHY 40. It has to be BELOW what the student may lawfully drive beside it, at
+ * every rung, or the pass the lesson asks for cannot be made without speeding.
+ * The slowest lawful speed in the overtaking lane of mw-v1 is the product's own
+ * motorway floor, 50 км/ч (`rules/types.ts motorwayMinFlowKmh`: a steady speed
+ * under it, with no vehicle within 60 m ahead in the lane, is billed
+ * DRIVING_TOO_SLOW_FOR_MOTORWAY) — so 40 leaves the slowest lawful student
+ * 10 км/ч of closing speed, and the taught 62 км/ч twenty-two. The lesson's cap
+ * (100, the pass task) and the road's limit (140; 119 under L5's rain
+ * envelope) are untouched: nothing was raised to make the pass fit.
+ *
+ * A heavy rig crawling at 40 in this wind is the picture the briefing already
+ * paints («отпред пъпли камион»), and ЗДвП чл. 20, ал. 2 — the article this
+ * lesson cites — is its driver's reason.
+ */
+const WIND_TRUCK_MPS = 40 / 3.6;
 
 /**
  * THE STAGED TRUCK — the rig whose lee (завет) is the whole lesson.
@@ -967,50 +986,122 @@ const MW_X_OVERTAKE = -8.12;
  * (CutInLeadCarRunner) can place a rig in the CRUISE lane (x = 0). Its CUT tier
  * is authored out of reach (cutAt 400 m past the road end + minCutSpeedKmh 250,
  * the sc-follow-rain-gap slam-out-of-reach pattern): the actor is deterministic
- * scenery — the truck the player overtakes — and executes NO cut. It emits no
- * SimTick events and resolves no outcome (the runner's collision arm only ever
- * arms AFTER a cut, which never fires here — verified by probe), so no drive can
- * grade from it.
+ * scenery — the truck the player overtakes — and executes NO cut.
  *
- * HONEST LIVE LIMIT (stated, not hidden — the sc-ac-crosswind dual-channel law):
- * cutInLeadCar has only a matchPlayer motion mode, so in the LIVE re-sim the rig
- * PACES the player and never physically falls behind — the overtake is not
- * completed in world space. The pass NARRATIVE (drawing level with the trailer,
- * the nose clearing the cab, the gust in the lee's edge) is carried by the
- * AUTHORED shadow polyline + the copy, exactly the way sc-ac-crosswind authors
- * the wind itself into the ghost (the recorder is kinematic — it never runs the
- * live crosswind force). A plain slow-cruiser lead actor (or a hold-only truck
- * slot) would make the live pass complete in world space — flagged for a
- * follow-up (see the file report): NOT taken here because it is new runner work
- * on a shared file, and the taught skill (hold the lane through the gust) is
- * fully LIVE regardless of the rig's relative position.
+ * THE RESTAGE OF 2026-10-08 (sc-ac-wind-truck-pass:ff1d4290; the founder's
+ * delegation of that date, the integrator's decision: «restage the truck-pass
+ * crosswind lesson so the truck can really be passed and its lee reached»).
+ * Until then this actor was `matchPlayer` with `paceAheadM: 60`: it paced the
+ * student and stayed 36–80 m AHEAD on every sample of every drive, so it was
+ * never abeam and never behind. Briefing step 8 («…щом целият камион е в
+ * огледалото») could not trigger, the first task («…до кабината…») was a disc
+ * on an empty lane, the correct demo ended on «изпреварихме камиона» with the
+ * truck still in front, and the lee the lesson is about could not be reached,
+ * so the briefing had been rewritten to tell the student there was none.
  *
- * paceAheadM 60: generous enough that the brief return to the cruise lane at the
- * end never re-approaches the rig inside the FOLLOWING band (56 m of bumper gap
- * ≈ 2.6 s at the ~78 km/h finish — over the 1.8 s dry threshold), so the ONLY
- * things this template grades are the wind-control channels.
+ * THREE AUTHORED FACTS MAKE IT REAL, all three opt-in on the shared contracts:
+ *  · `paceMode: "scheduledCruise"` at `WIND_TRUCK_MPS` — the truck holds its
+ *    own 40 км/ч on its own arc and is passed in world space. `paceAheadM: 90`
+ *    is that mode's RELEASE distance; the truck stands 80 m up the road at the
+ *    spawn, so it moves off with the student's first metres.
+ *  · `actor.windShelter: true` — its body is a wall to this lesson's wind
+ *    (`vehicle/windShelter.ts`): the wind blows WEST, the truck is in the
+ *    cruise lane, so the LEE is on its WEST side — the overtaking lane — and
+ *    in the 13 m of wake behind its tail. There the force on the student's car
+ *    is 30 % of the open wind's; it is whole again one car length past the cab.
+ *  · `overtake` — the runner reports, in the truck's own frame, the frame the
+ *    car draws level with the cab in the overtaking lane and the frame its
+ *    return into the truck's lane is FINISHED: settled in the lane with
+ *    10.25 m of road behind its tail, not slower than the truck, and the truck
+ *    not slowing for it, for the 1.44 s the truck takes to drive its guard's
+ *    reach — and the truck never braked hard for it (round 3). The first two
+ *    tasks below are those two reports.
+ *
+ * It still emits no SimTick events and resolves no outcome of its own; a real
+ * contact with it is the director's sentinel's to report, and now can be —
+ * the „narrow gap" mistake demo below is that contact.
  */
 const ACTS_WIND_TRUCK: CutInLeadCarSpec = {
   id: "sc-acw-truck",
   kind: "cutInLeadCar",
   actor: {
     pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
-    hold: { nodeIndex: 0, offsetM: 95 }, // dormant ~80 m ahead of the spawn, cruise lane
-    cruiseSpeedMps: 17, // ~61 km/h — the slow truck the player overtakes
+    hold: { nodeIndex: 0, offsetM: 95 }, // dormant 80 m ahead of the spawn, cruise lane
+    cruiseSpeedMps: WIND_TRUCK_MPS, // 40 км/ч — see WIND_TRUCK_MPS
     extraRightOffsetM: -8.125, // one drawn lane LEFT of the graph lane → the CRUISE lane (x = 0)
     colorIndex: 2,
-    profile: "truck", // FO-06 box-truck rig — the wall of the lee
+    profile: "truck", // FO-06 box-truck rig, 7.5 × 2.4 m — the wall of the lee
+    windShelter: true, // …and now it IS one: vehicle/windShelter.ts
   },
-  paceAheadM: 60, // see the header — keeps the return FOLLOWING-innocent
-  maxMatchSpeedMps: 33, // 118.8 km/h — never the constraint at this drill's speeds
-  cutAt: { x: MW_X_CRUISE, y: 1400 }, // 400 m PAST the 1000 m road — the cut tier is out of reach…
+  paceMode: "scheduledCruise", // its own speed, on its own arc — it can be passed
+  paceAheadM: 90, // the RELEASE distance: 80 m of road at the spawn, so it moves off with the student
+  maxMatchSpeedMps: WIND_TRUCK_MPS, // unused under scheduledCruise; carried because the spec requires it
+  cutAt: { x: MW_X_CRUISE, y: 3000 }, // 400 m PAST the 2600 m road — the cut tier is out of reach…
   cutRadiusM: 2,
   minCutSpeedKmh: 250, // …and double-locked: no player speed can fire it
   cutShiftM: 0,
   cutRampSec: 1.5,
-  cutSpeedMps: 17,
+  cutSpeedMps: WIND_TRUCK_MPS,
   clearAheadM: 45,
+  overtake: {
+    side: "left",
+    // The overtaking lane, edge to edge, measured from the truck's own line
+    // (x = 0): mw-v1's lane pitch is 8.12 m, so its centre is 8.12 m to the
+    // truck's left and its edges 4.06 and 12.18.
+    adjacentLaneM: [4.06, 12.18],
+    // „До кабината": the car's centre level with the cab — the front 2 m of
+    // the 7.5 m rig (its nose is 3.75 m ahead of its centre).
+    abeamFromM: 1.75,
+    // The truck's lane, half of it; the return is watched from the first
+    // frame any part of the car (0.85 m of half-width) is over its edge.
+    ownLaneHalfWidthM: 4.06,
+    // ROUND 3 — WHEN THE RETURN IS FINISHED (the round-2 verifier's F2-01: a
+    // car slower than the truck was answered «clear» on the frame its centre
+    // crossed the lane line, and the truck braked hard 0.6–1.6 s later). The
+    // car is SETTLED: centre within 3.0 m of the truck's line — the tighter of
+    // the lane-keeping band (laneKeepMaxOffsetM 3.25 on the drawn lane) and
+    // the truck's own following corridor (traffic/staged.ts GUARD_LATERAL_M
+    // 3.0), so the guard can see it — and heading within 15° of the road
+    // (runtime/turns.ts TURN_REARM_DEG, the runtime's «straightened out»).
+    // The restage test pins both to their sources.
+    establishedHalfWidthM: 3.0,
+    establishedHeadingDeg: 15,
+    // «Щом целият камион е в огледалото»: 10.25 m of road between the car's
+    // tail and the truck's nose. At that distance the whole 2.4 m front of the
+    // rig subtends 11° at the interior mirror — inside the glass, edge to edge.
+    //
+    // WHY NOT A ROUND 10 (round 2). The truck's own following guard watches
+    // 16 m ahead of its centre (`traffic/staged.ts GUARD_AHEAD_M`), which is
+    // 16 − 3.75 − 2.02 = 10.23 m between the bumpers, and brakes for a car
+    // nearer than that in its lane. A return counted «clear» at 10.00 m could
+    // therefore still be braked for on the next frame; at 10.25 the car is
+    // outside the truck's reach (`overtake-return-forced.test.ts` holds this
+    // number to the guard's). Round 3: the gap is one of the conditions the
+    // return must HOLD for 1.44 s before it is finished — never read on the
+    // frame the car crosses the line.
+    clearBumperGapM: 10.25,
+  },
 };
+
+/**
+ * Where the stretch ends, m up the northbound carriageway.
+ *
+ * WAS 600, and 600 is too tight for a truck that holds its own speed. MEASURED
+ * on the live car at every rung (`scenario/__tests__/
+ * wind-truck-pass-restage.test.ts` §2 — the five rungs agree to the metre):
+ *
+ *                          in the lee      alongside      level with   back, whole
+ *                          (any / full)    the truck      the cab at   truck behind
+ *   taught, 62 км/ч        4.2 s / 2.8 s   2.0 s, 33 m    y = 276      y = 361
+ *   slowest lawful, 53     7.2 s / 4.8 s   3.4 s, 49 m    y = 373      y = 481
+ *
+ * (53 on the pedal is 52 on the dial at the cab: two over the motorway floor.
+ * The lee column is with the 13 m wake of round 2; with round 1's 15 m it was
+ * 4.5 / 3.2 s and 7.8 / 5.4 s.)
+ * 900 leaves the slowest lawful pass 419 m of road in hand and the taught one
+ * 539 m, on a carriageway that is 2600 m long.
+ */
+const WIND_FINISH_Y = 900;
 
 /**
  * AC-12 — страничен вятър при изпреварване на камион (ЗДвП чл. 20, ал. 2:
@@ -1018,19 +1109,18 @@ const ACTS_WIND_TRUCK: CutInLeadCarSpec = {
  * така че водачът да запази контрол над превозното средство). The OVERTAKING
  * beat of the wind archetype, distinct from live sc-ac-crosswind (the plain
  * open-segment gust): here the danger is the TRANSITION — the truck's lee
- * (завет) shelters you while you are alongside, and the gust hits the instant
- * your nose clears the cab.
+ * (завет) shelters you while you are alongside, and the wind is back the
+ * instant your nose clears the cab.
  *
  * WHY mw-v1 AND NOT the fo-follow-v1 street sc-ac-crosswind uses:
  *  - The lesson needs a SLOW vehicle to overtake and a wide carriageway to do
  *    it on — a motorway is where „изпреварвам камион в силен вятър" actually
  *    lives (доц-72 AC-12's own „изпреварен камион" cue). The player pulls into
  *    the overtaking lane (laneId 2, x = −8.12), passes the rig in the cruise
- *    lane, and is struck by the gust at the cab line.
+ *    lane, and meets the wind again at the cab line.
  *  - mw-v1 carries no zones, crossings, junctions or signals, so nothing but
- *    the wind-control channels is gradable. Every speed stays ≥ 50 km/h (the
- *    motorway floor) and well under 140, so no motorway-crawl and no speeding
- *    code can attach.
+ *    the wind-control channels is gradable. In the overtaking lane every
+ *    lawful speed is ≥ 50 км/ч (the motorway floor) and well under 140.
  *
  * THE GRADING IS ALL LANE DISCIPLINE, AND THAT IS THE ARCHITECTURE (read before
  * „fixing" the mistake codeRefs):
@@ -1044,44 +1134,37 @@ const ACTS_WIND_TRUCK: CutInLeadCarSpec = {
  *    a violation); the LEFT indicator stays on across the pass, which EXEMPTS
  *    NOT_KEEPING_RIGHT (engine.ts keepRight indicator carve-out) while the car
  *    is in the overtaking lane.
- *  - The COLLISION mistake is the recorder's AUTHORED-consequence seam (a
- *    scripted `collision` step — the „пешеходец зад колата" pattern), the gust
- *    throwing the car against the trailer in the тясна пролука of the pass. It
- *    is a narrative beat at the current clock, never a geometric contact with
- *    the paced rig (which stays 8 m away in its own lane), so it bills EXACTLY
- *    COLLISION and nothing else.
+ *  - The COLLISION mistake is a REAL contact since the restage: the demo's car
+ *    runs into the truck's flank beside the cab and the director's sentinel
+ *    reports the two bodies overlapping. The recorder's scripted `collision`
+ *    seam, which billed a crash 8 m of air away from a paced rig, is gone.
  *
  * DUAL-CHANNEL HONESTY (the 4a law, wind edition — sc-ac-crosswind verbatim):
  * `physics.crosswind` runs the LIVE student's car under the westward force +
- * deterministic gust sine (CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_*, the same
- * whole-map wind the crosswind template ships — a truck-phase-locked gust is
- * doc-65 Phase-4 work, stated). The recorded demos are KINEMATIC, so the
- * lee-then-gust story is AUTHORED into the polylines (traces/scAcWindTruckPass
- * .ts): the shadow's small held-and-released correction at the cab line, the
- * mistakes' excursion / clip.
+ * deterministic gust sine (CROSSWIND_BRIDGE_N ± CROSSWIND_GUST_*), multiplied
+ * here by the truck's lee. The recorded demos are KINEMATIC, so what the wind
+ * does to the car is AUTHORED into the polylines (traces/scAcWindTruckPass.ts);
+ * what the truck does is not authored — it is this staged actor in the
+ * recorder's stack, on the same schedule as in the live one.
  */
 export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   id: "sc-ac-wind-truck-pass",
   family: "conditions",
   tagsBg: ["условия", "страничен вятър", "пориви", "изпреварване", "камион", "контрол на волана"],
   titleBg: "Страничен вятър след камиона",
-  // THE OBJECTIVE CARRIED THE SAME TWO PROMISES THE GATE TITLE WAS ALREADY
-  // STRIPPED OF — 2026-08-27, sc-ac-wind-truck-pass:6a076479. It read
-  // «изпревари бавния камион и бъди готов за порива в мига, в който носът ти
-  // излезе от завета му». Both halves are refused by this file's own measured
-  // notes: `ACTS_WIND_TRUCK`'s header states the pass „is not completed in
-  // world space" (cutInLeadCar has only a matchPlayer mode, so the rig holds
-  // `paceAheadM` forever), and the gate `sc-acw-pass` was retitled to
-  // «Излез в лявата лента до кабината…» for exactly that reason under the rule
-  // „until it exists no gate here may say «изпревари»"; and the lee is not in
-  // the physics at all (see instruction 3). `objectiveBg` is not a gate, but it
-  // IS student-facing on two live surfaces — `lane-world-claims.test.ts`
-  // counts it in `shownToTheStudent`, and `app/(dashboard)/classroom/
-  // lessonToRoom.ts:194` prints it as the caption under the correct take — so
-  // it was making both claims to the student's face while the chip beside it
-  // made neither.
+  // «ИЗПРЕВАРИ» IS BACK, BECAUSE THE WORLD NOW STAGES IT (2026-10-08,
+  // sc-ac-wind-truck-pass:ff1d4290). On 2026-08-27 (:6a076479) this sentence
+  // was stripped of both its promises — the overtake and the lee — under the
+  // rule „until it exists no gate here may say «изпревари»", because the rig
+  // only paced and the wind had no position term. Both exist now (see
+  // ACTS_WIND_TRUCK), both are measured on the live car at every rung
+  // (`wind-truck-pass-restage.test.ts`), and the sentence says what the drive
+  // delivers: the lee beside the truck, and the wind back at the cab.
+  // `objectiveBg` is student-facing on two live surfaces
+  // (`lane-world-claims.test.ts` counts it in `shownToTheStudent`, and the
+  // classroom prints it under the correct take).
   objectiveBg:
-    "При силен страничен вятър излез да изпреварваш бавния камион, без да разчиташ на завет зад него — вятърът натиска през целия участък: намали преди маневрата, дръж волана здраво с двете ръце и посрещай поривите с леки, постоянни корекции, не с рязко дръпване.",
+    "При силен страничен вятър изпревари бавния камион: намали преди маневрата и дръж волана здраво с двете ръце. До камиона си в неговия завет и вятърът отслабва — отпусни корекцията плавно; пред кабината вятърът се връща наведнъж — посрещни го с лека, постоянна корекция, не с рязко дръпване.",
   archetypeIds: ["AC-12"],
   conceptIds: [
     "c-vehicle-controls",
@@ -1092,7 +1175,7 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   ],
   map: {
     archetype: "motorway-segment",
-    // Reuses the committed mw-v1 map (1000 m divided 2+2 АМ, posted 140, an
+    // Reuses the committed mw-v1 map (2600 m divided 2+2 АМ, posted 140, an
     // emergencyLane span per carriageway, NO junctions/crossings/signals) —
     // its meta.scenario.params, mirrored here for provenance.
     // doc 87 B67: mw-v1 grew 1000 -> 2600 m per carriageway (the posted 140 was
@@ -1106,68 +1189,49 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // 287 characters — THE LONGEST STEP 1 IN THESE FIVE FILES. Three separate
-    // duties (hands, lamps, look) and a paragraph of reasoning, in one line the
-    // card could show a third of.
     // 70 ch
     { n: 1, textBg: "Хвани волана здраво с двете ръце — вятърът бие, а отпред пъпли камион." },
     // 73 ch
     { n: 2, textBg: "Включи късите светлини, ако вали (чл. 70) — минаваш през водния му облак." },
-    // 74 ch
-    // THE LEE IS NOT SIMULATED, AND THIS STEP WAS SELLING IT — 2026-08-27,
-    // sc-ac-wind-truck-pass:6a076479. The finding is filed as „no crosswind is
-    // depicted anywhere … in a lesson whose whole subject is the gust you take
-    // when you clear the truck's lee", and the DEPICTION half is the render
-    // layer's (routed in the lane report). This half is this file's, it is
-    // sharper, and it was measured in the code rather than inferred:
-    //
-    //   `LessonScene.tsx:2296-2298` — windLateralN = −CROSSWIND_BRIDGE_N,
-    //   windGustAmplitudeN = −CROSSWIND_GUST_AMPLITUDE_N, period
-    //   CROSSWIND_GUST_PERIOD_SEC, all three constant for the whole lesson.
-    //   `VehicleSim.ts:510-518` — the branch adds `windLateralN +
-    //   amplitude·sin(2π·t/period)` to the body EVERY step from t = 0. There is
-    //   no position term, no truck term and no shelter term anywhere in it.
-    //
-    // So the live student is under the full 1200 N from the first frame,
-    // INCLUDING while he sits behind the truck, and the gust peaks on a 5 s
-    // clock that knows nothing about the cab line. This step told him the
-    // opposite — «завет зад камиона» — and step 6 told him the blow would
-    // arrive at a place. tuning.ts measures the cost of believing it (re-
-    // measured 2026-10-04 with the wind's yaw pull, founder ruling «Stronger
-    // wind»; re-measured again in round 2 under the pull law that makes step 5
-    // true): at this drill's 70–78 км/ч a hands-fixed car is carried 0.5 m in
-    // 1 s and 1.8–1.9 m in 2 s, and
-    // POOR_LANE_KEEPING is live here at laneKeepMaxOffsetM 3.25 m. A student
-    // who relaxes his grip on the strength of the old step 3 is convicted by a
-    // wind the briefing promised him he was sheltered from — the founder's
-    // false-failure complaint, authored.
-    //
-    // NOT GUTTED, RETARGETED — the sc-ac-crosswind precedent
-    // (`conditions-sweep161-truth.test.ts` „the two rewritten drills still
-    // TEACH their hazard"). The AC-12 doctrine (a truck IS a wall, its lee ends
-    // at the cab, the second swing is the killer) is true on every real road
-    // and stays whole in `teach.whenBg`/`whyBg` below, and the mistake cards
-    // still narrate the authored ghosts that demonstrate it. What the briefing
-    // now states is what THIS drive delivers.
-    { n: 3, textBg: "Не разчитай на завет зад камиона — тук вятърът натиска през целия участък." },
+    // 64 ch
+    // WAS «Не разчитай на завет зад камиона — тук вятърът натиска през целия
+    // участък» (2026-08-27, when the wind had no position term and that was the
+    // truth of the drive). The first half is still the rule and is now a
+    // MEASURED property of the lee, at the product's OWN line (round 2, the
+    // round-1 verifier's F-05): the wake ends 13 m behind the truck's tail
+    // (`WIND_SHELTER_WAKE_M`), and the rule engine starts to bill a car
+    // following a 40 км/ч truck at 14.0 m — `followFireRatio` 0.7 of the
+    // `followSafeSeconds` 1.8 s gap, at 11.11 m/s. The TAUGHT gap is the whole
+    // 1.8 s, 20 m. So at every distance the product does not call too close
+    // the factor is exactly 1 (measured on the live car at four rungs,
+    // `wind-truck-pass-restage.test.ts` §8b), and the lee begins a metre
+    // inside the «твърде близо» card. The second half of the old sentence was
+    // true of the old world and is false of this one: beside the truck the
+    // wind is at 30 %.
+    { n: 3, textBg: "Дръж корекцията и зад камиона: на безопасна дистанция завет няма." },
     // 58 ch
     { n: 4, textBg: "Намали и подай ляв мигач ПРЕДИ да излезеш за изпреварване." },
     // 67 ch
     { n: 5, textBg: "Помни: по-бавно покрай камиона значи по-малко отместване от порива." },
-    // 74 ch
-    // WAS „Очаквай удара в мига, в който носът ти излезе пред кабината." — the
-    // same 2026-08-27 measurement as step 3. The gust is a pure sine of period
-    // CROSSWIND_GUST_PERIOD_SEC = 5 s and amplitude 500 N on a 1200 N base
-    // (tuning.ts:250-259), so it breathes between ~0.6× and ~1.4× and NEVER
-    // reverses — „диша, но никога не спира" is that envelope stated in words
-    // the student can act on, and it is what the wheel actually does. The old
-    // line pinned the event to a place the physics does not know about; a
-    // student who braced only there braced once, five seconds off, and held
-    // nothing for the other twenty-five.
-    { n: 6, textBg: "Очаквай порив на всеки няколко секунди — вятърът диша, но никога не спира." },
-    // 66 ch
-    { n: 7, textBg: "Посрещни го с лека, ПОСТОЯННА корекция към камиона — никога рязко." },
-    // 74 ch
+    // 67 ch
+    // WAS «Очаквай порив на всеки няколко секунди — вятърът диша, но никога не
+    // спира» — the 2026-08-27 line for a wind that knew no place. The event
+    // this lesson is named for HAS a place now, and the step names it. MEASURED
+    // on the live car at every rung: beside the truck the force is 210–510 N
+    // against 700–1700 N in the open, the wheel that holds the lane falls from
+    // 1.7 % of the lock to 0.4 %, and a wheel left where the open wind wanted
+    // it carries the car 1.6 m toward the truck in the 1.5 s the full lee
+    // lasts at 80 км/ч (0.9 m with no lee) — which is the „плавно".
+    { n: 6, textBg: "Отпусни корекцията плавно до камиона — в завета му вятърът отслабва." },
+    // 68 ch
+    // WAS «Посрещни го с лека, ПОСТОЯННА корекция към камиона — никога рязко».
+    // MEASURED: the factor is back to 1 within one car length (4.04 m) of
+    // relative travel past the cab — 0.7 s at the taught 62 км/ч, half a
+    // second at a 30 км/ч closing speed; the force goes from 214 N to 987 N in
+    // that time on the L3 drive.
+    { n: 7, textBg: "Посрещни вятъра пред кабината леко, никога рязко — връща се наведнъж." },
+    // 74 ch — unchanged, and since the restage it can happen: the truck falls
+    // behind, and the second task fires when it has.
     { n: 8, textBg: "Прибери се плавно надясно с десен мигач, щом целият камион е в огледалото." },
     // 51 ch
     { n: 9, textBg: "Очаквай нов порив при всяко следващо открито място." },
@@ -1175,133 +1239,92 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   success: [
     {
       id: "sc-acw-pass",
-      // THE BANNER NOW NAMES WHAT THE GATE MEASURES (sweep161: mobile-wrong/
-      // 04-t034s.png at 112 км/ч and pc-wrong/04-t039s.png at 135 км/ч — road
-      // ahead completely empty, no truck anywhere). It used to read «Изпревари
-      // камиона със съобразена скорост, без да излизаш от лентата», and the
-      // gate under it is a bare `reachZone`: arrive within 12 m of
-      // (−8.12, 340) at ≤ 100 км/ч. It cannot see a truck, cannot see whether
-      // one was passed, and cannot see the lane you left — and this file's own
-      // ACTS_WIND_TRUCK header already says the pass „is not completed in world
-      // space" because cutInLeadCar only paces. Above `maxMatchSpeedMps` = 33
-      // (118.8 км/ч) the rig cannot even keep station, which is exactly why the
-      // 135 км/ч frame shows bare tarmac.
+      // THE GATE IS THE CAB, WHEREVER THE STUDENT CATCHES IT
+      // (sc-ac-wind-truck-pass:ff1d4290).
       //
-      // So the tick stops promising the overtake and promises the two things a
-      // capped zone in the overtaking lane really does prove: that the student
-      // is IN the overtaking lane at the cab line, and that he is there under
-      // the prudent-wind ceiling this drill teaches. The lane discipline
-      // through the gust is still graded — by POOR_LANE_KEEPING, live, on the
-      // real crosswind force (`physics.crosswind`) — and the overtaking
-      // NARRATIVE is still taught by the instructions and the shadow.
+      // History, because both earlier repairs were right and neither could be
+      // enough: the banner was retitled from «Изпревари камиона…» to this one
+      // (sweep161 — a bare `reachZone` cannot see a truck), then the disc was
+      // shrunk from 12 m to the lane's own 4.5 (:aa37b361 — a disc wider than
+      // the lane pitch credited «в лявата лента» to a car that never left the
+      // right one). What remained was a disc at y = 340 beside which no truck
+      // ever stood: «до кабината» was certified on an empty lane.
       //
-      // Routed, not silently dropped: an actor that actually falls behind
-      // (a hold-only or plain slow-cruiser lead) is contracts.ts + a runner —
-      // NOT this lane's files. Until it exists no gate here may say «изпревари».
+      // `stagedPass` ends that. The task is complete on the frame the truck's
+      // own runner reports the car level with its cab in the overtaking lane
+      // (`ACTS_WIND_TRUCK.overtake`), at a speed within the cap. The disc is
+      // not consulted (`lessons/objectives.ts stepStagedPass`).
+      //
+      // THE CAP IS UNCHANGED — 100, the prudent-wind band this drill teaches
+      // (the shadow passes at 62) — and it is judged where the task now is:
+      // credited up to the cap plus the evaluator's slack on the frame the car
+      // draws level, and billed as the task cap's ARRIVAL above the bill line
+      // on that same frame (`lessons/engine.ts stagedPassCapArrival`), exactly
+      // as crossing the old disc over the line was.
+      //
+      // x / y / radiusM: where the committed shadow does it (level with the cab
+      // at y ≈ 280 in the overtaking lane) and the lane's own half-width. They
+      // are provenance and the aid ladder's dial; nothing judges the car
+      // against them, and guidance draws no ring there.
       titleBg: "Излез в лявата лента до кабината със съобразена за вятъра скорост",
-      // The pass point in the overtaking lane, at the cab line where the gust
-      // lands. Cap 100 is the prudent-wind band this drill teaches (the shadow
-      // rides ~70): both mistakes carry the pass off — the excursion demo
-      // leaves the lane, the clip demo never reaches the far marker — so чл. 20
-      // ал. 2 is graded by the objective and the LANE discipline by the shipped
-      // POOR_LANE_KEEPING detector.
-      //
-      // ── THE RADIUS WAS TWICE THE LANE PITCH, SO „ИЗЛЕЗ В ЛЯВАТА ЛЕНТА" WAS
-      //    EARNED WITHOUT LEAVING THE RIGHT ONE — 2026-08-28,
-      //    sc-ac-wind-truck-pass:aa37b361 (routed here by lane r07, endorsed by
-      //    verifier r16 as „a better diagnosis than the row's") ──────────────
-      //
-      // The retitle above was correct and insufficient. It moved the banner
-      // onto the two things a capped zone in the overtaking lane really does
-      // prove — but only ONE of them was actually provable, because the zone
-      // could not tell the two lanes apart. mw-v1's own meta says it in
-      // numbers: `laneCruiseX: 0`, `laneLeftX: -8.12` — a pitch of 8.12 m —
-      // against `radiusM: 12`, widened by the L1 ladder to 17. A car that never
-      // touched the steering, cruising straight up x = 0, sits 8.12 m from this
-      // mark: inside the disc at EVERY rung. So the half of the banner that
-      // says «в ЛЯВАТА лента» was decided by a circle that contains both lanes,
-      // and the drive in the frames — wheel untouched, road ahead empty —
-      // collected it.
-      //
-      // 4.5 IS THE LANE, MEASURED, NOT A SMALLER-IS-SAFER GUESS. The drawn lane
-      // is 8.12 m, so its half-width is 4.06: a radius of 4.5 accepts the whole
-      // of the overtaking lane INCLUDING both its edges, and `stepReachZone`
-      // bounds the approach capsule's LATERAL term by the same radius, so the
-      // acceptance never leaks sideways however long the approach. The ladder
-      // widens by `min(0.5·r, REACH_ZONE_GRACE_M, chainCap)`, giving 6.75 at L1
-      // and 4.5 at L3–L5 — still 1.4 m short of the cruise lane's centre line
-      // at the most forgiving rung. One number, two properties: no honest line
-      // through the correct lane is refused at any rung, and no line through
-      // the wrong one is credited at any rung.
-      //
-      // The committed shadow passes 0.85 m from this mark at 70 км/ч
-      // (content/traces/sc-ac-wind-truck-pass/shadow-correct.trace.json), so
-      // `s-w9-bot-completion.test.ts`'s L3 chain keeps 3.6 m of margin.
-      params: { kind: "reachZone", x: MW_X_OVERTAKE, y: 340, radiusM: 4.5, maxSpeedKmh: 100 },
+      params: {
+        kind: "reachZone",
+        x: MW_X_OVERTAKE,
+        y: 280,
+        radiusM: 4.5,
+        maxSpeedKmh: 100,
+        stagedPass: { eventId: "sc-acw-truck", phase: "abeam" },
+      },
     },
     {
       /**
-       * «ВЪРНИ СЕ В ДЯСНАТА ЛЕНТА» GETS A GATE THAT CAN SEE A LANE — and the
-       * terminal keeps the one property a terminal must have.
+       * «ПРИБЕРИ СЕ … СЛЕД ИЗПРЕВАРВАНЕТО» IS JUDGED BY THE TRUCK BEING BEHIND
+       * (sc-ac-wind-truck-pass:ff1d4290).
        *
-       * THE ROW'S OWN QUOTE is this promise, off the debrief of the drive that
-       * never steered: «✓ Върни се в дясната лента и стигни края на отсечката
-       * 1:55». It was one objective doing two jobs badly. Its disc stood at the
-       * CRUISE lane (x = 0) with radiusM 12 → 17 at L1, so a car still sitting
-       * in the overtaking lane 8.12 m away was certified as having returned to
-       * the right one; and it is the LAST objective, which is the reason the
-       * obvious repair — shrink it, as the pass gate above was shrunk — is the
-       * wrong one and is deliberately not made.
+       * It was a disc in the cruise lane at y = 480 — which could see a lane
+       * (the 2026-08-28 repair) but not an overtake: a car that had stayed 40 m
+       * behind the truck the whole way was «прибрал се след изпреварването» the
+       * moment it reached the mark. And a student who did what step 8 says —
+       * return once the whole truck is in the mirror — could never do it at
+       * all, because the truck never fell behind.
        *
-       * WHY SHRINKING THE TERMINAL WOULD HAVE BEEN A WORSE DEFECT THAN THE ONE
-       * IT CLOSED. `lessons/engine.ts` steps `routeFinishZone` only while the
-       * chain is NOT on its terminal objective; on the terminal the only escape
-       * is `terminalRescueZone`, which needs a STANDSTILL held 12 s within the
-       * zone, and `terminalDepartureZone` is pinned `null` at HEAD (see its
-       * block in engine.ts). A student who reaches y = 600 still in the
-       * overtaking lane would therefore have missed a tightened terminal disc,
-       * failed the rescue by not stopping, and driven on down 2,000 m of
-       * remaining motorway with no ending at all. Trading „it ticks a lane it
-       * cannot see" for „the lesson never finishes" is the trade doc 86 §7 R6
-       * forbids.
+       * Now: complete on the frame the runner reports the return FINISHED —
+       * the car settled in the truck's lane with at least 10.25 m of road
+       * between its tail and the truck's nose, not slower than the truck, the
+       * truck not slowing for it, held for 1.44 s — AFTER it drew level on the
+       * left (the runner's own order), and WITHOUT the truck having had to
+       * brake HARD for the return (rounds 2–3): such a return is billed
+       * (LANE_ENTRY_FORCED_BRAKING) and never completes this task by the gap
+       * the truck's own braking then opens. One the truck only gave way to is
+       * billed with the product's «Ранно прибиране пред изпреварения»
+       * (OVERTAKE_RETURN_TOO_EARLY) and completes it once finished.
+       * No cap, as before. A drive that never passes never hears either
+       * report, completes neither task, and is ended by the route finish with
+       * both rows open — which is the debrief that drive needs.
        *
-       * SO THE CLAIM MOVES TO A GATE THAT CAN CARRY IT. This one is not
-       * terminal: miss it and the drive simply continues to y = 600, where the
-       * wide terminal ends the lesson normally and the debrief walks the task
-       * that stayed open — which is exactly the ending the student needs
-       * («не се прибра в дясната лента преди края»), instead of a hang. The
-       * lane pitch argument is the pass gate's, unchanged: 4.5 accepts the
-       * whole cruise lane and refuses the overtaking lane's centre at every
-       * rung.
+       * THE TERMINAL BELOW IS UNTOUCHED IN KIND: a wide fixed disc, so the
+       * lesson always has an ending (`lessons/engine.ts` consults
+       * `routeFinishZone` while the chain is stalled on an earlier task).
        *
-       * NO CAP, ON PURPOSE. This gate asks ONE question — which lane are you in
-       * — and `stepReachZone` arms its approach-grace capsule only for a zone
-       * carrying a speed or paint term. Leaving the cap off keeps the
-       * acceptance the swept disc itself, so the lane answer cannot be widened
-       * by a long approach. The speed through the gust is already graded twice:
-       * by `sc-acw-pass`'s cap 100 upstream and by POOR_LANE_KEEPING live on
-       * the real crosswind force.
-       *
-       * MEASURED: the committed shadow is at x = −0.12 at y = 469 and x = 0.00
-       * from y = 487 on, i.e. it has completed the return before this mark and
-       * passes within about 0.1 m of it at 76 км/ч, so the L3 bot-completion
-       * chain (`s-w9-bot-completion.test.ts`, which asserts `completedAll`)
-       * gains a task it already performs. ЗДвП чл. 20, ал. 2 is the law this
-       * whole drill cites and it is unchanged — nothing new is recalled here.
+       * x / y / radiusM: where the committed shadow is back in the cruise lane
+       * (y ≈ 425), provenance only — see the first task.
        */
       id: "sc-acw-back",
       titleBg: "Прибери се обратно в дясната лента след изпреварването",
-      params: { kind: "reachZone", x: MW_X_CRUISE, y: 480, radiusM: 4.5 },
+      params: {
+        kind: "reachZone",
+        x: MW_X_CRUISE,
+        y: 425,
+        radiusM: 4.5,
+        stagedPass: { eventId: "sc-acw-truck", phase: "returned" },
+      },
     },
     {
-      // THE BANNER KEEPS ONLY WHAT THIS DISC MEASURES. The lane half moved to
-      // `sc-acw-back` above (which can see a lane); what is left here is the
-      // arrival, and the arrival is all a 12 m → 17 m terminal disc can honestly
-      // certify. Same law this file already applies to «изпревари»: a gate may
-      // not say a word its params cannot spend.
+      // THE BANNER KEEPS ONLY WHAT THIS DISC MEASURES: the arrival. Moved from
+      // y = 600 to WIND_FINISH_Y so the slowest lawful pass fits before it.
       id: "sc-acw-finish",
       titleBg: "Стигни края на отсечката",
-      params: { kind: "reachZone", x: MW_X_CRUISE, y: 600, radiusM: 12 },
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: WIND_FINISH_Y, radiusM: 12 },
     },
   ],
   rubric: { parTimeSec: 90 },
@@ -1314,72 +1337,76 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-blown-out.trace.json" },
       titleBg: "Изненадан от порива — към разделителната ивица",
       whatWentWrongBg:
-        // WAS «…В мига, в който носът мина пред кабината, заветът изчезна и поривът
-        // блъсна колата…» — round 2 of sc-ac-crosswind:a9db1738 (verifier V-13).
-        // This drive has no lee to vanish (step 3 above says so to the student's
-        // face, and the note at `teach.whyBg` has the measurement), so the card
-        // now names what did happen in the demo it sits under — the loose hand,
-        // the gust, half a lane — and keeps the rule about a lorry's lee as the
-        // rule it is.
-        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. Поривът я блъсна към разделителната ивица и тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
+        // The lee is back in this card because it is back in the world (it was
+        // taken out in round 2 of sc-ac-crosswind:a9db1738, V-13, when the
+        // drive had none). The demo under it clears the cab at 80 км/ч with a
+        // loose hand, and from that frame its polyline is carried 3.5 m toward
+        // the median — the live car, hands off from the same frame at the same
+        // speed, is carried 2.4 m that way in 2 s and 3.8 m in 2.5 s at every
+        // rung (`wind-truck-pass-restage.test.ts` §8): «през половин лента».
+        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. Пред кабината заветът на камиона свърши, вятърът се върна наведнъж и я понесе през половин лента към разделителната ивица, докато водачът реагира. При излизане от завета на камион скоростта се смъква ПРЕДИ това, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-clip-truck.trace.json" },
-      titleBg: "Порив в тясната пролука — удар в камиона",
-      // WAS «…поривът я хвърли обратно към камиона…» — round 3 of
-      // sc-ac-crosswind:a9db1738 (verifier V2-01). The wind on this lesson
-      // blows WEST on every sample (−700 … −1700 N) and the truck's lane is to
-      // the EAST, so the gust carries a car away from the truck, never at it
-      // (a 2 s loose wheel in the overtaking lane: 2.8 m toward the median).
-      // What throws it at the truck on this car is the hand — a sharp
-      // correction toward the truck against the gust: 3.0–3.8 m east within
-      // 2 s (`crosswind-live-lane-hold.test.ts` §7), which is also what
-      // `teach.whyBg` names. The rest of the card is unchanged.
+      // WAS «Порив в тясната пролука — удар в камиона». In the gap beside the
+      // truck there is no gust — that is the lee; what happens there is the
+      // hand. The title now names it.
+      titleBg: "Рязка корекция в тясната пролука — удар в камиона",
+      // The mechanism, measured on the live car: beside the truck the wind is
+      // at 30 %, so a sharp correction „against the wind" has almost nothing to
+      // push against and the car goes where the wheel points — toward the
+      // truck (`wind-truck-pass-restage.test.ts` §8: the same hand carries
+      // the car 1.6 m toward the truck through the lee and 0.9 m with no lee).
+      // The demo passes on the truck's side of its lane (three metres of air
+      // instead of six) and that correction closes the rest.
       whatWentWrongBg:
-        "Точно докато колата беше до кабината, в тясната пролука между нея и ремаркето, рязката корекция срещу порива я хвърли обратно към камиона — и последва удар. Изпреварването в силен вятър иска и по-широк страничен просвет, и по-ниска скорост: тръгне ли колата, за да намери просвета е нужно време, а вятърът не чака. По-бавно, здрав хват и повече място встрани (чл. 20, ал. 2).",
+        "Колата мина покрай камиона в тясна пролука и с висока скорост. В завета му вятърът отслабна, а рязката корекция срещу него остана — и хвърли колата към камиона: последва удар до кабината. Изпреварването в силен вятър иска и по-широк страничен просвет, и по-ниска скорост: тръгне ли колата, за да намери просвета е нужно време. По-бавно, здрав хват и повече място встрани (чл. 20, ал. 2).",
+      // COLLISION is the act, the one code this card cites, and — since round 2
+      // — THE ONE CODE THE DEMO GRADES, at every rung (10 т.; the trace gate
+      // and the live-chain test pin the sheet to exactly this).
+      //
+      // In round 1 the recording also graded LANE_CHANGE_WITHOUT_INDICATOR and
+      // LANE_CHANGE_WITHOUT_MIRROR_CHECK: mw-v1's lanes are 8.12 m wide and the
+      // truck holds the middle of its own, so a car cannot touch its flank
+      // without its centre being two metres over the lane line first, and the
+      // engine saw a lane entered with no signal toward it and no look. Through
+      // the live chain the universal first-fault grace was then spent on the
+      // first of those — a code this card never mentions — and the sheet read
+      // 13 at four rungs of five (the round-1 verifier's F-04). The demo's
+      // driver now looks right and signals right before his wheel goes over
+      // (`traces/scAcWindTruckPass.ts`): the swerve is graded as what the card
+      // says it is. It is not PRAISED either — a signalled, looked-for lane
+      // change that ends against the truck's side is not commended
+      // (`rules/engine.ts`, the `collision` case).
       codeRefs: ["COLLISION"],
     },
   ],
   teach: {
+    // WAS «…Докато си в завета на камиона вятърът мълчи — но точно затова
+    // ударът при излизане е двоен.» Two words were not this car's: in the lee
+    // the wind does not go silent (30 % of it remains — 210–510 N), and
+    // nothing measured is „double". What is measured is the weakening and the
+    // return, and the sentence now says those.
     whenBg:
-      "Винаги когато изпреварваш висок автомобил — камион, автобус, бус — при силен страничен вятър, най-често на магистрала и по откритите извънградски пътища. Разпознава се предварително: ветропоказателят или клоните се навеждат в една посока, а самата кола „плава“ при поривите. Докато си в завета на камиона вятърът мълчи — но точно затова ударът при излизане е двоен.",
-    // THE LEE IS TAUGHT AS WHAT IT IS — KNOWLEDGE ABOUT THE ROAD — AND THE CARD
-    // NOW SAYS WHAT THIS DRIVE DOES. Round 2 of sc-ac-crosswind:a9db1738,
-    // verifier V-13. It read «докато си зад него и до него, си в неговия завет
-    // и поривът не те бута», flat, on the „why" card of a lesson whose car is
-    // pushed by the full wind from the first frame. That was already untrue of
-    // the physics (the 2026-08-27 note at step 3), but nothing in the car made
-    // it perceptible; since the founder rulings of 2026-10-04 / 10-05 it is. The
-    // wind now turns the car, so MEASURED on this lesson's own stack
-    // (`crosswind-live-lane-hold.test.ts`): the wheel that holds the lane is
-    // held into the wind behind the truck (1.1 % of the lock, still gathering
-    // speed) and in the overtaking lane (2.1 %) alike, a 2 s lapse in that
-    // lane carries the car 1.8 m in the mean wind, and the staged rig is
-    // 37–73 m AHEAD for the whole drive, never abeam.
-    //
-    // WHY THE TEXT AND NOT A REAL LEE. The brief preferred a real one „if the
-    // staging can carry it". It cannot: ACTS_WIND_TRUCK is `matchPlayer`, so
-    // the car is never behind-and-near or beside the rig, and a shelter keyed
-    // on the truck would be a predicate nothing ever reads; one keyed on a
-    // stretch of road would shelter the student beside empty tarmac. A rig he
-    // can really pass (`paceMode: "scheduledCruise"`) plus a shelter term in
-    // the wind is a restage of the whole lesson — its ticks, its gates and the
-    // briefing's steps 3 and 6 — and is routed to the founder, not smuggled in.
-    //
-    // So: the doctrine keeps its sentence, marked as the road's («На пътя…»);
-    // the next sentence says what THIS drive delivers, which is step 3 again;
-    // «поривът те отмества повече» is a property of the car since round 2 (the
-    // hands-off displacement over a fixed reaction time rises with speed over
-    // the whole 8–110 км/ч range, `vehicle/crosswind.test.ts`); the drift is
-    // named on the side it really goes (the wind blows west — LEFT, toward the
-    // median); and the throw back toward the truck is attributed to the thing
-    // that does it on this car, the over-held correction (measured: a wheel
-    // sized for the gust and kept into the lull moves the car toward the truck
-    // by 0.4 m in 1 s and 1.5 m in 2 s at 74 км/ч). The law reference is
-    // unchanged — nothing is recalled here.
+      "Винаги когато изпреварваш висок автомобил — камион, автобус, бус — при силен страничен вятър, най-често на магистрала и по откритите извънградски пътища. Разпознава се предварително: ветропоказателят или клоните се навеждат в една посока, а самата кола „плава“ при поривите. Докато си в завета на камиона, вятърът отслабва — и точно затова връщането му пред кабината заварва неподготвения водач.",
+    // THE LEE IS TAUGHT AS WHAT THIS DRIVE DOES (2026-10-08). Round 2 of
+    // sc-ac-crosswind:a9db1738 (V-13) had to mark the lee as knowledge about
+    // the road («На пътя…») and add «В това упражнение на завет не се
+    // разчита — камионът остава далеч пред теб…», because that was the truth
+    // of a paced rig and a wind with no position term; that builder routed the
+    // real lee to the founder as owed, and this is it. Every clause below is
+    // measured on the lesson's own car at every rung
+    // (`wind-truck-pass-restage.test.ts`): the lee beside the truck and close
+    // behind it; none at a lawful following distance; the whole wind back
+    // within one car length past the cab; the displacement over a reaction
+    // time rising with speed (`vehicle/crosswind.test.ts`); the drift to the
+    // LEFT, toward the median (the wind blows west); and the sharp wheel
+    // throwing the car toward the truck when the wind it was turned against
+    // weakens — in a lull, and now in the lee. The law reference is unchanged
+    // — nothing is recalled here.
     whyBg:
-      "На пътя камионът е стена, която спира вятъра: плътно до него си в завета му, а в секундата, в която носът ти излезе пред кабината, стената изчезва и целият вятър те удря наведнъж, странично. В това упражнение на завет не се разчита — камионът остава далеч пред теб и вятърът те натиска през цялото време, затова корекцията се държи още от началото. При висока скорост изминаваш повече метри, докато реагираш, и поривът те отмества повече — към разделителната ивица отляво. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна, обратно към камиона — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
+      "Камионът е стена, която спира вятъра: до него и плътно зад него си в завета му и вятърът отслабва, а в секундата, в която носът ти излезе пред кабината, стената свършва и целият вятър те удря наведнъж, странично. Зад камиона, на безопасна дистанция, завет няма — там корекцията се държи през цялото време. При висока скорост изминаваш повече метри, докато реагираш, и вятърът те отмества повече — към разделителната ивица отляво. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли вятърът — в порив или в завета на камиона, — рязко завъртеният волан сам изхвърля колата на другата страна, към камиона — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а вятърът се посреща с меки, постоянни корекции.",
     lawRef: "ЗДвП чл. 20, ал. 2",
     examinerBg:
       "Изпитващият следи контрола на волана при вятър и при изпреварване на високи превозни средства: очаква по-ниска скорост преди маневрата, стабилна лента през целия участък и спокойни, постоянни корекции. Лъкатушенето в лентата е грешка, а изхвърлянето към разделителната ивица или към изпреварвания камион — тежка: две ръце на волана и смъкната скорост.",
@@ -1400,28 +1427,40 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     { level: 5, conditions: { weather: "rain" }, physics: { wetGrip: true } },
   ],
   staged: [ACTS_WIND_TRUCK],
+  // THE RETURN IS BILLED WHEN IT MAKES THE TRUCK BRAKE HARD (round 2; the
+  // integrator's decision of 2026-10-08 under the founder's delegation, on his
+  // rulings of 2026-09-30 «a lane-drop cut-in forcing hard braking IS the
+  // push-out» and 2026-10-05 «bill it only when a … car actually has to brake
+  // or swerve because of the entry, or there is contact»). The switch is the
+  // lane-drop lessons' own, and it arms both bases of the one code here:
+  //   · what an entry DEMANDS of a vehicle that is catching him (the runtime's
+  //     `laneEntered` — a student who drops in front of the truck while slower
+  //     than it), and
+  //   · what the truck actually DID about a car that came into its lane in
+  //     front of it (`laneEntryAnswer`, published by `ACTS_WIND_TRUCK`'s runner
+  //     off the truck's own account of speed shed because of him) — the early
+  //     return of step 8, where the car is the faster of the two and nothing
+  //     is „demanded" at all.
+  // A return with the whole truck in the mirror is outside the truck's reach
+  // and is never billed (measured at every rung, 10–20 m, at the slowest lawful
+  // speed and the taught one: `wind-truck-pass-restage.test.ts` §9).
+  ruleConfig: { laneEntryForcedBrakingEnabled: true },
   // DRY, clear weather — the wind is PHYSICS, never a weather render tag (the
   // sc-ac-crosswind law: no weather tag flips physics, and wind couples to none).
   conditions: { weather: "dry" },
   // THE SLICE: the live student's car runs the crosswind force (opt-in, authored
-  // — the same whole-map wind sc-ac-crosswind ships). The recorded ghosts are
-  // kinematic; their lee-then-gust story is authored (traces/scAcWindTruckPass.ts).
+  // — the same whole-map wind sc-ac-crosswind ships), and on this lesson the
+  // staged truck shelters it (`ACTS_WIND_TRUCK.actor.windShelter`): the scene
+  // reads the two facts together (`scene/lessonWindShelter.ts`) and feeds the
+  // rig the lee's factor before every physics step. The recorded ghosts are
+  // kinematic; what the wind does to them is authored
+  // (traces/scAcWindTruckPass.ts).
   //
-  // AND THIS LINE IS THE WHOLE OF THE TEMPLATE'S SAY IN THE WIND, which is the
-  // standing answer to sc-ac-wind-truck-pass:6a076479 („no crosswind is depicted
-  // anywhere — no gust, no dust, no spray, no sway"). The DEPICTION half named
-  // in the step-3 note above is not underspecified here, it is UNREACHABLE from
-  // here — so the address is written down rather than routed a third time
-  // without one: `ScenarioSpec` has no wind field and `ConditionAxis`
-  // (scenario/types.ts:212) is `{weather?: "dry"|"rain"|"fog"|"snow";
-  // night?: boolean}`, so nothing a template can author reaches the renderer as
-  // wind. It does not need to. `LessonScene.tsx:2301-2303` ALREADY holds
-  // `lesson.physics?.crosswind` in hand at the point it hands the force to
-  // `VehicleRig`, so a visual layer gates on the flag that is already there —
-  // the peer pattern is `SimEnvironment.tsx:445/448` (RainStreaks, SnowFlakes),
-  // and `environment/weather.ts` §5 refuses a fifth 0..1 store channel for the
-  // wind precisely because it would have no author and no reader. Owned by the
-  // render lane; nothing here can close it.
+  // The DEPICTION of the wind (sc-ac-wind-truck-pass:6a076479) rides the same
+  // number: the dust layer, the tree sway, the head lean and the gust chip all
+  // read `VehicleSim.windLateralNow` / `windLatAccelMs2`, which are the
+  // sheltered force — so the air is drawn calmer beside the truck with no
+  // change to any of them.
   physics: { crosswind: true },
   localeBg: "bg-BG",
 };

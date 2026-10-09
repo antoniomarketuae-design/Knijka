@@ -26,12 +26,29 @@
  *      that grades a student is a decision; making it means changing the pin
  *      here in the same diff, where a reviewer sees it.
  *
+ * ONE SENTENCE GROUP ADDED TO THE Наредба № 38 RATIONALE (2026-10-08,
+ * sc-ac-wind-truck-pass:ff1d4290 round 2): the code has a second basis since
+ * then — what the vehicle in the lane actually DID, on its own traffic model's
+ * account, when the entry demanded nothing of it because the student was the
+ * faster of the two (`rules/types.ts`, the `laneEntryAnswer` event). The
+ * rationale said «осъжда само … в кадъра на навлизането»; it now states both.
+ * The CARD, the contact copy, the road-consequence row and the lane-drop
+ * lessons' own sentences are untouched — the second basis has its own card
+ * (`LANE_ENTRY_ACT_COPY`, pinned in `lane-entry-act-copy.test.ts`).
+ *
  * ROUND 4'S ONE COPY CORRECTION (round 3 verifier, F10): the card said the
  * car's driver had to brake hard «дори ако е реагирал до секунда» — "even with
  * any reaction up to a second". The rule measures exactly ONE second of
  * reaction; a driver who reacted in half a second can need less than the
  * 7 m/s² line, so on some billed frames that clause was false. It now says
  * what is measured: after the normal second of reaction.
+ *
+ * THE SECOND BASIS' LEAD-IN (integrator decision TP-7, sc-ac-wind-truck-pass
+ * round 3, verifier note C3-05): the rationale introduced the second basis as
+ * the case where the student «е по-бързият от двамата». Round 3 judges a
+ * return by what the overtaken vehicle DID whichever of the two is faster (a
+ * car that comes back slower than the truck is read by the same harsh-brake
+ * basis), so the lead-in now says both; the rest of the group is unchanged.
  */
 
 import { readFileSync } from "node:fs";
@@ -125,7 +142,7 @@ const REVIEWED = {
     "noteBg": "Същата точка като престрояването без поглед, но друго деяние от нея: не „неправилно се престроява“, а „не спазва предимството“ — колата, която вече е в лентата, е тази с предимството.",
     "priorityDangerNoteBg": "От петте предложения на чл. 179, ал. 1, т. 5 наредбата взима само две: изпреварването (т. 9 — 13 к.т.) и неспирането на знак „Спри!“ (т. 15 — 10 к.т.). Неспазването на правилата за предимство при престрояване не е сред тях, затова тук точки не падат."
   },
-  "n38RationaleBg": "Осъжда само ИЗМЕРЕН конфликт: реално превозно средство вече се движи в лентата, в която влиза изпитваният, зад него; разстоянието между тях и скоростта, с която го настига, се четат в кадъра на навлизането, и вмъкването се таксува само ако след една секунда реакция то трябва да спира по-рязко от прага, при който продуктът нарича собственото спиране на ученика рязко (7 m/s²). Колата с предимство, принудена да спира аварийно, за да избегне удар, е създадената предпоставка за ПТП, която клаузата иска — затова и двата шаблона на стеснение на лентата наричат принуждаването да спира опасна грешка. За разлика от OVERTAKE_RETURN_TOO_EARLY (кратка дистанция в секунди, основна) тук се иска доказано рязко спиране.",
+  "n38RationaleBg": "Осъжда само ИЗМЕРЕН конфликт: реално превозно средство вече се движи в лентата, в която влиза изпитваният, зад него; разстоянието между тях и скоростта, с която го настига, се четат в кадъра на навлизането, и вмъкването се таксува само ако след една секунда реакция то трябва да спира по-рязко от прага, при който продуктът нарича собственото спиране на ученика рязко (7 m/s²). Колата с предимство, принудена да спира аварийно, за да избегне удар, е създадената предпоставка за ПТП, която клаузата иска — затова и двата шаблона на стеснение на лентата наричат принуждаването да спира опасна грешка. За разлика от OVERTAKE_RETURN_TOO_EARLY (кратка дистанция в секунди, основна) тук се иска доказано рязко спиране. Втора основа (2026-10-08, урокът с изпреварване на камион при страничен вятър): когато изпитваният се прибира пред превозно средство, което изпреварва — все едно дали е по-бързият от двамата (тогава нищо не го „настига“ и горната мярка е нула по построение) или по-бавният, — се чете не само какво ИЗИСКВА навлизането, но и какво превозното средство в лентата НАПРАВИ: собственият му модел на движение отчита скоростта, която е свалило заради изпитвания, и прибирането се таксува само ако то е спирало рязко по правилото, по което продуктът нарича рязко собственото спиране на ученика: над 7 m/s², задържано 0,4 s. Ако само е намалило, без рязко спиране, това е OVERTAKE_RETURN_TOO_EARLY (основна). Конфликтът и тук е измерен, не предположен.",
   "pushOutCard": {
     "titleBg": "Изтласкване на кола от съседната лента",
     "whatWentWrongBg": "Мигачът светна и воланът тръгна веднага след него — без нито един поглед в огледалото и без проверка на мъртвата зона. В лявата лента обаче вече имаше кола, която идваше отзад съвсем близо: тя се движи по своята лента, а твоята свършва — значи ти си този, който се съобразява (чл. 25, ал. 2). Вмъкна се толкова близо пред нея, че водачът ѝ трябваше да спира рязко, за да не те удари. „Ще ме пуснат“ не е маневра. Мигачът обявява намерението ти, но не проверява дали лентата е свободна — това правят огледалото и рамото, ПРЕДИ волана."

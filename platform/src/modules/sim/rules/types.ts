@@ -205,6 +205,135 @@ export type SimTickEvent =
       follower: LaneEntryFollower | null;
     }
   /**
+   * WHAT THE VEHICLE HE CAME IN FRONT OF ACTUALLY DID — the second basis of
+   * LANE_ENTRY_FORCED_BRAKING (sc-ac-wind-truck-pass:ff1d4290 round 2; the
+   * integrator's decision of 2026-10-08 under the founder's delegation, on his
+   * two rulings of this class: 2026-09-30 «a lane-drop cut-in forcing hard
+   * braking IS the push-out» and 2026-10-05 «bill it only when a … car actually
+   * has to brake or swerve because of the entry, or there is contact»).
+   *
+   * WHY `laneEntered` CANNOT SAY IT. That event carries what the entry DEMANDS
+   * of the follower — the deceleration it needs so as not to run into him — and
+   * that number is 0 by construction when he is the FASTER of the two: a
+   * student who has just overtaken a 40 км/ч truck and pulls back in three
+   * metres ahead of its bumper is drawing away from it. Nothing has to brake
+   * to avoid HIM. What happens is that the truck's own following law will not
+   * ride three metres behind a car and brakes hard to rebuild its gap — measured
+   * (round-1 verifier, F-01): 40 → 19.5 км/ч at 8 m/s². That is the vehicle in
+   * the lane being made to slow down by his entry, which is what the article
+   * forbids (ЗДвП чл. 42, ал. 1, т. 2, retrieved: „…да заеме място в пътната
+   * лента пред изпреварваното пътно превозно средство, без да го принуждава да
+   * намалява скоростта…"), and only the vehicle's own traffic model can report
+   * it — exactly as at a roundabout mouth (`playerShedMps`, the 2026-10-05
+   * ruling).
+   *
+   * WHO PUBLISHES IT: the staged runner that owns a vehicle the lesson asks the
+   * student to overtake (`CutInLeadCarSpec.overtake`,
+   * orchestrator/runners.ts `stepOvertakeWatch`). Nothing else does, so every
+   * other lesson's tick stream is byte-identical.
+   *
+   *  · `watching` — some part of his car is over that vehicle's lane and he is
+   *    no longer wholly behind it, and what the vehicle will have to do about
+   *    him is not yet known. The rule engine holds the PRAISE of a lane change
+   *    made in that state («…в правилния ред и навреме») until it is. (Round 3:
+   *    the watch now stays open until the return is FINISHED — the car settled
+   *    in the lane, clear of the vehicle's reach, not being caught, and the
+   *    vehicle seen not to answer for a stated time — never on the frame it
+   *    opens; `orchestrator/runners.ts stepOvertakeWatch`.)
+   *  · `clear`    — it is known, and the vehicle did not have to slow for him
+   *    at all (its account grew by less than its brake-lamp line): the return
+   *    is finished, or he left the lane again.
+   *  · `lift`     — it is known, and the vehicle had to give way to him — its
+   *    account grew by `shedMps` ≥ the traffic model's own line between
+   *    «holding its speed» and «braking» (`traffic/staged.ts
+   *    STAGED_BRAKE_LAMP_MARGIN_MPS`, 0.3 m/s, the size the roundabout
+   *    conviction is built on) — but it never braked HARD for him. Not a
+   *    fault (the integrator's decision D2 of 2026-10-08): nothing billed;
+   *    but the lane change is not praised, because «навреме» is not true.
+   *  · `braked`   — the vehicle braked HARD because of him: its account went
+   *    through the product's own harsh-brake gates (`harshBrakeEpisode.ts`:
+   *    over `harshBrakeDecelMps2` for `harshBrakeSustainSec` with a mean over
+   *    the line — 2.8 m/s or more of speed in 0.4 s or more). Published on the
+   *    frame that became true, with the window that made it so; the engine
+   *    re-checks it against its own config with the same predicate and bills
+   *    LANE_ENTRY_FORCED_BRAKING when the lesson armed the rule
+   *    (`laneEntryForcedBrakingEnabled`).
+   */
+  | {
+      kind: "laneEntryAnswer";
+      /** The vehicle's published state id — the id `laneEntered` names a
+       *  follower by, so the two bases share one „one cut-in, one act" window. */
+      vehicleId: number;
+      phase: "watching" | "clear" | "lift" | "braked";
+      /** `lift` / `braked`: speed its own traffic model has shed because of him
+       *  since he came in front of it, m/s. 0 on the other phases. */
+      shedMps: number;
+      /** `braked`: the MEAN deceleration of the harsh window, m/s² (the
+       *  account's growth over `heldSec`). 0 on the other phases. */
+      decelMps2: number;
+      /** `braked`: that window's length, s, and the qualifying seconds accrued
+       *  in it — the two halves of the sustain (`harshBrakeSustainSec`). 0 on
+       *  the other phases. */
+      heldSec: number;
+      qualifiedSec: number;
+      /** The vehicle's own speed when he came in front of it, m/s — what it has
+       *  to shed in a hard stop, i.e. how long it is still answering him. */
+      speedMps: number;
+      /** Which act the entry was — the catalogue's per-act copy key
+       *  (`rules/catalog.ts LANE_ENTRY_ACT_COPY`). */
+      act: "overtakeReturn";
+    }
+  /**
+   * THE CLOSE FOLLOWER HAD TO BRAKE HARD BECAUSE OF HIM — what the car glued
+   * behind him in his own lane ACTUALLY DID, on its own account
+   * (`sc-follow-tailgater:63c0c28c` C1/C2a, 2026-10-09; the founder's
+   * principle ruled twice — 2026-09-30 and 2026-10-05, «bill the forced
+   * braking»: a conviction about another car rests on what that car actually
+   * had to do).
+   *
+   * WHY IT EXISTS. HARSH_BRAKING_NO_CAUSE ignores a causeless emergency stop
+   * from under `harshBrakeMinSpeedKmh` (35 км/ч — „low-speed stabs are clumsy,
+   * not dangerous"). That is not true of a stab with a car five metres off the
+   * bumper: measured at c38086a through the live rung chain, a 9.5 m/s² brake
+   * check from 32.3 and 34.9 км/ч made the лепка of `sc-follow-tailgater`
+   * brake at a mean 9.7–10.0 m/s² over 0.4 s — and the lesson, whose own task
+   * asks for under 36 км/ч, passed it ★★★ with «Чисто и спокойно каране». The
+   * floor stays; what lifts it, for that one brake, is this report.
+   *
+   * WHO PUBLISHES IT: the staged runner that owns a car pacing the student from
+   * behind (`orchestrator/runners.ts RearTailgaterRunner`), and only while that
+   * car is GLUED — latched behind him, under its `matchPlayer` law (whose only
+   * input is his pace: every m/s it sheds there is shed because of him), with
+   * him ahead of it in its lane. Once per braking episode of the car, on the
+   * frame its own speed went through the product's harsh-brake gates
+   * (`harshBrakeEpisode.ts`: over `harshBrakeDecelMps2` for
+   * `harshBrakeSustainSec`, mean exclusive). Nothing else publishes it, so a
+   * lesson with no such car has a byte-identical tick stream.
+   *
+   * THE JUDGEMENT IS THE ENGINE'S: it re-checks the window against its own
+   * config (`isHarshBrakeWindow`) and bills HARSH_BRAKING_NO_CAUSE for the
+   * student's own episode only if that episode was causeless and emergency-
+   * grade by every other gate and the floor alone acquitted it (engine.ts,
+   * „THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK").
+   */
+  | {
+      kind: "followerBraked";
+      /** The car's published vehicle-state id (`TrafficVehicleState.id`). */
+      vehicleId: number;
+      /** The harsh window the car's own speed went through: its MEAN
+       *  deceleration, m/s², its length and the qualifying seconds in it, s. */
+      decelMps2: number;
+      heldSec: number;
+      qualifiedSec: number;
+      /** Speed the car shed in that window, m/s. */
+      shedMps: number;
+      /** The car's own speed when its braking began, m/s — what it has to shed
+       *  in a hard stop, i.e. how long it is still answering his brake. */
+      speedMps: number;
+      /** Bumper gap from its nose to his tail on the frame of the report, m. */
+      gapM: number;
+    }
+  /**
    * RESERVED for v2 (right-of-way detectors): the engine adjudicates a
    * priority situation (right-hand rule, left turn vs oncoming, roundabout
    * entry, emergency vehicle...). `violated` grades FAILED_TO_YIELD; `yielded`
@@ -1878,6 +2007,22 @@ export interface RuleEngineConfig {
   // other lesson can fail a student for — which is a founder call, not an
   // engineer's (the item-17 shape). Every other template and every exam bot
   // grades byte-for-byte as before.
+
+  //
+  // A THIRD LESSON ARMS IT SINCE 2026-10-08 — sc-ac-wind-truck-pass (the
+  // integrator's decision under the founder's delegation of that date, on this
+  // ruling and the roundabout one of 2026-10-05): the return in front of the
+  // truck the lesson asks the student to overtake. There the student is the
+  // faster of the two, so what the entry DEMANDS is nothing; the same switch
+  // also arms the bill's second basis, what the vehicle in the lane actually
+  // DID on its own traffic model's account (`SimTick` event `laneEntryAnswer`,
+  // published by that lesson's staged runner and by nothing else).
+  // ROUND 3 (the integrator's decision D2): on that basis „hard" is the WHOLE
+  // harsh-brake rule, not one frame of it — over `harshBrakeDecelMps2` for
+  // `harshBrakeSustainSec` with a mean over the line (`harshBrakeEpisode.ts`),
+  // the gates the student's own causeless harsh brake is convicted by. A truck
+  // that only lifts for him (its account past the brake-lamp line, short of
+  // that) is not billed; the lane change is not praised.
 
   /** Master switch — enabled per lesson (`ruleConfig`), never by default. */
   laneEntryForcedBrakingEnabled: boolean;

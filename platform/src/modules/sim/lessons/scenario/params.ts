@@ -352,6 +352,14 @@ export function serializeObjectiveParams(
           to: { x: p.laneChange.to.x, y: p.laneChange.to.y },
         };
       }
+      // …AND THE STAGED-PASS TERM (`stagedPass`, sc-ac-wind-truck-pass:
+      // ff1d4290) — on this whitelist for the same measured reason as every
+      // key above: unnamed here, the compiled gate would silently go back to
+      // being a disc on the road. NOT LADDERED — whether the truck was passed
+      // is not a precision.
+      if (p.stagedPass !== undefined) {
+        params.stagedPass = { eventId: p.stagedPass.eventId, phase: p.stagedPass.phase };
+      }
       return { kind: "reachZone", params };
     }
     case "passSignal": {

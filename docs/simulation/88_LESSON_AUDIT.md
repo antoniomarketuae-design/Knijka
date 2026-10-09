@@ -11152,3 +11152,552 @@ the patch was applied.
 **Owed (the builder's list, carried forward).** The d2-v1 non-ring hand-over e23040421.0 → e856821052.0 lags 6.5 m, which is billable; d2-v1 ring exits
 sit 2.7–4.05 m inside the ring band; a ring-to-ring hand-over under-reads a wander (about 1.35 s late on the wandering-line demo); sc-rb-busy-gap shadow L5
 COLLISION (pre-existing); a stale comment in `traces/scRbLaneChoice.ts` («measured 2.8 s at the join»).
+
+## Wave C verdicts — 2026-10-09
+
+This run retired 3 row(s). Their evidence frames were driven at (unattributable: 3 of 3) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`a30c833f11bf`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 3 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 13 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 5 |
+
+**Open list: 21 → 18**, out of 1533 filed across the whole programme (1512 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3a (integrator note, 2026-10-09)
+
+Six rows driven through `/dev/drive-rig` (the real LessonPlayShell) at `a30c833` — the commit that landed ADR-014 (rbcad) and rbexit — on PC
+(Chromium 1440×900) and the phone lens (WebKit 852×393 DPR 3), with specs drafted and adversarially checked beforehand (15 corrections, among them
+harness re-runs for clauses about the harness's own legs and a wrong drive keyed so it really meets the other car). truckpass's row was held back
+until its commit.
+
+**Provenance.** The ledger prints «unattributable» for all three retirements because its provenance reader does not parse rig sidecars. Every
+sidecar of this wave records `healthCommit` and `gitHead` = `a30c833f11bf12b68f1335698cd7de30a6c99890` and a clean tree; teaching the reader the
+rig sidecar is owed (tools).
+
+**Closed (each verified by an adversarial verifier):**
+- `sc-rb-lane-choice:ffdffd55` (critical) — the careful drive that was billed 33 т. now scores 0, ИЗДЪРЖАН, on phone L1/L3 and PC L1/L3, and at a
+  10 km/h exit; the yield and the lane change are credited; the lesson's own outer-lane and exit-across mistakes are still taught. rbexit's fix.
+- `sc-roundabout-entry:7b747c15` — one careful drive, one sheet on both lenses (0 т., ИЗДЪРЖАН, both tasks) at L1 and L3. ADR-014's fix, seen live.
+- `sc-vu-emergency:2e634d4d` — the opted-in phone briefing is the whole numbered sheet (613bfc6); the old clipped teaser is gone.
+
+**Still open, and what each rests on:**
+- `sc-sig-controller-postures:f7e046c4` — the judge proposed CLOSED; the verifier REFUTED it. The praise «Правилно изпълнен сигнал на регулировчика» is
+  on the PC sheets and missing on the phone sheets. Measured causes: (a) the OBEYED praise is gated on `lightState` red/redYellow, and on this lesson the
+  lamp is dark — the «red» is the hidden cycle showing through, so the praise depends on the moment the car crosses; (b) on the phone lens full throttle
+  left the car at 0.001 км/ч for about 3 s at launch (t 8.0–10.8), so its crossings come about 7 s later than on PC. Whether (b) is the product or the
+  rig's phone input under WebKit's 2–4 fps is NOT yet established. Next: a repair lane for (a), and a probe that settles (b) before anyone repairs it.
+- `sc-rb-busy-gap:7bbdd45e` — briefing, XP and the careful drive are settled (the careful drive is ИЗДЪРЖАН on both lenses; W80's phone-only collision
+  is gone). Open: the same short-gap act is graded 20 т. (FAILED_TO_YIELD + COLLISION) on PC and 10 т. (COLLISION only) on phone L1, with the phone go
+  0.045 s later. The 2026-10-05 ruling bills FAILED_TO_YIELD on contact as well, so a contact without it is a product question for a repair lane.
+- `sc-roundabout-entry:08a0b701` — clauses (a) «mobile 10, PC 20 on the wrong run» and (b) «wrong punished less than right on PC» are refuted at
+  a30c833 (the authored wrong drive gets FAILED_TO_YIELD −10 on both lenses; the careful drive 0). Open: the roll-in conflict band W80 found was not
+  entered (the rig's roll-ins started after the circulator had cleared). Next: the in-process judge on the cadence grid with the w80 tapes.
+
+**What these closures do NOT show:** a real phone (the phone lens is headless WebKit); a 120/144 Hz display; anything on the truck-pass lesson
+(held back). XP is judged from code, not captured: the rig drives logged out.
+
+## Landed: a truck pass is judged by what the truck really had to do (sc-ac-wind-truck-pass:ff1d4290; ADR-015) (2026-10-09)
+
+Decided under the founder's delegation of 2026-10-08 (item 2 above: restage the lesson). The bills come from the integrator's decisions D1–D2 of 2026-10-08, made under that delegation, which extend to this lesson the 2026-09-30 ruling «bill the forced braking» (made for the lane-drop lessons) and the 0.3 m/s account of the 2026-10-05 roundabout ruling. Lane `truckpass`, three rounds, each adversarially verified. Round 3 was SIGNED OFF WITH CONDITIONS (patch sha 84ee5e63, 76 files, tree 870de7ed). ADR-015 discharges the ADR-012 addendum owed since round 1.
+
+**The restage (round 1, still standing).**
+- The truck holds its own 40 км/ч on a scheduled cruise. That is below 50 км/ч, the slowest speed the product lets a student hold in the overtaking lane, so the truck can lawfully be passed. No limit or cap moved: the road is 140 and the pass task cap is 100.
+- The lee beside the truck is real. The one ADR-012 force is multiplied by a shelter factor: 30 % of the open force beside the trailer, and the wind is whole again about one car length past the cab. Only this lesson has a lee.
+- The two truck tasks fire on a pass and only on a pass.
+
+**What each verifier refuted.**
+- **Round 1 (F-01).** An early return that made the truck brake hard was credited and praised.
+  - A return 3.0–6.5 m ahead made the truck brake at about 8 m/s² (40 → 19.5–26.7 км/ч).
+  - The 10 m gap then opened only because the truck braked. The drive got SAFE_LANE_CHANGE on the entry frame and task 2 0.85–1.3 s later, 0 т. and 3/3 at every rung.
+  - Three mutants also survived: the rig-wiring mutants V4 and V5, and V7 (task 2 without the clear gap).
+- **Round 2.** It billed the faster car's early return, but was refuted on one finding (F2-01), with one condition (F2-02) and two surviving mutants (F2-03).
+  - F2-01: a car returning SLOWER than the truck was answered «clear» on the very frame the watch opened. The truck braked 0.6–1.6 s later. On slow51b36g18 the car was on the line at 35.7 км/ч, 10.94 m ahead, and the truck went 40 → 28.6 км/ч; the drive passed 3/3 at L1–L5.
+  - F2-02: its one-step «hard» billed a harmless return. A car pulling away 9.13 m ahead at 49.7 км/ч cost 10 т. and the lesson, for a truck that lost 1.44 км/ч.
+  - F2-03: the two surviving mutants were the rig's shelter ref not following the prop, and a spent return re-arming when the car left the lane.
+
+**What round 3 does (ADR-015).**
+- **The watch closes only when the return is finished.** Five things must hold together for 1.44 s, the time the truck takes to drive its guard's 16 m reach:
+  - the car is settled within 3.0 m of the truck's line;
+  - it is straight within 15° of the truck's heading;
+  - there are at least 10.25 m between bumpers;
+  - it is not slower than the truck;
+  - the truck is not shedding speed to it.
+  Credit, «overtaken», task 2 and the lane-change praise all wait for that.
+- **HARD.** The product's own harsh-brake rule (≥ 7 m/s² held 0.4 s, now in `rules/harshBrakeEpisode.ts`) is run on the truck's speed. It counts only when that speed shed is on the truck's account of what the student made it shed. A hard brake bills LANE_ENTRY_FORCED_BRAKING (опасна).
+- **LIFT.** The truck slowed by at least 0.3 m/s but did not brake hard. This bills OVERTAKE_RETURN_TOO_EARLY (основна) and withholds the lane-change praise.
+- **The lee.** It is held by `createRigWindShelter` and stepped into the sim before `sim.update`. Both round-2 surviving mutants are now killed.
+- **Text.** In the round-3 lane one reviewed sentence changed: the N38 rationale's last criterion now states the harsh-brake rule. At the merge, TP-7 (below) also changes that rationale's lead-in. OVERTAKE_RETURN_TOO_EARLY's existing card can now appear in this lesson; its text is unchanged.
+
+**What the round-3 verifier reproduced.** It ran 1,170 live-chain drives (234 tapes × L1–L5) and judged them with its own oracle on the truck's speed. Where the two disagreed, it refereed through the engine's own reducer.
+- **Lawful passes**, from the slowest (49.9–50.8 км/ч) up to the cap (85.5–97.2): 0 т., 3/3 and two SAFE_LANE_CHANGE at L1–L5.
+- **Drives that do not pass** complete nothing. Sitting beside the cab or staying left completes task 1 only.
+- **The return grid** (13 gaps × three cruise speeds × five return speeds, plus the verifier's own tapes):
+  - 606 billed-hard runs: none credited, none praised.
+  - 112 lifts: none billed as forced braking, none praised. OVERTAKE_RETURN_TOO_EARLY is coached at L1–L3/L5 and costs 3 т. at L4.
+  - 311 clean runs: none billed, and the truck shed nothing inside the watch.
+- **The round-2 refutations** now bill or hold back credit:
+  - slow51b36g18 is BRAKED at L1–L4 and a LIFT at L5, with task 2 left open;
+  - dab62g20 is BRAKED at L1–L5;
+  - the round-2 pull-away tapes at 8 m and 9 m end clear and are never billed as forced braking. Closer or slower returns at those gaps can still be lifts: the builder's sweep finds a lift band at every speed (7.25–8.75 m at 50 км/ч), and the verifier's earlyClear3slow (9.03 m, 49.7 км/ч) is a lift, coached, with the praise withheld.
+- **The lee:** 210–510 N beside the trailer against 700–1,700 N in the open. The verifier's own geometry equals the sim's factor (difference 0), and the wind is whole again 4.05–4.27 m past the cab.
+- **Census of the whole catalogue** (167 lessons, 2,434 rows, 0 errors): only this lesson's 15 rows differ from base. Against round 2, the only change is the correct demo's «overtaken» moving from 24.83 to 26.83 s.
+- **Suites:** 587/587 targeted tests; 2,179 tests in rules + orchestrator; tsc shows the same 22 errors as base; re-recording the manifest and the traces changes no byte.
+- **Mutants:** 10 run, all killed on assertion text.
+
+**Integrator decisions (binding, made under the delegation).**
+- **TP-1 (C3-01):** an exact 0.4 s hold counts as held, with the 1e-9 relative tie tolerance. A float summation artefact must never decide a verdict.
+  - The cut still sits on the 24th frame of the guard's 8 m/s² brake. On the verifier's tapes, 0.12 км/ч of truck speed separated a billed fail from a passed lift.
+  - The engine's own HARSH_BRAKING_NO_CAUSE reducer judges the student's own braking. It keeps a bare >= at that tie for now.
+- **TP-2:** a lift bills OVERTAKE_RETURN_TOO_EARLY (основна). It is coached the first time on practice rungs, costs 3 т. at L4, and is not the lesson's own mistake.
+- **TP-3:** a lift followed by a hard brake in the same unfinished return bills both. This holds by construction; no measured tape does it.
+- **TP-4:** a car that comes back slower than the truck and stays slower never finishes the return, so task 2 stays open.
+- **TP-5 (C3-02):** a clean return followed by a brake-check in front of the truck is the tailbrake lane's matter: bill a brake check when the follower was actually put at risk. It is not billed here.
+- **TP-6 (C3-03):** the kinematic laneEntered basis armed on this lesson is accepted. It is true: on every L1–L3/L5 run the verifier drove, a collision followed within 1.9 s, and at L4 the session ends at the bill.
+- **TP-7 (C3-05):** the reviewer-facing N38 rationale lead-in (`LANE_ENTRY_FORCED_BRAKING.rationaleBg`, `rules/n38.ts`) no longer says the second basis is only for the faster of the two, because round 3 judges a slower car by the same basis. The rest of the sentence is unchanged.
+
+**The merge onto gate 1.**
+- Gate 1 is 613bfc6 + rbcad r8 (ADR-014's fixed 1/60 s grid) + the rbcad integration pins + rbexit r1, committed detached as e9618fb.
+- It shares six files with truckpass, plus the reviewed-text manifest: `LessonScene.tsx`, `VehicleRig.tsx`, `liveChainReplay.ts`, `runners.ts`, `traffic/staged.ts` and `traffic/types.ts`.
+  - **One hand merge.** `liveChainReplay.ts` had two textual conflicts. Both lanes' engine imports were kept. Truckpass's opt-in outcome fold now folds the grid point's own `pt.staged.outcomes` after `applyTick`, in place of its frame-timed `o.tSec === t` filter, because one frame can bring several grid points.
+  - **Five automatic merges**, each checked by meaning. From rbcad: nothing graded reads a frame-end pose, so the watch and the harsh-brake step read the truck and the car at the grid point. From truckpass: the watch timing, hard versus lift, and the lee stepped before `sim.update`.
+- The reviewed-text manifest was restored to the gate-1 copy and re-recorded, not hand-merged.
+- The merge was proven together with gate 1 in a scratch worktree.
+
+**Merge result.** One patch, `truckpass-r3-on-gate1.patch` (sha256 074a4646…8cb9; 76 files, 10 added and 66 modified; 0 CR bytes). Applied onto e9618fb it gives tree 78398952. The adversarial check's verdict is **ACCEPT**, and it left the worktree exactly as it found it.
+- **Tests**, one worker each, all green:
+  - the truckpass suite: 20 files, 587/587;
+  - rules + orchestrator: 132 files, 2,198/2,198 (round 3's 2,179 plus rbcad's 3 files / 19 tests);
+  - rbcad's grid files: 7 files, 139/139;
+  - rbexit: 3 files, 28/28;
+  - text truth (manifest, caption-truth, keep-right census): 131/131, with only the manifest re-recorded;
+  - tsc: 21 errors, inside the 21–22 baseline, all in the prisma/db/store layer and none in sim code.
+- **Manifest:** re-recorded (49/49). 70 entries changed, all of them this lesson's, the overtakeReturn act copy or N38 (TP-7).
+- **Census.** In the checker's full census (2,434 rows), the merged tree equals gate 1 on all 2,419 rows outside this lesson. The 15 truck-pass rows keep round 3's verdicts, scores, objectives, events and outcomes, including drewLevel 19.03 and overtaken 26.83. Every difference is explained:
+  - L4 mistake-blown-out bills POOR_LANE_KEEPING one grid step earlier (20.3333 → 20.3167), with the same score;
+  - the frame counts are 1–2 lower: rbcad round 5 removed the t = 0 point, and on the shadow rows the session completes one step earlier;
+  - the clip-truck debriefs at L1–L3/L5 gain rbcad round 7's near-miss line (V-01). Rebuilt with nearMisses = [], their hashes equal round 3's exactly.
+- **Cadence:** all 15 cells, outcomes folded and not, at 60/120/144 Hz, 60 Hz ± 1 ms, mixed 1/60–1/20 s, 0.37 s and 0.5 s frames: 0 splits.
+- **Mutants** on the merged tree: three truckpass and two rbcad, all killed on assertion text.
+- **V-01, a false debrief line, to be filed as a finding.** On mistake-clip-truck at L1, L2, L3 and L5 the debrief says «Разминавания на косъм: 1 — автомобил на 0,4 м» about npcId 1000. That is the staged truck the same drive had just hit (COLLISION at 14.68 s; the near miss resolves at 15.05 s, 0.43 m). The score and verdict are unchanged (10 т., FAIL), but the line is false.
+  - Cause: rbcad's near-miss meter (`scene/nearMissMeter.ts`) uses one car envelope for every vehicle and does not drop an encounter that ended in contact, and it meets truckpass's new collision tape.
+  - The merge did not introduce it. L4 ends at the collision and has no such line.
+- **V-02, owed to the truck-pass lane.** The live shell folds a grid point's staged outcomes BEFORE that point's tick (LessonScene `onPoint`). The replay (`liveChainReplay` with applyOutcomes, and `liveWindDrive`) folds them AFTER `applyTick`. This predates the merge (43b4109) and can move an objective's completion by one grid point. The merge corrected the replay's comment and did not reopen the order.
+- **V-03, disclosed, physics only.** The lee reads the truck's newest grid state, so inside a long frame it can be up to one frame stale. Nothing graded reads it.
+
+**Still OPEN.** The row stays open. In all three rounds nothing was looked at on the glass: every number is in-process (VehicleSim under rapier, the live rung chain, and the real traffic system and director with a kinematic car). The row closes only after:
+- a drive through `/dev/drive-rig` on both lenses (PC and phone);
+- re-capture of the lesson's clips.
+
+**Owed.**
+- **The engine's tie rule (TP-1).** Align the HARSH_BRAKING_NO_CAUSE reducer with the 0.4 s tie rule, in its own lane.
+- **Brake checks (TP-5).** The tailbrake lane owes the bill for a brake check that puts the follower at risk.
+- **The near-miss line on a vehicle that was hit (V-01).** Filed as a finding for the near-miss / rbcad owner. Suppress an encounter with a body that was in contact during the window, and/or use a staged actor's own profile envelope. Then re-check the clip-truck debrief at L1–L3/L5.
+- **The outcome-fold order (V-02).** Owed to the truck-pass lane: make the replay fold a grid point's staged outcomes in the live shell's order (before the tick), or state why not.
+- **Photographs.** New in round 3:
+  - the OVERTAKE_RETURN_TOO_EARLY card on a lift;
+  - no praise on a lift;
+  - task 2 ticking 1.44 s after the car settles.
+  Still owed from rounds 1–2:
+  - the forced-return card on a phone, and no praise on an early return;
+  - the clip demo's blinker and wheel;
+  - the «ahead» ribbon, and no ring for the truck tasks;
+  - the banner cap line;
+  - the truck in the mirror at 10.25 m;
+  - the calmer air beside the truck;
+  - the gust chip's two sentences.
+- **Weak mutant coverage (C3-04).** Two mutants are held only by a fake-port test (settle without the clear gap) or only by a source pin (the follow inside an effect given []).
+- **Carried from rounds 1–2, not decided here:**
+  - the crawl-detector decision: the paced truck no longer gives the 60 m queue exemption, so a very slow start can be billed DRIVING_TOO_SLOW_FOR_MOTORWAY;
+  - a truck-aware scripted drive for the audit bots;
+  - par time (90 s), not re-derived;
+  - the clip demo's contact margin of about 0.4 m;
+  - whether the lee is long enough to feel (4.2 s at 62 км/ч), to be judged on the rig drive.
+
+**Addendum (2026-10-09): the first gate on the merge.** Gate «tp» went RED on six catalogue-wide pins that the truck-pass lane had not run: route-runout's two catalogue tests, the task-cap census under the late, hold and grace plans, and lane-11's T17. No product file or shown text changed to fix them. Both fixes are test-only: truckpass-fix1 (a9ef714b) and truckpass-fix2 (e02915b3). The staged fix 2 also carries a comment-only correction (V-2): the restage test's comment now says the census skips by the `stagedPass` property, not by name.
+- **Route-runout.** Its census cannot complete a staged-pass lesson.
+  - It walks each lesson with a bare applyTick and no staged runner, so no truck reports arrive and the chain stalls at sc-acw-pass.
+  - The stalled-chain gate then ends the drive 9.4/7.2/5.0 m short at L1/L2/L3–L5. That gate is `routeFinishZone`, on the ladder-widened 17/15/12 m terminal ring with its 0.5 s dwell.
+  - The live car passing the real staged truck completes all three tasks at every rung, at the taught 62 km/h and at the slowest lawful 53 km/h. The run-out then ends the drive 2.43–2.48 m from (0, 900), inside ROUTE_RUNOUT_ARRIVE_M (2.5 m). The fix's checker measured 2.35 m on the committed correct demo at L1–L5.
+  - The fix: the census now skips any route whose zones carry `stagedPass`, and a pin holds the skipped set to exactly `sc-ac-wind-truck-pass`.
+  - A live-car pin in `wind-truck-pass-restage.test.ts` enforces the run-out rule for this lesson at every rung and at both speeds. It also requires L1 to end no further from the mark than L5 + 0.5 m.
+- **Task-cap census.** Exactly 20 row × plan entries changed: sc-acw-pass at L1/L2/L3/L5 under the census's five plans.
+  - Only the 12 under late, hold and grace lost a blow, 4 per plan. The old disc blow (arrival 105.2 km/h at t = 20.85 s) is gone, because the restaged cap reads the truck runner's own reported speed, not the speed the census forces on the tick.
+  - Under line and wet there was no blow on either tree. Only frame counts and hashes changed, because the route now ends at y = 900.
+  - The other 517 rows are bit-identical.
+  - Re-pinned, with the reason next to each pin:
+    - blown 513 → 509 under each of late, hold and grace;
+    - graded 324 → 320 (late);
+    - sign-bound 189, unchanged;
+    - glass-under-gate floor > 298 (299 measured).
+  - The over-cap bill is still covered on the live car: at 118 km/h it is raised once and not credited; at 98 km/h it is credited.
+- **Lane-11 T17.** The banded matchPlayer count fell 19 → 18: the truck now cruises on its own 40 km/h schedule (`scheduledCruise`).
+- **Directory runs after fix 1:**
+  - lesson-ui: 42 files / 712 tests, green.
+  - scenario: 173 files / 4,138 tests, green.
+  - lessons: 123 files; red only on the two route-runout tests that fix 2 addresses.
+- **Directory runs after fix 2,** on the integrated set before tailbrake was added (truck-pass round 3 + fix 1 + fix 2, meetcars, islandcoach, crashcam):
+  - lessons: 124 files, 2,336 passed, 0 failed, 165 skipped, with route-runout at 14/14 including the new pin;
+  - scenario: exit 0, but its per-test counts were not kept on disk.
+  - Tailbrake changes `rules/engine.ts`, so these runs do not stand for the final set. See the tailbrake section.
+
+## Landed: the two oncoming cars the briefing announces pass once and do not come back — `sc-ln-obstacle-meeting:114706e0` (critical), clause 6 (2026-10-09)
+
+Lane `meetcars`, round 1, built on `c38086a` from the rig-w2 judge's measured cause. SIGNED OFF WITH CONDITIONS by its adversarial verifier. The patch is `meetcars-result-r1.patch` (sha256 007c96a0…, 8 files). Five are product files: `traffic/types.ts`, `traffic/staged.ts`, `contracts.ts`, `orchestrator/runners.ts` and `lessons/scenario/templates-lanes2.ts`. The other three are tests and a test helper. It shares `orchestrator/runners.ts` and `contracts.ts` with tailbrake. The hunks are disjoint: meetcars touches `NarrowMeetingSpec`, `OncomingStreamSpec` and their runners' `stage` calls, and tailbrake touches the `RearTailgaterSpec` doc and `RearTailgaterRunner`. It shares no file with islandcoach, crashcam or the truck-pass fixes.
+
+**Why.** The briefing says «Насреща идват ДВЕ коли» and «Изчакай и двете да отминат… Чак когато насрещната лента е празна докрай». In rig-w2 the judge measured that the staging sends each oncoming car back about 12.7 s after it leaves, so a student who waits more than about 11 s meets a third car and a fourth.
+- The cause in the code: every staged road vehicle is sent back round (FR-B5-RETURN, `reentryArc` in `traffic/staged.ts`). Only rail actors were exempt, and an author had no field to give a road car a single run.
+- FR-B5-FACING keeps an oncoming returner off-scene while the student is stopped facing it, so it comes back the moment he moves off.
+- Both of this lesson's cars, `LNOM_STREAM` and `LNOM_MEETING.actor`, returned at their hold point, 85–87 m dead ahead. They are authored in `templates-lanes2.ts`, not in `templates-lanes.ts` as the rig's suspect-file note said.
+- On the builder's base drives with a 15 km/h approach, every move-off from 7 s after the lane emptied ended in a COLLISION.
+
+**What landed.**
+- `StagedVehicleSpec.oneRun?: boolean`. A oneRun car is never sent back round: a new step (2b) in `reentryArc` returns −1 for it. When the field is absent or false, nothing changes.
+- `NarrowMeetingSpec` and `OncomingStreamSpec` carry `oneRun`. Their runners pass it to the staged actor only when it is `true`.
+- This lesson's two cars get `oneRun: true`, with a doc block that states the reading.
+- A retired car parks at the existing FR-B5-EXIT pose, y = −70. That is 70 m beyond the street's south end and off the road. On base it already parked there during every FACING hold.
+- The reading chosen is two cars, then an empty lane, because every sentence the student gets counts two cars. The staging was changed to match the text:
+  - no shown sentence changed, and the manifest was not re-recorded;
+  - no threshold moved;
+  - FR-B5 is unchanged for every other lesson.
+
+**What the verifier reproduced.**
+- **Its own tapes: 620 drives through the live rung chain.**
+  - Four careful profiles: the shadow approach at 38 km/h, and approaches at 15, 10 and 30 km/h, each with its own stop point and passing pace.
+  - Each profile × L1–L5 × 31 waits, from 0 to 40 s after the lane empties, in half-second steps across 4–9 s.
+  - Its detector is independent of the builder's. It watches every vehicle on the road ahead in either direction, any jump in y, and the staged views' `returns` counter.
+  - Result on all 620 drives:
+    - exactly the two announced cars, both present from t = 0.02;
+    - no car after move-off, and 0 returns;
+    - never a car ahead while the student was committed;
+    - every drive committed, completed and passed.
+- **Controls.**
+  - The same tapes with `oneRun` stripped from the template: 434 COLLISIONs.
+  - The verifier's 15 km/h tape on base product: COLLISION at every wait from 0 to 40 s, at L1 and at L4.
+- **The builder's tests.** 47/47 on the tree. On base product, 22 fail and 25 pass, and every failure is an AssertionError.
+- **Demo census** (shadow, pull-out and squeeze × L1–L5, live chain): base and tree JSON are byte-identical over 15 rows, with 0 staged returns in every row.
+- **Regression.**
+  - The lesson, text-truth and catalogue-integrity files: 176/176.
+  - The four grid census files: 63/63.
+  - traffic and orchestrator: 74 files / 889 tests.
+  - tsc: at the 22-error environment baseline, none in touched files.
+- **Retry.** A retry still restores a oneRun car: the reset rewinds it to its hold and it makes one run again (a unit probe on the tree).
+- **Mutants.** The verifier ran 7 of its own, one at a time. 5 were killed. V6 and V8 survived; they are conditions C2 and C3.
+
+**The conditions, and how each stands.**
+- **C1. A lesson of the same class was missed by the census.**
+  - `sc-ov-narrow` is the other lesson on ov-narrow-v1. Its briefing says «Насреща идва кола» and «Щом насрещният премине…», and its narrowMeeting actor can still return.
+  - The verifier measured the same defect there at L1:
+    - moving off 19.65 s after the car passed, the student had committed when the car returned (no contact);
+    - at 24.65 s and at 29.65 s: COLLISION, not passed.
+  - The builder's phrase regex missed this sentence.
+  - This patch does not change that lesson's staging, so it does not refute the lane.
+  - OWED: a row or lane of its own.
+- **C2. The retry path is not pinned.** It is correct on the tree. But mutant V6 survives the builder's 47 tests: a retry that leaves a retired car retired, so the retried lesson would have no oncoming cars. OWED: a retry assertion.
+- **C3. «Unchanged for every other lesson» is not pinned.**
+  - It is true by inspection and by grep: only the two LNOM specs set `oneRun`.
+  - But mutant V8 (every narrowMeeting actor oneRun) survives 495 tests.
+  - Mutant V7 (every stream car oneRun) is killed only by the builder's own control tests.
+  - OWED: a pin.
+- **C4. The lesson sweep stops at 30 s; the stop rule asks for 0–40 s.** A car returning 40 s after it retired (mutant V9b) is caught only by the unit test. The verifier's own tapes run to 40 s and found nothing. OWED: extend the lesson sweep to 40 s.
+- **C5. No browser evidence yet.** In process, a retired car stands at (−4.1, −70.0): car 1000, on every census and tape drive. OWED: the rig drive below, plus a look in the rear mirror and at L5 night at the two parked cars about 200 m behind.
+
+**Nothing closes by this landing.** `sc-ln-obstacle-meeting:114706e0` stays OPEN. It closes only after a careful drive through `/dev/drive-rig` at L1 and L3 photographs the clause, moving off 4–9 s and 25 s after the lane empties. Every number above is in-process, measured through the live rung chain.
+
+**Owed.**
+- The rig drive above, with the rear-mirror and L5-night look at the retired cars (C5).
+- `sc-ov-narrow` as a row or lane of its own (C1).
+- The pins of C2, C3 and C4.
+- The builder's other same-class lessons each need a timed patient-student drive before any change:
+  - `sc-ov-oncoming-gap`: «След последната насрещна кола»;
+  - `sc-merge-from-property`: «… ЗАД последната кола». Its shadow already shows returns at 34–38 s;
+  - `sc-mv-uturn-ban`: «Когато потокът мине»;
+  - `sc-pk-double-park`: «Насреща идва кола».
+- An ADR decision. `oneRun` extends FR-B5-RETURN guard 2 to road cars that an author sets. Whether that needs an entry in `docs/architecture/07` is the integrator's call; the patch adds none.
+- Filed by the verifier (N2), outside this lane and not caused by it. At L4, DRIVING_TOO_SLOW_IN_TOWN bills a careful 10 km/h crawl home (1 т., still passed). Whether it bills depends on how long the student waited: waits of 0–4 s are not billed, 4.5 s and longer are. L1–L3 and L5 never billed it.
+
+## Landed: after a crash, the coach stops ordering the manoeuvre until the car drives again or leaves the crash pin — `sc-roundabout-entry:4ab693eb` (critical), clause 2 (2026-10-09)
+
+Lane `islandcoach`, round 1, built on `c38086a` from the rig-w2 judge's measured cause. SIGNED OFF WITH CONDITIONS by its adversarial verifier. The patch is `islandcoach-result-r1.patch` (sha256 af606a5e…, 7 files). Four are product files: `lessons/advisor.ts`, `lessons/engine.ts`, `lessons/finish.ts` and `lessons/types.ts`. The other three are test files. These are the lessons-module engine and types, not `rules/engine.ts` or `rules/types.ts`. The patch shares no file with meetcars, crashcam, tailbrake or the truck-pass fixes.
+
+**Why.**
+- **What rig-w2 measured.** The car can no longer mount the island, and the crash card and chase cut are there. But the coach card «Излез от кръговото с десен мигач» stayed up after the crash: the judge's verdict puts the coach line and the bare banner on screen until about +5.2 s. The judge's pc-L3-island-b sidecar shows:
+  - COLLISION at t = 61.74, at 2.27 km/h;
+  - the car at rest at 62.98 (+1.24 s);
+  - the coach line in the HUD text timeline from 60.58 to 64.41 (+2.67 s);
+  - the next card first at 66.90 (+5.16 s).
+- **The cause.** The only thing that took the objective off the coach after a crash was the 5 s route hold (`ROUTE_HOLD_S` in `routeHoldForSession`). Until it ran out, the last branch of `advisorPromptForSession` gave the manoeuvre on every tick.
+- **The 5 s is not a founder ruling, and it was not shortened.** No ruling fixes ROUTE_HOLD_S. The 2026-09-27 ruling rules out a damage model and says nothing about the coach line.
+
+**What landed.**
+- **`CRASH_PIN_DRIVING_KMH = 5`, in `finish.ts`.** This is not a new number. ROUTE_HOLD_S was derived from it as the driving floor: 6 m at 5 km/h takes 4.32 s, under 5 s. It is also the shell's existing «moving» bar. A test pins the derivation.
+- **A rest latch on the crash pin, `cameToRest`.**
+  - The engine sets it from the tick's own speed (|v| ≤ 5 km/h) and re-sets it on every re-arm.
+  - It grades nothing and ends nothing.
+  - It has to be a latch, not a speed check, because the speed on the contact tick is usually high: across the census's 212 collisions the median is 29.8 km/h, and 197 are above 5 km/h.
+- **`objectiveWithheldAfterImpact`.**
+  - While the pin is armed, the objective line is withheld until the car has come to rest and is driving again above 5 km/h. Reversing counts as driving.
+  - Leaving the 6 m pin radius ends the pin, and the line comes back.
+  - It ranks after the live-yield cards and before both the cap-released task sentence and the objective.
+- **What is not changed.**
+  - No line replaces the withheld one, and no string was added or changed. The −10 fault card with ЗДвП чл. 20, ал. 2 is already on the glass.
+  - At 5 s the pinned recovery card lands exactly as before.
+  - ROUTE_HOLD_S, the route hold and the banner are unchanged.
+
+**What the verifier reproduced.**
+- **The builder's two test files.** 18/18 on the tree. On base product 13 fail, among them «+0.000 s: expected 'Излез от кръговото с десен мигач' to be null». Three of the 13 are TypeErrors, because the new export does not exist on base.
+- **Its own census**, keyed on the raw collision inputs rather than on pin arms: every committed demo × rung, 2,434 cells, through the live chain at 60 Hz.
+  - 200 cells have a collision. 170 changed, all of them among those 200.
+  - No cell changed without a collision, or before its first collision. The first change lands on the collision tick.
+  - Every change is the objective line → no card. No wait card or recovery card was removed.
+  - Collisions and crash cards are byte-identical between base and tree. The builder's census also found the pin arms identical, so no sheet moved.
+- **Its own drives.**
+  - The island hit at 15.6 km/h, at L1, L2, L3 and L5: no card from +0.000 s, the car at rest at +0.917 s, the recovery card at +5.000 s. On base, the exit line is on from +0 to +5 s.
+  - Reversing out at L3 and L5: the line stays withheld through a 3 km/h crawl and comes back at +4.067 s, at −5.02 km/h.
+  - Two other lessons, each at L1, L3 and L5:
+    - an sc-follow-brake rear-end at 23.9 km/h: no line from +0 to +4.7 s, then the recovery card;
+    - an sc-pe-jaywalker hit at 14.6 km/h: no objective line.
+  - The banner is the same with the advisor on and off, on every sample.
+- **Nothing ruled was touched.** ROUTE_HOLD_S is still 5. The recovery card lands at +5.000 s and +5.017 s, as on base. No shown text changed.
+- **Regression.** A targeted 30 files, 746/746. tsc is at the 22-error baseline. The verifier did not re-run the whole `lessons/__tests__` directory. The two route-runout failures the builder saw there are the truck-pass census, covered in the truck-pass addendum. The integrator's gate has since run that whole directory on the integrated set before tailbrake was added: 124 files, 2,336 passed, 0 failed, 165 skipped, with `advisor-crash-withdrawal` at 13/13.
+- **Mutants.** 7, run one at a time:
+  - X3, X6 and X7 went red on assertion text;
+  - X1, X2, X4 and X5 survived (conditions C2, C3 and C5).
+
+**The conditions, and how each stands.**
+- **C1. The banner.** For the first 5 s the bare task banner still reads «Премини през кръговото и излез с десен мигач». That is by design: qualifying it before ROUTE_HOLD_S would claim «притисната» before that is known. The judge named the banner in clause 2. STANDS OPEN: if the judge counts the banner, it needs a founder ruling or a separate row.
+- **C2. The coach praises a wait after the student hits a pedestrian.**
+  - This is pre-existing and identical on base; the patch did not introduce it.
+  - The withdrawal ranks below the live-yield cards. So after the sc-pe-jaywalker hit, from +1.067 s to +3.75 s, the card reads «Чакаш правилно — пешеходецът на пътеката минава пръв…».
+  - That is false for a car that has just struck him, which breaks THEO-4.
+  - In the census the same card appears on 1,200 grid points inside post-collision windows.
+  - The ranking is not pinned (mutant X4 survives).
+  - OWED: a new row. A yield whose counterpart was just struck must be treated as convicted and never praised.
+- **C3. Its precedence over the cap-released sentence is not pinned.** Mutant X1 moves the withdrawal below `taskCapReleased` and leaves all 18 tests green. OWED: a test with both a released cap and a collision.
+- **C4. The line comes back through the 6 m radius before the car has rested.**
+  - This is the existing CRASH_PIN_RADIUS_M behaviour, inherited by the patch. It contradicts the patch's own comment.
+  - In the census, 111 billed collisions see the line come back before the car first rests: at 11–58 km/h, 0.38–1.97 s after the hit. These are kinematic replays, in which the car drives through the body it struck.
+  - Example: sc-follow-brake mistake-late-reaction at L3. The line is back at +0.83 s; the car comes to rest at +2.25 s, about 3 m behind its last contact, with the line still on.
+  - The car is moving on those samples, so the stop rule did not fire.
+  - OWED: confirm on the rig.
+- **C5. Two surviving mutants.**
+  - X2 (`<` for `<=` in the latch) differs only at exactly 5.00 km/h.
+  - X5 (no latch on the crash tick) differs only if the car is at or under 5 km/h on the contact tick and above it on the next.
+  - The verifier filed both as a condition and reads them as near-equivalent. No integrator acceptance is on record. OWED: a pin, or a recorded near-equivalence argument for each.
+- **C6. The live photograph.** OWED (below).
+- **N1, a test that checks nothing.** The census test's default cell (`sc-park-gap-short` mistake-forward-hit) has no collision, so the default run checks nothing. OWED: point it at a real collision cell, for example sc-follow-brake mistake-no-reaction at L3.
+- **N2, a recovery card that is not always true.** The existing card «Съвсем леко назад с прави колела…» is shown after a pedestrian hit, and while the car is already reversing out at −8 km/h. This is pre-existing and a candidate for a separate row.
+
+**Nothing closes by this landing.** `sc-roundabout-entry:4ab693eb` stays OPEN until the rig re-drives pc-L3-island-b (advisor on) and pc-L3-island (advisor off) on the integrated build and photographs the glass from +0.05 s to +5 s after the hit. Every drive above is in-process, with the contact injected at the measured pose, because rapier does not run in process.
+
+**Owed.**
+- The rig drive above.
+- The second-contact state, which has never been captured live. In process, only the re-arm test covers it.
+- C1 (a ruling or a row), C2 (a new row), C3 (a pin), C4 (a rig check), C5 (a pin or an argument), N1 (the census default cell) and N2 (a candidate row).
+- Carried from the judge, not part of this row:
+  - an ambient walker turns round on the ring's entry chord at about (8.82, −18.9) and drew a −10 «Удар в пешеходец» on a careful drive;
+  - 9 shadow-correct demos have ambient collisions in the live chain.
+
+## Landed: the camera pose follows the body that is drawn, so the crash response no longer stands the camera inside the car or shows the chase view's bare cabin — `sc-hz-brake-dont-swerve:f0023997`, clauses 1 and 6 (2026-10-09)
+
+Lane `crashcam`, round 1, built on `c38086a` from the rig-w2 judge's measured cause. SIGNED OFF WITH CONDITIONS by its adversarial verifier. The patch is `crashcam-result-r1.patch` (sha256 a673d317…, 5 files): the new `scene/bodyViewCut.ts`, `CameraRig.tsx`, `HeroCarBody.tsx`, `vitok/VitokCockpit.tsx`, and `bodyViewCut.test.ts`. It shares no file with meetcars, islandcoach, tailbrake or the truck-pass fixes.
+
+**Why.** rig-w2 found the flash, the shake and the chase cut present (no damage model, per the 2026-09-27 ruling). But for seven 60 fps frames at the chase/cockpit hand-over the camera was inside the car's own body, and the first chase frames drew the cabin shell without the body.
+
+The cause, read in the code by the builder and confirmed by the verifier: the camera pose and the body swap ran on two clocks.
+- `applyCameraMode` writes the camera-mode ref at once, and CameraRig snaps to the new pose on the next frame.
+- The same call also sets React state (`setCockpit`). That state swaps the exterior body (HeroCarBody) and the cabin shell (VitokCockpit) only when the reconciler commits, some frames later.
+- ImpactCut polls every 200 ms and can hand the view back one frame after the cut.
+- So on the swerve, the chase view was first drawn around a cabin shell that was still showing (c074). When the commit landed, the exterior was drawn around the cockpit eye: the flat orange-brown field with two seat backs, at c079–c081 and again at c095–c098.
+- The near plane plays no part. It is a constant 0.1 m.
+
+**What landed.**
+- **`bodyViewCut.ts`.**
+  - `readDrawnBodies` reads the two named body groups' own `visible` flags, ancestors included, from the scene graph that is about to be drawn.
+  - `cameraPoseMode` never puts the camera at the cockpit eye while the exterior is drawn, and never outside the car while the cabin shell is drawn.
+  - While the requested view does not match the drawn bodies, it holds the last pose that does match, for exactly as long as the commit takes. If the last pose does not match either, it uses the one view that does.
+- **CameraRig** takes its pose through `cameraPoseMode`, so the camera moves in the same frame as the body swap. `data-sim-camera` now publishes that pose, so the DOM speed block and the 3D cluster agree with the picture.
+- **HeroCarBody and VitokCockpit** each name their top group. Nothing else in either file changes.
+- **Unchanged:** ImpactCut, IMPACT_RELEASE_KMH, the flash and the shake. No damage model was added, and no shown sentence changed.
+
+**What the verifier reproduced.**
+- **Its own walk, independent of the builder's.**
+  - Real three.js groups, read through `readDrawnBodies`.
+  - React commits modelled three ways (delay line, coalescing, random jitter) at lags of 0–600 ms.
+  - The real ImpactCut rules and the 200 ms poll, at 8 poll phases.
+  - Impacts at 20, 40 and 60 km/h, in six speed profiles: dead stop, just under 5 km/h, just over 5 km/h, a swerve with a second contact, a scrape, and stop-then-go.
+  - Cadences of 60, 30 and 9 fps, plus jittered ones.
+  - Result: 17,280 grid runs with 0 bad frames under the repair, against 11,243 bad runs under the base rule, and 0 liveness violations.
+  - A 3,000-seed fuzz with random impacts, random C and top-down presses and random lags also gave 0.
+- **On a stop below the release speed,** the chase view stays to the end and arrives on exactly the frame the exterior is first drawn.
+- **The builder's tests.**
+  - The suite passes 22/22.
+  - With the three product files reverted, the 3 wiring pins go red on assertion text.
+  - The builder's base-vs-repaired table reproduces cell for cell. For example, swerve at 60 fps with lag 5 goes from 276 bad frames to 0, and the no-brake drive at 60 fps with lag 20 from 400 to 0.
+- **Regression**, on one worker:
+  - 38 files. 37 pass, with 762 tests.
+  - The 38th file, reverseAssist-audit-harness, needs `tools/mobile/`. With that copied in temporarily it passed 40/40.
+  - tsc is at the 22-error baseline.
+- **Mutants.** The verifier ran 7, one at a time. 5 went red on assertion text. V1 and V4 survived; they are conditions C3 and C4.
+- **What none of this shows: pixels.** The evidence proves the order of the pose against the visible flags three.js will draw, not the GPU image. The body box used is the collider plus the documented 1.4 m height, not the model's own triangles.
+
+**The conditions, and how each stands.**
+- **C1. A moving contact can now show no chase cut at all.**
+  - This happens when ImpactCut's poll hands the view back (the speed is above IMPACT_RELEASE_KMH) before the chase commit lands, and React merges the two updates into one commit. The exterior is then never drawn and the camera never leaves the cockpit. The flash and the shake still play.
+  - On a swerve-like contact (50 km/h, then held at 48), over 40 poll phases, with merged commits, the chase cut was missing on:
+    - 4/40 runs at 17 ms lag;
+    - 17/40 at 83 ms;
+    - 30/40 at 150 ms;
+    - 40/40 at 333 ms.
+  - Base misses it on 3/40 throughout; at base those frames were the open-shell defect itself.
+  - With delay-line commits, both repair and base miss it on 3/40.
+  - On the swerve rig-w2 measured, the chase commit did land (c079–c081 show the exterior), so a chase of about 3 frames should still show there.
+  - OWED: the re-photograph of pc-L3-swerve60 must show chase frames with the full exterior. Whether the cut gets a minimum hold needs a number derived from the product, and a ruling.
+- **C2. On the no-brake drive the chase arrives one commit-lag later.**
+  - This is the authorized hold. The cockpit is shown under the 0.92-opacity flash for the length of the commit lag. The judge measured c048→c052, about 4 frames.
+  - OWED: on the pc-L3-late60 re-photograph, the cockpit must not read as the filed blank-wall picture for longer than that.
+- **C3. Nothing pins `data-sim-camera` publishing the drawn pose.** Mutant V1 (publish the requested mode instead) leaves 26/26 green. The code is correct. OWED: a pin.
+- **C4. Nothing pins looking up a stale cabin node again.** Mutant V4 leaves 26/26 green, because the remount test unmounts only the exterior. The code is correct. OWED: a cabin remount case.
+- **Note N2.** While either named group is missing (the model is still loading), the lookup walks the chassis subtree on every frame. frameCost passes 10/10. Minor.
+
+**Nothing closes by this landing.** `sc-hz-brake-dont-swerve:f0023997` stays OPEN until pc-L3-swerve60 and pc-L3-late60 are re-photographed through `/dev/drive-rig` at 60 fps. What to expect:
+- no flat-brown frames around c079–c081 or c095–c098;
+- no open-shell chase frames;
+- the camera holding its old pose for as many frames as the React commit takes.
+
+**Owed.**
+- The two re-photographs (C1, C2).
+- A ruling on a minimum hold. ImpactCut still hands the view back on its 200 ms poll, so on the swerve the chase lasts from 1 to about 12 frames and the view still flips between cockpit and chase twice. It is now never inside a body.
+- The pins for C3 and C4.
+- Clause 7 (sc-fo-brakelight-chain pc-wrong t047, the blue slab) had no rig-w2 drive and was not judged. If it is the same mechanism, this patch covers it; that is unverified.
+- reverseAssist-audit-harness in the full gate. It cannot run in a lane without `tools/`.
+
+## Landed: a brake check at the tailgater is billed under 35 km/h when the car behind had to brake hard — `sc-follow-tailgater:63c0c28c` (critical) clauses C1, C2a (2026-10-09)
+
+Lane `tailbrake`, two rounds, built on `c38086a`. Round 1 was REFUTED by its adversarial verifier. Round 2 was SIGNED OFF WITH CONDITIONS. The patch is `tailbrake-result-r2.patch` (sha256 3cb8db66…, cumulative against `c38086a`, 10 files, +1795/−28). Five are product files: `rules/types.ts`, `rules/engine.ts`, `orchestrator/runners.ts`, `contracts.ts` (comments only) and `lessons/scenario/templates-following.ts`. The other five are four test files and one test helper (`tailgaterTape.ts`).
+
+**Why.** In rig-w2 (above), a full-pedal brake check with the лепка 8.5–8.9 m behind, from 32.3–34.9 km/h, escaped entirely: no card, «ИЗДЪРЖАН» ★★★, and «Чисто и спокойно каране».
+- `HARSH_BRAKING_NO_CAUSE` bills only from `harshBrakeMinSpeedKmh` (35 km/h), read one frame after the pedal.
+- The lesson's own task 1 says «дръж под 36». So a student who obeys the ease-off and then brake-checks is under the floor because of the lesson's own instruction.
+- The runner that stages the лепка published nothing, so the engine could not know the car behind had been forced to brake.
+
+**What landed.** It applies the integrator decision recorded in rig-w2 (told to the founder 2026-10-08). That decision is the principle of his two «bill the forced braking» rulings (2026-09-30, 2026-10-05): a causeless hard brake is billed in a lesson that stages a close follower when that follower was actually put at risk, judged from the follower's own account. No speed threshold was added or moved. The one new value, FTG_LEAD's floor, equals the lead's existing authored cap (below). The global 35 km/h floor stays for every lesson without a close follower.
+- `rules/types.ts`: a new `SimTickEvent`, `followerBraked`. It is a report, not a verdict.
+- `orchestrator/runners.ts`, `RearTailgaterRunner`:
+  - The лепка's own published speed is put through the product's harsh-brake gates (over 7 m/s², held 0.4 s).
+  - It is read only while the car is glued: latched, under its `matchPlayer` law (before the pass, or in a passShiftM-0 station), with the student ahead of it in its lane.
+  - It reports once per braking episode.
+  - A car that is un-glued and later re-glued restarts its account from its speed at that moment.
+- `rules/engine.ts` («THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK»):
+  - Below the floor, a causeless emergency-grade episode is recorded as floored.
+  - A report is re-checked with `isHarshBrakeWindow` against the lesson's config.
+  - The student is billed once per pedal application when the report falls inside the follower's own answer window (its speed / 7 m/s²).
+  - A new pedal application resets the floored record, and a cause appearing mid-brake clears it.
+  - The cause ledger, the mean and accrual gates and the 35 km/h floor are untouched.
+- `templates-following.ts`, FTG_LEAD (round 2): `minMatchSpeedMps: 11.5`.
+  - This is the product's own floor mechanism (sc-ov-crest-curve:b26aaa0b), set equal to the lead's own authored cap.
+  - So the lead holds the constant 11.5 m/s cruise that the template doc, instruction 4 and the sc-ftg-ease note already claim.
+  - Only sc-follow-tailgater uses FTG_LEAD.
+- Round 2 also removed one engine conjunct (`t <= flooredAt + followerAnswerSec`) as provably equivalent, and corrected a runner comment.
+- No shown sentence was added or changed. The bill uses the catalogue copy «Рязко спиране без причина» («…Внезапното силно спиране изненадва движещите се зад теб…»), and that sentence explains the decision. It held on the bills the verifiers examined: the round-1 verifier found nothing ahead within reach and the car behind braking hard on the drives it billed, and in round 2 every bill under 35 km/h has a follower report behind it.
+
+**Round 1, refuted.**
+- The floor-lift did what it claimed on the builder's own cells (32.3 and 34.9 km/h).
+- On the verifier's own tapes, a full-pedal brake check still escaped at 20, 22 and 25 km/h on every rung L1–L5: of 204 glued cells, 150 were billed and 54 escaped.
+- In every escape the engine had `causeSeen=true`. In 50 of them, plus 8 in the y110–330 sweep, the runner had published `followerBraked` at 9.56–10.05 m/s².
+- The cause was the staging:
+  - FTG_LEAD is a `matchPlayer` lead with `followGapM` 150. A slow student let the gap grow until the lead was tied to him and copied his braking (leadV 9.0 → 1.9 m/s).
+  - The far-lead ledger then stamped `farBrakingAt`, and his brake check was acquitted by a cause he had created himself.
+  - At L4 these drives showed the unscoped «Чисто и спокойно каране», for example h20 y80.
+- Four of the verifier's seven mutants survived: the station read, the new-pedal reset, the follower-track reset, and the t-window conjunct.
+
+**What the round-2 verifier reproduced** (r1 reversed, r2 applied, its own probes):
+- The round-1 refutation no longer reproduces. 0 escapes carry `causeSeen`, and FTG_LEAD holds 11.5 m/s through the pedal.
+- Glued under 35 km/h, billed / glued:
+  - low sweep: 200/204 (h20 51/54, h22 54/55, h25 50/50, h28 45/45);
+  - dense, every hold 20–35 km/h at y35–330, L1–L5: 379/395;
+  - densetf, easing to the task speed and then braking: 190/197;
+  - sweep: 94/100;
+  - partial brakes: 48/52;
+  - taskfirst: 65/66.
+- The named round-1 cells (L3 h22 y90, L4 h20 y80, L2 h25 y105) are billed.
+- In every sweep, every drive with a follower report is billed, and every bill under 35 km/h has a follower report behind it.
+- The bill form matches the over-the-floor brake check on each rung: coached lesson mistake at L1/L2/L3/L5, charged at L4, never passed.
+- Gentle ease-offs at 1–5 m/s²: 125 drives, 0 billed, 0 follower reports, identical to round 1.
+- Billed drives with the unscoped «Чисто и спокойно каране»: 0 across all 5,295 probe drives. The scoped form («— но само на отделни отсечки…») appears only at L4 at early y. Over-the-floor L4 bills show it too, so it is existing product behaviour.
+- Comparing r1 with r2 on its tapes, the only grading change is the added `HARSH_BRAKING_NO_CAUSE`.
+- Census: every template × committed demo × L1–L5, base `c38086a` against the tree, including violation code@t and a sha1 of the debrief. That is 2,515 cells; 81 are the same ScenarioCompileError on both trees, and the other 2,434 differ in 0 cells. The 35 km/h floor in `rules/types.ts` is unchanged, and the `contracts.ts` diff is comments only.
+- Mutants: 12, run one at a time, each restored and sha-checked.
+  - The round-1 survivors MA, MC and MF now die on assertion text.
+  - MD was removed, not pinned, and the verifier agrees with the equivalence proof.
+  - R1 (floor removed: lead speed 0, 47/48 cells unbilled), X1–X4, X8 and X9 die.
+  - X5 and X7 survive (see C3).
+- The builder's four touched test files pass 42/42. tsc is at the 22-error environment baseline, none in touched files. No shown text changed.
+
+**The conditions, and how each stands.**
+- **C1, F2: a brake check while the лепка's pass is already under way.** INTEGRATOR DECISION: it stays unbilled under the tailbrake principle, which bills only when the follower was actually put at risk. Risk is measured by the product's own harsh line, the same line the student is judged at. The verifier reports the class as wider than «pulling out, not braking», and the decision covers all of it:
+  - 33 escape cells have the pass commanded 0.03–0.41 s after the pedal.
+  - In some of them the лепка, still at lat 0 and 7.2–8.0 m behind, brakes at about 9.3–10 m/s² for up to 0.38 s before it pulls out. Its in-lane loss:
+    - 3.78 m/s at L3 h25 y125, which is 56% of its 6.76 m/s;
+    - 3.75 m/s at L4 h32 y155;
+    - 3.69 m/s at L2 h20 y170, via a task-first ease.
+  - Its qualified time peaks at 0.383 s, under the 0.4 s sustain, so by the product's own line it was not forced.
+  - With no other fault, those drives keep the unscoped «Чисто и спокойно каране». The verifier saw this on L4 h32 y155 and L2 h20 y170; the builder on L4 h28 y140, L4 h30 y150 and taskfirst L5 h34.9 y180.
+  - The judge's two L1 tasks-first rig drives (32.3 / 34.8 km/h) belong to this class: at the pedal the лепка was already pulling out and accelerating. Under this decision they stay unbilled.
+  - What is pinned: the 6-cell F2 row in `follow-tailgater-brake-check-under-floor.test.ts`. It holds the round-1 verifier's six cells, where the лепка sheds about 1 m/s and never brakes hard. The wider round-2 cells above are decided but not pinned.
+- **C2, N5: catalogue-wide directory regression.**
+  - The verifier could not confirm it: its full-directory run was still going at report time.
+  - It confirmed the touched tests (42/42) and tsc.
+  - It argued that the lane11 matchPlayer count failure (18 vs 19) cannot come from this patch, because FTG_LEAD is still matchPlayer.
+  - The builder reported 641 files / 11,717 tests on its lane, with 7 failures it showed are also red on base: task-cap-lesson-census ×3, route-runout ×2, lane11-data-truth, and touchHintLifetime (needs `tools/`). The first six are the pins truckpass-fix1 and fix2 address, and both fixes are staged on the integrated set.
+  - Before tailbrake was added, the integrator's gate passed lessons/__tests__ on the integrated set: 124 files, 2,336 passed, 0 failed, 165 skipped. The scenario directory exited 0.
+  - Tailbrake changes `rules/engine.ts`, so the integrator re-ran every directory on the integrated set (truckpass round 3 + fix1 + fix2, meetcars, islandcoach, crashcam, tailbrake) with tailbrake staged, one at a time: `lessons/__tests__` 124 files / 2,336 passed; `lessons/scenario/__tests__` 176 / 4,200; `components/sim/lesson-ui/__tests__` 43 / 717; `orchestrator/__tests__` 37 / 458; `rules/__tests__` 97 / 1,765; `traffic/__tests__` 37 / 441; `scene/` 45 / 740; the camera and cockpit set 21 / 314; the truck-pass traces 19 — 0 failed in every set; tsc at the 21-error Prisma baseline. The merge verifier confirmed the patch, the shared-file hunks and one mutant per lane, and re-ran `rules/__tests__` (97 / 1,765) itself; its own re-run of the other directories did not finish in its time, so the gate's full vitest run is the independent confirmation.
+- **C3, N1: two surviving mutants, X5 and X7.** Neither reaches stop rule (a), and the verifier calls both near-equivalent.
+  - X5 lets the follower's reference speed ratchet to the highest seen. It differs only when the car speeds up and then brakes inside one read window.
+  - X7 makes the report lag the pedal by 0.3 s. A follower answering his pedal cannot qualify a 0.4 s-sustain window sooner.
+  - Neither is pinned. They are carried as owed.
+- **C4, N4: one moved catalogue pin.** In `follow-tailgater-brake-check-rates.test.ts`, «the w71 wrong leg's three stops» is now `["coached","none","charged"]` at all 7 rates.
+  - Stop 1: coached, as before.
+  - Stop 2: the lead is at 209–213 m and still closing at 4.61 m/s, so it is acquitted by the round-4 far-closing ruling, as before.
+  - Stop 3: the lead has left the 400 m road and nothing is ahead. A full-pedal stop from 58 km/h is now charged `HARSH_BRAKING_NO_CAUSE`; the builder reports `STOPPED_WITHOUT_CAUSE` charged too.
+  - The old row's antecedent (lead 136–138 m ahead after an 8 s rest) was the mirroring defect itself.
+  - The verifier confirms the row is backed by assertions (stop 3's `leadGapM` is null) and turns red under R1 with a lead at 135.5 m.
+  - The builder argues that the verdict is unanimous across rates, so `:f42dce4f` stays green. The verifier leaves accepting the moved pin, against the f42dce4f / round-4 geometry, to the integrator.
+  - The 2026-10-04 landing's «stops 2–3 … acquitted like base» therefore no longer holds for stop 3 on this tree.
+  - INTEGRATOR DECISION: ACCEPTED. Stop 3 of the w71 three-stop leg is a hard stop from 58 км/ч with nothing ahead. On the 2026-10-04 tree it was acquitted only because the lead, tied to the student by matchPlayer, copied his braking and the far-lead ledger counted that as a cause — the very mechanism round 1 was refuted on. With the lead now holding its own pace, the global rule applies above the 35 км/ч floor and HARSH_BRAKING_NO_CAUSE is billed; the moved pin records exactly that.
+
+**Integration.** Tailbrake shares `orchestrator/runners.ts` and `contracts.ts` with meetcars. It is staged on top of the other lanes in the integration worktree at `c38086a`:
+- `git apply --reverse --check --cached` passes for tailbrake, meetcars, islandcoach, crashcam and truckpass-fix1. The raw fix2 patch fails that check only on its V-2 comment hunk.
+- The staged diff against `c38086a` is sha256 33d7b1a2…, byte-equal to `gate-tp2.patch`: 32 files, +3754/−41.
+- The shared-file hunks are disjoint. In `contracts.ts`, meetcars adds `oneRun` to `NarrowMeetingSpec` and `OncomingStreamSpec`, and tailbrake rewrites the `RearTailgaterSpec` doc. In `runners.ts`, meetcars touches the `NarrowMeetingRunner` and `OncomingStreamRunner` stage calls, and tailbrake touches `RearTailgaterRunner` only.
+
+**Nothing closes by this landing.** `sc-follow-tailgater:63c0c28c` stays OPEN until a rig re-drive photographs it:
+- the brake check under 35 km/h on the lens and level the row was filed on;
+- the phone lens for C2b (the guilty acceleration) and C4 (59 in a posted 50). w74 found a PC/phone split on both, and rig-w2 settled only the PC half.
+
+On a re-drive, expect two different outcomes on the brake check:
+- a geometry like the L3 rig drives should be billed. In the judge's trail for pc-L3-brake-tasksfirst the лепка braked from 9.0 to 1.65 m/s still in lane; the round-1 builder gives 9.0 → 3.2 m/s for the L3 rig drives;
+- the L1 tasks-first geometry (the лепка already pulling out) stays unbilled, by the C1 decision.
+
+**Owed.**
+- The integrator's accept/reject of the moved w71 three-stop pin (C4).
+- The rig re-drive above, including the phone lens for C2b and C4 (this row was never driven on mobile). It should photograph the coached modal and show that no unscoped praise appears.
+- An ADR for `followerBraked` and the engine's floor-lift (a contract change in the ADR-015 family; the builder proposed ADR-016).
+- Pinning rows for X5 and X7, or a recorded near-equivalence argument for each.
+- A pin for the wider F2 cells (L3 h25 y125, L4 h32 y155, L2 h20 y170), where the follower sheds over half its speed in lane and stays unbilled by decision.
+- A founder or integrator question: should a causeless slam under 35 km/h, with a car pulling out 8 m behind, withhold «Чисто и спокойно каране» even though it is not billed? This includes the F2 cells where the follower sheds over half its speed for up to 0.38 s.
+- The w71/w69 recordings had the lead at 131–140 m at stops 2–3 because of the mirroring. A re-drive on this tree shows a different front-lead geometry, so evidence that rests on those frames needs a new frame.
+- The `n38.ts` HARSH_BRAKING_NO_CAUSE rationale (a brake that creates a предпоставка would be COLLISION or CLOSING_ON_LEAD_TOO_FAST) should be read against forced-follower bills.
+- touchHintLifetime needs `tools/` in the tree to run.

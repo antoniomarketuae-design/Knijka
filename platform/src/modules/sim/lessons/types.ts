@@ -604,6 +604,46 @@ export interface ReachZoneParams {
    * forgives.
    */
   laneChange?: { from: { x: number; y: number }; to: { x: number; y: number } };
+  /**
+   * THE GATE IS A FACT ABOUT A MOVING VEHICLE, NOT A PLACE ON THE ROAD
+   * (sc-ac-wind-truck-pass:ff1d4290).
+   *
+   * «Излез в лявата лента до кабината» and «Прибери се … след изпреварването»
+   * are claims about where the car is RELATIVE TO THE TRUCK, and a truck that
+   * holds its own speed is level with the student at a place that depends on
+   * his speed (measured: about 300 m of road between a 50 км/ч and a 78 км/ч
+   * student, against a 40 км/ч truck). No disc can stand there. So the staged
+   * runner that owns the truck reports the fact itself, in the truck's own
+   * frame (`CutInLeadCarSpec.overtake`), and a zone carrying this term is
+   * COMPLETE WHEN THAT REPORT ARRIVES — the latest `StagedEventOutcome` for
+   * `eventId` whose `detail` matches the `phase`:
+   *
+   *   · `"abeam"`    ← `detail: "drewLevel"`. If the zone also carries
+   *                    `maxSpeedKmh`, the speed the report was made at
+   *                    (`approachSpeedKmh`) must be within the cap plus
+   *                    `REACH_ZONE_CAP_SLACK_KMH` — the same crediting numbers
+   *                    a capped disc uses — and drawing level over the bill
+   *                    line is billed as the task cap's ARRIVAL
+   *                    (`lessons/engine.ts`), exactly as crossing a capped
+   *                    mark is. A later, slower attempt is a new report and
+   *                    completes the zone.
+   *   · `"returned"` ← `detail: "overtaken"` — which the runner reports only
+   *                    for a return the vehicle did not have to brake for
+   *                    (round 2: a return that made it brake is billed
+   *                    LANE_ENTRY_FORCED_BRAKING and reports nothing, so the
+   *                    zone stays open however far behind the vehicle then
+   *                    falls).
+   *
+   * `x` / `y` / `radiusM` are still required and still mean a place: where
+   * the TAUGHT drive (the committed correct demo) does this, in the lane the
+   * task names. They are provenance and the ladder's dial, and nothing judges
+   * the car against them — which is why guidance draws no ring there
+   * (`scene/guidanceRoute.ts`: an „ahead" ribbon, no marker) and the route
+   * finish does not treat them as a waypoint (`finish.ts`).
+   *
+   * NOT LADDERED: whether the truck was passed is not a precision.
+   */
+  stagedPass?: { eventId: string; phase: "abeam" | "returned" };
 }
 
 /**
@@ -2093,6 +2133,15 @@ export interface LessonSessionState {
     x: number;
     y: number;
     stillSinceSec: number | null;
+    /**
+     * sc-roundabout-entry:4ab693eb clause 2 (additive). Has the car come down
+     * to `finish.ts CRASH_PIN_DRIVING_KMH` or under since THIS arm (the last
+     * impact)? Re-set on every re-arm from that tick's speed and latched true
+     * after; it is what tells „still sliding off the impact" from „driving
+     * again" (`advisor.ts objectiveWithheldAfterImpact`). Grades nothing and
+     * ends nothing. Absent reads as false (not yet at rest).
+     */
+    cameToRest?: boolean;
   };
   /**
    * O22 — session time the current OFF-NETWORK run began (`finish.ts`

@@ -760,6 +760,16 @@ export interface StagedVehicleSpec {
    * is the point). An active `brake` command overrides the guard.
    */
   playerGuard?: boolean;
+  /**
+   * ONE RUN (sc-ln-obstacle-meeting:114706e0) — the actor drives its script
+   * ONCE, retires off-scene (FR-B5-EXIT) and FR-B5-RETURN never brings it
+   * back round. It is guard 2 of staged.ts's RETURN_CLEAR_M block — the one
+   * run the RX train gets by riding a rail — made authorable for a road car,
+   * for a lesson whose briefing COUNTS its traffic («Насреща идват ДВЕ коли»):
+   * a third car the lesson never announced is a car the student was told
+   * would not come. Absent/false = FR-B5-RETURN unchanged, byte-identical.
+   */
+  oneRun?: boolean;
 }
 
 export interface StagedPedestrianSpec {
@@ -966,6 +976,33 @@ export interface StagedActorView {
    * same fake-port reason as the fields above.
    */
   readonly passGuardArmed?: boolean;
+  /**
+   * SPEED THIS ACTOR HAS SHED BECAUSE OF THE STUDENT, m/s — the agent's own
+   * running account (`StagedVehicleAgent.playerShedMps`: cumulative, monotone,
+   * never cleared by a `reset`; accounted in `updateStagedVehicle` step 3d with
+   * the ambient fleet's `playerShedThisStep`). 0 for ever for an actor the
+   * student never got in the way of. Vehicles only.
+   *
+   * It was published to the RUNTIME only (the circulating report, founder
+   * ruling 2026-10-05). It is on the view since sc-ac-wind-truck-pass:ff1d4290
+   * round 2, because the runner that owns an overtaken vehicle has to say the
+   * same kind of thing about it: whether the student's return into its lane
+   * made it brake (`CutInLeadCarRunner.stepOvertakeWatch`). A reader
+   * differences two readings; the number itself grades nothing. Optional for
+   * the same fake-port reason as the fields above — absent reads as „no
+   * account", and a runner that finds it absent reports nothing from it.
+   */
+  readonly playerShedMps?: number;
+  /**
+   * The id this actor's VEHICLE STATE is published under
+   * (`TrafficVehicleState.id`) — the id the runtime's lane-entry tracker names
+   * a follower by (`LaneEntryFollower.vehicleId`). Published so that a runner
+   * reporting what this vehicle did and the runtime reporting what an entry
+   * demanded of it name ONE vehicle, and the rule engine's „one cut-in, one
+   * act" window (`cutInActUntil`) covers both. Vehicles only; optional for the
+   * fake-port reason above.
+   */
+  readonly stateId?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -239,6 +239,14 @@ export class VehicleSim {
   /** Wind clock (s) for the deterministic gust sine; reset() rewinds it. */
   private windClockSec = 0;
   /**
+   * How much of the wind reaches the car right now, 0..1 — the LEE of a staged
+   * sheltering vehicle (`windShelter.ts`; sc-ac-wind-truck-pass:ff1d4290).
+   * `null` until a caller sets one, and `null` on every lesson that stages no
+   * sheltering vehicle: `currentWindN()` then returns the unsheltered number
+   * without a multiplication, so every existing wind lesson is bit-identical.
+   */
+  private windShelter: number | null = null;
+  /**
    * Road-wheel angle (rad, + = left) the crosswind is turning the steered
    * pair by this step — the wind's YAW PULL (`crosswindPull.ts`; founder
    * ruling 2026-10-04). Written only inside the `windActive` gate, so it is
@@ -683,6 +691,10 @@ export class VehicleSim {
     this.aLatGripSmooth = 0; // F1: the tyre stops protesting on a restart
     this.aLongGripSmooth = 0;
     this.windClockSec = 0; // gust sine restarts with the attempt (determinism)
+    // The lee is a fact about where the car IS; a restart puts it back at the
+    // spawn, and the caller that feeds the shelter re-reads it on the next
+    // step. A sim nobody ever fed stays `null` (the identity law).
+    if (this.windShelter !== null) this.windShelter = 1;
     this.windPullRad = 0; // …and the pull it drives is recomputed on the first step
     this.tripMetres = 0; // …and so does the trip meter: a retry starts at 0 m
     this.prevVel.x = 0;
@@ -718,12 +730,36 @@ export class VehicleSim {
     // `lessonWind.ts` — the same function the trace recorder's held-wheel
     // channel reads on a demo's clock, so the ghost's correction breathes on
     // the gust this car is pushed by.
-    return crosswindForceAtN(
+    const openN = crosswindForceAtN(
       this.windLateralN,
       this.windGustAmplitudeN,
       this.windGustPeriodSec,
       this.windClockSec,
     );
+    // THE LEE MULTIPLIES THE ONE NUMBER (`windShelter.ts`). Here and nowhere
+    // else, so the force on the chassis, the yaw pull, the head lean, the gust
+    // chip and the drawn air — every reader of this method — are sheltered
+    // together or not at all.
+    return this.windShelter === null ? openN : openN * this.windShelter;
+  }
+
+  /**
+   * THE LEE — set how much of the wind reaches the car on the NEXT step
+   * (1 = open wind; `windShelter.ts windShelterFactor` is the caller's
+   * source). Called once per fixed step, before `update()`, by whoever knows
+   * where the sheltering vehicle is: the rig on a live session
+   * (`VehicleRig`'s pre-step hook, the surface-patch precedent), the
+   * live-wind harness in a test. A lesson with no sheltering vehicle never
+   * calls it, and a calm car ignores it (`windActive` gates every reader).
+   */
+  setWindShelterFactor(factor: number): void {
+    if (this.disposed) return;
+    this.windShelter = clamp(factor, 0, 1);
+  }
+
+  /** The factor last set (1 when none ever was) — test / instrument read-out. */
+  get windShelterFactor(): number {
+    return this.windShelter ?? 1;
   }
 
   /**

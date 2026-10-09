@@ -28,7 +28,7 @@ import { recordScSpWetLimitPlateDrive } from "../../../traces/scSpWetLimitPlate"
 import { recordScAcWindTruckPassDrive } from "../../../traces/scAcWindTruckPass";
 import { recordScPeParkedRowScanDrive } from "../../../traces/scPeParkedRowScan";
 import { recordScEdPoligonChainDrive } from "../../../traces/scEdPoligonChain";
-import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
+import { applyStagedOutcome, applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { gradeFinishWire, serializeRuleEvents } from "../../wire";
 import { compileScenario } from "../compile";
 import { scenarioLessonById } from "../resolve";
@@ -306,6 +306,12 @@ describe("wave-9 bot completion — sc-ac-wind-truck-pass at L3", () => {
   recordScAcWindTruckPassDrive(loadDistrict("mw-v1"), "shadow-correct", {
     onTick: (tick) => {
       session = applyTick(session, tick).state;
+    },
+    // The first two tasks are the staged truck's own reports since the restage
+    // (sc-ac-wind-truck-pass:ff1d4290) — folded the way the live shell folds
+    // them, after the tick of the frame they were made on.
+    onOutcome: (outcome) => {
+      session = applyStagedOutcome(session, outcome);
     },
   });
   const result = buildLessonResult(session);

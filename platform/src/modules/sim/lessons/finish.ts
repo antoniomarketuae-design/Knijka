@@ -752,6 +752,25 @@ export const FINISH_OUTSIDE_STUCK_S = 75;
 export const CRASH_PIN_RADIUS_M = 6;
 
 /**
+ * The speed at and under which a car that has just hit something is NOT
+ * driving, км/ч (magnitude: reverse counts) — sc-roundabout-entry:4ab693eb
+ * clause 2.
+ *
+ * NOT A NEW NUMBER. It is the driving floor `advisor.ts ROUTE_HOLD_S` was
+ * derived from (CRASH_PIN_RADIUS_M ÷ (5 ÷ 3.6) = 4.32 s < 5 s), named here so
+ * the window before that hold and the hold itself read one floor. The same 5
+ * is the shell's „the car is moving" bar on every surface that has one
+ * (`TOUCH_HINT_MOVING_KMH`, `DEMO_DECK_MOVING_KMH`,
+ * `CONTROLS_LEGEND_MOVING_KMH`, all `Math.abs(v) > 5`).
+ *
+ * WHAT READS IT. Only the crash pin's `cameToRest` latch (`engine.ts`) and
+ * the advisor's `objectiveWithheldAfterImpact`. It grades nothing and ends
+ * nothing: the pin's radius, its ten-second ending and the stillness clock are
+ * untouched.
+ */
+export const CRASH_PIN_DRIVING_KMH = 5;
+
+/**
  * Seconds motionless against what you hit before the drive is closed for you.
  *
  * Shorter than FINISH_STUCK_S (12) on purpose: at the end of a route a
@@ -1169,6 +1188,12 @@ interface Point {
 function targetPoint(params: ObjectiveParams): Point | null {
   switch (params.kind) {
     case "reachZone":
+      // A staged-pass zone is a fact about a moving vehicle; its x/y is where
+      // the taught drive does it and no place the car is judged against
+      // (`ReachZoneParams.stagedPass`), so it is not a waypoint the route
+      // finish has to keep clear of.
+      if (params.stagedPass !== undefined) return null;
+      return { x: params.x, y: params.y };
     case "passSignal":
       return { x: params.x, y: params.y };
     case "driveDistance":

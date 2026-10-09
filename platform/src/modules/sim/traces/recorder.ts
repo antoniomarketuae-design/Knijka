@@ -28,6 +28,7 @@ import {
   type SimTick,
 } from "../rules";
 import { createWorldRuntime, type SignalClusterMode } from "../runtime";
+import { createLessonWindShelter, type WindShelterLesson } from "../scene/lessonWindShelter";
 import { createTrafficSystem } from "../traffic/system";
 import type { TrafficDistrict } from "../traffic/types";
 import {
@@ -396,6 +397,16 @@ export interface RecordScriptedDriveOptions {
    */
   onTick?: (tick: SimTick) => void;
   /**
+   * Called with each staged-encounter report on the frame the director makes
+   * it, AFTER that frame's `onTick` — the order `LessonScene` hands the shell
+   * its tick and then its outcomes in. A caller that folds ticks into a live
+   * session (`applyTick`) folds these with `applyStagedOutcome`, or an
+   * objective that is judged by a staged report (`emergencyStop`,
+   * `reachZone.stagedPass`) never hears it. Absent = nothing changes: the
+   * reports are still returned on `RecordedDrive.outcomes`.
+   */
+  onOutcome?: (outcome: StagedEventOutcome) => void;
+  /**
    * Rule-engine config override for the recorder's INTERNAL grader (the
    * `ruleEvents` innocence/§9 channel only — the serialized trace bytes never
    * depend on it). A lesson that DRILLS a config-gated detector
@@ -423,6 +434,17 @@ export interface HeldWheelWind {
   windLateralN: number;
   windGustAmplitudeN: number;
   windGustPeriodSec: number;
+  /**
+   * THE LEE (sc-ac-wind-truck-pass:ff1d4290): the lesson whose staged
+   * sheltering vehicle eases this wind beside it — its `physics` and
+   * `stagedEvents`, the slice `scene/lessonWindShelter.ts` reads. Present, the
+   * held wheel is computed from the SHELTERED force at each sample (the factor
+   * the live car's wind is multiplied by at that pose, against the truck the
+   * recorder itself staged), so the demo's wheel comes off beside the truck
+   * and back on at the cab exactly where the live car's does. Absent, or a
+   * lesson with no sheltering vehicle: the open wind, byte for byte.
+   */
+  shelter?: WindShelterLesson;
 }
 
 /** Half-width (s) of each of the two windows a path's heading change is read
@@ -478,6 +500,8 @@ export const HELD_WHEEL_FULL_SPEED_MS = 2;
 export function heldWheelChannel(
   samples: readonly TraceSample[],
   wind: HeldWheelWind,
+  /** Per-sample share of the wind that reaches the car (the lee); absent = 1. */
+  shelterFactors?: readonly number[],
 ): number[] {
   const n = samples.length;
   const out = new Array<number>(n).fill(0);
@@ -510,9 +534,11 @@ export function heldWheelChannel(
     // District heading h (0 = north, cw): the car's left axis is (−cos h, sin h),
     // and the wind blows along district x.
     const leftX = -Math.cos((s.headingDeg * Math.PI) / 180);
-    const lateralN =
-      crosswindForceAtN(wind.windLateralN, wind.windGustAmplitudeN, wind.windGustPeriodSec, s.tSec) *
-      leftX;
+    const openN = crosswindForceAtN(wind.windLateralN, wind.windGustAmplitudeN, wind.windGustPeriodSec, s.tSec);
+    // The lee multiplies the one force, as it does on the live car
+    // (`VehicleSim.currentWindN`). No factors = the open wind, the product
+    // `openN * leftX` this line has always been.
+    const lateralN = (shelterFactors === undefined ? openN : openN * (shelterFactors[i] ?? 1)) * leftX;
     const ramp = Math.min(1, speedMps / HELD_WHEEL_FULL_SPEED_MS);
     const steer = Math.max(
       -0.6,
@@ -688,6 +714,13 @@ export function recordScriptedDrive(
 
   // --- recording state -----------------------------------------------------
   const samples: TraceSample[] = [];
+  // The lee the live car of this lesson would be in at each recorded pose —
+  // only when the caller asked for a held wheel under a sheltering vehicle.
+  const shelterAt =
+    options.heldWheel?.shelter !== undefined
+      ? createLessonWindShelter(options.heldWheel.shelter, (actorId) => traffic.staged(actorId))
+      : null;
+  const shelterFactors: number[] = [];
   const events: TraceEvent[] = [];
   let t = 0;
   let frame = 0;
@@ -741,6 +774,7 @@ export function recordScriptedDrive(
     }
     if (frame % 3 === 0) {
       const speedKmh = (reverse ? -1 : 1) * speedMps * 3.6;
+      if (shelterAt !== null) shelterFactors.push(shelterAt(pose.x, pose.y));
       samples.push({
         tSec: t,
         x: pose.x,
@@ -875,8 +909,11 @@ export function recordScriptedDrive(
       });
       for (const e of res.events) tick.events.push(e);
       outcomes.push(...res.outcomes);
+      options.onTick?.(tick);
+      if (options.onOutcome) for (const o of res.outcomes) options.onOutcome(o);
+    } else {
+      options.onTick?.(tick);
     }
-    options.onTick?.(tick);
     const reduced = reduceTick(rules, tick);
     rules = reduced.state;
     ruleEvents.push(...reduced.events);
@@ -1029,7 +1066,7 @@ export function recordScriptedDrive(
   // (see `heldWheelChannel`). The wheel channel ONLY, after the drive is over:
   // nothing the stack above stepped, sampled or graded ever saw it.
   if (options.heldWheel !== undefined) {
-    const held = heldWheelChannel(samples, options.heldWheel);
+    const held = heldWheelChannel(samples, options.heldWheel, shelterAt !== null ? shelterFactors : undefined);
     for (let i = 0; i < samples.length; i++) samples[i].steerRad = held[i]!;
   }
 

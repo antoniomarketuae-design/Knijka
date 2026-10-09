@@ -33,7 +33,7 @@ import type {
 const DEFAULT_ACCEL_MPS2 = 2.6;
 const DEFAULT_DECEL_MPS2 = 4.5;
 const DEFAULT_SLAM_DECEL_MPS2 = 7.5;
-const HOLD_DECEL_MPS2 = 8;
+export const HOLD_DECEL_MPS2 = 8;
 /** A commanded target at/below this is „stand still", not „crawl" (B40 — the
  *  standing-hold brake lamps at the bottom of `stepStagedVehicle`). */
 const HOLD_LIT_TARGET_MPS = 0.05;
@@ -55,9 +55,9 @@ const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
  */
 export const STAGED_BRAKE_LAMP_MARGIN_MPS = 0.3;
 /** Player-guard corridor: brake for a player within this far ahead, m. */
-const GUARD_AHEAD_M = 16;
+export const GUARD_AHEAD_M = 16;
 /** Player-guard lateral half-width, m (~car width + margin). */
-const GUARD_LATERAL_M = 3.0;
+export const GUARD_LATERAL_M = 3.0;
 /**
  * FR-B5-CROSS: how far off its own path a RETURNING actor watches for a student
  * who is coming onto it (step 2a). Step 2's `GUARD_LATERAL_M` is a LANE width,
@@ -264,7 +264,9 @@ const RETURN_DUE_SEC = 1 / 60;
  *     the RX „жп прелез" train (the only `railPath` spec in the catalogue,
  *     templates-rail.ts), and a second train crossing a level crossing the
  *     lesson has just declared clear would convict a student who did exactly
- *     as told. It gets the one run it is written for.
+ *     as told. It gets the one run it is written for. A ROAD car whose lesson
+ *     counts it gets the same single run by authoring `oneRun`
+ *     (StagedVehicleSpec; `reentryArc` step 2b).
  *
  *     NOT `playerGuard`, which was the first thing tried here and is WRONG:
  *     the two `playerGuard: false` actors in the catalogue are that train and
@@ -519,6 +521,11 @@ interface MutableView {
   laneWidthM?: number;
   /** Is the pass guard armed — see StagedActorView.passGuardArmed. Vehicles only. */
   passGuardArmed?: boolean;
+  /** The agent's own account of speed shed because of the student — see
+   *  StagedActorView.playerShedMps. Vehicles only. */
+  playerShedMps?: number;
+  /** The published vehicle-state id — see StagedActorView.stateId. Vehicles only. */
+  stateId?: number;
 }
 
 export interface StagedVehicleAgent {
@@ -994,6 +1001,17 @@ const ON_ACTORS_ROAD_M = 16.25;
 function reentryArc(agent: StagedVehicleAgent, env: StagedEnv): number {
   // (2) A one-shot hazard on its own rail crosses the road once, as written.
   if (agent.spec.railPath !== undefined) return -1;
+  // (2b) …and so does a road car its lesson COUNTS (StagedVehicleSpec.oneRun,
+  //      sc-ln-obstacle-meeting:114706e0). MEASURED on that lesson at L1, live
+  //      rung chain, a careful drive that stops at its wait ring, lets both
+  //      announced cars by and goes with one look: `sc-lnom-stream-0` re-entered
+  //      85 m dead ahead at t = 53.27 whenever he was moving then, and was held
+  //      off-scene by FR-B5-FACING until the instant he moved off otherwise —
+  //      COLLISION, 10 т., НЕИЗДЪРЖАН for every move-off from 18 s after the
+  //      lane emptied (12.5 s on a 20 км/ч approach), and a car released at him
+  //      AFTER his centre had crossed the axis for move-offs 14.5–16 s after it
+  //      (9–10.5 s on the slower approach). The briefing says «ДВЕ коли».
+  if (agent.spec.oneRun === true) return -1;
   const proj = env.hasPlayer
     ? projectOntoPolyline(
         agent.path.px,
@@ -1089,6 +1107,8 @@ export function createStagedVehicle(
       returns: 0,
       laneWidthM,
       passGuardArmed: false,
+      playerShedMps: 0,
+      stateId,
     },
     command: { type: "hold", speedMps: 0, gapM: 0, maxSpeedMps: 0, minSpeedMps: 0, decelMps2: 0 },
     holdS,
@@ -1807,6 +1827,7 @@ function publishVehicle(agent: StagedVehicleAgent): void {
   view.lateralOffsetM = agent.lat;
   view.returns = agent.returns;
   view.passGuardArmed = agent.passGuard;
+  view.playerShedMps = agent.playerShedMps;
 }
 
 function setPedOnRoad(

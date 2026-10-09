@@ -123,6 +123,11 @@ const TURN_DIR_WINDOW_M = 6;
 const AHEAD_BUFFER_M = 30;
 /** emergencyStop is coordinate-free — guide down the corridor this far. */
 const EMERGENCY_AHEAD_M = 150;
+/** A staged-pass zone is coordinate-free for the same reason (its place is a
+ *  moving truck — `ReachZoneParams.stagedPass`); the same corridor length, so
+ *  „the longest single leg" every consumer of this file sizes against is
+ *  unchanged. The route-loss rule re-derives it as the car runs on. */
+const STAGED_PASS_AHEAD_M = EMERGENCY_AHEAD_M;
 const MAX_WALK_EDGES = 64;
 const EPS = 1e-6;
 const DEG2RAD = Math.PI / 180;
@@ -1021,6 +1026,17 @@ export function guidanceGoalFor(
   }
   switch (params.kind) {
     case "reachZone": {
+      // A STAGED-PASS ZONE HAS NO PLACE TO DRAW (`ReachZoneParams.stagedPass`,
+      // sc-ac-wind-truck-pass:ff1d4290). The task is judged beside a truck that
+      // is moving, wherever the student catches it; a ring and a «Карай дотук»
+      // sign at the zone's authored x/y would mark a spot on the road where
+      // nothing is decided — the marker's own rule is that it draws „the
+      // objective's OWN contract". So: the ribbon runs on ahead in the lane the
+      // car is in (the `driveDistance` form — the line never tells him WHEN to
+      // pull out, the truck does), and there is no marker. The task's cap is
+      // still on the glass: the strip and the banner read it off the objective,
+      // not off a marker.
+      if (params.stagedPass !== undefined) return { kind: "ahead", meters: STAGED_PASS_AHEAD_M };
       const halt = params.maxSpeedKmh !== undefined && params.maxSpeedKmh <= HALT_CAP_KMH;
       const back = halt ? STOP_BAR_BEFORE_LINE_M : THROUGH_GATE_BEFORE_LINE_M;
       // B18. A waypoint authored past a line the student can SEE is pulled

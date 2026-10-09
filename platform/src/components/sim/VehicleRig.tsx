@@ -27,6 +27,7 @@ import {
   SPAWN,
   applyDifficulty,
   createDriveAssistState,
+  createRigWindShelter,
   DEFAULT_DIFFICULTY,
   rigSimOptions,
   transmissionModeFor,
@@ -325,6 +326,7 @@ export function VehicleRig({
   windLateralN = 0,
   windGustAmplitudeN = 0,
   windGustPeriodSec = 0,
+  windShelterAt,
   engineBraking = false,
   roadRoughness = 0,
   telltaleLitRef,
@@ -421,6 +423,14 @@ export function VehicleRig({
   windGustAmplitudeN?: number;
   /** Gust sine period, s (must be > 0 for the gust to arm). */
   windGustPeriodSec?: number;
+  /** THE LEE (sc-ac-wind-truck-pass:ff1d4290) — OPT-IN: how much of the wind
+   *  reaches a car at district (x, y) right now, 0..1
+   *  (`scene/lessonWindShelter.ts createLessonWindShelter`). Absent (default,
+   *  every lesson that stages no sheltering vehicle) = the branch below never
+   *  runs and `VehicleSim.setWindShelterFactor` is NEVER called — the wind is
+   *  bit-identical (the surface-patch law, one prop over). Identity-stable on
+   *  the caller's side; read through a ref so it never rebuilds the sim. */
+  windShelterAt?: ((x: number, y: number) => number) | null;
   /** ENGINE BRAKING (doc 82 §4.2 F3) — OPT-IN. false (default, every shipped
    *  lesson) constructs the pre-F3 car and no engine-brake code runs at all:
    *  lifting off in D still coasts exactly as it does today, so no committed
@@ -537,6 +547,16 @@ export function VehicleRig({
     roadRoughness,
   ]);
 
+  // The lee reader is held OUTSIDE the sim's effect: a new function identity
+  // must not rebuild the sim (the effect above is keyed on the scalar wind
+  // props only). It follows the prop on EVERY render — no dependency list to
+  // get wrong (round 3: an effect given `[]` kept the first lesson's lee for
+  // the life of the rig, and nothing failed) — and gives the open wind back
+  // if the prop goes away after a lee was set (`vehicle/windShelter.ts
+  // createRigWindShelter`, executed in its test).
+  const windShelter = useMemo(createRigWindShelter, []);
+  windShelter.follow(windShelterAt);
+
   // Runs once per fixed 60 Hz substep, right before world.step() — exactly
   // the contract VehicleSim.update() requires. Always the fixed dt.
   useBeforePhysicsStep(() => {
@@ -557,6 +577,14 @@ export function VehicleRig({
         sim.setSurfaceGripFactor(Math.min(gripFactor, patchGrip));
       }
     }
+    // THE LEE: where the car is beside the staged truck decides how much of
+    // the wind reaches it on THIS step — handed to the sim before `update()`
+    // reads the wind, from the chassis' own position, by the vehicle module's
+    // own function (`vehicle/windShelter.ts stepRigWindShelter`, through the
+    // rig's held lee, both executed in its test; `vehicle/lessonWind.test.ts`
+    // holds this call to its place). The sim is never touched on a lesson
+    // that never had a sheltering vehicle.
+    windShelter.step(sim, bodyRef.current?.translation());
     const raw = inputRef.current?.read() ?? IDLE_INPUT;
     const mode = difficultyRef?.current ?? DEFAULT_DIFFICULTY;
     // Shape input for the learner mode (throttle/governor/steer smoothing) —

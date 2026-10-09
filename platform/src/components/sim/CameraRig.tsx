@@ -114,6 +114,12 @@ import {
   IMPACT_SHAKE_MS,
   type ImpactShakeHandle,
 } from "./ImpactCut";
+// The view cut and the body swap are one event (f0023997 clauses 1 and 6).
+import {
+  cameraPoseMode,
+  readDrawnBodies,
+  type BodyNodeCache,
+} from "@/modules/sim/scene/bodyViewCut";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
 
@@ -546,6 +552,8 @@ export function CameraRig({
 }) {
   const fpsMeterRef = useRef(new FpsMeter());
   const lastMode = useRef<CameraMode | null>(null);
+  /** The two bodies under the chassis, resolved once by name (bodyViewCut). */
+  const bodyNodesRef = useRef<BodyNodeCache>({ exterior: null, cabin: null });
   /** Reversing-POV swing, 0 = looking forward … 1 = looking back
    *  (engine/reverseView.ts owns every rule and constant behind it). */
   const swingRef = useRef(0);
@@ -933,7 +941,20 @@ export function CameraRig({
     const chassis = chassisGroupRef.current;
     if (!chassis) return;
     const cam = state.camera as PerspectiveCamera;
-    const mode = cameraModeRef.current ?? "chase";
+    // THE POSE FOLLOWS THE DRAWN BODY — sc-hz-brake-dont-swerve:f0023997,
+    // clauses 1 and 6. `cameraModeRef` changes the instant a view is asked
+    // for; the body swap (exterior shell vs open cabin) is React state and is
+    // drawn only when the reconciler commits, frames later. Posing straight
+    // off the ref put the cockpit eye inside a still-drawn exterior (the flat
+    // orange-brown field, rig-w2 c079–c081 / c095–c098) and the chase view on
+    // a car with no body. So the rig poses the view the bodies three.js is
+    // about to draw actually fit, and moves on the frame the swap lands.
+    // Unknown bodies (no hero car under this chassis) ⇒ the request, as before.
+    const mode = cameraPoseMode(
+      cameraModeRef.current ?? "chase",
+      readDrawnBodies(chassis, bodyNodesRef.current),
+      lastMode.current,
+    );
     publishCameraMode(mode);
 
     const switched = mode !== lastMode.current;

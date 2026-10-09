@@ -1649,8 +1649,14 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   ),
   // Founder ruling 2026-09-30: a cut-in is only a cut-in in front of a vehicle
   // ALREADY travelling in the lane he enters — on the lane-drop lessons, the
-  // staged through car (a rearTailgater actor in the continuing lane).
-  LANE_ENTRY_FORCED_BRAKING: stagedActorRule(["rearTailgater"], "a vehicle already in the lane he enters"),
+  // staged through car (a rearTailgater actor in the continuing lane). Since
+  // sc-ac-wind-truck-pass:ff1d4290 round 2 also the slow vehicle a lesson asks
+  // him to overtake (a cutInLeadCar actor with `overtake` authored): the lane
+  // he returns into is the one it is travelling in.
+  LANE_ENTRY_FORCED_BRAKING: stagedActorRule(
+    ["rearTailgater", "cutInLeadCar"],
+    "a vehicle already in the lane he enters",
+  ),
 
   // -- observation -----------------------------------------------------------
   JUNCTION_SCAN_INCOMPLETE: junctionNodeRule(),
@@ -1899,6 +1905,11 @@ export function checkT8(f: ScenarioFacts): { capped: number; invisible: string[]
   for (let i = 0; i < f.objectives.length; i += 1) {
     const o = f.objectives[i]!;
     if (o.kind !== "reachZone" || o.maxSpeedKmh === undefined) continue;
+    // A staged-pass zone is judged beside a moving vehicle and has no marker to
+    // carry a figure (`ReachZoneParams.stagedPass`; `guidanceGoalFor` gives it
+    // an „ahead" ribbon). Its cap is not hidden: the advisor's task sentence,
+    // the strip and the banner read it off the objective itself.
+    if (o.stagedPass !== undefined) continue;
     capped += 1;
     const goal = guidanceGoalFor(f.lesson, i, ctx);
     if (!goal || goal.kind !== "point" || goal.maxSpeedKmh === undefined) {

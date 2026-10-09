@@ -304,9 +304,16 @@ describe("routing: the bend reaches the shipped canopies and something drives it
     // same function on a demo's clock), so the one-number law is now: the sim
     // reads its own wind clock in exactly ONE place, that place is the shared
     // function, and the sim writes no sine of its own.
+    //
+    // Since 2026-10-08 (sc-ac-wind-truck-pass:ff1d4290, the truck's lee) that
+    // one read is NAMED — `openN` — and then multiplied by the shelter factor
+    // in the same method, so the picture drawn from `windLateralNow` calms
+    // beside the truck with the force. Still one read of the clock, one
+    // function, one number. (Round 1 of that lane changed the method and left
+    // this pin on its old shape, red; round 2 found it and moved it.)
     expect(SIM_SRC.match(/this\.windClockSec,\s*\);/g)?.length).toBe(1);
     expect(
-      /private currentWindN\(\): number \{[\s\S]{0,400}?return crosswindForceAtN\(\s*this\.windLateralN,\s*this\.windGustAmplitudeN,\s*this\.windGustPeriodSec,\s*this\.windClockSec,\s*\);/.test(
+      /private currentWindN\(\): number \{[\s\S]{0,400}?const openN = crosswindForceAtN\(\s*this\.windLateralN,\s*this\.windGustAmplitudeN,\s*this\.windGustPeriodSec,\s*this\.windClockSec,\s*\);[\s\S]{0,400}?return this\.windShelter === null \? openN : openN \* this\.windShelter;/.test(
         SIM_SRC,
       ),
     ).toBe(true);

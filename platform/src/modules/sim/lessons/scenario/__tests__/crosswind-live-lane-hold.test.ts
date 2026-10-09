@@ -136,6 +136,28 @@ function drive(
     districtRaw: spec === SC_AC_CROSSWIND ? FO : MW,
     trace: spec === SC_AC_CROSSWIND ? CROSSWIND_SHADOW : TRUCK_SHADOW,
     driver,
+    // THE MOTORWAY SIBLING'S TRUCK HOLDS ITS OWN SPEED since the restage of
+    // 2026-10-08 (sc-ac-wind-truck-pass:ff1d4290), so where the car is level
+    // with it depends on the car — and a driver who only replayed the demo's
+    // polyline would pull out and come back where the DEMO's truck was. This
+    // driver watches his own truck (`liveWindDrive`'s lane plan): out with
+    // three seconds of road to its tail, back once its nose is 12 m behind his.
+    // He holds 74 км/ч — the band these device and lean measurements were
+    // taken in (70–78) — unless a test names another speed.
+    ...(spec === SC_AC_WIND_TRUCK_PASS
+      ? {
+          maxSec: 200,
+          cruiseKmh: 74,
+          lanePlan: {
+            homeX: 0,
+            passX: -8.12,
+            passWhenGapM: Math.max(45, ((extra.cruiseKmh ?? 74) / 3.6) * 3),
+            returnWhenClearM: 12,
+            changeOverM: 80,
+            stopAtY: 915,
+          },
+        }
+      : {}),
     ...extra,
   });
   if (PRINT) {
@@ -501,7 +523,28 @@ describe("round 2 — a keyboard holds the lane with taps: 0 т. at every rung, 
         () => {
           // (50 ms is the default press of the per-rung keyboard tests above.)
           const o = drive(spec, level, "keyboard", { keyMinPressFrames: 6 });
-          expectCleanPass(o, `L${level} chase 100 ms`);
+          if (spec === SC_AC_WIND_TRUCK_PASS) {
+            // THE CHASER'S OWN BILL, NOT ASSERTED — the same one the header
+            // above already records for it at 150 ms. Chasing the wheel with
+            // the opposite key scrubs speed, and on the motorway this driver
+            // is still at 41–48 км/ч twelve seconds in (y ≈ 100–180, measured
+            // at L3–L5). Until the restage of 2026-10-08 the truck PACED him
+            // 60 m ahead, inside the crawl detector's own queue exemption
+            // (`motorwaySlowQueueGapM` 60), so that crawl was never read; the
+            // truck now holds its own speed, is 70 m and more up the road by
+            // then, and the detector reads what it always would have on an
+            // open motorway (DRIVING_TOO_SLOW_FOR_MOTORWAY — taught free on a
+            // practice rung, 1 т. on L4 and on the wet L5). Every driver that
+            // gathers speed like a driver — analog, 50 ms taps, rationed taps,
+            // the stick — is at 0 т. on every rung, below and in
+            // `wind-truck-pass-restage.test.ts`. Everything else about this
+            // one still holds: every task, no other bill, the cue silent.
+            expect(o.violationCodes.filter((c) => c !== "DRIVING_TOO_SLOW_FOR_MOTORWAY"), `L${level} chase 100 ms`).toEqual([]);
+            expect(o.result.objectives.every((x) => x.done), `L${level} chase 100 ms objectives`).toBe(true);
+            expect(o.session.phase).toBe("completed");
+          } else {
+            expectCleanPass(o, `L${level} chase 100 ms`);
+          }
           expect(o.secondSwingFires).toBe(0);
         },
         TEST_TIMEOUT,
@@ -587,10 +630,19 @@ describe("round 2 — the cockpit lean reports the WIND to the driver who holds 
     () => {
       for (const level of [1, 5] as const) {
         const o = drive(SC_AC_WIND_TRUCK_PASS, level, "analog");
-        const lean = wholePeriods(o.samples, (s) => s.speedKmh > 66).map((s) => s.leanMs2);
+        // In the OPEN wind (the truck's lee is its own measurement, next).
+        const lean = wholePeriods(o.samples, (s) => s.speedKmh > 66 && s.shelter === 1 && s.t > 30).map((s) => s.leanMs2);
         expect(lean.length).toBeGreaterThan(2 * CROSSWIND_GUST_PERIOD_SEC * 60);
         expect(meanOf(lean), `L${level}`).toBeGreaterThan(WIND_MS2 * 0.9); // measured 0.973
         expect(meanOf(lean), `L${level}`).toBeLessThan(WIND_MS2 * 1.1);
+        // AND IN THE LEE THE HEAD COMES UP WITH THE WIND (the restage of
+        // 2026-10-08): beside the truck the wind's force is 30 % of the open
+        // one (`vehicle/windShelter.ts`), and the lean — which reads that same
+        // one number — is under half of the open wind's mean on every sample.
+        const lee = o.samples.filter((s) => s.shelter <= 0.3 + 1e-9);
+        expect(lee.length, `L${level} lee`).toBeGreaterThan(60);
+        expect(meanOf(lee.map((s) => s.leanMs2)), `L${level} lee`).toBeLessThan(WIND_MS2 * 0.5);
+        expect(meanOf(lee.map((s) => s.leanMs2)), `L${level} lee`).toBeGreaterThan(WIND_MS2 * 0.15);
       }
     },
     TEST_TIMEOUT,
@@ -623,65 +675,18 @@ describe("round 2 — the cockpit lean reports the WIND to the driver who holds 
  *  straight (y 200 → 290): 105 m of cruise lane + the 80.4 m lane change. */
 const OVERTAKING_STRAIGHT_FROM_M = 200;
 
-describe("round 2 — sc-ac-wind-truck-pass says what its car does: no lee, the truck far ahead, the wheel held throughout", () => {
-  for (const level of TRUCK_LEVELS) {
-    it(
-      `L${level}: «вятърът те натиска през цялото време» / «камионът остава далеч пред теб» / «корекцията се държи още от началото»`,
-      () => {
-        const o = drive(SC_AC_WIND_TRUCK_PASS, level, "analog");
-        expectCleanPass(o, `L${level} analog`);
-        // THE WIND NEVER STOPS, anywhere on the drive: the gust's own floor.
-        const floorN = CROSSWIND_BRIDGE_N - CROSSWIND_GUST_AMPLITUDE_N;
-        for (const s of o.samples) {
-          expect(s.windN).toBeLessThanOrEqual(-floorN + 1e-6); // westward, always
-          expect(s.windPullRad).toBeGreaterThan(0); // and always turning the car LEFT
-        }
-        // THE TRUCK IS NEVER ABEAM — and never behind: it is ahead by at least
-        // seven car lengths for the whole drive (measured 37–73 m), so there
-        // is no moment at which the car is in its shadow.
-        const moving = o.samples.filter((s) => s.speedKmh > 20);
-        for (const s of moving) {
-          expect(s.truckAheadM, `t=${s.t.toFixed(1)}`).not.toBeNull();
-          expect(s.truckAheadM!, `t=${s.t.toFixed(1)}`).toBeGreaterThan(30);
-        }
-        // THE CORRECTION IS HELD BEHIND THE TRUCK AND IN THE OVERTAKING LANE
-        // ALIKE — to the right, i.e. toward the truck from the left lane, as
-        // step 7 says. Measured 1.1 % of the lock behind it (still gathering
-        // speed) and 2.1 % beside where the old text put the lee.
-        const behind = o.samples.filter((s) => s.speedKmh > 50 && Math.abs(s.x) < 1 && s.y < 130);
-        const beside = o.samples.filter((s) => Math.abs(s.x + 8.12) < 1 && s.y > 210 && s.y < 370);
-        expect(behind.length).toBeGreaterThan(120);
-        expect(beside.length).toBeGreaterThan(300);
-        const share = (xs: LiveWindSample[]) => meanOf(xs.map((s) => -s.steerRad / maxSteerRadAt(s.speedKmh)));
-        expect(share(behind)).toBeGreaterThan(0.007);
-        expect(share(beside)).toBeGreaterThan(0.012);
-        expect(share(beside)).toBeLessThan(0.03);
-        // …and in the overtaking lane the wheel never comes back to centre.
-        expect(Math.max(...beside.map((s) => s.steerRad))).toBeLessThan(0.002);
-      },
-      TEST_TIMEOUT,
-    );
-  }
-
-  it(
-    "what believing in a lee costs there: two seconds of loose wheel in the overtaking lane carries the car more than a metre toward the median",
-    () => {
-      const o = drive(SC_AC_WIND_TRUCK_PASS, 3, "analog", { lapse: { atPathM: OVERTAKING_STRAIGHT_FROM_M, forSec: 2 } });
-      expect(o.lapseStartedAtSec).not.toBeNull();
-      const a = o.samples.find((s) => s.t >= o.lapseStartedAtSec!)!;
-      const b = o.samples.find((s) => s.t >= o.lapseStartedAtSec! + 2)!;
-      // In the overtaking lane, the truck 60 m ahead, at the shadow's ~74 км/ч.
-      expect(Math.abs(a.x + 8.12)).toBeLessThan(1);
-      expect(a.truckAheadM!).toBeGreaterThan(45);
-      // LEFT — toward the median («към разделителната ивица отляво»).
-      expect(a.x - b.x).toBeGreaterThan(1.0);
-      expect(a.x - b.x).toBeLessThan(2.6);
-      // He takes the wheel back and still finishes clean: a lesson, not a trap.
-      expectCleanPass(o, "2 s lapse");
-    },
-    TEST_TIMEOUT,
-  );
-
+// THE «NO LEE» HALF OF THIS SECTION IS GONE WITH THE WORLD IT MEASURED
+// (sc-ac-wind-truck-pass:ff1d4290, the restage of 2026-10-08). Round 2 pinned,
+// at every rung, that the truck stayed 30–80 m ahead, that the full wind was on
+// the car on every sample and that a hand let go „in the lee" was carried a
+// metre and more — because that was what the paced rig and the place-less wind
+// delivered, and the briefing had been made to say so. The truck now holds its
+// own 40 км/ч and its lee is in the wind model; the sentences were rewritten
+// to that, and each is held against the car at every rung in
+// `wind-truck-pass-restage.test.ts` (§3 the force and the wheel in the lee and
+// at the cab, §4 no lee at a lawful distance behind, §8 the hand). What stays
+// here is step 5, whose sentence did not change.
+describe("round 2 — sc-ac-wind-truck-pass, step 5 on its own motorway", () => {
   it(
     "STEP 5 ON ITS OWN MOTORWAY — «по-бавно покрай камиона значи по-малко отместване от порива»: what letting go costs rises with speed, 54 < 60 < 70 < 78 < 90 км/ч",
     () => {
@@ -702,7 +707,11 @@ describe("round 2 — sc-ac-wind-truck-pass says what its car does: no lee, the 
       // on the same road, in the same wind. There it is the wind's own
       // property, and there round 1 was FALSE (1.85 m at 54 км/ч, 1.83 at 60,
       // 1.79 at 70, 1.78 at 78 — falling).
-      const SETTLED_AT_M = 520; // 64 m into the last straight (y ≈ 534)
+      // (Since the restage the truck holds its own speed, so the slower the
+      // car the further up the road its pass ends: 760 m is past the return at
+      // every one of these speeds — the slowest is back in the cruise lane by
+      // y ≈ 620 — and the truck is far behind, outside any lee.)
+      const SETTLED_AT_M = 760;
       const lesson = compileScenario(SC_AC_WIND_TRUCK_PASS, 3);
       expect(lesson.physics?.crosswind).toBe(true);
       const cost = (cruiseKmh: number) => {
@@ -769,8 +778,18 @@ describe("round 2 — the correct demo shows the wheel a live driver on the same
   it(
     "sc-ac-wind-truck-pass: the same at 70–78 км/ч — the shadow holds what the live car needs behind the truck and past it",
     () => {
-      const demo = TRUCK_SHADOW.samples.filter((s) => s.speedKmh > 66);
-      const live = wholePeriods(drive(SC_AC_WIND_TRUCK_PASS, 3, "analog").samples, (s) => s.speedKmh > 66);
+      // On the straight after the return, where both hold 78 км/ч in the open
+      // wind with no manoeuvre of their own on the wheel.
+      const demo = TRUCK_SHADOW.samples.filter((s) => s.speedKmh > 66 && s.y > 480);
+      // Both in the OPEN wind: the demo passes at 62 км/ч, so its samples over
+      // 66 are all outside the lee; the live driver here holds 74 throughout,
+      // so his are taken where no shelter reaches him (the lee's own wheel is
+      // `crosswind-held-wheel.test.ts` for the demo and
+      // `wind-truck-pass-restage.test.ts` §3 for the live car).
+      const live = wholePeriods(
+        drive(SC_AC_WIND_TRUCK_PASS, 3, "analog", { cruiseKmh: 78 }).samples,
+        (s) => s.speedKmh > 66 && s.shelter === 1 && s.y > 480,
+      );
       const demoMean = meanOf(demo.map((s) => s.steerRad));
       const liveMean = meanOf(live.map((s) => s.steerRad));
       expect(demoMean).toBeLessThan(-0.004); // measured −0.0056 rad
@@ -823,56 +842,25 @@ const SHARP_CORRECTION = [{ forSec: 0.6, input: -0.35 }] as const;
 describe("round 3 — sc-ac-wind-truck-pass: the throw back toward the truck is the sharp correction's, never the gust's", () => {
   it("the card and the clip demo's captions say so, and no longer say the gust threw the car at the truck", () => {
     const card = SC_AC_WIND_TRUCK_PASS.mistakes[1]!.whatWentWrongBg;
-    expect(card).toContain("рязката корекция срещу порива я хвърли обратно към камиона — и последва удар");
+    expect(card).toContain("В завета му вятърът отслабна, а рязката корекция срещу него остана — и хвърли колата към камиона");
     expect(card).not.toContain("поривът я хвърли");
     const clip = captionsOf("content/traces/sc-ac-wind-truck-pass/mistake-clip-truck.trace.json");
     expect(clip).toContain(
-      "До кабината, в тясната пролука между колата и ремаркето — рязката корекция срещу порива я хвърля обратно към камиона.",
+      "В завета на камиона вятърът отслабва — а рязката корекция срещу него остава и хвърля колата към камиона.",
     );
     expect(clip).toContain(
-      "Грешката: тясна пролука до ремаркето и висока скорост — вятърът иска корекция, а пролуката не оставя място за грешка с нея.",
+      "Грешката: тясна пролука до камиона и висока скорост — пролуката не оставя място за грешка с волана.",
     );
     expect(clip.join(" ")).not.toContain("поривът я хвърля");
     expect(clip.join(" ")).not.toContain("вятърът не оставя място за реакция");
   });
 
-  for (const level of TRUCK_LEVELS) {
-    it(
-      `L${level}: the wind blows away from the truck; a loose wheel goes to the median, a sharp correction against the gust goes at the truck`,
-      () => {
-        const held = drive(SC_AC_WIND_TRUCK_PASS, level, "analog");
-        const sharp = drive(SC_AC_WIND_TRUCK_PASS, level, "analog", {
-          handScript: { atPathM: CLIP_AT_M, steps: SHARP_CORRECTION },
-        });
-        const loose = drive(SC_AC_WIND_TRUCK_PASS, level, "analog", { lapse: { atPathM: CLIP_AT_M, forSec: 2 } });
-        // THE TRUCK IS TO THE RIGHT (east) of the overtaking lane — and the
-        // wind, on every sample of all three drives, pushes WEST.
-        const t0 = sharp.handScriptStartedAtSec!;
-        const a = at(sharp, t0);
-        expect(Math.abs(a.x + 8.12), "in the overtaking lane").toBeLessThan(1);
-        expect(a.truckRightM!, "the truck is to the right").toBeGreaterThan(6);
-        for (const o of [held, sharp, loose]) {
-          for (const s of o.samples) expect(s.windN).toBeLessThan(0);
-        }
-        // «…вятърът иска корекция»: let go there, the car goes the OTHER way
-        // from the truck — measured 2.8–2.9 m toward the median in 2 s.
-        const l0 = loose.lapseStartedAtSec!;
-        const x0 = at(loose, l0).x;
-        const looseEast = Math.max(...loose.samples.filter((s) => s.t >= l0 && s.t <= l0 + 2).map((s) => s.x)) - x0;
-        expect(x0 - at(loose, l0 + 2).x, "loose: carried west, toward the median").toBeGreaterThan(1);
-        expect(looseEast, "loose: never toward the truck").toBeLessThan(0.05);
-        // «…рязката корекция срещу порива я хвърля обратно към камиона»: a
-        // sharp hand toward the truck throws the car at it — measured a peak
-        // of 3.0–3.8 m east within 2 s, even with the driver taking the wheel
-        // straight back.
-        const sharpEast = Math.max(...sharp.samples.filter((s) => s.t >= t0 && s.t <= t0 + 2).map((s) => s.x)) - a.x;
-        expect(sharpEast, "sharp: thrown east, toward the truck").toBeGreaterThan(2);
-        // And the held drive, which does neither, is the clean one.
-        expectCleanPass(held, `L${level} held`);
-      },
-      TEST_TIMEOUT,
-    );
-  }
+  // THE DRIVES MOVED with the restage of 2026-10-08 (sc-ac-wind-truck-pass:
+  // ff1d4290): they threw the hand at a fixed place in the overtaking lane with
+  // the truck 60 m up the road. Beside a truck that is really there the same
+  // hand is measured at every rung in `wind-truck-pass-restage.test.ts` §8 —
+  // let go at the cab, let go in the lee, and held where the open wind wanted
+  // it through the lee, which is what runs the car toward the truck.
 });
 
 describe("round 3 — the loose-hand demos: the wind holds the car nowhere; it keeps carrying it", () => {
@@ -880,7 +868,7 @@ describe("round 3 — the loose-hand demos: the wind holds the car nowhere; it k
     const street = captionsOf("content/traces/sc-ac-crosswind/mistake-full-speed.trace.json");
     expect(street).toContain("Колата язди осевата линия в насрещното, докато водачът не се събуди.");
     const motorway = captionsOf("content/traces/sc-ac-wind-truck-pass/mistake-blown-out.trace.json");
-    expect(motorway).toContain("Колата се понесе през половин лента към мантинелата, докато водачът се събуди.");
+    expect(motorway).toContain("Колата се понесе през половин лента към разделителната ивица, докато водачът се събуди.");
     for (const c of [...street, ...motorway]) expect(c).not.toContain("държи там");
   });
 
@@ -913,31 +901,14 @@ describe("round 3 — the loose-hand demos: the wind holds the car nowhere; it k
     );
   }
 
-  for (const level of TRUCK_LEVELS) {
-    it(
-      `L${level} motorway, a loose wheel in the overtaking lane: carried half a lane toward the median until he takes it back — and, left alone, out of the lane`,
-      () => {
-        // «…се понесе през половин лента към мантинелата, докато водачът се
-        // събуди»: 2.5 s of loose wheel carries the car 4.3–4.5 m west (the
-        // lane's half-width is 4.06 m); he takes it back and finishes clean.
-        const woke = drive(SC_AC_WIND_TRUCK_PASS, level, "analog", { lapse: { atPathM: CLIP_AT_M, forSec: 2.5 } });
-        const w0 = woke.lapseStartedAtSec!;
-        const x0 = at(woke, w0).x;
-        const carried = x0 - Math.min(...woke.samples.filter((s) => s.t >= w0).map((s) => s.x));
-        expect(carried).toBeGreaterThan(3.5);
-        expect(carried).toBeLessThan(5);
-        expectCleanPass(woke, `L${level} woke after 2.5 s`);
-        // NOT HELD THERE: six seconds of loose wheel and the car never once
-        // moves back east; by 4 s it is past the lane's median-side edge.
-        const off = drive(SC_AC_WIND_TRUCK_PASS, level, "analog", { lapse: { atPathM: CLIP_AT_M, forSec: 6 } });
-        const o0 = off.lapseStartedAtSec!;
-        const win = off.samples.filter((s) => s.t >= o0 + 0.5 && s.t < o0 + 6);
-        for (let k = 1; k < win.length; k++) expect(win[k]!.x).toBeLessThanOrEqual(win[k - 1]!.x);
-        expect(at(off, o0 + 4).x).toBeLessThan(-12.19);
-      },
-      TEST_TIMEOUT,
-    );
-  }
+  // THE MOTORWAY HALF MOVED with the restage of 2026-10-08
+  // (sc-ac-wind-truck-pass:ff1d4290). It let the wheel go at a fixed place in
+  // the overtaking lane, 60 m behind a truck that paced the car; the truck now
+  // holds its own speed and that place is in its lee or past it depending on
+  // the drive. The caption it backed — «Колата се понесе през половин лента
+  // към разделителната ивица, докато водачът се събуди» — is measured where the
+  // demo now shows it, from the frame the car clears the cab, at every rung, in
+  // `wind-truck-pass-restage.test.ts` §8.
 });
 
 // The second-swing coaching copy, shown on both lessons by `LessonScene`.

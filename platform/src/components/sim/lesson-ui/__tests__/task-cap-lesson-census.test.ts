@@ -465,7 +465,7 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
     expect(T.stampedFrames).toBe(0);
     expect(T.frames).toBeGreaterThan(1_000_000);
   }, 900_000);
-  it("late · a late blow, then the route's own driving — 0 differences; the domain is the committed one (the glass under the gate on 300+ blown marks, 130+ of them sign-bound; the gate at or above the sign with the glass under it; reversing, night, snow, fog, rain and bend frames)", () => {
+  it("late · a late blow, then the route's own driving — 0 differences; the domain is the committed one (the glass under the gate on 299+ blown marks, 130+ of them sign-bound; the gate at or above the sign with the glass under it; reversing, night, snow, fog, rain and bend frames)", () => {
     const { problems, T } = runPlan("late");
     expect(said(problems)).toEqual(CLEAN);
     expect(T.drives).toBe(521);
@@ -476,14 +476,27 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
     // where the car crosses it. On five rows the drive ENDS before that crossing (a terminal objective credited short of
     // its mark: sc-park-parallel-exit L1/L2 sc-ppx-out, sc-park-bay-exit-rev L1/L2 sc-pbe-away, sc-speed-creep L1
     // sc-crp-finish), so nothing is decided there; elsewhere marks the gate's old line let through are crossed over the new one.
-    expect(T.blown).toBe(513);
+    // 513 → 509 blown, 324 → 320 graded, 189 sign-bound unchanged (sc-ac-wind-truck-pass:ff1d4290, ADR-015): the four
+    // rows sc-ac-wind-truck-pass L1/L2/L3/L5 sc-acw-pass. Each was a graded blow (glass 100 under the road's 140, arrival
+    // 105,2 at t = 20,85) of a DISC at (−8.12, 340). The restage made that task a `stagedPass` — «до кабината» is the
+    // truck runner's own report that the car drew level with the cab, and its cap is billed on the report's own speed
+    // (`lessons/engine.ts stagedPassCapArrival`), not on a crossing of x/y, which are provenance only. This census forces
+    // the TICK's speed near the old mark, which the restaged task no longer reads (the report's speed is the recorded
+    // drive's own), so nothing is blown there under any plan; the arrival over the line is pinned on the live car by
+    // `wind-truck-pass-restage.test.ts` (118 км/ч: raised exactly once, not credited; 98: credited, nothing raised). Measured per row against a30c833 over
+    // all five plans, with and without the cap: these 4 rows × 5 plans are the ONLY rows whose ticks, events, cards or
+    // toasts moved; the other 517 rows are bit-identical.
+    expect(T.blown).toBe(509);
     expect(T.signBound).toBe(189);
-    expect(T.graded).toBe(324);
+    expect(T.graded).toBe(320);
     // …every one decided at the crossing: while the objective is active, or after the ladder's gate credited it short of
     // the mark at a speed it then carried over the line (`taskCapMarkWatch`, L1/L2).
     expect(T.crossingArrivals).toBeGreaterThan(400);
     expect(T.creditedArrivals).toBeGreaterThan(90);
-    expect(T.glassUnderGate).toBeGreaterThan(300);
+    // 301 → 299 (sc-ac-wind-truck-pass:ff1d4290, ADR-015): of the four truck-pass rows no longer blown here (see the blown
+    // pin above), two had the glass under the gate — L1 (gate 105) and L2 (gate 102,5) sc-acw-pass, glass 100; at L3/L5 the
+    // gate is 100 itself. Floor moved by exactly those two rows, measured 299.
+    expect(T.glassUnderGate).toBeGreaterThan(298);
     expect(T.signBoundGlassUnderGate).toBe(133);
     expect(T.gradedGateAtOrAboveSign).toBe(3);
     expect(T.breachRows).toBe(T.graded);
@@ -508,7 +521,7 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
   it("hold · a late blow, then 14 s over the task's line and the sign — 0 differences; stamped stretches, re-grades and charged points arise in hundreds", () => {
     const { problems, T } = runPlan("hold");
     expect(said(problems)).toEqual(CLEAN);
-    expect(T.blown).toBe(513);
+    expect(T.blown).toBe(509); // 513 → 509: the four sc-ac-wind-truck-pass sc-acw-pass rows (L1/L2/L3/L5), see the late plan
     expect(T.glassWithoutStamp).toBe(0);
     // Round 15 (measured: 113,170 / 105 / 132 / 125): the held speed is 3 over the glass line, no longer over gate + slack.
     expect(T.stampedFrames).toBeGreaterThan(100_000);
@@ -521,7 +534,7 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
   it("grace · a late blow, then 12 s in the sign's grace band — 0 differences; the sign-bound arrivals wait and bill on their held correction, each card quoting the glass figure and the sign of its blow", () => {
     const { problems, T } = runPlan("grace");
     expect(said(problems)).toEqual(CLEAN);
-    expect(T.blown).toBe(513);
+    expect(T.blown).toBe(509); // 513 → 509: the four sc-ac-wind-truck-pass sc-acw-pass rows (L1/L2/L3/L5), see the late plan
     expect(T.glassWithoutStamp).toBe(0);
     expect(T.signBoundCards).toBeGreaterThan(15);
     expect(T.kinRows).toBeGreaterThan(380);

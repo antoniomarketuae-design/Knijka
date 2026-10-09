@@ -84,8 +84,9 @@ import { DEFAULT_TRAFFIC_CONFIG, type TrafficDistrict } from "../../../traffic/t
 import { ambientSidewalkBudget } from "../../../traffic/pedestrians";
 import { createScenarioDirector, lessonSeed } from "../../../orchestrator/director";
 import { applySignalModes, wireTrafficQueries } from "../../../scene/lessonWorldRecipe";
+import { createLessonWindShelter } from "../../../scene/lessonWindShelter";
 import { DEFAULT_LESSON_TRAFFIC } from "../../../contracts";
-import type { LessonSpec, StagedEventSpec } from "../../../contracts";
+import type { LessonSpec, StagedEventOutcome, StagedEventSpec } from "../../../contracts";
 import type { ScenarioTrace } from "../../../traces/types";
 import { lessonRequiredSpeedKmh } from "../../../scene/lessonSpeedContract";
 import {
@@ -107,13 +108,14 @@ import {
   STEER_MAX_ANGLE,
   STEER_MIN_ANGLE,
   STEER_MIN_SPEED_KMH,
+  createRigWindShelter,
   stepSecondSwing,
   VehicleSim,
   WHEEL_POSITIONS,
   type DifficultyMode,
   type VehicleSimOptions,
 } from "../../../vehicle";
-import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
+import { applyStagedOutcome, applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import type { LessonResult, LessonSessionState } from "../../types";
 
 export type WindDriver = "analog" | "keyboard" | "keyboardRationed" | "gamepad" | "handsOff" | "late";
@@ -178,6 +180,46 @@ export interface LiveWindDriveOptions {
   maxSec?: number;
   /** The learner tier whose input shaping applies. Default: the product's. */
   difficulty?: DifficultyMode;
+  /**
+   * NO LEE (a mutation control / the BEFORE column): drive this lesson with the
+   * shelter the scene would feed the rig switched off. Default false — the
+   * harness calls `createLessonWindShelter`, the scene's own function, and
+   * feeds its factor to the sim before every step exactly as `VehicleRig` does.
+   */
+  noShelter?: boolean;
+  /**
+   * A LANE PLAN that replaces the demo's lateral line (the demo is still
+   * followed for speed, signals and glances): the driver holds `x` (district)
+   * and changes lane when its own rule says so. It exists because a truck that
+   * holds its own speed is level with the car at a place that depends on the
+   * car's speed, so a driver who only replays the demo's polyline pulls out and
+   * returns where the DEMO's truck was, not his own. `passWhenGapM`: pull out
+   * to `passX` when the truck's tail is this close ahead; return to `homeX`
+   * once the truck's nose is `returnWhenClearM` behind the car's tail. With
+   * `neverPass` the driver stays in `homeX` behind the truck at its speed.
+   */
+  lanePlan?: {
+    homeX: number;
+    passX: number;
+    passWhenGapM: number;
+    returnWhenClearM: number;
+    /** Metres of travel a lane change is spread over. */
+    changeOverM: number;
+    /** …and the RETURN's own, when it differs (an early, short cut back). */
+    returnChangeOverM?: number;
+    neverPass?: boolean;
+    /** Behind the truck: the bumper gap the driver settles at, m (default 30). */
+    followGapM?: number;
+    /** Stop once the car is this far up the road, m (district y). */
+    stopAtY: number;
+  };
+  /**
+   * A FREE PLANNER (round 3; the round-2 verifier's harness hook, adopted so
+   * its tapes run on this file): replaces the lane plan entirely — the line,
+   * the speed target (NOT capped by the demo's), the indicator and the looks
+   * are whatever it answers on each frame.
+   */
+  planner?: (c: LiveWindPlannerInput) => LiveWindPlannerOutput;
 }
 
 export interface LiveWindSample {
@@ -200,6 +242,11 @@ export interface LiveWindSample {
   windN: number;
   /** Road-wheel angle the wind is adding, rad (`windSteerPullRad`). */
   windPullRad: number;
+  /** The share of the open wind reaching the car (`windShelterFactor`; 1 = open). */
+  shelter: number;
+  /** The wind's lateral acceleration on the car (`windLatAccelMs2`, + = left) —
+   *  the gust chip's side input. */
+  windLatAccelMs2: number;
   /** What `CameraRig` feeds the head lean, m/s² (+ = pushed left) —
    *  `cockpitLeanFromSim` on this frame's car. */
   leanMs2: number;
@@ -208,6 +255,44 @@ export interface LiveWindSample {
    *  to its RIGHT. `null` when none is within 300 m. */
   truckAheadM: number | null;
   truckRightM: number | null;
+  /** That vehicle's own speed on this frame, км/ч (`null` with none). */
+  truckKmh: number | null;
+  /** That vehicle's centre NORTH of the car's, m, in district space (+ = it is
+   *  ahead up the road) — the road's own frame, which the car's heading is not
+   *  while it changes lane. */
+  truckNorthM: number | null;
+  /** The staged truck's own account of speed shed because of the student
+   *  (`StagedActorView.playerShedMps`), m/s, after this frame's traffic step —
+   *  `null` without a staged truck (round 3: what its return-watch reads). */
+  truckShedMps: number | null;
+}
+
+/** One `laneEntryAnswer` the staged runner published, with its session time. */
+export interface LiveWindAnswer {
+  t: number;
+  phase: "watching" | "clear" | "lift" | "braked";
+  shedMps: number;
+  decelMps2: number;
+  heldSec: number;
+  qualifiedSec: number;
+  speedMps: number;
+}
+
+/** What a free `planner` is told on every frame (district space). */
+export interface LiveWindPlannerInput {
+  t: number;
+  x: number;
+  y: number;
+  speedKmh: number;
+  truck: { x: number; y: number; speedKmh: number } | null;
+}
+/** …and what it answers: the line to hold, the speed to hold, the lamp, a look. */
+export interface LiveWindPlannerOutput {
+  xAt: (yy: number) => number;
+  targetKmh: number;
+  indicator: "left" | "right" | "off";
+  glance?: "left" | "right" | "rear" | "shoulder" | null;
+  atEnd?: boolean;
 }
 
 export interface LiveWindDriveOutcome {
@@ -229,6 +314,12 @@ export interface LiveWindDriveOutcome {
   handScriptStartedAtSec: number | null;
   /** Session seconds of every `secondSwing.ts` fire, in order. */
   secondSwingFiredAtSec: number[];
+  /** Every staged-encounter report, in order (also folded into the session). */
+  outcomes: StagedEventOutcome[];
+  /** Every `laneEntryAnswer` tick event the staged runner published, in order. */
+  answers: LiveWindAnswer[];
+  /** Every rule event of the session with its own time (`+` praise, `!` fault). */
+  eventLog: string[];
 }
 
 /** What `LessonScene` hands `VehicleRig` for this rung's `physics`. */
@@ -329,6 +420,21 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
       ? createScenarioDirector(staged, traffic, { seed: lessonSeed(lesson.id), signals: runtime })
       : null;
   let session = createLessonSession(lesson);
+  const outcomes: StagedEventOutcome[] = [];
+  const answers: LiveWindAnswer[] = [];
+  // THE LEE, by the scene's own function (`scene/lessonWindShelter.ts`): null
+  // on a lesson with no sheltering vehicle, and then nothing is ever set on
+  // the sim — exactly `VehicleRig`'s rule.
+  const shelterAt = opts.noShelter === true ? null : createLessonWindShelter(lesson, (id) => traffic.staged(id));
+  // …held exactly as the rig holds it (`createRigWindShelter`).
+  const rigLee = createRigWindShelter();
+  rigLee.follow(shelterAt);
+  // The lane plan's own state (see `LiveWindDriveOptions.lanePlan`).
+  const plan = opts.lanePlan;
+  let planState: "behind" | "out" | "back" = "behind";
+  let planFromY = 0;
+  let planGlanced = false;
+  const truckId = staged[0]?.id;
 
   // --- the car: rapier + VehicleSim, the product's options for this rung ------
   const world = new RAPIER.World({ x: 0, y: GRAVITY, z: 0 });
@@ -429,7 +535,6 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
     const sNow = a.s + along;
     // + = the car is LEFT of the path (path direction × offset, z up).
     const offPathM = (ux * (y - a.y) - uy * (x - a.x)) / len;
-    maxOffPathM = Math.max(maxOffPathM, Math.abs(offPathM));
     const demoIdx = a.i;
     const demo = trace.samples[demoIdx]!;
 
@@ -441,12 +546,86 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
       glanceIdx++;
     }
 
+    // --- THE LANE PLAN (when given): the line, the signals and the looks are
+    //     decided by where the TRUCK is, not by where the demo's truck was ----
+    let planIndicator: "left" | "right" | "off" | null = null;
+    let planX: ((yy: number) => number) | null = null;
+    let planTargetKmh: number | null = null;
+    let planAtEnd = false;
+    if (plan !== undefined) {
+      glance = null;
+      const truck = truckId !== undefined ? traffic.staged(truckId) : null;
+      // Road between the car's nose and the truck's tail (+ = truck ahead), and
+      // between the car's tail and the truck's nose once it is behind.
+      const truckAheadCentres = truck ? truck.y - y : Infinity;
+      const halfBoth = 3.75 + 2.02;
+      const gapAhead = truckAheadCentres - halfBoth;
+      const clearBehind = -truckAheadCentres - halfBoth;
+      const ramp = (from: number, to: number, fromY: number) => (yy: number) => {
+        const u = Math.min(1, Math.max(0, (yy - fromY) / plan.changeOverM));
+        const sm = u * u * (3 - 2 * u);
+        return from + (to - from) * sm;
+      };
+      if (planState === "behind" && !plan.neverPass && gapAhead <= plan.passWhenGapM && speedKmh > 20) {
+        planState = "out";
+        planFromY = y;
+        planGlanced = false;
+      } else if (planState === "out" && clearBehind >= plan.returnWhenClearM && y - planFromY > plan.changeOverM) {
+        // (The pull-out is finished; the return begins where the plan says.)
+        planState = "back";
+        planFromY = y;
+        planGlanced = false;
+      }
+      if (planState === "behind") {
+        planX = () => plan.homeX;
+        planIndicator = "off";
+        // Behind the truck: never closer than a lawful gap — ease to its speed.
+        if (truck && gapAhead < 45) {
+          planTargetKmh = Math.max(20, truck.speedMps * 3.6 + (gapAhead - (plan.followGapM ?? 30)) * 0.6);
+        }
+      } else if (planState === "out") {
+        planX = ramp(plan.homeX, plan.passX, planFromY);
+        planIndicator = "left";
+        if (!planGlanced) {
+          glance = "left";
+          planGlanced = true;
+        }
+      } else {
+        const backOverM = plan.returnChangeOverM ?? plan.changeOverM;
+        planX = (yy: number) => {
+          const u = Math.min(1, Math.max(0, (yy - planFromY) / backOverM));
+          return plan.passX + (plan.homeX - plan.passX) * (u * u * (3 - 2 * u));
+        };
+        const doneBack = y - planFromY > backOverM + 15;
+        planIndicator = doneBack ? "off" : "right";
+        if (!planGlanced) {
+          glance = "right";
+          planGlanced = true;
+        }
+      }
+      planAtEnd = y >= plan.stopAtY;
+    }
+    if (opts.planner !== undefined) {
+      const tr = truckId !== undefined ? traffic.staged(truckId) : null;
+      const r = opts.planner({ t, x, y, speedKmh, truck: tr ? { x: tr.x, y: tr.y, speedKmh: tr.speedMps * 3.6 } : null });
+      glance = r.glance ?? null;
+      planX = r.xAt;
+      planIndicator = r.indicator;
+      planTargetKmh = r.targetKmh;
+      planAtEnd = r.atEnd === true;
+    }
+
     // --- pedals: hold the demo's speed (or the override) ----------------------
-    const atEnd = endS - sNow < 1.5;
+    const atEnd = plan !== undefined || opts.planner !== undefined ? planAtEnd : endS - sNow < 1.5;
     const lookIdx = Math.min(trace.samples.length - 1, demoIdx + 12);
+    const cruiseKmh = Math.max(8, opts.cruiseKmh ?? Math.abs(trace.samples[lookIdx]!.speedKmh));
     const targetKmh = atEnd
       ? 0
-      : Math.max(8, opts.cruiseKmh ?? Math.abs(trace.samples[lookIdx]!.speedKmh));
+      : opts.planner !== undefined && planTargetKmh !== null
+        ? planTargetKmh
+        : planTargetKmh !== null
+          ? Math.min(cruiseKmh, planTargetKmh)
+          : cruiseKmh;
     const err = targetKmh - Math.abs(speedKmh);
     const throttle = atEnd ? 0 : Math.min(1, Math.max(0, 0.1 + 0.2 * err));
     const brake = atEnd ? 0.45 : err < -3 ? Math.min(0.45, -err * 0.05) : 0;
@@ -461,17 +640,32 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
     let alpha = bearing - (headingDeg * Math.PI) / 180;
     while (alpha > Math.PI) alpha -= 2 * Math.PI;
     while (alpha < -Math.PI) alpha += 2 * Math.PI;
-    const aimDist = Math.max(2, Math.hypot(aim.x - x, aim.y - y));
+    let aimDist = Math.max(2, Math.hypot(aim.x - x, aim.y - y));
+    // Under a lane plan the line is the plan's (a northbound lane, x = planX(y)):
+    // the same pursuit, the same integral, on that line instead of the demo's.
+    let lineOffM = offPathM;
+    if (planX !== null) {
+      const ax = planX(y + lookM);
+      const bearingP = Math.atan2(ax - x, lookM);
+      alpha = bearingP - (headingDeg * Math.PI) / 180;
+      while (alpha > Math.PI) alpha -= 2 * Math.PI;
+      while (alpha < -Math.PI) alpha += 2 * Math.PI;
+      aimDist = Math.max(2, Math.hypot(ax - x, lookM));
+      // + = the car is LEFT (west) of the line.
+      lineOffM = planX(y) - x;
+    }
+    // The line the driver is holding: the demo's, or the lane plan's.
+    maxOffPathM = Math.max(maxOffPathM, Math.abs(lineOffM));
     // alpha > 0 = the aim is to the RIGHT; steer is + = LEFT.
     const pursuitRad = -Math.atan((2 * WHEELBASE_M * Math.sin(alpha)) / aimDist);
-    if (vMs > 2) integ = Math.min(4, Math.max(-4, integ + offPathM * FIXED_DT));
+    if (vMs > 2) integ = Math.min(4, Math.max(-4, integ + lineOffM * FIXED_DT));
     // The WHEEL the driver wants, as a share of the lock available right now.
     const wish = Math.min(
       1,
-      Math.max(-1, pursuitRad / maxSteerRadAt(speedKmh) - 0.035 * offPathM - 0.03 * integ),
+      Math.max(-1, pursuitRad / maxSteerRadAt(speedKmh) - 0.035 * lineOffM - 0.03 * integ),
     );
 
-    if (!handsBack && Math.abs(offPathM) >= (opts.lateAfterM ?? 1)) handsBack = true;
+    if (!handsBack && Math.abs(lineOffM) >= (opts.lateAfterM ?? 1)) handsBack = true;
     if (opts.lapse !== undefined && lapseStartedAtSec === null) {
       const due =
         opts.lapse.atPathM !== undefined ? sNow >= opts.lapse.atPathM : t >= (opts.lapse.atSec ?? Infinity);
@@ -599,6 +793,10 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
       lessonRequiredKmh,
     );
     const shapedSteer = shaped.steer;
+    // THE LEE, set before the step that reads the wind — `VehicleRig`'s order
+    // and `VehicleRig`'s own call (its held lee's `step` → `stepRigWindShelter`,
+    // handed the chassis' rapier translation exactly as the rig hands it).
+    rigLee.step(sim, st.position);
     sim.update(shaped, FIXED_DT, READY_DRIVELINE);
     world.step();
     // The head lean's input, as `CameraRig` computes it on this frame's car.
@@ -628,12 +826,17 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
       steerInput,
       shapedSteer,
       steerRad: sim.steerRad,
-      offPathM,
+      offPathM: plan !== undefined || opts.planner !== undefined ? lineOffM : offPathM,
       windN: sim.windLateralNow,
       windPullRad,
+      shelter: sim.windShelterFactor,
+      windLatAccelMs2: sim.windLatAccelMs2,
       leanMs2,
       truckAheadM: null,
       truckRightM: null,
+      truckKmh: null,
+      truckNorthM: null,
+      truckShedMps: null,
     });
 
     // --- the lesson stack, LessonScene's order --------------------------------
@@ -660,16 +863,19 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
           best = d;
           last.truckAheadM = dx * fx + dy * fy;
           last.truckRightM = dx * fy - dy * fx;
+          last.truckKmh = v.speedMps * 3.6;
+          last.truckNorthM = dy;
         }
       }
     }
+    if (truckId !== undefined) samples[samples.length - 1]!.truckShedMps = traffic.staged(truckId)?.playerShedMps ?? null;
     const leadGap = traffic.leadGapMeters(x, y, headingDeg);
     const tick = runtime.sample(
       {
         position: { x, y },
         headingDeg,
         speedKmh,
-        indicator: demo.indicator,
+        indicator: planIndicator ?? demo.indicator,
         headlights,
         seatbeltOn: true,
         handbrakeOn: false,
@@ -698,9 +904,30 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
         brakePedal: brake,
         tickEvents: tick.events,
       });
-      for (const e of res.events) tick.events.push(e);
+      for (const e of res.events) {
+        tick.events.push(e);
+        if (e.kind === "laneEntryAnswer") {
+          answers.push({
+            t,
+            phase: e.phase,
+            shedMps: e.shedMps,
+            decelMps2: e.decelMps2,
+            heldSec: e.heldSec,
+            qualifiedSec: e.qualifiedSec,
+            speedMps: e.speedMps,
+          });
+        }
+      }
+      session = applyTick(session, tick).state;
+      // The shell's order: the tick, then that frame's staged reports
+      // (`LessonPlayShell handleStagedOutcome` → `applyStagedOutcome`).
+      for (const o of res.outcomes) {
+        outcomes.push(o);
+        session = applyStagedOutcome(session, o);
+      }
+    } else {
+      session = applyTick(session, tick).state;
     }
-    session = applyTick(session, tick).state;
   }
 
   const result = buildLessonResult(session);
@@ -719,6 +946,9 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
     lapseStartedAtSec,
     handScriptStartedAtSec,
     secondSwingFiredAtSec,
+    outcomes,
+    answers,
+    eventLog: session.events.map((e) => `${e.kind === "commendation" ? "+" : "!"}${e.code}@${e.t.toFixed(2)}`),
   };
 }
 

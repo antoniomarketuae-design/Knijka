@@ -505,6 +505,26 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         }
         out.laneChange = { from: { x: lc.from.x, y: lc.from.y }, to: { x: lc.to.x, y: lc.to.y } };
       }
+      // THE STAGED-PASS TERM (`ReachZoneParams.stagedPass`,
+      // sc-ac-wind-truck-pass:ff1d4290). Malformed is refused loudly, like
+      // every other authored term: a half-authored one would leave a gate that
+      // says «до кабината» judged as a disc on the road again.
+      if (p.stagedPass !== undefined) {
+        const sp = p.stagedPass as Record<string, unknown> | null;
+        if (
+          typeof sp !== "object" ||
+          sp === null ||
+          typeof sp.eventId !== "string" ||
+          sp.eventId.length === 0 ||
+          (sp.phase !== "abeam" && sp.phase !== "returned")
+        ) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            'reachZone stagedPass must be { eventId: string, phase: "abeam" | "returned" }',
+          );
+        }
+        out.stagedPass = { eventId: sp.eventId, phase: sp.phase };
+      }
       return out;
     }
     case "passSignal": {
@@ -4210,6 +4230,9 @@ export function stepObjective(
 ): ObjectiveStepResult {
   switch (params.kind) {
     case "reachZone":
+      // A zone that is a fact about a staged vehicle is judged by that
+      // vehicle's own report, never by the disc (`ReachZoneParams.stagedPass`).
+      if (params.stagedPass !== undefined) return stepStagedPass(params, prev, ctx);
       return stepReachZone(params, prev, tick, ctx);
 
     case "passSignal":
@@ -4471,6 +4494,64 @@ export function stepLineStandstill(
     restSinceSec: since,
     made: since !== undefined && tick.t - since >= DEFAULT_RULE_CONFIG.fullStopMinDurationSec,
   };
+}
+
+/**
+ * The staged-pass report a `stagedPass` zone is waiting for: the LATEST
+ * outcome of its event with the phase's detail, or null while none has
+ * arrived. Latest, because the runner re-arms when the car drops back behind
+ * the vehicle — a second attempt is a second report and it is the one that
+ * counts (the `stepEmergencyStop` rule: «the LAST outcome for the event wins»).
+ * Exported for the lesson engine's task-cap arrival, which must read the same
+ * report this gate does.
+ */
+export function stagedPassReport(
+  stagedPass: NonNullable<ReachZoneParams["stagedPass"]>,
+  stagedOutcomes: readonly StagedEventOutcome[],
+): StagedEventOutcome | null {
+  const detail = stagedPass.phase === "abeam" ? "drewLevel" : "overtaken";
+  for (let i = stagedOutcomes.length - 1; i >= 0; i--) {
+    const o = stagedOutcomes[i];
+    if (o.eventId === stagedPass.eventId && o.detail === detail) return o;
+  }
+  return null;
+}
+
+/**
+ * A ZONE THAT IS A FACT ABOUT A MOVING VEHICLE (`ReachZoneParams.stagedPass`,
+ * sc-ac-wind-truck-pass:ff1d4290) — done when the staged runner has reported
+ * it, and, where the zone is capped, when it was done within the cap.
+ *
+ * THE DISC IS NOT CONSULTED AT ALL, and that is the repair rather than a
+ * shortcut: the row is that a gate titled «до кабината» was a circle at
+ * y = 340 which a student could collect with the truck 60 m up the road, and
+ * that a student who really passed a truck holding its own speed would be
+ * level with its cab somewhere the circle is not. The eval state is handed
+ * back untouched (it stays the disc's initial state), so nothing downstream
+ * that reads a reachZone's state sees a shape it does not know.
+ *
+ * THE CAP IS THE GATE'S OWN CREDITING NUMBER, unchanged: the cap plus
+ * `REACH_ZONE_CAP_SLACK_KMH`, read against the speed the report was made at
+ * (the runner stamps it on the frame the car drew level). Over it, the report
+ * does not complete the task — and the student is told why by the bill that
+ * arrives with it (`lessons/engine.ts`, the task cap's arrival), not by
+ * silence. Drop back, pass again within the cap, and the new report completes
+ * it.
+ */
+function stepStagedPass(
+  params: WitnessedReachZoneParams,
+  prev: ObjectiveEvalState,
+  ctx: ObjectiveContext,
+): ObjectiveStepResult {
+  const stagedPass = params.stagedPass;
+  if (stagedPass === undefined) return { done: false, progress: 0, evalState: prev };
+  const report = stagedPassReport(stagedPass, ctx.stagedOutcomes);
+  if (report === null) return { done: false, progress: 0, evalState: prev };
+  const withinCap =
+    params.maxSpeedKmh === undefined ||
+    report.approachSpeedKmh === undefined ||
+    report.approachSpeedKmh <= params.maxSpeedKmh + REACH_ZONE_CAP_SLACK_KMH;
+  return { done: withinCap, progress: withinCap ? 1 : 0.5, evalState: prev };
 }
 
 function stepReachZone(

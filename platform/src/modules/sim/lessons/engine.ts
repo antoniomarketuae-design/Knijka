@@ -82,6 +82,7 @@ import {
   reachZoneJourneyRefusal,
   reachZoneMarkCrossing,
   reachZoneStateRefusal,
+  stagedPassReport,
   restFaultVoidsObjective,
   solidLineFaultVoidsObjective,
   speedFaultVoidsObjective,
@@ -99,6 +100,7 @@ import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { foldLessonMistakes, lessonMistakeTargetCodes } from "./lessonMistake";
 import { examTerminationFor } from "./exam";
 import {
+  CRASH_PIN_DRIVING_KMH,
   CRASH_PIN_RADIUS_M,
   CRASH_PIN_STUCK_S,
   FINISH_STANDSTILL_KMH,
@@ -803,6 +805,90 @@ function stepTaskCapLatch(
   return { ...active, arrival: watched.arrival, breach: active.breach ?? watched.breach, watch: watched.watch };
 }
 
+/**
+ * THE ARRIVAL OF A CAPPED TASK WHOSE MARK IS A MOVING VEHICLE
+ * (`ReachZoneParams.stagedPass`, sc-ac-wind-truck-pass:ff1d4290).
+ *
+ * «Излез в лявата лента до кабината със съобразена за вятъра скорост» carries
+ * the lesson's 100 км/ч cap, and until the restage the cap was billed where
+ * every capped task's is: on the frame the car crossed the task's mark over
+ * the bill line (founder rulings 2026-09-26 «Bill the arrival» and 2026-10-03
+ * «Like a speed sign»). The mark was a disc at y = 340. The truck now holds
+ * its own speed, the cab is wherever the student catches it, and there is no
+ * disc — so the SAME event is read where the task is now judged: the frame
+ * the staged runner reports the car level with the cab. The speed is the
+ * report's own (`approachSpeedKmh`, stamped by the runner on that frame); the
+ * line is the same `taskCapBillLineKmh`; the reducer bills it through the same
+ * `taskCapArrival` slot, once.
+ *
+ * WHAT IS NOT CARRIED OVER, AND WHY THAT ADDS NOTHING AND REMOVES NOTHING. A
+ * disc's latch also stamps the ceiling along a STRETCH after the blow (the
+ * road to the next goal). A stretch is a region of road, and this task has
+ * none; `TASK_CAP_FEATURES` never named one for it either (it was a
+ * zone-default task: its cap bound across its own 4.5 m disc, i.e. for a
+ * fifth of a second at these speeds). So the arrival is the whole of what the
+ * old gate billed in practice, and it is what is billed here.
+ *
+ * ONE BILL PER REPORT. The latch is the memory: created spent (nothing to
+ * stamp) and already re-armed (the task is still open and still asks for the
+ * cap, so the figure stays on the glass — `advisor.ts taskCapReleased`), named
+ * by the report's own time. A second pass is a second report, a different
+ * time, and — if it too is over the line — a second act, which is what a
+ * second lap round a capped ring is.
+ */
+function stagedPassCapArrival(
+  prev: LessonSessionState,
+  tick: SimTick,
+  idx: number,
+  objectiveId: string,
+  params: Extract<ObjectiveParams, { kind: "reachZone" }>,
+  capKmh: number,
+  shownKmh: number,
+): {
+  cap: TaskSpeedCap | undefined;
+  latch: TaskCapLatch | undefined;
+  breach: TaskCapBreach | undefined;
+  arrival: TaskCapArrival | undefined;
+} {
+  const existing =
+    prev.taskCapLatch !== undefined && prev.taskCapLatch.objectiveIndex === idx ? prev.taskCapLatch : undefined;
+  const kept = { cap: undefined, latch: existing, breach: undefined, arrival: undefined };
+  if (params.stagedPass === undefined || !isFlowTaskCap(capKmh)) return kept;
+  const report = stagedPassReport(params.stagedPass, prev.stagedOutcomes ?? []);
+  if (report === null || report.approachSpeedKmh === undefined) return kept;
+  if (existing !== undefined && existing.blownAtSec === report.tSec) return kept;
+  if (!(report.approachSpeedKmh > taskCapBillLineKmh(shownKmh, prev.rules.config))) return kept;
+  const latch: TaskCapLatch = {
+    objectiveIndex: idx,
+    blownAtSec: report.tSec,
+    stretch: {
+      markX: params.x,
+      markY: params.y,
+      approach: null,
+      corner: null,
+      halfWidthM: 0,
+      goal: { x: params.x, y: params.y, radiusM: params.radiusM },
+      featureEnd: { kind: "goal" },
+    },
+    progress: { reached: true, spent: true },
+    stamped: true,
+    rearmed: true,
+  };
+  const graded = shownKmh < tick.maxSpeedKmh;
+  return {
+    cap: undefined,
+    latch,
+    breach: graded ? { objectiveId, t: tick.t } : undefined,
+    arrival: {
+      capKmh,
+      shownKmh,
+      graceKmh: REACH_ZONE_CAP_SLACK_KMH,
+      blownAtSec: report.tSec,
+      arrivalKmh: report.approachSpeedKmh,
+    },
+  };
+}
+
 function stepActiveTaskCapLatch(
   prev: LessonSessionState,
   tick: SimTick,
@@ -822,6 +908,11 @@ function stepActiveTaskCapLatch(
   const st = prev.evalStates[idx];
   if (st === undefined || st.type !== "reachZone") return none;
   const shownKmh = shownObjectiveCapKmh(active.spec, capKmh, prev.lesson.postedLimitKmh);
+  // A capped zone that is a fact about a moving vehicle has no mark on the road
+  // to cross; its arrival is the staged report (`stagedPassCapArrival`).
+  if (active.params.stagedPass !== undefined) {
+    return stagedPassCapArrival(prev, tick, idx, active.spec.id, active.params, capKmh, shownKmh);
+  }
   // ROUND 15 — THE BLOW IS THE CROSSING, OVER THE LINE (founder ruling 2026-10-03 «LIKE A SPEED SIGN»; see
   // `markCrossingOf`). Rounds 3–14 latched off the evaluator's `approachCap === "blown"`, and that verdict keeps an
   // «honoured» it earned anywhere on the approach — up to `REACH_ZONE_GRACE_M` behind the disc, i.e. 20 m short of the
@@ -3987,6 +4078,20 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       } else if (crashPin.stillSinceSec === null) {
         crashPin = { ...crashPin, stillSinceSec: tick.t };
       }
+    }
+    // sc-roundabout-entry:4ab693eb clause 2 — HAS THE CAR COME TO REST SINCE
+    // THE IMPACT? A coaching fact, not a grading one (the advisor withholds the
+    // objective line until the car is DRIVING again, `advisor.ts
+    // objectiveWithheldAfterImpact`). A speed reading alone cannot say „again":
+    // a car still sliding off a 20 км/ч impact reads above the floor on the
+    // ticks after it, and that is not a student who has driven off. So the pin
+    // remembers whether this impact's car has been at or under
+    // CRASH_PIN_DRIVING_KMH since the arm — re-set on every re-arm from that
+    // tick's own speed (a fresh impact is a fresh question), latched after.
+    if (crashPin !== undefined) {
+      const atRestNow = Math.abs(tick.speedKmh) <= CRASH_PIN_DRIVING_KMH;
+      const cameToRest = crashed ? atRestNow : crashPin.cameToRest === true || atRestNow;
+      if (crashPin.cameToRest !== cameToRest) crashPin = { ...crashPin, cameToRest };
     }
   }
   /**

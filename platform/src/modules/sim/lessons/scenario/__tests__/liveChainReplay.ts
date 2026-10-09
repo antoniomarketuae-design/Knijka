@@ -148,6 +148,7 @@ import { sessionClockAdvance } from "../../../../../components/sim/lesson-ui/ses
 import { buildDebrief } from "../../debrief";
 import {
   applyNearMiss,
+  applyStagedOutcome,
   applyTick,
   buildLessonResult,
   createLessonSession,
@@ -207,6 +208,20 @@ export interface LiveReplayOptions {
    *  `beforeApply`, it runs once per GRADED GRID POINT (scene/gradeGrid.ts),
    *  with `t` = k·FIXED_DT — not once per render frame. */
   afterApply?: (ctx: LiveReplayFrameContext & { step: LessonStepResult }) => void;
+  /**
+   * Fold each staged-encounter report into the session after that GRID
+   * POINT's tick — the live shell folds the same reports
+   * (`LessonPlayShell handleStagedOutcome` → `applyStagedOutcome`), handed
+   * over by `LessonScene`'s grid `onPoint` for the same point (there just
+   * BEFORE `onTick`; this replay keeps the order its witnesses were measured
+   * with, after the tick: the point is the same, the order within it is
+   * not — aligning it is owed to the truck-pass lane). An
+   * objective judged by a staged report (`emergencyStop`,
+   * `reachZone.stagedPass`) can only complete with it. OPT-IN, default off:
+   * every witness written before 2026-10-08 replayed without it, and none of
+   * them may move because a harness grew a faithful half.
+   */
+  applyOutcomes?: boolean;
 }
 
 export interface AmbientContact {
@@ -413,6 +428,12 @@ export function liveChainReplay(opts: LiveReplayOptions): LiveReplayOutcome {
     const step = applyTick(session, tick);
     session = step.state;
     lastTickPos = { x: tick.position.x, y: tick.position.y };
+    if (opts.applyOutcomes === true && director && pt.staged) {
+      // The reports THIS GRID POINT's director.step made (pushed just above)
+      // — the point's own outcomes, never «every outcome stamped with the
+      // frame's time»: a frame can bring several grid points.
+      for (const o of pt.staged.outcomes) session = applyStagedOutcome(session, o);
+    }
     for (const m of step.teachMoments ?? []) teachMomentCodes.push(m.code);
     opts.afterApply?.({ t: tp, tick, session: before, traffic, director, wallSec, step });
     if ((step.teachMoments?.length ?? 0) > 0 || step.mistakeMoment !== undefined) {

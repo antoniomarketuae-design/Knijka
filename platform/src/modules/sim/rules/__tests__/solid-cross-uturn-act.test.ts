@@ -2172,7 +2172,7 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     expect(corrective!("CROSSED_SOLID_LINE", "no-such-act")).toBe(pooled);
   });
 
-  it("CENSUS: the U-turn is the ONLY act in the catalogue with its own corrective — no other card moved", () => {
+  it("CENSUS: two acts in the catalogue have their own corrective — the U-turn, and (since 2026-10-08) the return in front of an overtaken vehicle — and no other card moved", () => {
     const withOwn: string[] = [];
     for (const [code, acts] of Object.entries(rules.PER_ACT_COPY)) {
       for (const [detail, copy] of Object.entries(acts ?? {})) {
@@ -2182,7 +2182,11 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
         else expect(got, `${code}|${detail}`).toBe(rules.VIOLATIONS[code as keyof typeof rules.VIOLATIONS].correctiveBg);
       }
     }
-    expect(withOwn).toEqual([`CROSSED_SOLID_LINE|${UTURN}`]);
+    // The second row is sc-ac-wind-truck-pass:ff1d4290 round 2: the pooled
+    // LANE_ENTRY_FORCED_BRAKING advice («…пусни я да мине и влез в пролуката
+    // ЗАД нея») is the lane-drop act's own and is wrong for a driver who has
+    // just overtaken — `lane-entry-act-copy.test.ts` pins the act's row.
+    expect(withOwn).toEqual([`CROSSED_SOLID_LINE|${UTURN}`, "LANE_ENTRY_FORCED_BRAKING|overtakeReturn"]);
   });
 });
 

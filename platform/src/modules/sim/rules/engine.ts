@@ -84,6 +84,7 @@ import {
   WRONG_WAY_ROAD_MOTORWAY,
 } from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
+import { BRAKING_LINE_MPS2, HARSH_BRAKE_TIE_TOLERANCE, isHarshBrakeWindow } from "./harshBrakeEpisode";
 import {
   type ActAmendment,
   DEFAULT_RULE_CONFIG,
@@ -195,7 +196,15 @@ export interface RuleEngineState {
    * deltas are held laneChangeJointGraceSec and dropped when a segment
    * transition lands inside the window — see the config comment. */
   laneChange: {
-    pending: Array<{ t: number; dir: TurnDirection; indicatorOk: boolean; mirrorOk: boolean }>;
+    /**
+     * `forced` (sc-ac-wind-truck-pass:ff1d4290 round 2): this lane change is
+     * the entry of a BILLED cut-in — it put him in front of a vehicle that had
+     * to brake hard — so it is graded for its indicator and its mirror as
+     * before but is never COMMENDED: «…в правилния ред и навреме. Отлично.» is
+     * false of a lane change the vehicle behind had to brake hard for. Absent
+     * on every lane change that was not one.
+     */
+    pending: Array<{ t: number; dir: TurnDirection; indicatorOk: boolean; mirrorOk: boolean; forced?: true }>;
     lastBasisChangeAt: number | null;
   };
   /** Previous frame's speed — lets detectors read braking response (A12). */
@@ -524,6 +533,19 @@ export interface RuleEngineState {
    */
   cutInActUntil: Record<string, number>;
   /**
+   * THE VEHICLES HE IS IN FRONT OF WHOSE ANSWER IS NOT YET KNOWN (the
+   * `laneEntryAnswer` event's `watching` phase, keyed like `cutInActUntil`).
+   * While any is open, a lane change that would be commended is HELD rather
+   * than praised — the praise says «навреме», and whether it was in time is
+   * exactly what the vehicle behind has not yet answered. Closed by `clear`
+   * (it did not have to slow for him), `lift` (it gave way, not hard) or
+   * `braked` (hard) — round 3: only once the return is finished. Empty for ever on a lesson whose
+   * cast publishes no such event, i.e. on every lesson but the one that stages
+   * a vehicle to overtake. Copied whole by cloneState; entries are assigned
+   * and deleted, never mutated.
+   */
+  laneEntryWatch: Record<string, true>;
+  /**
    * Path length driven since the session began, metres — a monotone odometer
    * clamped per frame, never reset. Each episode remembers its own reading, so
    * "travel since THAT contact" is a subtraction and one body's report cannot
@@ -655,6 +677,22 @@ export interface RuleEngineState {
      */
     qualifiedSec: number;
     lastQualAt: number | null;
+    /**
+     * THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK (`sc-follow-tailgater:
+     * 63c0c28c` C1/C2a) — see the detector. `flooredSince` / `flooredAt`: the
+     * window start and the latest frame of a causeless, emergency-grade episode
+     * that the `harshBrakeMinSpeedKmh` floor ALONE acquitted (null: none open);
+     * `flooredBilled`: that episode has been billed on a follower's account.
+     * `followerForcedAt` / `followerAnswerSec`: the latest close follower's
+     * report that it had to brake hard (`followerBraked`), and how long it is
+     * still answering a brake — its own hard stop from the speed it had.
+     * Flat primitives on purpose: this block is shallow-copied per tick.
+     */
+    flooredSince: number | null;
+    flooredAt: number | null;
+    flooredBilled: boolean;
+    followerForcedAt: number | null;
+    followerAnswerSec: number;
   };
   /** First-move-off observation check (PK-05; config-gated). */
   moveOff: { restSeen: boolean; done: boolean };
@@ -2226,8 +2264,11 @@ const POSE_PLACEHOLDER_KMH = 0.5;
  * that bills; the per-frame `harshDecel` reading keeps its shipped comparison,
  * because there it only chooses whether a frame is credited and the mean has
  * the last word either way.
+ *
+ * (The constant itself now lives in `harshBrakeEpisode.ts`, imported above, so
+ * the one harsh-brake line is shared with the question asked of ANOTHER
+ * vehicle — sc-ac-wind-truck-pass:ff1d4290 round 3.)
  */
-const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
 
 /**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
@@ -2438,6 +2479,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     contactEpisodes: {},
     cutInContactUntil: null,
     cutInActUntil: {},
+    laneEntryWatch: {},
     contactOdometerM: 0,
     contactReverseOdometerM: 0,
     actBills: {},
@@ -2460,6 +2502,11 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
       causeSeen: false,
       qualifiedSec: 0,
       lastQualAt: null,
+      flooredSince: null,
+      flooredAt: null,
+      flooredBilled: false,
+      followerForcedAt: null,
+      followerAnswerSec: 0,
     },
     moveOff: { restSeen: false, done: false },
     lastHazardEventAt: null,
@@ -2543,6 +2590,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     actBills: { ...s.actBills },
     // Same argument again: a follower's act window is assigned whole.
     cutInActUntil: { ...s.cutInActUntil },
+    laneEntryWatch: { ...s.laneEntryWatch },
     laneChange: { pending: s.laneChange.pending.map((p) => ({ ...p })), lastBasisChangeAt: s.laneChange.lastBasisChangeAt },
     stall: { ...s.stall },
     stopOvershoot: { ...s.stopOvershoot },
@@ -4256,8 +4304,10 @@ export const LEAD_REACTION_SEC = 1.0;
  * and at which a released pedal re-arms it. The cause ledger now asks the same
  * question of the LEAD («is it braking?») and of the GAP («does it make you
  * brake?»), so it is named once and read everywhere the ledger asks it.
+ * (Defined in `harshBrakeEpisode.ts` since round 3 of
+ * sc-ac-wind-truck-pass:ff1d4290 and imported above — the same line opens a
+ * harsh-brake episode on another vehicle's account.)
  */
-const BRAKING_LINE_MPS2 = 2;
 
 /**
  * THE DEMAND LINE, m/s² — the braking a closing must DEMAND before it is a reason
@@ -5092,7 +5142,31 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       }
       if (!p.indicatorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_INDICATOR", p.t));
       if (!p.mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", p.t));
-      if (p.indicatorOk && p.mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", p.t));
+      if (p.indicatorOk && p.mirrorOk) {
+        // THE PRAISE WAITS FOR THE VEHICLE BEHIND, AND IS NOT GIVEN FOR A
+        // CUT-IN (sc-ac-wind-truck-pass:ff1d4290 round 2). «Правилна смяна на
+        // лента … в правилния ред и навреме. Отлично.» was pushed here on the
+        // order of the mirror and the lamp alone; the round-1 verifier's tape
+        // (F-01) has it printed over a return made three metres ahead of a
+        // truck that then braked from 40 to 19.5 км/ч. Two rules, both read off
+        // state another case of this reducer owns:
+        //  · `forced` — the lane change is the entry of a billed cut-in
+        //    (`billForcedLaneEntry`): no praise, ever;
+        //  · a `laneEntryAnswer` watch is open — the vehicle he is in front of
+        //    has not answered yet: the praise is HELD (the order was right, so
+        //    there is no violation to push and nothing else to do) and is
+        //    pushed, with the lane change's own time, on the first frame no
+        //    watch is open — or never, if the answer is a hard brake or a
+        //    lift (round 3: the vehicle had to give way, so «навреме» is false).
+        // A lesson with no such vehicle never opens a watch and never bills a
+        // cut-in, so this branch is its old one line.
+        if (p.forced === true) continue;
+        if (laneEntryWatchOpen(s)) {
+          still.push(p);
+          continue;
+        }
+        events.push(makeCommendation("SAFE_LANE_CHANGE", p.t));
+      }
     }
     s.laneChange.pending = still;
   }
@@ -5130,7 +5204,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       if (!mirrorOk) events.push(makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", t));
       if (indicatorOk && mirrorOk) events.push(makeCommendation("SAFE_LANE_CHANGE", t));
     } else if (gradableWithEdge) {
-      s.laneChange.pending.push({ t, dir, indicatorOk, mirrorOk });
+      // A lane change made while a billed cut-in is still being answered IS
+      // that cut-in's entry (the bill lands when his body's first corner
+      // crosses the line, or when the vehicle behind has braked; the lane id
+      // flips when his centre does) — see `pending.forced`.
+      if (cutInActOpen(s, t)) s.laneChange.pending.push({ t, dir, indicatorOk, mirrorOk, forced: true });
+      else s.laneChange.pending.push({ t, dir, indicatorOk, mirrorOk });
     }
     // else: renumbering at/near a segment joint — locator artifact, no grade.
 
@@ -8058,6 +8137,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       // anchor frame rather than the one before it: one frame (~0.1 км/ч) at
       // render rates, and at the coarse replay rates the LOWER of the two
       // readings, which is the acquitting one.
+      if (openWindow === null) {
+        // A NEW pedal application: the last one's floored record is spent
+        // (its follower window is its own — see „THE FLOOR LIFTS" below). A
+        // re-anchor inside the same application keeps it.
+        s.harshBrake.flooredSince = null;
+        s.harshBrake.flooredAt = null;
+        s.harshBrake.flooredBilled = false;
+      }
       s.harshBrake.activeSince = t;
       s.harshBrake.onsetKmh = speed;
       s.harshBrake.qualifiedSec = 0;
@@ -8097,14 +8184,17 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
           : Math.max(0, Math.min(t - s.harshBrake.lastQualAt, Math.min(dt, 2)));
       s.harshBrake.lastQualAt = t;
     }
-    if (
-      !s.harshBrake.emitted &&
-      s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh &&
-      s.harshBrake.qualifiedSec >= cfg.harshBrakeSustainSec &&
-      meanIsEmergencyGrade
-    ) {
-      s.harshBrake.emitted = true;
-      events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
+    if (!s.harshBrake.emitted && s.harshBrake.qualifiedSec >= cfg.harshBrakeSustainSec && meanIsEmergencyGrade) {
+      if (s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh) {
+        s.harshBrake.emitted = true;
+        events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
+      } else {
+        // Causeless and emergency-grade by every gate — the floor ALONE
+        // acquits it. Recorded for „THE FLOOR LIFTS" below; nothing is billed
+        // here, and without a close follower's report nothing ever is.
+        if (s.harshBrake.flooredSince === null) s.harshBrake.flooredSince = s.harshBrake.activeSince;
+        s.harshBrake.flooredAt = t;
+      }
     }
   } else if (accelMps2 > -BRAKING_LINE_MPS2) {
     // Pedal released (or a cause appeared and braking eased) — re-arm.
@@ -8118,6 +8208,73 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.harshBrake.activeSince = null;
     s.harshBrake.qualifiedSec = 0;
     s.harshBrake.lastQualAt = null;
+    // …on either basis: the cause exempts the whole application (C3), so a
+    // floored record of it is no longer a causeless brake.
+    s.harshBrake.flooredSince = null;
+    s.harshBrake.flooredAt = null;
+  }
+
+  // THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK (2026-10-09 ·
+  // `sc-follow-tailgater:63c0c28c` C1/C2a, critical).
+  //
+  // WHAT WAS MEASURED. `harshBrakeMinSpeedKmh` (35) says a causeless stab from
+  // lower is „clumsy, not dangerous". The rig-w2 judge photographed the case
+  // where it is false: a full-pedal brake check at the лепка of
+  // `sc-follow-tailgater` (−9.3 … −9.6 m/s², the car 8.5–8.9 m behind) from
+  // 32.3–34.9 км/ч escaped entirely — no card, «ИЗДЪРЖАН» ★★★, «Чисто и
+  // спокойно каране» — while the same pedal from 38.4 км/ч failed the lesson.
+  // The lesson's own task 1 asks for under 36, so the student who OBEYS it is
+  // the one the floor hides. Re-measured at c38086a through the live rung
+  // chain (`follow-tailgater-brake-check-under-floor.test.ts`): from 32.3 and
+  // 34.9 км/ч the glued лепка itself braked at a mean 9.7–10.0 m/s² over 0.4 s,
+  // and on 23 of 40 drives — every one where it was still glued behind him —
+  // nothing was billed.
+  //
+  // THE RULE, ON THE FOUNDER'S PRINCIPLE AND NOT A NEW SPEED. He ruled twice
+  // (2026-09-30, 2026-10-05) that a conviction about another car rests on what
+  // that car ACTUALLY had to do. So the floor is not moved; it is lifted for
+  // ONE brake: a causeless episode that is emergency-grade by every gate above
+  // (the cause ledger, the mean and the accrual — untouched) and that the floor
+  // ALONE acquitted is billed when a close follower reports, on its own
+  // account, that it had to brake HARD (`followerBraked`, re-checked here by
+  // `isHarshBrakeWindow` against this config — the same line the student's own
+  // brake is judged at, 7 m/s² held 0.4 s). Only the staged runner of a car
+  // glued behind him in his lane publishes it (`RearTailgaterRunner`), so every
+  // lesson without one keeps the 35 км/ч floor exactly.
+  //
+  // THE WINDOW — DERIVED, NOT TUNED. The follower's report must fall on or
+  // after this episode's window start (it is answering HIS brake, not braking
+  // on its own before it), and no later than its own hard stop after his last
+  // emergency-grade frame: `speedMps / harshBrakeDecelMps2`, the speed it had
+  // shed at the harsh line — the window the forced-braking bill already uses
+  // for a vehicle answering him (`laneEntryAnswer`). For the лепка at 9.0–9.7
+  // m/s that is 1.29–1.39 s. One bill per pedal application (`flooredBilled`);
+  // `emitted` is set while the pedal is still down, so the praise gates read
+  // the episode as billed exactly as for a bill from over the floor.
+  //
+  // NO SEPARATE „is it still inside the window NOW" TEST (round 2: a mutant
+  // showed it could not fail, so it was removed rather than pinned). Every
+  // field this condition reads changes only on a frame where it is set to that
+  // frame: a report sets `followerForcedAt = t` (handleTickEvent runs before
+  // this block in the same reduceTick), a floored frame sets `flooredAt = t`,
+  // and every other write nulls `flooredSince` (the new pedal, the cause). So
+  // the condition can only turn true on a frame where `t` IS the report time
+  // (bounded by the window conjunct) or IS `flooredAt` (inside its own window,
+  // `followerAnswerSec` ≥ 0) — and it bills on that frame.
+  {
+    const hb = s.harshBrake;
+    if (
+      hb.flooredSince !== null &&
+      hb.flooredAt !== null &&
+      !hb.flooredBilled &&
+      hb.followerForcedAt !== null &&
+      hb.followerForcedAt >= hb.flooredSince &&
+      hb.followerForcedAt <= hb.flooredAt + hb.followerAnswerSec
+    ) {
+      hb.flooredBilled = true;
+      if (hb.activeSince !== null) hb.emitted = true;
+      events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
+    }
   }
 
   // -- 5. pedestrian-crossing zone: track approach speed while a pedestrian is
@@ -8794,6 +8951,14 @@ function handleTickEvent(
     }
 
     case "collision": {
+      // A VEHICLE CONTACT WHILE A `laneEntryAnswer` WATCH IS OPEN ends that
+      // entry in the worst way there is, so the lane change that put him there
+      // is not praised, whatever the watch later says (`pending.forced`;
+      // sc-ac-wind-truck-pass:ff1d4290 round 2). Before the episode logic, on
+      // every report: this is about the praise, not about the bill.
+      if (e.withWhat === "vehicle" && s.laneChange.pending.length > 0 && laneEntryWatchOpen(s)) {
+        s.laneChange.pending = s.laneChange.pending.map((p) => (p.forced === true ? p : { ...p, forced: true as const }));
+      }
       // ONE ENCOUNTER, ONE ACCIDENT — and the definition is the whole rule:
       //
       //   an encounter OPENS on the first reported contact and stays open for
@@ -9157,13 +9322,6 @@ function handleTickEvent(
       const f = e.follower;
       if (f === null) break;
       if (f.forcedDecelMps2 <= cfg.harshBrakeDecelMps2 * (1 + HARSH_BRAKE_TIE_TOLERANCE)) break;
-      const answeringSec = f.reactionSec + f.speedMps / cfg.harshBrakeDecelMps2;
-      const actKey = String(f.vehicleId);
-      const openUntil = s.cutInActUntil[actKey];
-      if (openUntil === undefined || t > openUntil) {
-        out.push(makeViolation("LANE_ENTRY_FORCED_BRAKING", t));
-        s.cutInActUntil[actKey] = t + answeringSec;
-      }
       // A contact inside the follower's react-and-stop time — its reaction plus
       // shedding its own speed at the hard line — is this cut-in's tail, and
       // the forward-collision card («…колкото ти е трябвал, за да спреш») would
@@ -9172,8 +9330,144 @@ function handleTickEvent(
       // be the tail of. Nothing about the CHARGE moves: COLLISION still bills,
       // terminates and prices exactly as it did; only which true sentence the
       // student reads.
-      s.cutInContactUntil = Math.max(s.cutInContactUntil ?? -Infinity, t + answeringSec);
+      billForcedLaneEntry(s, t, out, f.vehicleId, f.reactionSec + f.speedMps / cfg.harshBrakeDecelMps2, undefined);
+      break;
+    }
+
+    case "followerBraked": {
+      // THE CLOSE FOLLOWER'S OWN ACCOUNT (`sc-follow-tailgater:63c0c28c`): it
+      // had to brake hard. Only recorded here — the bill, if any, is the harsh-
+      // brake detector's („THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK"), and
+      // only for a causeless emergency-grade episode of HIS that the floor alone
+      // acquitted. „Hard" is re-checked against this config by the one
+      // predicate (`isHarshBrakeWindow`), exactly as `laneEntryAnswer` does.
+      if (!isHarshBrakeWindow({ heldSec: e.heldSec, meanDecelMps2: e.decelMps2, qualifiedSec: e.qualifiedSec }, cfg)) break;
+      s.harshBrake.followerForcedAt = t;
+      s.harshBrake.followerAnswerSec = e.speedMps / cfg.harshBrakeDecelMps2;
+      break;
+    }
+
+    case "laneEntryAnswer": {
+      // THE SECOND BASIS OF THE SAME BILL — what the vehicle he came in front of
+      // ACTUALLY DID, on its own traffic model's account (`types.ts`, the
+      // `laneEntryAnswer` event; sc-ac-wind-truck-pass:ff1d4290 round 2, the
+      // integrator's decision of 2026-10-08 on the founder's rulings of
+      // 2026-09-30 and 2026-10-05). The runner measures and publishes; this is
+      // only the judgement, and it is the `laneEntered` case's judgement word
+      // for word:
+      //   · armed per lesson, by the same switch;
+      //   · „brake hard" is `harshBrakeDecelMps2`, EXCLUSIVE, the tie acquits,
+      //     same tolerance — read here against the deceleration the vehicle's
+      //     account actually grew at, where `laneEntered` reads the one the
+      //     entry demands;
+      //   · one cut-in, one act, per vehicle — the SAME window record, keyed by
+      //     the same published id, so an entry that is billed on what it
+      //     demanded is not billed again for what the vehicle then did.
+      // The vehicle has already reacted (it is braking), so what it is still
+      // answering for is its own hard stop from the speed it had: no reaction
+      // term in the window.
+      //
+      // ROUND 3 (the integrator's decision D2): „hard" is the WHOLE harsh-brake
+      // rule — the window the runner found, re-checked here against this
+      // engine's own config by the one predicate (`harshBrakeEpisode.ts
+      // isHarshBrakeWindow`: over `harshBrakeDecelMps2` for
+      // `harshBrakeSustainSec`, mean exclusive). A vehicle that only LIFTED for
+      // him (`lift`, or a `braked` this config does not find hard) is NOT
+      // billed as forced braking; the lane change is not praised either
+      // («…навреме» is not true of a return the vehicle had to give way to);
+      // and the product's own line for exactly this act is billed:
+      // OVERTAKE_RETURN_TOO_EARLY (doc 72 OV-09, основна) — «Прибра се … пред
+      // автомобила, който изпревари, и го принуди да намали», whose Наредба
+      // № 38 rationale is this very case («Пострадалият е принуден да намали —
+      // реакция, но не установена предпоставка за ПТП»). Its runtime tracker
+      // cannot see a one-way carriageway (it watches an excursion onto the
+      // opposing bank); this is its second basis, measured the same way the
+      // forced-braking one is — the vehicle's own account, at the brake-lamp
+      // line 0.3 m/s, inside its guard's reach (10.23 m at 40 км/ч = 0.92 s,
+      // under the tracker's own 1.0 s conviction line). Armed by the same
+      // per-lesson switch; detail the tracker's own, "overtake-return".
+      const key = String(e.vehicleId);
+      if (e.phase === "watching") {
+        s.laneEntryWatch[key] = true;
+        break;
+      }
+      delete s.laneEntryWatch[key];
+      if (e.phase === "clear") break;
+      const hard =
+        e.phase === "braked" &&
+        cfg.laneEntryForcedBrakingEnabled &&
+        isHarshBrakeWindow({ heldSec: e.heldSec, meanDecelMps2: e.decelMps2, qualifiedSec: e.qualifiedSec }, cfg);
+      if (!hard) {
+        withholdLaneChangePraise(s);
+        if (cfg.laneEntryForcedBrakingEnabled) {
+          out.push(makeViolation("OVERTAKE_RETURN_TOO_EARLY", t, { detail: "overtake-return" }));
+        }
+        break;
+      }
+      billForcedLaneEntry(s, t, out, e.vehicleId, e.speedMps / cfg.harshBrakeDecelMps2, e.act);
       break;
     }
   }
+}
+
+/** The lane change(s) still waiting out their grace are not to be praised —
+ *  see `pending.forced`. Shared by a billed cut-in and by a return the
+ *  vehicle had to give way to (`laneEntryAnswer` `lift`). */
+function withholdLaneChangePraise(s: RuleEngineState): void {
+  if (s.laneChange.pending.length > 0) {
+    s.laneChange.pending = s.laneChange.pending.map((p) => (p.forced === true ? p : { ...p, forced: true as const }));
+  }
+}
+
+/** Is any vehicle he is in front of still to answer — see `laneEntryWatch`. */
+function laneEntryWatchOpen(s: RuleEngineState): boolean {
+  for (const k in s.laneEntryWatch) {
+    if (s.laneEntryWatch[k] === true) return true;
+  }
+  return false;
+}
+
+/** Is a billed cut-in still being answered at `t` — see `cutInActUntil`. */
+function cutInActOpen(s: RuleEngineState, t: number): boolean {
+  for (const k in s.cutInActUntil) {
+    if (t <= s.cutInActUntil[k]!) return true;
+  }
+  return false;
+}
+
+/**
+ * BILL A FORCED LANE ENTRY — the one place LANE_ENTRY_FORCED_BRAKING is pushed,
+ * shared by its two bases (`laneEntered`: what the entry demanded;
+ * `laneEntryAnswer`: what the vehicle did). The caller has already judged it
+ * HARD. ONE CUT-IN, ONE ACT: per vehicle, a second forced entry inside the time
+ * that vehicle is still answering the first is the same act and is not billed
+ * again; the contact window is extended either way (a contact can be the tail
+ * of any of them).
+ *
+ * …AND THE LANE CHANGE THAT WAS THE ENTRY IS NOT PRAISED. Every lane change
+ * still waiting out its grace is marked `forced` here — the bill and the lane
+ * id's flip are a fraction of a second apart, in either order, and
+ * `pending` holds a lane change for `laneChangeJointGraceSec` (and for as
+ * long as a `laneEntryAnswer` watch is open); one made after this frame while
+ * the act is still open is marked where it is created.
+ *
+ * `act` is the catalogue's per-act copy key (`LANE_ENTRY_ACT_COPY`):
+ * undefined for the lane-drop cut-in, whose pooled row is written for it.
+ */
+function billForcedLaneEntry(
+  s: RuleEngineState,
+  t: number,
+  out: RuleEvent[],
+  vehicleId: number,
+  answeringSec: number,
+  act: string | undefined,
+): void {
+  const actKey = String(vehicleId);
+  const openUntil = s.cutInActUntil[actKey];
+  if (openUntil === undefined || t > openUntil) {
+    out.push(makeViolation("LANE_ENTRY_FORCED_BRAKING", t, act === undefined ? undefined : { detail: act }));
+    s.cutInActUntil[actKey] = t + answeringSec;
+  }
+  s.cutInContactUntil = Math.max(s.cutInContactUntil ?? -Infinity, t + answeringSec);
+  withholdLaneChangePraise(s);
 }

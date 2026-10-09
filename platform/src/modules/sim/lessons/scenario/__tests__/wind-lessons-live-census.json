@@ -1,0 +1,1306 @@
+{
+ "note": "Live-rung-chain census of every committed demo of the two crosswind lessons at every rung. base = the tree at 43b4109 (before the restage of sc-ac-wind-truck-pass, staged reports not folded: none existed); tree = after. Re-record tree with RECORD_WIND_CENSUS=1 (wind-truck-pass-restage.test.ts). base is frozen.",
+ "base": {
+  "sc-ac-crosswind": {
+   "shadow-correct.trace.json@L1": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L2": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L3": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L4": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L1": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED",
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L2": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L3": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L4": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "CENTER_LINE_TOUCHED"
+    ],
+    "commendations": [],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L1": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING",
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L2": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L3": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L4": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "POOR_LANE_KEEPING"
+    ],
+    "commendations": [],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   }
+  },
+  "sc-ac-wind-truck-pass": {
+   "shadow-correct.trace.json@L1": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     37.5,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L2": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     35.8,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L3": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     35.1,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L4": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     36.7,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L5": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     35.7,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L1": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": [
+     35.7,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L2": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": [
+     34,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L3": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": [
+     33.2,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L4": {
+    "phase": "driving",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "POOR_LANE_KEEPING"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     34.9,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L5": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": [
+     33.9,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L1": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     35.7,
+     92.8
+    ]
+   },
+   "mistake-clip-truck.trace.json@L2": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     34,
+     92.3
+    ]
+   },
+   "mistake-clip-truck.trace.json@L3": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     33.2,
+     92
+    ]
+   },
+   "mistake-clip-truck.trace.json@L4": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     34.9,
+     92.5
+    ]
+   },
+   "mistake-clip-truck.trace.json@L5": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     33.9,
+     92.2
+    ]
+   }
+  }
+ },
+ "tree": {
+  "sc-ac-crosswind": {
+   "shadow-correct.trace.json@L1": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L2": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L3": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "shadow-correct.trace.json@L4": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acx-open:1",
+     "sc-acx-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L1": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED",
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L2": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L3": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "CENTER_LINE_TOUCHED"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-full-speed.trace.json@L4": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "CENTER_LINE_TOUCHED"
+    ],
+    "commendations": [],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L1": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING",
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L2": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L3": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "TASK_SPEED_CAP_EXCEEDED"
+    ],
+    "commendations": [],
+    "teach": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "TASK_SPEED_CAP_EXCEEDED",
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [],
+    "truckAheadM": null
+   },
+   "mistake-overcorrect.trace.json@L4": {
+    "phase": "completed",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acx-open:0",
+     "sc-acx-finish:0"
+    ],
+    "violations": [
+     "POOR_LANE_KEEPING"
+    ],
+    "commendations": [],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": null
+   }
+  },
+  "sc-ac-wind-truck-pass": {
+   "shadow-correct.trace.json@L1": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@19.03",
+     "sc-acw-truck:overtaken@26.83"
+    ],
+    "truckAheadM": [
+     -276.1,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L2": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@19.03",
+     "sc-acw-truck:overtaken@26.83"
+    ],
+    "truckAheadM": [
+     -276.1,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L3": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@19.03",
+     "sc-acw-truck:overtaken@26.83"
+    ],
+    "truckAheadM": [
+     -276.1,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L4": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@19.03",
+     "sc-acw-truck:overtaken@26.83"
+    ],
+    "truckAheadM": [
+     -276.1,
+     80
+    ]
+   },
+   "shadow-correct.trace.json@L5": {
+    "phase": "completed",
+    "passed": true,
+    "score": 0,
+    "completedAll": true,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:1",
+     "sc-acw-finish:1"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@19.03",
+     "sc-acw-truck:overtaken@26.83"
+    ],
+    "truckAheadM": [
+     -276.1,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L1": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@14.87"
+    ],
+    "truckAheadM": [
+     -118.3,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L2": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@14.87"
+    ],
+    "truckAheadM": [
+     -118.3,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L3": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@14.87"
+    ],
+    "truckAheadM": [
+     -118.3,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L4": {
+    "phase": "driving",
+    "passed": false,
+    "score": 1,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "POOR_LANE_KEEPING"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@14.87"
+    ],
+    "truckAheadM": [
+     -118.3,
+     80
+    ]
+   },
+   "mistake-blown-out.trace.json@L5": {
+    "phase": "driving",
+    "passed": false,
+    "score": 0,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:1",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [],
+    "commendations": [
+     "SAFE_LANE_CHANGE",
+     "CLEAN_DRIVING"
+    ],
+    "teach": [
+     "POOR_LANE_KEEPING"
+    ],
+    "coached": [
+     "POOR_LANE_KEEPING"
+    ],
+    "outcomes": [
+     "sc-acw-truck:drewLevel@14.87"
+    ],
+    "truckAheadM": [
+     -118.3,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L1": {
+    "phase": "driving",
+    "passed": false,
+    "score": 10,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:0",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "COLLISION"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE"
+    ],
+    "teach": [
+     "COLLISION"
+    ],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     -24.9,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L2": {
+    "phase": "driving",
+    "passed": false,
+    "score": 10,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:0",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "COLLISION"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     -24.9,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L3": {
+    "phase": "driving",
+    "passed": false,
+    "score": 10,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:0",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "COLLISION"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     -24.9,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L4": {
+    "phase": "completed",
+    "passed": false,
+    "score": 10,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:0",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "COLLISION"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     0.1,
+     80
+    ]
+   },
+   "mistake-clip-truck.trace.json@L5": {
+    "phase": "driving",
+    "passed": false,
+    "score": 10,
+    "completedAll": false,
+    "objectives": [
+     "sc-acw-pass:0",
+     "sc-acw-back:0",
+     "sc-acw-finish:0"
+    ],
+    "violations": [
+     "COLLISION"
+    ],
+    "commendations": [
+     "SAFE_LANE_CHANGE"
+    ],
+    "teach": [],
+    "coached": [],
+    "outcomes": [],
+    "truckAheadM": [
+     -24.9,
+     80
+    ]
+   }
+  }
+ }
+}

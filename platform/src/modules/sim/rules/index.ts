@@ -99,6 +99,7 @@ export {
   /** May an amendment still name this row? — none yet, or a provisional act. */
   actIsOpen,
   PER_ACT_COPY,
+  LANE_ENTRY_ACT_COPY,
   PROVISIONAL_ACTS,
   SOLID_CROSS_ACT_ASTRIDE,
   SOLID_CROSS_ACT_ASTRIDE_OWN_WAY,
@@ -116,6 +117,22 @@ export {
  * not by authoring order. See gravest.ts for why a reorder is not the fix.
  */
 export { gravestViolation, severityRank, type GravestViolation } from "./gravest";
+/**
+ * WHEN A VEHICLE'S BRAKING IS „HARSH" — the engine's own two gates as a pure
+ * step (sc-ac-wind-truck-pass:ff1d4290 round 3): read by the staged runner of a
+ * vehicle the student overtakes, to tell a truck that braked hard for his
+ * return from one that only lifted, and by the engine to re-check it.
+ */
+export {
+  BRAKING_LINE_MPS2,
+  HARSH_BRAKE_TIE_TOLERANCE,
+  isHarshBrakeWindow,
+  newHarshBrakeTrack,
+  stepHarshBrakeTrack,
+  type HarshBrakeLine,
+  type HarshBrakeTrack,
+  type HarshBrakeVerdict,
+} from "./harshBrakeEpisode";
 
 /**
  * The one splitter for the `lawRef` strings this subpackage authors. Imported

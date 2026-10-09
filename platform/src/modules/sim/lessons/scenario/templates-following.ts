@@ -1692,8 +1692,36 @@ const FTG_LEAD: BrakingLeadCarSpec = {
     extraRightOffsetM: 0, // the player's OWN lane (northbound right, x ≈ 12.19)
     colorIndex: 2,
   },
-  followGapM: 150, // ABOVE the real ~95 m gap → target always over the cap…
-  maxMatchSpeedMps: 11.5, // …so the lead cruises at a constant 11.5 m/s (~41 km/h)
+  followGapM: 150, // ABOVE the real ~95 m gap → target over the cap while he keeps pace…
+  maxMatchSpeedMps: 11.5, // …so the lead cruises at a constant 11.5 m/s (~41 km/h)…
+  // …AND THE CONSTANCY IS NOW TRUE AT EVERY PACE HE IS TAUGHT TO TAKE
+  // (2026-10-09 · sc-follow-tailgater:63c0c28c round 2). The band's target is
+  // `his speed + 0.55 × (150 − gap)` (traffic/staged.ts MATCH_GAIN), so it sits
+  // above the 11.5 cap only while gap < 150 − (11.5 − his speed) / 0.55: for a
+  // student at 20–28 км/ч (the task asks for under 36) that is 132–142 m, and
+  // easing off opens the gap at 3.7–5.9 m/s from ~95 m — so within ~10 s the lead
+  // was MIRRORING him, and a brake check of his made it slow 9.0 → 1.9 m/s
+  // ~145–150 m ahead. The rule engine's far-lead ledger read that as a forward
+  // cause (`leadMemory.farBrakingAt` → `harshBrake.causeSeen`) and the brake
+  // check acquitted itself with a cause it had created (verifier sweep at
+  // c38086a + round 1: 54 of 204 glued brake checks from 20–28 км/ч escaped this
+  // way, L1–L5). The floor is the product's own mechanism for „a vehicle with its
+  // own pace that does not stop because you stopped" (`minMatchSpeedMps`,
+  // sc-ov-crest-curve:b26aaa0b), and its value is not chosen: it is this lead's
+  // OWN authored ceiling, so floor = ceiling = the constant cruise this doc,
+  // instruction 4 and the sc-ftg-ease title-truth note already state. Applied
+  // before the player guard (which still clamps it) and never to a finished
+  // actor, so it changes nothing on any frame where the band already sat on
+  // the cap — only the frames where the lead used to copy him. NOT a lower
+  // floor: measured with 9 m/s, the lead still slowed 11.5 → 9 when he braked
+  // and 39 of the 50 round-2 cells were still acquitted by it, so any room
+  // under the cruise is room for the cause he makes. And not `scheduledCruise`,
+  // whose speed would be a second number: `maxMatchSpeedMps` stays the one
+  // value the drill's pace gate is checked against (following-claim-gates.test.ts
+  // «the pace cap sits below the front lead's constant cruise»). The floor-at-
+  // the-cap caution in lanes2-sweep161.test.ts is about leads that must PACE a
+  // student; this one's whole job is not to.
+  minMatchSpeedMps: 11.5,
   slamAt: { x: 12.19, y: 520 }, // far past the 400 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
@@ -1709,10 +1737,13 @@ const FTG_LEAD: BrakingLeadCarSpec = {
  * BEHIND the player in their OWN lane, the „лепка" pose (the emergencyApproach
  * rear-sync precedent without the offset path; playerGuard off — see the
  * RearTailgaterSpec doc, safety is the proportional law + a 12 m/s² decel cap
- * that out-brakes any player slam). PRESSURE SCENERY: the runner emits ZERO
- * events (learn-only policy, doc 72 FO-07) — the graded surfaces are the
+ * that out-brakes any player slam). PRESSURE SCENERY: the runner grades
+ * nothing itself (learn-only policy, doc 72 FO-07) — the graded surfaces are the
  * player's own choices: the brake-check grades the SHIPPED
- * HARSH_BRAKING_NO_CAUSE (a rear car is not a forward cause), guilty speeding
+ * HARSH_BRAKING_NO_CAUSE (a rear car is not a forward cause; from under the
+ * engine's 35 км/ч floor — the lesson's own task asks for under 36 — it grades
+ * when this car reports it had to brake hard for him, `followerBraked`,
+ * sc-follow-tailgater:63c0c28c), guilty speeding
  * grades SPEEDING_OVER_LIMIT, and the taught ease-off shows up as the growing
  * front gap. After ~12 s of pressure it laneShift-passes on the left.
  */

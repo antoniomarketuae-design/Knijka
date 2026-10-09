@@ -34,9 +34,9 @@ sc-ac-truck-spray/shadow-correct	4a5570d5e490 af90b5e8b1cf 92a5164fe885 dab6b885
 sc-ac-wet-braking/mistake-dry-point	e26fb342f6fa 94b21cca4478 97abce9e7135 a0c5c52b7b2c
 sc-ac-wet-braking/mistake-dry-speed	e26fb342f6fa b671db76d2d5 9792564405ca 4bcc5954d199
 sc-ac-wet-braking/shadow-correct	4a5570d5e490 51014d383d0c 7c1df36bf49a 5b54a13544ff 4b7462d3bb95
-sc-ac-wind-truck-pass/mistake-blown-out	d51f2d1fb857 6201f1158a4d 325c73620dce 6ce582fcdd78 3069444e3106
-sc-ac-wind-truck-pass/mistake-clip-truck	0e62475a21f8 826d7e3ba0da 5e12522ac217 3c3e4004a9e3
-sc-ac-wind-truck-pass/shadow-correct	61c26283571c 8e190544a622 1da640cae2c7 b1dca2b5b671 d1434d8d1e99 437dda981125
+sc-ac-wind-truck-pass/mistake-blown-out	d51f2d1fb857 6201f1158a4d 24474d177b40 e2f470e0809e 8e894e486a81
+sc-ac-wind-truck-pass/mistake-clip-truck	a191e965b503 097ac476e9c9 8c4dde08b3cf 3c3e4004a9e3
+sc-ac-wind-truck-pass/shadow-correct	d75cca111e6b 8e190544a622 1da640cae2c7 f59ac4926caf 4463a7e23373 268f9a4312e4 2f5dc69158ae
 sc-accident-own-conduct/mistake-clip-continue	1e458e3c9303 58ee56b2a42a ee9025b985bf b2e5f4c74dec
 sc-accident-own-conduct/mistake-hit-and-flee	3445ff91f351 c4d7cb0901ad 34509a55ffab fda408f89fb7 3c889b5513b7
 sc-accident-own-conduct/shadow-correct	2753822eb992 b01ea56fd433 6a611eda29b9

@@ -243,6 +243,7 @@ import {
   wireTrafficQueries,
   type LessonWorldCore,
 } from "@/modules/sim/scene/lessonWorldRecipe";
+import { createLessonWindShelter } from "@/modules/sim/scene/lessonWindShelter";
 import { RouteGuidance } from "./RouteGuidance";
 import {
   ScenarioObstacles,
@@ -2707,6 +2708,17 @@ export function ReadyScene({
   // drift out of phase exactly where the lesson asks the student to read the
   // gust. Identity-stable so the environment never remounts its mote field.
   const readWindLateralN = useCallback(() => simRef.current?.windLateralNow ?? 0, []);
+  // THE LEE — sc-ac-wind-truck-pass:ff1d4290. On a lesson that authors
+  // `physics.crosswind` AND stages an actor with `windShelter: true`, the
+  // wind's one force is multiplied by where the car is beside that actor
+  // (`vehicle/windShelter.ts`); `VehicleRig` asks this once per fixed physics
+  // step. `null` everywhere else, and then nothing is ever set on the sim —
+  // the same mapping the live-wind harness and the trace recorder's held
+  // wheel call (`scene/lessonWindShelter.ts`), so a test's lee is this lee.
+  const windShelterAt = useMemo(
+    () => createLessonWindShelter(lesson, (actorId) => traffic.staged(actorId)),
+    [lesson, traffic],
+  );
 
   const handleCollision = useCallback(
     (impactKmh: number, withWhat: CollisionWithWhat) => {
@@ -2904,6 +2916,10 @@ export function ReadyScene({
                 windLateralN={rigPhysics.windLateralN}
                 windGustAmplitudeN={rigPhysics.windGustAmplitudeN}
                 windGustPeriodSec={rigPhysics.windGustPeriodSec}
+                // THE LEE (sc-ac-wind-truck-pass:ff1d4290): `null` on every
+                // lesson that stages no sheltering vehicle — see
+                // `windShelterAt` above.
+                windShelterAt={windShelterAt}
                 // N11 (VP-06): director→cluster warning-lamp channels (red +
                 // amber — the triage needs both to be visible).
                 telltaleLitRef={telltaleLitRef}

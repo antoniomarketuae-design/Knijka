@@ -3,9 +3,9 @@
  "command": "RECORD_REVIEWED_TEXT_MANIFEST=1 npx vitest run --maxWorkers=1 src/modules/sim/lessons/scenario/__tests__/reviewed-text-manifest.test.ts",
  "surfaces": {
   "catalog": {
-   "fingerprint": "bee51e9971ce4b7050b77f4baa1269d431193ecc678831844ca0fb320a77c1f7",
-   "units": 14,
-   "strings": 590
+   "fingerprint": "faf85a5f83ca950afc62932985216abfbf95ee9e745e5abbdc3f6e3b3b1b8c6d",
+   "units": 15,
+   "strings": 598
   },
   "consequences": {
    "fingerprint": "a9827e20b7e5941fb8941d47ba49040cc69104de6f17d3cf3027bc949a056b72",
@@ -13,24 +13,24 @@
    "strings": 922
   },
   "n38": {
-   "fingerprint": "199315591cf4ade6aba8bfd7bed5b44a6d38ab45bbb84a1d32d85777e76c59c2",
+   "fingerprint": "db61af159e36463fb49579339a54501da15a18b09be2a2ea71c17925d0e828c3",
    "units": 11,
    "strings": 138
   },
   "template": {
-   "fingerprint": "0a42baf207543fa0e8bf3a434d55ec0ecfc426a55d7568f905629b1983b43f48",
+   "fingerprint": "4fb51c5c93c449951ff3152436ad0c1b628e6dc730921f04901437123290b112",
    "units": 167,
    "strings": 4298
   },
   "compiled": {
-   "fingerprint": "7d0be40916d78327eda7851849aa024b35fbb2eefac734f733042537ff1e2313",
+   "fingerprint": "80366bd966cf0d9fb298af4b8230503b5e34a8a5434f5508a514e30906553407",
    "units": 808,
    "strings": 9083
   },
   "caption": {
-   "fingerprint": "fe3aec9cd5e7b84e1afe27eb2ce3c18c71257981b92f2fbd0a7395e1bb135c7f",
+   "fingerprint": "e9cdd164e11608c0bebbbf8e14b63d7192cc2b9353badb8793db568fb5a28607",
    "units": 503,
-   "strings": 1870
+   "strings": 1871
   },
   "theory": {
    "fingerprint": "150dc7d3b3c2858da8f3e32c3cf6df3d5ee0eefb52b781533344a75cc79ed0d4",
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "6f225b3e7d6c4037168509397a336007d4c2ab14f2264ceb67fb49364bc78d78",
+   "fingerprint": "3f1d30657abb2b188ca5015f606d207c4e08556d3ce88998a848a8d1d5c1119f",
    "units": 487,
-   "strings": 13233
+   "strings": 13238
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",

@@ -57,6 +57,23 @@ export {
 export { crosswindForceAtN, lessonRigPhysics, rigSimOptions } from "./lessonWind";
 export type { LessonPhysicsFlags, LessonRigPhysics, RigSimWindOptions } from "./lessonWind";
 
+// The LEE of a staged tall vehicle: the factor the wind's one force is
+// multiplied by beside it and in its wake (sc-ac-wind-truck-pass:ff1d4290).
+// Pure geometry; `scene/lessonWindShelter.ts` decides which lessons have one.
+export {
+  createRigWindShelter,
+  stepRigWindShelter,
+  windShelterDepth,
+  windShelterFactor,
+  WIND_SHELTER_CAR_LENGTH_M,
+  WIND_SHELTER_FADE_M,
+  WIND_SHELTER_REACH_M,
+  WIND_SHELTER_RESIDUAL,
+  WIND_SHELTER_WAKE_M,
+  WIND_SHELTER_WINDWARD_FADE_M,
+} from "./windShelter";
+export type { RigWindShelter, WindShelterBody } from "./windShelter";
+
 // The «втори замах» read — the observable trigger sc-ac-crosswind's instruction
 // 7 warns about and nothing could see (sc-ac-crosswind:a9db1738). A read, not a
 // rule: it moves no verdict and is inert on every lesson without authored wind.

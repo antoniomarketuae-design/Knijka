@@ -1943,6 +1943,15 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // overtaken car's reference speed the moment the cut starts forcing it
     // (runtime OVERTAKE_RETURN_* constants), while a car slowing on its OWN
     // keeps lowering the reference — that named FP is structurally innocent.
+    // A SECOND BASIS since sc-ac-wind-truck-pass:ff1d4290 round 3 (the
+    // integrator's decision D2): on a lesson that stages a vehicle to overtake
+    // on a ONE-WAY carriageway (where the tracker above, which watches an
+    // excursion onto the opposing bank, cannot see), the overtaken vehicle's
+    // own account says it slowed because of the return (0.3 m/s, the
+    // brake-lamp line) without braking hard — `rules/engine.ts`, the
+    // `laneEntryAnswer` "lift" case. Every sentence below is true of it: he
+    // came back in front of it and made it slow. A HARD brake is the опасна
+    // LANE_ENTRY_FORCED_BRAKING instead.
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Ранно прибиране пред изпреварения",
@@ -3751,6 +3760,61 @@ export const SOLID_CROSS_ACT_COPY: Record<
   },
 };
 
+/**
+ * LANE_ENTRY_FORCED_BRAKING, BY ACT — the key is the `act` a `laneEntryAnswer`
+ * tick event carries (`rules/types.ts`), which the reducer stamps on the bill
+ * as its `detail` (`engine.ts billForcedLaneEntry`).
+ *
+ * WHY THE POOLED ROW CANNOT SPEAK FOR THIS ACT (sc-ac-wind-truck-pass:ff1d4290
+ * round 2). The pooled card is written for the lane-drop cut-in and two of its
+ * sentences are that act's own:
+ *
+ *   · «…че след нормалната секунда за реакция водачът ѝ трябва да спира рязко,
+ *     за да не те удари» is the KINEMATIC basis — what the entry demands of a
+ *     vehicle that is catching him. A student who has just overtaken a slower
+ *     vehicle is drawing AWAY from it; nothing has to brake so as not to hit
+ *     him, and the sentence would be false on every frame this act is billed
+ *     on. What is measured here is what the vehicle DID: its own traffic model
+ *     shed speed because of him, at more than the product's hard-braking line.
+ *   · «…отпусни газта, пусни я да мине и влез в пролуката ЗАД нея» is the
+ *     right advice at a lane drop and the wrong advice to a driver who has
+ *     just finished overtaking: he should have stayed out LONGER, not dropped
+ *     back behind the vehicle he passed.
+ *
+ * EVERY CLAUSE BELOW IS ESTABLISHED WHEN IT PRINTS: he is in a lane a vehicle
+ * was already travelling in (the runner's watch opens only there), in front of
+ * it, and that vehicle's own account says it lost speed BECAUSE OF HIM at a
+ * deceleration over `harshBrakeDecelMps2`. The copy does not say he was
+ * faster, slower, or how far ahead — none of those is the measurement.
+ *
+ * LAW, RETRIEVED from content/law/acts/zdvp.json (ADR-002), not recalled:
+ * чл. 25, ал. 2 — the pooled row's own `lawRef`, inherited („…навлизане
+ * изцяло или частично в съседна пътна лента, водачът е длъжен да пропусне
+ * пътните превозни средства, които се движат по нея") — and чл. 42, ал. 1,
+ * т. 2, the overtaker's half of the same duty („…че може да заеме място в
+ * пътната лента пред изпреварваното пътно превозно средство, без да го
+ * принуждава да намалява скоростта или да изменя посоката на движение").
+ * `rules/__tests__/lane-entry-act-copy.test.ts` finds both provisions in the
+ * bank by their own words and holds every citation here to them.
+ *
+ * No `lawRef` of its own (the pooled one is this act's duty too) and no
+ * road-consequence row of its own: the fine is the same точка
+ * (`consequences.ts`, „не спазва предимството на друг участник в движението").
+ */
+export const LANE_ENTRY_ACT_COPY: Record<
+  "overtakeReturn",
+  { titleBg: string; explanationBg: string; peekBg: string; correctiveBg: string }
+> = {
+  overtakeReturn: {
+    titleBg: "Прибиране твърде близо пред изпреварения",
+    explanationBg:
+      "Влезе в лентата толкова близо пред превозно средство, което вече се движеше по нея, че водачът му трябваше да спира рязко заради теб. Който навлиза в съседна лента, пропуска движещите се по нея (чл. 25, ал. 2), а който изпреварва, заема място пред изпреварения, без да го принуждава да намалява скоростта (чл. 42, ал. 1, т. 2). Мигачът обявява прибирането, но не отваря място.",
+    peekBg: "Накара го да спира рязко.",
+    correctiveBg:
+      "След изпреварване остани в лентата за изпреварване, докато видиш в огледалото ЦЯЛОТО превозно средство, което задмина — чак тогава десен мигач и плавно надясно. Вижда ли се само част от него или още е до теб, рано е: продължи напред. Мигачът обявява, но не отваря място.",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
@@ -3785,6 +3849,9 @@ export const PER_ACT_COPY: Partial<
   STOPPED_WITHOUT_CAUSE: NEEDLESS_STOP_ACT_COPY,
   // sc-mv-uturn-ban:6d60c160 — the turn-round across the line, named as itself.
   CROSSED_SOLID_LINE: SOLID_CROSS_ACT_COPY,
+  // sc-ac-wind-truck-pass:ff1d4290 round 2 — the return in front of the
+  // overtaken vehicle that made it brake hard, named as itself.
+  LANE_ENTRY_FORCED_BRAKING: LANE_ENTRY_ACT_COPY,
 };
 
 /**

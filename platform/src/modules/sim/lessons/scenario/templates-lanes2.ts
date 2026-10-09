@@ -1981,6 +1981,8 @@ const LNOM_MEETING: NarrowMeetingSpec = {
     { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 148 } },
     { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 161 } },
   ],
+  // THE QUEUE IS TWO CARS AND THEN IT IS OVER — see LNOM_ONE_RUN below.
+  oneRun: true,
 };
 
 /**
@@ -2009,7 +2011,39 @@ const LNOM_STREAM: OncomingStreamSpec = {
   count: 1,
   gapsM: [],
   releaseKmh: 3,
+  // See LNOM_ONE_RUN below.
+  oneRun: true,
 };
+
+/**
+ * LNOM_ONE_RUN (sc-ln-obstacle-meeting:114706e0) — WHY BOTH ONCOMING CARS ARE
+ * `oneRun`. The lesson COUNTS its traffic, and every sentence the student is
+ * given counts it the same way: instruction 4 «Насреща идват ДВЕ коли»,
+ * instruction 5 «Изчакай и двете да отминат … Чак когато насрещната лента е
+ * празна докрай», the shadow's «Втората кола отмина и насрещната лента е празна
+ * докрай — чак сега тръгваш», and this file's own design note above («the drill
+ * is not „traffic“» — a QUEUE whose second car is the lesson). A continuing
+ * flow is NOT what it teaches: the trap is reading «clear» off the FIRST car's
+ * tail lights, and that trap is fully built by two cars.
+ *
+ * FR-B5-RETURN (traffic/staged.ts) used to send each car round again ~12.7 s
+ * after it left the street — at its hold, 85-87 m dead ahead — and FR-B5-FACING
+ * held it off-scene while the student sat facing it, so it came back THE
+ * INSTANT HE MOVED OFF. Measured at L1 through the live rung chain on a careful
+ * one-look drive (the lane-empty instant = car #2 past his nose): a move-off
+ * 18 s or more after the lane emptied met a third car head-on — COLLISION,
+ * 10 т., НЕИЗДЪРЖАН — and one 14.5-16 s after it had the car released at him
+ * after his centre was already over the axis — on the shadow's 38 км/ч
+ * approach; on a 20 км/ч one 12.5 s and 9-10.5 s, on a 15 км/ч one 7 s and
+ * 3.5-5.5 s (car #1 is clockwork from his first movement, car #2 is synced to
+ * his arrival, so the slower he comes the sooner after the lane empties car #1
+ * is due — the rig's «4-9 s»). The outcome of a correct drive was a function
+ * of how long he had been patient. With both cars run once, the oncoming lane
+ * is empty for good once the second car has gone by — which is exactly what he
+ * was told — and each car stands off-scene 70 m beyond the street's south end
+ * (y = −70, FR-B5-EXIT): off the 240 m of road, behind him, where he never
+ * drives. Pinned by ln-obstacle-meeting-briefed-queue.test.ts.
+ */
 
 /** OV-18 × OV-14 — препятствие в собствената половина (ЗДвП чл. 44: при
  *  разминаване водачът, от чиято страна е препятствието, изчаква насрещните и

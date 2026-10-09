@@ -316,16 +316,29 @@ describe("sc-follow-tailgater · the w71 wrong leg's three stops, at every rate"
   // so those two stops are acquitted — identically at every rate, which is what
   // f42dce4f asks. The recorded w71/w69 replays have the same geometry (stops 2 and 3
   // with the lead 131–140 m ahead).
-  it("the first stop (front lead inside the reach) is graded and coached; the two later ones (front lead 130–140 m ahead, closing 4.6 m/s) are acquitted — at every rate", () => {
+  //
+  // ROUND 2 OF sc-follow-tailgater:63c0c28c (2026-10-09) MOVED THE THIRD STOP, and on
+  // purpose. «The lead has drawn 136–138 m ahead (the student rested 8 s)» was the lead
+  // MIRRORING him: matchPlayer at followGapM 150 slowed it while he stood still, so it
+  // waited for him and every later stop met it again, closing. That is the defect round 2
+  // repairs — the same mirroring let a 20–25 км/ч brake check at the лепка manufacture
+  // its own far-lead cause — and FTG_LEAD now holds its authored constant 11.5 m/s
+  // (`minMatchSpeedMps` = its cap). Measured on this drive at every rate: stop 2 meets the
+  // lead 209–213 m ahead, still closing 4.61 m/s — the round-4 ruling's far closing
+  // cause, still acquitted; by stop 3 the lead has run off the 400 m road and NOTHING is
+  // in the lead channel (the лепка passed long ago, 227–233 m ahead of his tail). A full-
+  // pedal stop from 58 км/ч with nothing ahead is the causeless brake check the drill
+  // teaches against, and it is billed — charged, the lesson's own mistake having had its
+  // first-fault grace at stop 1 (Ruling A / 16) — identically at all seven rates.
+  it("the first stop (front lead inside the reach) is graded and coached; the second (front lead beyond the reach, closing 4.6 m/s) is acquitted; the third (nothing ahead) is charged — at every rate", () => {
     for (const { hz, out } of runs) {
       expect(out.stops.length, `${hz} Hz`).toBe(3);
       expect(out.stops[0].leadGapM!, `${hz} Hz`).toBeLessThan(DEFAULT_RULE_CONFIG.harshBrakeSignalCauseM);
-      for (const s of out.stops.slice(1)) {
-        expect(s.leadGapM!, `${hz} Hz`).toBeGreaterThan(DEFAULT_RULE_CONFIG.harshBrakeSignalCauseM);
-        expect(s.closingMps!, `${hz} Hz`).toBeGreaterThan(DEFAULT_RULE_CONFIG.harshBrakeClosingLeadMps);
-      }
+      expect(out.stops[1].leadGapM!, `${hz} Hz`).toBeGreaterThan(DEFAULT_RULE_CONFIG.harshBrakeSignalCauseM);
+      expect(out.stops[1].closingMps!, `${hz} Hz`).toBeGreaterThan(DEFAULT_RULE_CONFIG.harshBrakeClosingLeadMps);
+      expect(out.stops[2].leadGapM, `${hz} Hz`).toBeNull();
       const h = out.stops.map((s) => harshAt(out, s));
-      expect(h.map((x) => (x === undefined ? "none" : x.charged ? "charged" : "coached")), `${hz} Hz ${JSON.stringify(out.graded)}`).toEqual(["coached", "none", "none"]);
+      expect(h.map((x) => (x === undefined ? "none" : x.charged ? "charged" : "coached")), `${hz} Hz ${JSON.stringify(out.graded)}`).toEqual(["coached", "none", "charged"]);
     }
   });
 

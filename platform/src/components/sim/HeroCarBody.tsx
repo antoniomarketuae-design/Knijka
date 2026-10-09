@@ -124,6 +124,7 @@ import { QUALITY_PRESETS, type QualityLevel } from "@/modules/sim/environment";
 import { loadQualityPreset } from "./lesson-ui/QualityPresetSelector";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
+import { EXTERIOR_BODY_NODE } from "@/modules/sim/scene/bodyViewCut";
 
 const HERO_URL = "/sim/vehicles/hero_car.glb";
 /** Local Draco decoder (CSP-safe, no CDN) — copied to public/draco/. */
@@ -401,8 +402,11 @@ export function HeroCarBody({
     if (fogRRef.current) fogRRef.current.visible = fogOn;
   });
 
+  // NAMED so CameraRig can read this flag off the scene graph and never pose
+  // the cockpit eye inside a shell that is still drawn (f0023997 clauses 1/6,
+  // scene/bodyViewCut.ts). The flag itself is unchanged.
   return (
-    <group visible={!cockpitView}>
+    <group name={EXTERIOR_BODY_NODE} visible={!cockpitView}>
       <group scale={scale} position={[0, offsetY, 0]} rotation={[0, HERO_YAW, 0]}>
         <primitive object={model} />
       </group>

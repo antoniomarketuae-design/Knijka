@@ -232,6 +232,8 @@ describe("catalogue — a completed route ends AT its end, on every rung", () =>
   }
   const rows: Row[] = [];
   const neverEnded: string[] = [];
+  /** Templates left out because a waypoint is the staged vehicle's to give. */
+  const stagedPassSkipped = new Set<string>();
 
   for (const spec of SCENARIO_TEMPLATES) {
     for (const rung of spec.levels) {
@@ -245,6 +247,18 @@ describe("catalogue — a completed route ends AT its end, on every rung", () =>
       // turns no wheel, so anything else stalls the chain and ends through the
       // rescue gates — a different mechanism, and the battery's business.
       if (zones.length !== params.length) continue;
+      // …nor a zone that is a fact about a moving vehicle: a `stagedPass` task
+      // is completed only by the staged runner's own report (`drewLevel`,
+      // `overtaken`), and this driver brings no staged runner, so the chain
+      // stalls on it and the drive ends through the rescue gates too — on the
+      // ladder-widened terminal ring, which is why such a row would read short
+      // and inverted. The completed drive is the live car's business
+      // (`scenario/__tests__/wind-truck-pass-restage.test.ts`), and the set of
+      // templates that leave this census for this reason is pinned below.
+      if (zones.some((p) => p.stagedPass !== undefined)) {
+        stagedPassSkipped.add(spec.id);
+        continue;
+      }
       // …and it drives a flat 40 km/h, so a waypoint demanding less would never
       // latch its cap. Those rungs are simply not measurable from here.
       if (zones.some((p) => p.maxSpeedKmh !== undefined && p.maxSpeedKmh < 40)) continue;
@@ -275,6 +289,15 @@ describe("catalogue — a completed route ends AT its end, on every rung", () =>
     // The 60 m of road past the mark is far more than any run-out needs, so a
     // name here means a route that cannot close, which is the worse bug.
     expect(neverEnded).toEqual([]);
+  });
+
+  it("the staged-pass skip leaves out exactly one lesson — the truck pass — and nothing else slips out with it", () => {
+    // The skip above is a hole in the census, so its size is pinned. Today the
+    // only route a staged vehicle completes is sc-ac-wind-truck-pass, whose
+    // completed drive is held to ROUTE_RUNOUT_ARRIVE_M on the live car with the
+    // real truck. A second lesson here means a second route nobody measures:
+    // give it a live-car pin of its own before adding its id.
+    expect([...stagedPassSkipped].sort()).toEqual(["sc-ac-wind-truck-pass"]);
   });
 
   it("no rung stops short of its own mark by more than the arrival tolerance", () => {

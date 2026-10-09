@@ -535,6 +535,14 @@ describe("G3 — the marker publishes its contract", () => {
   it("every speed-capped objective's cap reaches the marker", () => {
     const missing: string[] = [];
     let capped = 0;
+    // A capped zone whose mark is a MOVING VEHICLE has no marker to carry the
+    // figure (`ReachZoneParams.stagedPass`, sc-ac-wind-truck-pass:ff1d4290 —
+    // `guidanceGoalFor` gives it an „ahead" ribbon, because a ring at a spot on
+    // the road would mark a place where nothing is judged). Its cap reaches the
+    // glass on the strip and the banner instead, which
+    // `lessons/scenario/__tests__/wind-truck-pass-restage.test.ts` asserts at
+    // every rung. Counted and named here so the exemption cannot grow unseen.
+    const stagedMark: string[] = [];
     for (const spec of SCENARIO_TEMPLATES) {
       for (const rung of spec.levels) {
         let lesson: LessonSpec;
@@ -548,6 +556,11 @@ describe("G3 — the marker publishes its contract", () => {
         for (let i = 0; i < lesson.objectives.length; i += 1) {
           const params = parseObjectiveParams(lesson.objectives[i]!);
           if (params.kind !== "reachZone" || params.maxSpeedKmh === undefined) continue;
+          if (params.stagedPass !== undefined) {
+            stagedMark.push(`${spec.id}@L${rung.level} obj${i}`);
+            expect(guidanceGoalFor(lesson, i, { stopLines: world.stopLines })).toEqual({ kind: "ahead", meters: 150 });
+            continue;
+          }
           capped += 1;
           const goal = guidanceGoalFor(lesson, i, { stopLines: world.stopLines });
           if (!goal || goal.kind !== "point" || goal.maxSpeedKmh !== params.maxSpeedKmh) {
@@ -558,6 +571,7 @@ describe("G3 — the marker publishes its contract", () => {
     }
     expect(capped).toBeGreaterThan(0);
     expect(missing).toEqual([]);
+    expect(stagedMark).toEqual([1, 2, 3, 4, 5].map((l) => `sc-ac-wind-truck-pass@L${l} obj0`));
   });
 
   it("a halt cap reads as «Спри тук», a cruise cap as «Карай дотук»", () => {

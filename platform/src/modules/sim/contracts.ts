@@ -901,6 +901,19 @@ export interface StagedActorPathSpec {
     | "childCyclist"
     | "animal";
   /**
+   * WIND SHELTER — this actor's body is a WALL to the lesson's crosswind
+   * (sc-ac-wind-truck-pass:ff1d4290, the restage of 2026-10-08). Opt-in and
+   * inert by default: absent on every other staged actor in the catalogue, and
+   * read only on a lesson that ALSO authors `physics.crosswind` — there is no
+   * wind to shelter from anywhere else. When both hold, the wind's force on
+   * the student's car is multiplied by `vehicle/windShelter.ts
+   * windShelterFactor` of where the car is relative to this actor's body: the
+   * lee beside its leeward flank and in its wake, full wind again one car
+   * length past its nose. The geometry and the numbers live in that file; the
+   * body's own size is its `profile`'s (`traffic/types.ts`).
+   */
+  windShelter?: true;
+  /**
    * RESTING TURN INDICATOR — the blinker the actor shows from the moment it is
    * staged, before any runner has commanded anything.
    *
@@ -1430,6 +1443,13 @@ export interface NarrowMeetingSpec extends StagedEventBase {
     extraRightOffsetM?: number;
     colorIndex?: number;
   }>;
+  /**
+   * The oncoming actor makes its ONE meeting and leaves — FR-B5-RETURN never
+   * sends it round again (traffic/types.ts StagedVehicleSpec.oneRun, which the
+   * runner stages it with). Author it when the lesson's briefing counts the
+   * oncoming traffic. Absent/false = the actor returns, unchanged.
+   */
+  oneRun?: boolean;
 }
 
 /**
@@ -1716,18 +1736,105 @@ export interface CutInLeadCarSpec extends StagedEventBase {
   /** Scheduled-cruise speed, m/s. Default `actor.cruiseSpeedMps`. Ignored
    *  under "matchPlayer". */
   paceSpeedMps?: number;
+  /**
+   * THE ACTOR IS A SLOW VEHICLE THE LESSON ASKS THE STUDENT TO OVERTAKE, and
+   * the runner reports the two facts of that overtake as they happen
+   * (sc-ac-wind-truck-pass:ff1d4290). Opt-in; absent = no report, the runner
+   * byte-identical. Meaningful only with `paceMode: "scheduledCruise"` — a
+   * rubber-banded actor is never passed.
+   *
+   * Both facts are measured in the ACTOR's own frame, off the two live poses
+   * the runner already holds, so they are true wherever on the road the
+   * student catches the actor and at whatever speed:
+   *
+   *  · `detail: "drewLevel"` — the student's car, having been wholly BEHIND the
+   *    actor, is in the adjacent lane on the `side` named here with its centre
+   *    level with the actor's front section: from `abeamFromM` ahead of the
+   *    actor's centre to its nose plus half a car. `approachSpeedKmh` carries
+   *    the speed at that frame (the figure a capped task is judged on).
+   *  · `detail: "overtaken"` — after drawing level, the student's car has
+   *    FINISHED its return into the ACTOR's lane: settled there
+   *    (`establishedHalfWidthM`, `establishedHeadingDeg`) with at least
+   *    `clearBumperGapM` of road between its rear bumper and the actor's front
+   *    one («целият камион е в огледалото»), not slower than the actor, and
+   *    the actor not braking for it, for the time the actor takes to drive its
+   *    guard's reach — AND THE ACTOR NEVER HAD TO BRAKE HARD FOR THE RETURN
+   *    (rounds 2–3). From the first frame any part of the car is over the
+   *    actor's lane and it is no longer wholly behind, the runner watches the
+   *    actor's own account of speed shed because of the student
+   *    (`StagedActorView.playerShedMps`). If that account goes through the
+   *    product's harsh-brake gates (`rules/harshBrakeEpisode.ts`) the return
+   *    made the actor brake hard: the runner publishes it to the rule engine
+   *    (`SimTickEvent` `laneEntryAnswer`, phase "braked" — billed
+   *    LANE_ENTRY_FORCED_BRAKING) and the attempt reports no "overtaken",
+   *    whatever gap that braking then opens. If it only grew past the traffic
+   *    model's braking line (0.3 m/s), the answer is "lift": not billed, the
+   *    lane change not praised, "overtaken" on the frame the return finishes. A lesson that authors `overtake` therefore ARMS
+   *    `laneEntryForcedBrakingEnabled` in its `ruleConfig` — the runner
+   *    withholds the task, and the rule is what tells the student why
+   *    (`wind-truck-pass-restage.test.ts` holds every such lesson to it).
+   *
+   * Neither fact resolves the encounter (the cut tier, where one is authored,
+   * is untouched) and neither is a grade: an objective that wants one names it
+   * (`reachZone.stagedPass`, lessons/objectives.ts). The pair re-arms when the
+   * car drops wholly behind the actor again, so a second attempt is measured
+   * afresh and the LAST report of each kind is the one that counts.
+   */
+  overtake?: {
+    /** Which side the pass is made on, seen from the actor: its LEFT or RIGHT. */
+    side: "left" | "right";
+    /** Lateral band the car's centre must be in to count as „in the adjacent
+     *  lane", m from the actor's line, [min, max]. */
+    adjacentLaneM: readonly [number, number];
+    /** How far ahead of the actor's CENTRE the car's centre must be to be
+     *  „level with the cab", m. */
+    abeamFromM: number;
+    /** Half-width of the actor's own lane for the return, m. The return's
+     *  watch opens on the first frame ANY PART of the car is over it — the
+     *  car's centre within this plus its own half-width of the actor's line
+     *  (round 3: `orchestrator/runners.ts stepOvertakeWatch`). */
+    ownLaneHalfWidthM: number;
+    /**
+     * „SETTLED IN THE LANE" for the return to be finished (round 3), m: the
+     * car's centre within this of the actor's line. Authored as the tighter
+     * of the product's lane-keeping band (`rules/types.ts laneKeepMaxOffsetM`,
+     * 3.25 on the drawn lane) and the actor's own following corridor
+     * (`traffic/staged.ts GUARD_LATERAL_M`, 3.0) — a car settled there is one
+     * the actor's guard can see, so its silence is an answer.
+     */
+    establishedHalfWidthM: number;
+    /**
+     * …and heading along the road (round 3), degrees off the actor's heading:
+     * the runtime's own line for „straightened out" after a turn
+     * (`runtime/turns.ts TURN_REARM_DEG`, 15°).
+     */
+    establishedHeadingDeg: number;
+    /** Clear road between the car's rear bumper and the actor's front bumper
+     *  for the return to count, m. Authored no shorter than the reach of the
+     *  actor's own following guard (`traffic/staged.ts GUARD_AHEAD_M`, less the
+     *  two half-lengths), so a return that is counted is one the actor's guard
+     *  cannot reach; round 3: it must HOLD, with the car settled and not
+     *  slower than the actor, for the time the actor takes to drive that
+     *  reach before the return is finished. */
+    clearBumperGapM: number;
+  };
 }
 
 /**
  * Doc 72 FO-07 „Лепка отзад" — the rear-tailgater actor: matchPlayer with a
  * NEGATIVE gap paces the actor 3–6 m of bumper behind the player in their OWN
  * lane (the emergencyApproach rear-sync precedent, without the offset path).
- * PRESSURE SCENERY under the learn-only policy (doc 72): the runner emits
- * ZERO SimTick events — no violation can ever grade from it (the policeStop
- * discipline). The taught response (ease off, grow the FRONT gap, let them
- * pass) and the taught mistake (brake-check) grade through EXISTING channels:
- * the front leadGap telemetry and HARSH_BRAKING_NO_CAUSE (a rear car is not a
- * forward cause — the cause ledger only reads the forward gap channel).
+ * PRESSURE SCENERY under the learn-only policy (doc 72): no violation ever
+ * grades from the runner itself (the policeStop discipline). The taught
+ * response (ease off, grow the FRONT gap, let them pass) and the taught
+ * mistake (brake-check) grade through EXISTING channels: the front leadGap
+ * telemetry and HARSH_BRAKING_NO_CAUSE (a rear car is not a forward cause —
+ * the cause ledger only reads the forward gap channel). The ONE event it
+ * publishes (since 2026-10-09, `sc-follow-tailgater:63c0c28c`) is a report,
+ * not a verdict: `followerBraked`, when the glued car's own speed went through
+ * the harsh-brake gates because of him — the account the rule engine needs to
+ * bill a brake check from under its 35 км/ч floor (rules/engine.ts „THE FLOOR
+ * LIFTS FOR A FOLLOWER IT PUT AT RISK"; runners.ts `stepFollowerAccount`).
  * After `pressureSec` of glued pressure the actor laneShift-passes on the
  * left and drives off — the situation resolves like the real one does.
  *
@@ -1815,6 +1922,14 @@ export interface OncomingStreamSpec extends StagedEventBase {
   gapsM: number[];
   /** Player speed that releases the whole stream at cruise, km/h. */
   releaseKmh: number;
+  /**
+   * Every car of the stream drives its run ONCE and leaves — FR-B5-RETURN
+   * never sends it round again (traffic/types.ts StagedVehicleSpec.oneRun,
+   * which the runner stages each car with). Author it when the lesson's
+   * briefing counts the oncoming cars. Absent/false = the cars return,
+   * unchanged.
+   */
+  oneRun?: boolean;
 }
 
 /**
@@ -1899,7 +2014,19 @@ export interface StagedEventOutcome {
      * than award the lesson. Consumers that switch on `detail` should treat it
      * as "not measured", never as a clean run.
      */
-    | "notEncountered";
+    | "notEncountered"
+    /**
+     * cutInLeadCar with `overtake` authored (sc-ac-wind-truck-pass:ff1d4290):
+     * the student drew level with the slow vehicle's cab in the adjacent lane
+     * (`approachSpeedKmh` = his speed on that frame) / is back in its lane with
+     * the whole vehicle behind him and the vehicle not having had to brake for
+     * his return. PROGRESS REPORTS, not resolutions: the
+     * runner stays live after each, and a re-attempt reports again (the last
+     * of a kind counts). `success` is true on both — each says a thing was
+     * done; whether it was done within a task's cap is the task's to judge.
+     */
+    | "drewLevel"
+    | "overtaken";
   /** Session time of resolution, s. */
   tSec: number;
   /** Stimulus onset → first brake application, s (dart-out + lead car). */

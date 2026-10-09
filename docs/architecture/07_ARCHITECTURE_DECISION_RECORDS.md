@@ -424,3 +424,92 @@ the trace's samples, looks and indicator edges. LessonScene owns the grid's life
   are owed. The replay harness keeps the lever and the stalk ideal at every grid point, where the product samples them once per frame, so its
   long-frame moment differences are partly its own. `STAGED_POSE_FULL=1` was run by neither the builder nor the verifier.
 - **Full design note:** [doc 94](../simulation/94_ADR014_FIXED_STEP_NOTE.md), the builder's note with nine passages corrected against the verifier.
+
+## ADR-015: A pass is judged by what the overtaken vehicle really had to do
+
+**Status.** Accepted by the integrator under the founder's delegation of 2026-10-08 (doc 88, «Founder delegation», item 2: restage the truck-pass
+lesson). Its bills come from the integrator's decisions D1–D2 of 2026-10-08, made under that delegation, which extend to this lesson the founder
+ruling 2026-09-30 «bill the forced braking» (made for the lane-drop lessons) and the 0.3 m/s account of the 2026-10-05 roundabout ruling. It is not
+itself a founder ruling. Lane `truckpass`, rounds 1–3, each adversarially verified; round 3 SIGNED OFF WITH CONDITIONS (row
+`sc-ac-wind-truck-pass:ff1d4290`). It is a new ADR, not an addendum to ADR-012. It discharges the ADR-012 addendum owed since round 1: ADR-012 lists
+this lesson's staging as owed, and the lee here multiplies ADR-012's one force without changing its pull law. It runs on ADR-014's grid: it was
+merged onto gate 1 (ADR-014) and checked there (doc 88). Landed with the commit that carries this entry.
+
+**Context.** The restage puts the truck on a scheduled cruise at 40 км/ч, under the 50 км/ч floor for the overtaking lane. That makes the pass real,
+and with it the return in front of the truck, the act that step 8 teaches. The truck's guard brakes at `HOLD_DECEL_MPS2` 8 m/s² for anything inside
+its reach: `GUARD_AHEAD_M` 16 m ahead of its centre and `GUARD_LATERAL_M` 3.0 m either side of its line, which is 10.23 m between bumpers. The
+lane-drop measure of what an entry demands is 0 by construction when the student is the faster car. The bill must therefore read what the truck did,
+from its own traffic-model account (`StagedActorView.playerShedMps`).
+
+**Decision.**
+- **The watch** (`CutInLeadCarRunner.stepOvertakeWatch`, `orchestrator/runners.ts`) opens on the first grid point at which any part of the car is
+  over the truck's lane and the car is no longer wholly behind it: the car's centre within 4.06 + 0.85 = 4.91 m of the truck's line. It closes «clear»
+  only when the return is FINISHED. Five conditions must hold together, without a break, for `settleNeedSec`:
+  - (1) the car's centre is within 3.0 m of the truck's line (`establishedHalfWidthM` = `GUARD_LATERAL_M`, inside `laneKeepMaxOffsetM` 3.25);
+  - (2) its heading is within 15° of the truck's (`establishedHeadingDeg` = `TURN_REARM_DEG`);
+  - (3) there are at least 10.25 m between bumpers (`clearBumperGapM`, just outside the guard's 10.23 m reach);
+  - (4) its speed along the road is not below the truck's;
+  - (5) the truck's account is not growing.
+- **The settle time** is how long the truck takes to drive its guard's whole reach: 16.0 m / 11.11 m/s = 1.44 s. «clear», «overtaken», task 2 and
+  the lane-change praise are decided only when the watch closes. Leaving the lane closes the watch with «lift» or «clear» and no credit.
+- **HARD** is the product's own harsh-brake rule as a pure step, `stepHarshBrakeTrack` in `rules/harshBrakeEpisode.ts`. `BRAKING_LINE_MPS2` and
+  `HARSH_BRAKE_TIE_TOLERANCE` moved there, and the engine imports them. The rule:
+  - deceleration is read as a 0.04 s windowed derivative;
+  - frames at 7 m/s² or more must add up to 0.4 s or more;
+  - the window's mean must be over 7 (exclusive);
+  - the window re-anchors when its mean is not harsh, and resets when braking falls under 2 m/s².
+- **What HARD reads.** The step is fed the TRUCK's speed, against its speed when the watch opened. The 35 км/ч onset floor is not applied: it exists
+  to forgive a student's own low-speed stab, not to judge another vehicle. A hard brake is attributed to the student only when the speed shed in that
+  harsh window is also on the truck's account of speed shed because of him.
+- **What HARD bills.** It answers «braked» and bills LANE_ENTRY_FORCED_BRAKING (опасна, billed at once). The engine re-checks the published window
+  with `isHarshBrakeWindow`. The attempt is spent until the car drops wholly behind the truck.
+- **LIFT** means the account grows by 0.3 m/s or more (`OVERTAKE_BRAKED_SHED_MPS`, the brake-lamp size ADR-011 uses) and the brake ends without
+  being hard. «lift» is published once per watch. The engine withholds the praise (`withholdLaneChangePraise`) and bills OVERTAKE_RETURN_TOO_EARLY (doc
+  72 OV-09, основна, чл. 42, ал. 1, т. 2) with detail overtake-return. A lift is never billed as forced braking. Task 2 is credited if the return
+  then finishes.
+- **The lee.** `createRigWindShelter` in `vehicle/windShelter.ts` holds the shelter in the rig:
+  - it follows the prop on every render;
+  - it is stepped into the sim before `sim.update`;
+  - if the prop goes away after a lee was set, it gives the open wind back once;
+  - the test harness uses the same object.
+  The shelter multiplies the one ADR-012 force, with a residual of 0.30 and a wake of 13 m (inside the 14.0 m FOLLOWING_TOO_CLOSE line). It exists
+  only where a lesson authors `physics.crosswind` and stages an actor with `windShelter: true`. Today that is this lesson alone.
+- **New vocabulary.** All of it is opt-in:
+  - the SimTickEvent `laneEntryAnswer` (watching / clear / lift / braked, with heldSec and qualifiedSec);
+  - `StagedActorView.playerShedMps` and `stateId`;
+  - `CutInLeadCarSpec.overtake`, `ReachZoneParams.stagedPass` and the outcome details drewLevel / overtaken.
+- **On ADR-014's grid.** The watch and the harsh-brake step read the truck and the car at the fixed 1/60 s grid point, never a frame-end pose. The one
+  exception is not graded. The lee, stepped before each physics step, reads the truck's newest grid state, so inside a long frame it can be up to one
+  frame stale. It is a physics input only, and nothing graded reads it.
+
+**Alternatives rejected.**
+- **Round 1:** credit task 2 when the gap reached 10 m. Refuted: a return 3.0–6.5 m ahead made the truck brake at about 8 m/s². The gap reached 10 m
+  only because the truck braked. The return was praised on its entry frame and credited about a second later, with 0 т. and 3/3 at every rung.
+- **Round 2:** answer «clear» when the gap was ≥ 10.25 m and the account was not growing on that frame. Refuted: a car returning slower than the truck
+  got «clear» on the very frame the watch opened, and the truck braked 0.6–1.6 s later (slow51b36g18: 35.7 км/ч, 10.94 m, truck 40 → 28.6 км/ч;
+  passed 3/3). Its «hard» had no hold time, so it also billed a harmless step: a car pulling away 9.13 m ahead at 49.7 км/ч cost 10 т. and the
+  lesson for a truck that lost 1.44 км/ч.
+- **A bare >= at the 0.4 s tie.** 24 frames of 1/60 s summed to 0.39999999999999997 on one tape and 0.4000000000000001 on the next.
+
+**Consequences.**
+- **TP-1.** An exact 0.4 s hold counts as held, with the 1e-9 relative tie tolerance. A float summation artefact never decides a verdict.
+  - The cut still sits on the 24th frame of the guard's 8 m/s² brake. On the verifier's tapes, 0.12 км/ч of truck speed separated «10 т., failed»
+    (slow51b36g18@L1) from «0 т., passed» (G80g13b30@L1).
+  - The engine's own HARSH_BRAKING_NO_CAUSE reducer keeps a bare >= at that tie. It judges the student's own braking, so aligning it is owed
+    elsewhere, not done here.
+- **Confirmed as built (TP-2..4):**
+  - a lift is coached the first time on practice rungs, costs 3 т. at L4, and is not the lesson's own mistake (Ruling A does not reach it);
+  - a lift followed by a hard brake in one unfinished return bills both. This holds by construction; no measured tape does it;
+  - a car that comes back slower than the truck and stays slower never finishes the return, so task 2 stays open.
+- **TP-5 (C3-02).** Nothing is read after the watch closes. A clean return followed by a brake-check that makes the truck brake harshly stays
+  credited and praised. Billing a brake check that put the follower at risk is owed to the tailbrake lane.
+- **TP-6 (C3-03).** The kinematic laneEntered basis (`laneEntryForcedBrakingEnabled`) also bills a slower car that swerves in at the truck's nose
+  before the truck reacts. Accepted: on every L1–L3/L5 run the verifier drove, a COLLISION followed within 1.9 s, and at L4 the session ends at the
+  bill.
+- **TP-7.** The reviewer-facing N38 rationale for LANE_ENTRY_FORCED_BRAKING no longer limits the second basis to the faster car.
+- **The merge onto ADR-014's grid** left two items owed elsewhere (doc 88):
+  - the live shell folds a grid point's staged outcomes before that point's tick, while the replay folds them after it (owed to the truck-pass lane);
+  - on the clip-truck demo the near-miss meter reports the truck it has just hit as a near miss (owed to the near-miss owner).
+- **Not driven in a browser.** Every number is in-process: VehicleSim under rapier, the live rung chain, and the real traffic system and director
+  with a kinematic car. The rig's lee wiring is held by a source pin and an executed test of `createRigWindShelter`, not by a browser frame. The gust
+  chip's state machine is unexecuted. The row stays open until a drive through the rig on both lenses and a re-capture of the clips.

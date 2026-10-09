@@ -176,6 +176,123 @@ const harnessBuildsTheProductCar = (src: string) =>
     src,
   );
 
+// THE LEE'S ROUTING (sc-ac-wind-truck-pass:ff1d4290 round 2, the round-1
+// verifier's F-02). Read off the real sources, like the wind's above, and
+// proven able to fail below: the scene BUILDS the lesson's shelter function
+// with the scene module's own factory, off the live traffic port, and HANDS it
+// to the rig; the rig keeps it in a ref and, inside its physics callback and
+// BEFORE `sim.update` reads the wind, calls the vehicle module's own step
+// (`stepRigWindShelter`, executed in windShelter.test.ts) with the sim, that
+// function and the chassis' translation; the harness calls the same step.
+const sceneBuildsTheLee = (src: string) =>
+  /const windShelterAt = useMemo\(\s*\(\) => createLessonWindShelter\(lesson, \(actorId\) => traffic\.staged\(actorId\)\),\s*\[lesson, traffic\],\s*\);/.test(
+    code(src),
+  );
+const sceneHandsTheLeeToTheRig = (src: string) => {
+  const rig = /<VehicleRig\b[\s\S]*?\/>/.exec(code(src));
+  return rig !== null && /\bwindShelterAt=\{windShelterAt\}/.test(rig[0]);
+};
+/**
+ * ROUND 3 (the round-2 verifier's F2-03(a)): the rig kept the prop in a ref
+ * copied by an effect, and that effect given `[]` kept the first lesson's lee
+ * for the life of the rig with every test green. The rig now holds the lee in
+ * `createRigWindShelter()` (executed in windShelter.test.ts) and FOLLOWS the
+ * prop as a bare statement of its render — right after creating it, inside no
+ * hook — so there is no dependency list to get wrong; the physics callback
+ * calls its `step` before `sim.update`.
+ */
+const rigStepsTheLeeBeforeTheWindIsRead = (src: string) => {
+  const c = code(src);
+  const from = c.indexOf("useBeforePhysicsStep(() => {");
+  if (from < 0) return false;
+  const body = c.slice(from);
+  const step = body.indexOf("windShelter.step(sim, bodyRef.current?.translation());");
+  const update = body.indexOf("sim.update(");
+  return (
+    step >= 0 &&
+    update > step &&
+    /const windShelter = useMemo\(createRigWindShelter, \[\]\);\s*windShelter\.follow\(windShelterAt\);/.test(c) &&
+    c.split("windShelter.follow(").length - 1 === 1 &&
+    c.split("windShelter.step(").length - 1 === 1 &&
+    // …and it is the ONLY place the rig touches the sim's shelter: no inline
+    // copy of the step, with or without the call that matters.
+    !/setWindShelterFactor/.test(c) &&
+    !/stepRigWindShelter\(/.test(c)
+  );
+};
+const harnessStepsTheLeeWithTheRigsFunction = (src: string) =>
+  /const rigLee = createRigWindShelter\(\);\s*rigLee\.follow\(shelterAt\);/.test(code(src)) &&
+  /rigLee\.step\(sim, st\.position\);[\s\S]{0,400}?sim\.update\(shaped, FIXED_DT, READY_DRIVELINE\);/.test(code(src)) &&
+  !/setWindShelterFactor/.test(code(src));
+
+describe("routing: the LEE reaches the live car — scene → rig → sim, before every physics step", () => {
+  it("LessonScene builds the lesson's shelter function off the live traffic port and passes it to VehicleRig", () => {
+    expect(sceneBuildsTheLee(SCENE_SRC)).toBe(true);
+    expect(sceneHandsTheLeeToTheRig(SCENE_SRC)).toBe(true);
+  });
+
+  it("VehicleRig holds the lee in createRigWindShelter, follows the prop on every render, and steps it into the sim inside its physics callback, before sim.update — and nowhere else", () => {
+    expect(rigStepsTheLeeBeforeTheWindIsRead(RIG_SRC)).toBe(true);
+  });
+
+  it("the live-lane harness steps the lee with the SAME function, so every live-car test runs the rig's own code", () => {
+    expect(harnessStepsTheLeeWithTheRigsFunction(HARNESS_SRC)).toBe(true);
+  });
+
+  it("each guard can fail — the round-1 verifier's two surviving mutants, and three more, put into the REAL sources turn it red", () => {
+    // V5: the scene passes no shelter function.
+    const v5 = SCENE_SRC.replace("windShelterAt={windShelterAt}", "windShelterAt={null}");
+    expect(v5).not.toBe(SCENE_SRC);
+    expect(sceneHandsTheLeeToTheRig(v5)).toBe(false);
+    // …or builds none.
+    const noBuild = SCENE_SRC.replace(
+      "() => createLessonWindShelter(lesson, (actorId) => traffic.staged(actorId)),",
+      "() => null,",
+    );
+    expect(noBuild).not.toBe(SCENE_SRC);
+    expect(sceneBuildsTheLee(noBuild)).toBe(false);
+    // V4: the rig works the factor out and never hands it to the sim.
+    const call = "windShelter.step(sim, bodyRef.current?.translation());";
+    expect(RIG_SRC).toContain(call);
+    const v4 = RIG_SRC.replace(
+      call,
+      "{ const t = bodyRef.current?.translation(); if (t && windShelterAt) windShelterAt(t.x, -t.z); }",
+    );
+    expect(rigStepsTheLeeBeforeTheWindIsRead(v4)).toBe(false);
+    // The step moved AFTER the update that reads the wind (a frame late).
+    const late = RIG_SRC.replace(call, "").replace(
+      "sim.update(shaped, FIXED_DT, driveline);",
+      "sim.update(shaped, FIXED_DT, driveline);\n    " + call,
+    );
+    expect(late).not.toBe(RIG_SRC);
+    expect(late).toContain(call);
+    expect(rigStepsTheLeeBeforeTheWindIsRead(late)).toBe(false);
+    // The prop dropped on the floor: the held lee never follows it.
+    const follow = "windShelter.follow(windShelterAt);";
+    const deaf = RIG_SRC.replace(follow, "");
+    expect(deaf).not.toBe(RIG_SRC);
+    expect(rigStepsTheLeeBeforeTheWindIsRead(deaf)).toBe(false);
+    // F2-03(a): it follows the prop only ONCE — the round-2 verifier's
+    // surviving mutant, in the shape the rig now has (an effect given `[]`).
+    const once = RIG_SRC.replace(follow, "useEffect(() => {\n    windShelter.follow(windShelterAt);\n  }, []);");
+    expect(once).not.toBe(RIG_SRC);
+    expect(rigStepsTheLeeBeforeTheWindIsRead(once)).toBe(false);
+    // …or follows it from a memo keyed on nothing.
+    const memo = RIG_SRC.replace(follow, "useMemo(() => windShelter.follow(windShelterAt), []);");
+    expect(rigStepsTheLeeBeforeTheWindIsRead(memo)).toBe(false);
+    // A comment that only TALKS about the call does not satisfy the guard.
+    const onlyAComment = RIG_SRC.replace(call, "// " + call);
+    expect(rigStepsTheLeeBeforeTheWindIsRead(onlyAComment)).toBe(false);
+    // The harness with its own copy of the three lines again.
+    const copy = HARNESS_SRC.replace(
+      "rigLee.step(sim, st.position);",
+      "if (shelterAt !== null) sim.setWindShelterFactor(shelterAt(x, y));",
+    );
+    expect(copy).not.toBe(HARNESS_SRC);
+    expect(harnessStepsTheLeeWithTheRigsFunction(copy)).toBe(false);
+  });
+});
+
 describe("routing: the scene, the rig, the harness and the demos share ONE wind mapping", () => {
   it("LessonScene derives the rig's physics from lessonRigPhysics(lesson.physics) and passes exactly those four props", () => {
     expect(sceneMapsThroughTheSharedFunction(SCENE_SRC)).toBe(true);
@@ -194,11 +311,21 @@ describe("routing: the scene, the rig, the harness and the demos share ONE wind 
   });
 
   it("VehicleSim's gust is crosswindForceAtN on its own clock — the sine is written once", () => {
+    // Since the restage of sc-ac-wind-truck-pass (ff1d4290) the open force is
+    // named and then multiplied by the lee — still ONE call, on the sim's own
+    // clock, and still the only place the wind's number is made.
     expect(
-      /private currentWindN\(\): number \{[\s\S]{0,400}?return crosswindForceAtN\(\s*this\.windLateralN,\s*this\.windGustAmplitudeN,\s*this\.windGustPeriodSec,\s*this\.windClockSec,\s*\);/.test(
+      /private currentWindN\(\): number \{[\s\S]{0,400}?const openN = crosswindForceAtN\(\s*this\.windLateralN,\s*this\.windGustAmplitudeN,\s*this\.windGustPeriodSec,\s*this\.windClockSec,\s*\);/.test(
         SIM_SRC,
       ),
     ).toBe(true);
+    expect(code(SIM_SRC).split("crosswindForceAtN(").length - 1).toBe(1);
+    // THE LEE MULTIPLIES THAT ONE NUMBER, in that one method, and a sim nobody
+    // ever fed a shelter returns the open force untouched (no multiplication).
+    expect(code(SIM_SRC)).toContain("return this.windShelter === null ? openN : openN * this.windShelter;");
+    // …and it is touched nowhere else: the restart, that multiplication, the
+    // setter and the read-out.
+    expect(code(SIM_SRC).split("this.windShelter").length - 1).toBe(6);
     expect(/Math\.sin\(/.test(code(SIM_SRC))).toBe(false);
   });
 
@@ -206,9 +333,18 @@ describe("routing: the scene, the rig, the harness and the demos share ONE wind 
     expect(CROSSWIND_TRACES_SRC).toContain(
       '...(kind === "shadow" ? { heldWheel: lessonRigPhysics(SC_AC_CROSSWIND.physics) } : {}),',
     );
-    expect(TRUCK_TRACES_SRC).toContain(
-      '...(kind === "shadow" ? { heldWheel: lessonRigPhysics(SC_AC_WIND_TRUCK_PASS.physics) } : {}),',
-    );
+    // The motorway sibling's wind has a lee (ff1d4290): the same mapping, plus
+    // the lesson slice the scene's own shelter function reads.
+    expect(TRUCK_TRACES_SRC).toContain("...lessonRigPhysics(SC_AC_WIND_TRUCK_PASS.physics),");
+    expect(TRUCK_TRACES_SRC).toContain("physics: SC_AC_WIND_TRUCK_PASS.physics,");
+    expect(TRUCK_TRACES_SRC).toContain("stagedEvents: [...(SC_AC_WIND_TRUCK_PASS.staged ?? [])] as StagedEventSpec[],");
+    // Round 2 (F-04): the «рязка корекция» demo's wheel channel is the same
+    // computation on its own path — so it opts in beside the shadow, and the
+    // blown-out demo (a loose hand is its story) still does not.
+    expect(
+      /kind === "shadow" \|\| name === "mistake-clip-truck"\s*\?\s*\{\s*heldWheel: \{/.test(TRUCK_TRACES_SRC),
+    ).toBe(true);
+    expect(TRUCK_TRACES_SRC).not.toContain('"mistake-blown-out"\n      ? {');
   });
 
   it("each guard can fail — an inline copy put back into the REAL source turns it red", () => {

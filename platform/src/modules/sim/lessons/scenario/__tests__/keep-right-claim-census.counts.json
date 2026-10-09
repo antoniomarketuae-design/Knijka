@@ -1,12 +1,12 @@
 {
- "total": 569,
+ "total": 570,
  "duty": 83,
  "exemption": 15,
  "both": 6,
- "other": 465,
+ "other": 466,
  "distractors": 43,
  "bySurface": {
-  "catalog": 16,
+  "catalog": 17,
   "consequences": 4,
   "concept": 32,
   "n38": 3,

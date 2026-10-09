@@ -38,9 +38,18 @@ import type {
   TrainPassSpec,
 } from "../contracts";
 import type { ContactCastMember } from "./contact";
-import { playerOverLaneReachM } from "../collision";
-import type { SimTickEvent } from "../rules";
+import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, playerOverLaneReachM } from "../collision";
+import {
+  DEFAULT_RULE_CONFIG,
+  newHarshBrakeTrack,
+  stepHarshBrakeTrack,
+  type HarshBrakeLine,
+  type HarshBrakeTrack,
+  type HarshBrakeVerdict,
+  type SimTickEvent,
+} from "../rules";
 import type { Rng } from "../traffic/rng";
+import { vehicleHalfLengthM } from "../traffic/types";
 import type { StagedActorView, VehicleProfile } from "../traffic/types";
 import type {
   DirectorInput,
@@ -2448,6 +2457,7 @@ export class NarrowMeetingRunner implements EventRunner {
         colorIndex: s.actor.colorIndex,
         playerGuard: true, // never rams a player blocking its lane — the
         // guard standstill IS the barge evidence
+        ...(s.oneRun === true ? { oneRun: true } : {}),
       });
       if (!view) throw new Error(`staged event ${s.id}: oncoming path failed to stage`);
       for (let i = 0; i < (s.props?.length ?? 0); i++) {
@@ -3603,6 +3613,46 @@ const CUTIN_MISSED_PAST_M = 70;
 const CUTIN_VISIBLE_CONE_DEG = 20;
 const CUTIN_VISIBLE_CONE_TAN = Math.tan((CUTIN_VISIBLE_CONE_DEG * Math.PI) / 180);
 
+/**
+ * «THE OVERTAKEN VEHICLE HAD TO GIVE WAY», m/s of speed shed because of the
+ * student — `CutInLeadCarRunner.stepOvertakeWatch`, the size at which the
+ * return into its lane is reported as having made it slow («lift»). Whether
+ * it braked HARD is a different question with its own answer, the product's
+ * harsh-brake detector (`OVERTAKE_HARSH_LINE`, round 3).
+ *
+ * NOT A NEW NUMBER. It is the traffic model's own line between «holding its
+ * speed» and «braking» (`traffic/staged.ts STAGED_BRAKE_LAMP_MARGIN_MPS`: an
+ * actor's brake lamps light when its speed stands more than this above what
+ * its guard asks for), and it is the size the founder's 2026-10-05 ruling is
+ * built on at a roundabout mouth (`runtime/worldRuntime.ts
+ * ROUNDABOUT_FORCED_SHED_MPS`, with the reasoning: anything smaller is one or
+ * two frames of a guard trimming a vehicle that then carries on — 0.133 m/s is
+ * a single 60 Hz frame of its 8 m/s² — and the floor under it is nil, not
+ * small: a vehicle the student is not the binding obstacle of accounts exactly
+ * 0). Mirrored here rather than imported for the reason the runtime gives: the
+ * orchestrator takes types and body sizes from the traffic module, not its
+ * model's constants. `orchestrator/__tests__/overtake-return-forced.test.ts`
+ * pins the three numbers to each other.
+ */
+export const OVERTAKE_BRAKED_SHED_MPS = 0.3;
+
+/**
+ * «…HAD TO BRAKE HARD» — the rule engine's own harsh-brake line, read off its
+ * default config (`harshBrakeDecelMps2` 7 m/s², `harshBrakeSustainSec` 0.4 s,
+ * read over `accelWindowSec` 0.04 s) and run through its own gates (`rules/harshBrakeEpisode.ts`) on the
+ * overtaken vehicle's account: 2.8 m/s or more of speed shed in 0.4 s or more
+ * at a mean over 7 m/s². The engine re-checks the window it is handed against
+ * the lesson's live config with the same predicate before it bills; a lesson
+ * that moved either number would see a «braked» it does not bill (and treats
+ * as a lift — no praise). The truck-pass lesson does not move them (its
+ * restage test pins its `ruleConfig`).
+ */
+const OVERTAKE_HARSH_LINE: HarshBrakeLine = {
+  harshBrakeDecelMps2: DEFAULT_RULE_CONFIG.harshBrakeDecelMps2,
+  harshBrakeSustainSec: DEFAULT_RULE_CONFIG.harshBrakeSustainSec,
+  accelWindowSec: DEFAULT_RULE_CONFIG.accelWindowSec,
+};
+
 export class CutInLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -3621,6 +3671,37 @@ export class CutInLeadCarRunner implements EventRunner {
   private indicatorOn = false;
   private indicatorOffAtSec: number | null = null;
   private minDistToCutM = Infinity;
+  /** `spec.overtake` bookkeeping — see `stepOvertakeWatch`. */
+  private passSawBehind = false;
+  private passDrewLevel = false;
+  private passOvertaken = false;
+  private passPrevAlongM: number | null = null;
+  /**
+   * THE RETURN'S ANSWER (`stepOvertakeWatch`, rounds 2–3) — what the
+   * overtaken vehicle has had to do about the car being in its lane in front
+   * of it: "none" while no part of the car is there, "watching" from the frame
+   * some part is until the return is FINISHED, then "clear" (it did not slow
+   * for him) or "lift" (it gave way, not hard); "braked" from the frame its
+   * own account went through the harsh-brake gates; "contact" once the two
+   * bodies have touched (the collision's to bill — nothing more is read).
+   */
+  private passAnswer: "none" | "watching" | "clear" | "lift" | "braked" | "contact" = "none";
+  /** The actor's account (`StagedActorView.playerShedMps`) on the last frame
+   *  the car was NOT in its lane in front of it — what growth is measured from. */
+  private passShedBaseMps = 0;
+  private passPrevShedMps: number | null = null;
+  /** The account's open harsh-brake episode during this watch. */
+  private passTrack: HarshBrakeTrack = newHarshBrakeTrack();
+  /** Seconds the return has held «finished» without a break (see `settleNeedSec`). */
+  private passSettleSec = 0;
+  /** This watch's «lift» has been published (once per watch). */
+  private passLiftPublished = false;
+  /** The actor's own speed when the car came in front of it, m/s. */
+  private passEntrySpeedMps = 0;
+  /** This attempt's return made the vehicle brake HARD (or ended in contact):
+   *  no «overtaken» until the car has dropped wholly behind it and gone round
+   *  again — leaving its lane and coming back does not re-arm it. */
+  private passForced = false;
 
   /**
    * Sized from the actor's OWN profile: sc-vu-child-cyclist stages a CHILD ON
@@ -3754,9 +3835,347 @@ export class CutInLeadCarRunner implements EventRunner {
     this.indicatorOffAtSec = null;
     this.minDistToCutM = Infinity;
     this.contacted = false;
+    this.passSawBehind = false;
+    this.passDrewLevel = false;
+    this.passOvertaken = false;
+    this.passPrevAlongM = null;
+    this.passAnswer = "none";
+    this.passShedBaseMps = 0;
+    this.passPrevShedMps = null;
+    this.passTrack = newHarshBrakeTrack();
+    this.passSettleSec = 0;
+    this.passLiftPublished = false;
+    this.passEntrySpeedMps = 0;
+    this.passForced = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
+    // The encounter itself, exactly as before. A lesson that authors no
+    // `overtake` returns here on every frame — the byte-identity of every
+    // other cut-in in the catalogue is this one line.
+    const resolved = this.stepEncounter(traffic, input, out);
+    if (resolved !== null || this.spec.overtake === undefined) return resolved;
+    return this.stepOvertakeWatch(traffic, input, out);
+  }
+
+  /**
+   * THE TWO FACTS OF AN OVERTAKE, MEASURED IN THE ACTOR'S OWN FRAME
+   * (`CutInLeadCarSpec.overtake`; sc-ac-wind-truck-pass:ff1d4290).
+   *
+   * WHY HERE AND NOT IN A ZONE. A `reachZone` is a place on the road, and a
+   * vehicle that holds its own speed is level with the student at a place
+   * that moves with HIS speed: measured on mw-v1 against a 40 км/ч truck
+   * released 80 m ahead, a student at 50 км/ч draws level some 300 m further
+   * up the road than one at 78. No disc can stand „at the cab". The runner
+   * already holds both live poses, so it says the thing itself.
+   *
+   * `along` is the car's centre ahead of the actor's centre on the actor's
+   * heading; `right` is the car's centre to the actor's right. A REPORT, never
+   * a resolution: `phase` and `outcome` are untouched, so the encounter the
+   * runner was written for (where a lesson authors one) is unaffected.
+   *
+   * SWEPT, NOT SAMPLED: the cab window is about four metres long and a phone
+   * that stalls is integrated at up to 0.5 s a frame (`sessionClockAdvance`),
+   * which at a 60 км/ч closing speed is eight metres. So „level with the cab"
+   * is true on the frame the car is in the window OR has crossed it since the
+   * frame before, while it is in the adjacent lane.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * THE RETURN IS JUDGED BY WHAT THE OVERTAKEN VEHICLE HAD TO DO (round 2,
+   * the round-1 verifier's F-01; the integrator's decision of 2026-10-08 on
+   * the founder's rulings of 2026-09-30 «a … cut-in forcing hard braking IS
+   * the push-out» and 2026-10-05 «bill it only when a … car actually has to
+   * brake or swerve because of the entry, or there is contact»).
+   *
+   * WHAT WAS MEASURED. Round 1 reported «overtaken» on the first frame the car
+   * was in the actor's lane with `clearBumperGapM` between the bumpers. A
+   * student who pulled back in 3.0–6.5 m ahead of the truck was not credited
+   * on that frame — and was credited a second later, because the truck's own
+   * following guard had braked from 40 to 19.5–26.7 км/ч at 8 m/s² and the
+   * ten metres opened BY ITSELF. The lesson passed 3/3 at 0 т., with the lane
+   * change praised «…навреме. Отлично.», at every rung.
+   *
+   * THE FACT IS THE VEHICLE'S OWN. Its traffic model accounts the speed it has
+   * shed BECAUSE OF THE STUDENT (`StagedActorView.playerShedMps` — the staged
+   * player guard's share of each step's slow-down; exactly 0 for a vehicle he
+   * is not the binding obstacle of). This runner differences that account
+   * from the last frame the car was NOT over the vehicle's lane in front of it.
+   *
+   * ROUND 3 — THE WATCH CLOSES ONLY WHEN THE RETURN IS FINISHED (the round-2
+   * verifier's F2-01). Round 2 answered «clear» on the frame the car's CENTRE
+   * crossed the lane line, if the gap was 10.25 m and the truck not yet
+   * braking — the watch watched zero frames. The truck's guard sees a car only
+   * inside its 3 m corridor, a metre further in, so a car SLOWER than the
+   * truck (the slowest lawful passer easing off through the return, a brake
+   * dab from the taught speed) was credited and praised on that frame and the
+   * truck braked from 40 to 24.6–28.6 км/ч 0.6–1.6 s later. PASS 3/3 at L1–L5.
+   * And its one-frame «hard» billed the benign side (F2-02): a car pulling
+   * AWAY 9 m ahead touched the guard for 50 ms, the truck lost 1.44 км/ч, 10 т.
+   *
+   *   · WATCHING — from the first frame ANY PART of the car is over the
+   *     vehicle's lane (its centre within `ownLaneHalfWidthM` plus its own
+   *     half-width of the vehicle's line) and it is no longer wholly behind.
+   *     Published (`laneEntryAnswer` "watching") so the rule engine holds the
+   *     praise of the lane change until the answer is in.
+   *   · BRAKED (HARD) — the vehicle's own SPEED through the product's own
+   *     harsh-brake detector (`rules/harshBrakeEpisode.ts`, the engine's
+   *     causeless ledger line for line: ≥ 7 m/s² held 0.4 s, mean over 7,
+   *     read over the 0.04 s window — 2.8 m/s or more, never a blip), with the
+   *     speed it shed in that brake on its account of speed shed because of
+   *     him. Published on the frame that becomes true; the engine bills
+   *     LANE_ENTRY_FORCED_BRAKING (the founder's two rulings). From this frame
+   *     the attempt's return is spent: no «overtaken», whatever gap the
+   *     braking then opens — through leaving the lane and coming back in, too
+   *     (`passForced` is cleared only when the car drops wholly behind).
+   *   · LIFT — the account has grown by `OVERTAKE_BRAKED_SHED_MPS` (0.3 m/s,
+   *     the traffic model's own line between «holding its speed» and
+   *     «braking», the roundabout ruling's size) and the brake it grew in is
+   *     OVER without having been hard. Published once per watch on that frame;
+   *     the engine bills the product's own line for exactly this,
+   *     OVERTAKE_RETURN_TOO_EARLY («…и го принуди да намали», основна), and
+   *     withholds the praise. The watch stays open: a later hard brake in it
+   *     is still «braked».
+   *   · FINISHED — the car settled in the vehicle's lane (centre within
+   *     `establishedHalfWidthM`, heading within `establishedHeadingDeg` of the
+   *     vehicle's), at least `clearBumperGapM` between the bumpers (outside the
+   *     guard's reach), NOT SLOWER than the vehicle, and the account not
+   *     growing — all held without a break for `settleNeedSec` (the vehicle
+   *     driving its guard's whole reach: 16.0 m at 11.11 m/s = 1.44 s). Then
+   *     «clear» is published if the vehicle never gave way, and «overtaken»
+   *     is reported if the car had drawn level and the attempt is not spent.
+   *     A car slower than the vehicle is never finished: it is judged by what
+   *     the vehicle then does, exactly like a faster one.
+   *
+   * A car that leaves the lane again before the watch closes ends it with
+   * «lift» or «clear» by the account (if not already answered) and no credit;
+   * the next entry is a new watch. A CONTACT with the vehicle while the watch
+   * is open ends it with no answer at all: the collision is billed by the
+   * rule engine off the sentinel's report, the return is spent, and what the
+   * vehicle does afterwards about the car stopped in front of it is not read
+   * as a second act. After the watch closes nothing more is read: a driver
+   * who later brake-checks the vehicle he overtook has not ENTERED its lane,
+   * and that is another rule's matter (the harsh-brake detector).
+   *
+   * WHAT IT NEEDS FROM THE PORT, AND WHAT IT DOES WITHOUT. The account and the
+   * published state id are optional on the view (fake ports in unit tests).
+   * With no account the vehicle is read as never having slowed; with no state
+   * id nothing is published to the rule engine.
+   */
+  private stepOvertakeWatch(
+    traffic: StagedTrafficPort,
+    input: DirectorInput,
+    out: SimTickEvent[],
+  ): StagedEventOutcome | null {
+    const watch = this.spec.overtake;
+    if (watch === undefined || this.phase === "resolved") return null;
+    const actor = traffic.staged(this.spec.id);
+    if (!actor) return null;
+    const dLen = Math.hypot(actor.dirX, actor.dirY);
+    if (!(dLen > 0)) return null;
+    const dx = actor.dirX / dLen;
+    const dy = actor.dirY / dLen;
+    const rx = input.x - actor.x;
+    const ry = input.y - actor.y;
+    const along = rx * dx + ry * dy;
+    const right = rx * dy - ry * dx;
+    const prevAlong = this.passPrevAlongM;
+    this.passPrevAlongM = along;
+
+    const halfActor = vehicleHalfLengthM(this.spec.actor.profile);
+    const windowEndM = halfActor + PLAYER_HALF_LENGTH_M;
+    // The vehicle's own account of speed shed because of the student, and how
+    // much of it is this frame's.
+    const shedNow = actor.playerShedMps;
+    const prevShed = this.passPrevShedMps;
+    this.passPrevShedMps = shedNow ?? null;
+    const shedThisFrame = shedNow !== undefined && prevShed !== null && shedNow > prevShed ? shedNow - prevShed : 0;
+    // Wholly behind the actor: where every attempt starts, and what re-arms
+    // the pair — a car that drops back and goes round again is measured again.
+    if (along < -windowEndM) {
+      this.passSawBehind = true;
+      this.passDrewLevel = false;
+      this.passOvertaken = false;
+      this.passForced = false;
+      this.closeReturnWatch(actor, out);
+      return null;
+    }
+    if (!this.passSawBehind) return null;
+
+    // Travelling the actor's way (a car facing it is not overtaking it).
+    const hRad = (input.headingDeg * Math.PI) / 180;
+    const sameWay = Math.sin(hRad) * dx + Math.cos(hRad) * dy > 0.7;
+    const bumperGapM = along - windowEndM;
+
+    // THE RETURN'S ANSWER — see the docblock (round 3: «THE WATCH CLOSES ONLY
+    // WHEN THE RETURN IS FINISHED»).
+    const overLane = Math.abs(right) < watch.ownLaneHalfWidthM + PLAYER_HALF_WIDTH_M;
+    if (!overLane) {
+      this.closeReturnWatch(actor, out);
+    } else {
+      if (this.passAnswer === "none") {
+        this.passAnswer = "watching";
+        // Its speed before any of this frame's braking for him.
+        this.passEntrySpeedMps = actor.speedMps + shedThisFrame;
+        this.passTrack = newHarshBrakeTrack();
+        this.passSettleSec = 0;
+        this.passLiftPublished = false;
+        this.publishReturnAnswer(actor, out, "watching", 0, null);
+      }
+      // THE BODIES TOUCHED: the entry ended in a collision, which the
+      // director's sentinel reports and the rule engine bills. Whatever the
+      // vehicle then does about the car stopped in front of it is that
+      // crash's aftermath, not a second act — so nothing more is read, the
+      // return is spent, and the rule engine's watch stays OPEN (no «clear»
+      // is published here: a lane change that ended against the vehicle's
+      // side must not be told it was in time) until the car leaves the lane
+      // or drops behind.
+      if (this.contacted && this.passAnswer === "watching") {
+        this.passAnswer = "contact";
+        this.passForced = true;
+      }
+      if (this.passAnswer === "watching") {
+        const grownMps = shedNow === undefined ? 0 : shedNow - this.passShedBaseMps;
+        // HARD — the vehicle's own SPEED through the product's own harsh-brake
+        // detector (read exactly as the engine reads a car's: the windowed
+        // derivative, the two gates), and the speed it shed in that brake
+        // shed BECAUSE OF HIM on its own account. Without an account nothing
+        // is claimed (a fake port).
+        const read =
+          shedNow === undefined
+            ? null
+            : stepHarshBrakeTrack(this.passTrack, input.tSec, this.passEntrySpeedMps - actor.speedMps, OVERTAKE_HARSH_LINE);
+        const hard = read !== null && grownMps >= read.shedMps - 1e-6 ? read : null;
+        if (hard !== null) {
+          this.passAnswer = "braked";
+          this.passForced = true;
+          this.publishReturnAnswer(actor, out, "braked", grownMps, hard);
+        } else {
+          // LIFT — the vehicle gave way to him (its account past the
+          // brake-lamp line) and the brake it gave way with is OVER without
+          // having been hard: published once, on the frame that is known (the
+          // engine bills it with the product's own «you came back too soon»,
+          // OVERTAKE_RETURN_TOO_EARLY, and withholds the praise). The watch
+          // stays open: the return is not finished, and a later hard brake in
+          // it is still «braked».
+          if (!this.passLiftPublished && grownMps >= OVERTAKE_BRAKED_SHED_MPS && this.passTrack.anchorT === null) {
+            this.passLiftPublished = true;
+            this.publishReturnAnswer(actor, out, "lift", grownMps, null);
+          }
+          // FINISHED — settled in the lane, clear of the vehicle's reach, not
+          // being caught, and the vehicle not answering, for the settle time.
+          const headingCos = Math.sin(hRad) * dx + Math.cos(hRad) * dy;
+          const alongSpeedMps = (input.speedKmh / 3.6) * headingCos;
+          const settling =
+            Math.abs(right) < watch.establishedHalfWidthM &&
+            headingCos >= Math.cos((watch.establishedHeadingDeg * Math.PI) / 180) &&
+            bumperGapM >= watch.clearBumperGapM &&
+            alongSpeedMps >= actor.speedMps &&
+            shedThisFrame === 0;
+          this.passSettleSec = settling ? this.passSettleSec + Math.max(0, input.dtSec) : 0;
+          if (this.passSettleSec >= this.settleNeedSec(windowEndM)) {
+            // (A lifted return's answer is already in; a clean one's is now.)
+            this.passAnswer = this.passLiftPublished ? "lift" : "clear";
+            if (!this.passLiftPublished) this.publishReturnAnswer(actor, out, "clear", 0, null);
+          }
+        }
+      }
+    }
+
+    if (!this.passDrewLevel) {
+      const lateral = watch.side === "left" ? -right : right;
+      const inAdjacentLane = lateral >= watch.adjacentLaneM[0] && lateral <= watch.adjacentLaneM[1];
+      const inOrThroughCabWindow =
+        along >= watch.abeamFromM && (along <= windowEndM || (prevAlong !== null && prevAlong < windowEndM));
+      // GAINING on the actor, not being passed by it: a car that has slowed or
+      // stopped beside the road is level with the cab too, for a moment, as the
+      // truck drives by — and that is the truck overtaking the car.
+      const gaining = prevAlong !== null && along > prevAlong;
+      if (inAdjacentLane && inOrThroughCabWindow && gaining && sameWay && input.speedKmh > 4) {
+        this.passDrewLevel = true;
+        return outcomeOf(this.spec, input, true, "drewLevel", {
+          approachSpeedKmh: Math.abs(input.speedKmh),
+        });
+      }
+      return null;
+    }
+
+    // «Overtaken»: the return is FINISHED in the vehicle's lane with the whole
+    // of it behind, and the vehicle never braked HARD for it (`passAnswer` is
+    // "clear" or "lift" only on the frame the watch closed in the lane — and
+    // never in an attempt whose return it braked hard for: `passForced` holds
+    // through leaving and re-entering its lane until the car drops wholly
+    // behind it).
+    if (!this.passOvertaken && !this.passForced && (this.passAnswer === "clear" || this.passAnswer === "lift") && sameWay) {
+      this.passOvertaken = true;
+      return outcomeOf(this.spec, input, true, "overtaken", {
+        approachSpeedKmh: Math.abs(input.speedKmh),
+      });
+    }
+    return null;
+  }
+
+  /**
+   * How long the return must hold «finished» before the watch closes, s —
+   * the time the vehicle takes, at its own scheduled speed, to drive the whole
+   * reach of its following guard (`clearBumperGapM` between the bumpers plus
+   * the two half-lengths, i.e. the guard's 16 m from its centre): for that
+   * long the car was settled in front of it, beyond everything the guard
+   * watches, not being caught — and the guard said nothing. 16.0 m at the
+   * lesson truck's 11.11 m/s is 1.44 s.
+   */
+  private settleNeedSec(windowEndM: number): number {
+    const watch = this.spec.overtake!;
+    const v = this.spec.paceSpeedMps ?? this.spec.actor.cruiseSpeedMps;
+    return v > 0 ? (watch.clearBumperGapM + windowEndM) / v : 0;
+  }
+
+  /** Publish one phase of the return's answer to the rule engine — nothing
+   *  without the vehicle's published state id (a fake port). */
+  private publishReturnAnswer(
+    actor: StagedActorView,
+    out: SimTickEvent[],
+    phase: "watching" | "clear" | "lift" | "braked",
+    shedMps: number,
+    hard: HarshBrakeVerdict | null,
+  ): void {
+    if (actor.stateId === undefined) return;
+    out.push({
+      kind: "laneEntryAnswer",
+      vehicleId: actor.stateId,
+      phase,
+      shedMps,
+      decelMps2: hard?.meanDecelMps2 ?? 0,
+      heldSec: hard?.heldSec ?? 0,
+      qualifiedSec: hard?.qualifiedSec ?? 0,
+      speedMps: this.passEntrySpeedMps,
+      act: "overtakeReturn",
+    });
+  }
+
+  /** No part of the car is over the vehicle's lane in front of it (or it is
+   *  wholly behind): an open watch ends with what the vehicle did — «lift» if
+   *  its account grew past the brake-lamp line, «clear» if not — and with no
+   *  credit (the car is not in the lane); a contact's open watch ends «clear»
+   *  (its praise is already withheld by the collision). The account's baseline
+   *  follows the account — growth is measured from the last frame he was NOT
+   *  there. `passForced` is NOT touched: a return the vehicle braked hard for
+   *  stays spent until the car has dropped wholly behind it. */
+  private closeReturnWatch(actor: StagedActorView, out: SimTickEvent[]): void {
+    if (this.passAnswer === "watching" && !this.passLiftPublished) {
+      const grownMps = actor.playerShedMps === undefined ? 0 : actor.playerShedMps - this.passShedBaseMps;
+      const lifted = grownMps >= OVERTAKE_BRAKED_SHED_MPS;
+      this.publishReturnAnswer(actor, out, lifted ? "lift" : "clear", lifted ? grownMps : 0, null);
+    } else if (this.passAnswer === "contact") {
+      this.publishReturnAnswer(actor, out, "clear", 0, null);
+    }
+    this.passAnswer = "none";
+    this.passShedBaseMps = actor.playerShedMps ?? 0;
+    this.passTrack = newHarshBrakeTrack();
+    this.passSettleSec = 0;
+    this.passLiftPublished = false;
+  }
+
+  private stepEncounter(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
     const s = this.spec;
     if (this.phase === "resolved") return null;
     const actor = traffic.staged(s.id);
@@ -4046,12 +4465,21 @@ export class RearTailgaterRunner implements EventRunner {
   /** L6 indicator bookkeeping (the pass is a lane change and owes a lamp). */
   private indicatorOn = false;
   private indicatorOffAtSec: number | null = null;
+  /**
+   * WHAT THE GLUED CAR HAD TO DO (`followerBraked`, sc-follow-tailgater:63c0c28c)
+   * — its own speed through the product's harsh-brake gates while it is glued
+   * behind him under the matchPlayer law; see `stepFollowerAccount`.
+   */
+  private followTrack: HarshBrakeTrack = newHarshBrakeTrack();
+  /** The speed the account is measured from (the first glued frame), m/s. */
+  private followRefMps: number | null = null;
 
   constructor(readonly spec: RearTailgaterSpec) {}
 
   /**
    * NO CAST BY POLICY (see the block comment above): this actor is PRESSURE
-   * SCENERY that emits zero SimTick events, ever. It is the one staged body
+   * SCENERY that grades nothing itself (its one event, `followerBraked`, is a
+   * report of its own hard brake — `stepFollowerAccount`). It is the one staged body
    * that approaches from BEHIND, and a rear-end by a car glued to your bumper
    * is not the student's fault — billing it here would convict the victim. The
    * safety is structural, not a hope: the authored decel cap (12 m/s², above
@@ -4098,6 +4526,68 @@ export class RearTailgaterRunner implements EventRunner {
     this.sawYield = false;
     this.indicatorOn = false;
     this.indicatorOffAtSec = null;
+    this.followTrack = newHarshBrakeTrack();
+    this.followRefMps = null;
+  }
+
+  /**
+   * THE CLOSE FOLLOWER'S ACCOUNT — «did the car glued to his bumper have to
+   * brake HARD because of him?» (2026-10-09 · sc-follow-tailgater:63c0c28c
+   * C1/C2a; the founder's principle, ruled 2026-09-30 and 2026-10-05: a
+   * conviction about another car rests on what that car ACTUALLY had to do).
+   *
+   * READ ONLY WHILE THE CAR IS A CLOSE FOLLOWER WHOSE EVERY BRAKE IS HIS:
+   *   · GLUED — latched (`latchedAt`: once within followBehindM + the latch
+   *     slack, the runner's own definition of the лепка pose);
+   *   · UNDER THE matchPlayer LAW — before the pass is commanded, or a
+   *     passShiftM-0 pass degraded to keeping station. That law's only input is
+   *     his pace and the gap to him (staged.ts `matchPlayer`: target = his
+   *     speed + gain × gap error), so every m/s the car sheds under it is shed
+   *     because of him. A car already cruising round him on its pass is not
+   *     read — measured at c38086a, its pass guard does not brake for a student
+   *     who keeps to his own lane, so there is nothing of his to read;
+   *   · HE IS AHEAD OF IT IN ITS LANE (`playerAheadInActorLane` — the station
+   *     law's own test; a view without a lane width answers false and nothing
+   *     is read).
+   * Any frame that is not all three restarts the account, so a brake is read
+   * WHOLE inside one glued stretch: a car that stops being glued (he leaves its
+   * lane, or its pass takes it off his tail) and is glued again later starts
+   * from the speed it has THEN — what it shed while it was not reading him is
+   * not his brake (pinned in tailgater-follower-account.test.ts).
+   *
+   * „HARD" IS THE PRODUCT'S OWN LINE, not a new one: the car's speed through
+   * `stepHarshBrakeTrack` on `OVERTAKE_HARSH_LINE` (the engine's defaults:
+   * over 7 m/s² held 0.4 s, mean exclusive, read over 0.04 s) — the very gates
+   * the student's own brake is judged at. Reported once per braking episode,
+   * on the frame it becomes true, with the window; the rule engine re-checks it
+   * against the lesson's config and bills only a causeless emergency-grade
+   * brake of his that the 35 км/ч floor alone acquitted (engine.ts „THE FLOOR
+   * LIFTS FOR A FOLLOWER IT PUT AT RISK"). Without a published state id
+   * nothing is reported (a fake port), as for `laneEntryAnswer`.
+   */
+  private stepFollowerAccount(actor: StagedActorView, input: DirectorInput, behindM: number, out: SimTickEvent[]): void {
+    const glued =
+      this.latchedAt !== null &&
+      (!this.passCommanded || this.passMode === "station") &&
+      playerAheadInActorLane(actor, input);
+    if (!glued) {
+      this.followTrack = newHarshBrakeTrack();
+      this.followRefMps = null;
+      return;
+    }
+    if (this.followRefMps === null) this.followRefMps = actor.speedMps;
+    const hard = stepHarshBrakeTrack(this.followTrack, input.tSec, this.followRefMps - actor.speedMps, OVERTAKE_HARSH_LINE);
+    if (hard === null || actor.stateId === undefined) return;
+    out.push({
+      kind: "followerBraked",
+      vehicleId: actor.stateId,
+      decelMps2: hard.meanDecelMps2,
+      heldSec: hard.heldSec,
+      qualifiedSec: hard.qualifiedSec,
+      shedMps: hard.shedMps,
+      speedMps: actor.speedMps + hard.shedMps,
+      gapM: behindM - vehicleHalfLengthM(this.spec.actor.profile) - PLAYER_HALF_LENGTH_M,
+    });
   }
 
   /**
@@ -4132,7 +4622,7 @@ export class RearTailgaterRunner implements EventRunner {
     }
   }
 
-  step(traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
+  step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
     const s = this.spec;
     if (this.phase === "resolved") return null;
     const actor = traffic.staged(s.id);
@@ -4171,7 +4661,10 @@ export class RearTailgaterRunner implements EventRunner {
     }
 
     // triggered — glued pressure, then the pass, then the resolution.
-    // NO adjudication and NO events: pressure scenery (learn-only, A12).
+    // NO adjudication of its own (learn-only, A12): the one thing it reports is
+    // what the glued car had to do (`stepFollowerAccount`), read under the law
+    // that moved it on this frame — before this frame's latch and commands.
+    this.stepFollowerAccount(actor, input, behindM, out);
     if (this.latchedAt === null) {
       if (
         !this.passCommanded &&
@@ -4444,6 +4937,7 @@ export class OncomingStreamRunner implements EventRunner {
           profile: s.actor.profile,
           playerGuard: true, // never ram the gambler — the runtime's
           // gap-memory latch keeps the conviction honest past the rescue
+          ...(s.oneRun === true ? { oneRun: true } : {}),
         });
         if (!view) throw new Error(`staged event ${s.id}: oncoming car ${i} failed to stage`);
         // A gap wider than the head's own hold arc drives this car to a NEGATIVE

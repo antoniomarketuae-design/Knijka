@@ -33,7 +33,7 @@ import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "./objectives";
 // name WHICH site a wait or a conviction belongs to — imported for the same
 // reason the arc above is: the hold and the voice may not disagree about where
 // „this junction" ends.
-import { YIELD_ROUNDABOUT_APPROACH_M, YIELD_STOP_LINE_REACH_M } from "./finish";
+import { CRASH_PIN_DRIVING_KMH, YIELD_ROUNDABOUT_APPROACH_M, YIELD_STOP_LINE_REACH_M } from "./finish";
 import { parseScenarioLessonId } from "./scenario";
 // Deep, not through the `./scenario` barrel: the barrel line belongs in
 // scenario/index.ts, a file this lane does not own. The value import above
@@ -888,6 +888,15 @@ export type RouteHold = "crashPinned" | "offRoad";
  * own 10 s ending in the pure-standstill case, so the qualification is read
  * rather than skipped, and the off-road clause takes the same number rather
  * than inventing a second one.
+ *
+ * THE FIVE SECONDS BEFORE IT ARE NOT AN ORDER EITHER (sc-roundabout-entry:
+ * 4ab693eb clause 2, rig-w2). This number is when the coach may SAY „pinned";
+ * it was never a licence to go on issuing the objective until then. No founder
+ * ruling fixes that window — the one cited for it (2026-09-27, «flash + shake +
+ * chase cut IS the crash response») rules out a damage model and says nothing
+ * about the coach line — so the window is governed by
+ * `objectiveWithheldAfterImpact` below, and this number is unchanged. The
+ * driving floor in the derivation above is `finish.ts CRASH_PIN_DRIVING_KMH`.
  */
 export const ROUTE_HOLD_S = 5;
 
@@ -1065,6 +1074,58 @@ const ROUTE_HOLD_PEEK_BG: Record<RouteHold, string> = {
   offRoad: "Не дърпай волана — тук сцеплението е друго.",
 };
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * FROM THE IMPACT UNTIL THE CAR IS DRIVING AGAIN, THE OBJECTIVE IS NOT ISSUED
+ * — sc-roundabout-entry:4ab693eb [critical], clause 2.
+ *
+ * THE FRAMES. rig-w2 at 43b4109, `pc-L3-island-b-22/-25` (Level 3, advisor
+ * on): the car steered into the central island, the product cut to the chase
+ * view and put up −10 «Удар в неподвижно препятствие» (ЗДвП чл. 20, ал. 2) on
+ * the contact tick — and the coach card under the banner went on reading
+ * «Излез от кръговото с десен мигач» at +0.05, +1.2, +1.9 and +3.2 s with the
+ * car at 0 км/ч against the kerb. The recovery card came at +5.2 s. An order
+ * the car cannot carry out, beside the card saying it has just crashed: the
+ * same THEO-4 crime `routeHoldAdvisorPrompt` exists for, five seconds early.
+ *
+ * WHY NOT SHORTEN ROUTE_HOLD_S. That number decides when the coach may CLAIM
+ * the car is pinned, and its derivation is what makes the claim true; at the
+ * contact tick nobody knows yet whether the car will reverse out, so the
+ * pinned card may not come sooner. What is false from the contact tick is the
+ * OBJECTIVE, issued to a car that is not driving. So it is withdrawn — nothing
+ * replaces it: the fault card on the glass already names the crash, its law
+ * and its why, and the module has no retrieved line that is true of every
+ * just-crashed car on every frame (the pinned card asserts the pin). No new
+ * sentence is written.
+ *
+ * THE WINDOW. Armed by the crash pin (a scored COLLISION, `engine.ts`), and
+ * over when the car is DRIVING AGAIN: it has come to rest since the impact
+ * (`crashPin.cameToRest`) and now moves faster than
+ * `finish.ts CRASH_PIN_DRIVING_KMH` — the floor ROUTE_HOLD_S was derived from
+ * — either way (reversing out counts). A car still sliding off the impact is
+ * not driving again; a car that leaves CRASH_PIN_RADIUS_M drops the pin and
+ * the objective is back; at ROUTE_HOLD_S the pinned card (ranked above) takes
+ * over exactly as before. No collision → no pin → nothing here moves.
+ *
+ * WHAT IT DOES NOT TOUCH. The banner (`routeHoldForSession` and the shell's
+ * `objectiveTitleUnderHold`): the banner states the task, which is still
+ * owed, and qualifying it before ROUTE_HOLD_S would assert „pinned" before it
+ * is known. The live-yield cards: they are waits, not manoeuvres, and rank
+ * above this as they rank above the objective.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function objectiveWithheldAfterImpact(s: LessonSessionState): boolean {
+  const pin = s.crashPin;
+  if (pin === undefined) return false;
+  const v = s.lastTick?.speedKmh;
+  const drivingAgain =
+    pin.cameToRest === true &&
+    v !== undefined &&
+    Number.isFinite(v) &&
+    Math.abs(v) > CRASH_PIN_DRIVING_KMH;
+  return !drivingAgain;
+}
+
 /** The card the coach shows instead of an unobeyable objective. */
 export function routeHoldAdvisorPrompt(hold: RouteHold): CoachedAdvisorPrompt {
   return {
@@ -1179,6 +1240,10 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
   // the sheet no longer grades it, so the sentence stops asking for it — and
   // with it the strip and the banner, which print this sentence's figure
   // (`LessonPlayShell taskCapKmhFromPrompt` / `snapshotOf`).
+  // sc-roundabout-entry:4ab693eb clause 2 — a car standing at what it has just
+  // hit is not issued the manoeuvre (see `objectiveWithheldAfterImpact`).
+  if (objectiveWithheldAfterImpact(s)) return null;
+
   if (taskCapReleased(s)) return taskSentencePrompt(active.spec.titleBg, []);
 
   // The author's own cap comes off the RAW compiled objective, not off

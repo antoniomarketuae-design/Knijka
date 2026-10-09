@@ -318,6 +318,21 @@ const FOUNDERS_61 = [
   "sc-acbi-deck", "sc-acw-pass", "sc-hzbp-approach", "sc-ecoc-coast", "sc-lndc-wait",
 ];
 
+/**
+ * ONE OF THE 61 NO LONGER HAS A MARK ON THE ROAD (sc-ac-wind-truck-pass:ff1d4290,
+ * the restage of 2026-10-08). «Излез в лявата лента до кабината…» is judged
+ * beside a truck that now holds its own speed (`ReachZoneParams.stagedPass`),
+ * so there is no disc for the census below — which drives a shadow's polyline
+ * with no director and no truck — to blow. Its cap is still billed as an
+ * ARRIVAL, on the frame the truck's runner reports the car level with the cab
+ * over the bill line (`lessons/engine.ts stagedPassCapArrival`); that bill is
+ * driven with the lesson's own staged truck, and asserted to land exactly
+ * once, in `scenario/__tests__/wind-truck-pass-restage.test.ts` §5 (L1, L3 and
+ * L5). It stays in the founder's list — the ruling still covers it — and is
+ * taken out of THIS census by name, not by a filter that could hide another.
+ */
+const STAGED_MARK = ["sc-acw-pass"];
+
 interface CensusRow {
   id: string;
   lv: number;
@@ -367,8 +382,10 @@ describe("A · ruling 4 — the arrival is billed at EVERY blown cap (the integr
 
   it("every capped objective of every practice rung, blown at a graded cap: EXACTLY ONE TASK bill, taught with the arrival copy — named features included", () => {
     const p20 = rows.filter((r) => r.prof === "p20" && blown(r));
-    // Not vacuous: 329 blown-at-a-graded-cap rows on the committed content.
-    expect(p20.length).toBeGreaterThanOrEqual(320);
+    // Not vacuous: 318 blown-at-a-graded-cap rows on the committed content (322
+    // until sc-acw-pass's four practice rungs moved to a staged mark — STAGED_MARK).
+    expect(p20.length).toBeGreaterThanOrEqual(318);
+    expect(p20.filter((r) => STAGED_MARK.includes(r.obj))).toEqual([]);
     const bad = p20.filter(
       (r) =>
         r.d.coachedTask.length !== 1 ||
@@ -400,14 +417,15 @@ describe("A · ruling 4 — the arrival is billed at EVERY blown cap (the integr
   it("the founder's 61, each blown at L3: every one produces a TASK card (round-5 verifier F1 — the four short features and sc-prs-row included)", () => {
     const got = new Map<string, CensusRow>();
     for (const r of rows) if (r.prof === "p20" && r.lv === 3 && blown(r) && FOUNDERS_61.includes(r.obj)) got.set(r.obj, r);
-    expect([...got.keys()].sort()).toEqual([...FOUNDERS_61].sort());
+    expect(FOUNDERS_61).toHaveLength(61);
+    expect([...got.keys()].sort()).toEqual(FOUNDERS_61.filter((o) => !STAGED_MARK.includes(o)).sort());
     const unbilled = [...got.values()].filter((r) => r.d.coachedTask.length + r.d.chargedTask.length !== 1).map((r) => r.obj);
     expect(unbilled).toEqual([]);
   });
 
   it("held over the cap for 12 s after the blow, on every row: ONE TASK card, never a second first bill, and any charge is the act's one re-grade", () => {
     const hold = rows.filter((r) => r.prof === "hold" && blown(r));
-    expect(hold.length).toBeGreaterThanOrEqual(320);
+    expect(hold.length).toBeGreaterThanOrEqual(318);
     const bad = hold.filter(
       (r) =>
         r.d.coachedTask.length !== 1 ||

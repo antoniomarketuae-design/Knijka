@@ -133,10 +133,6 @@
   "В лявата лента обаче вече имаше кола, която идваше отзад съвсем близо: тя се движи по своята лента, а твоята свършва — значи ти си този, който се съобразява (чл. 25, ал. 2).": {
    "class": "other"
   },
-  "В лявата лента сме, а завет няма — вятърът натиска през цялото време.": {
-   "class": "other",
-   "why": "a description of the recording (sc-ac-wind-truck-pass correct demo, during the overtake): where the car is while it passes and that the wind keeps pushing because the staged truck gives no shelter — the overtake lane in use, not the чл. 15, ал. 1 duty or the town lane choice"
-  },
   "В лявата лента съм, зелено е — оттук нататък само следвам стрелката.": {
    "class": "other"
   },
@@ -1545,6 +1541,10 @@
   "След вливането първо се установяваш в дясната лента и стабилизираш скоростта.": {
    "class": "other"
   },
+  "След изпреварване остани в лентата за изпреварване, докато видиш в огледалото ЦЯЛОТО превозно средство, което задмина — чак тогава десен мигач и плавно надясно.": {
+   "class": "other",
+   "why": "the corrective of LANE_ENTRY_FORCED_BRAKING/overtakeReturn (sc-ac-wind-truck-pass round 2): it is shown on the bill for a return ALREADY made too close in front of the overtaken vehicle and says how long to stay out before moving back (ЗДвП чл. 42, ал. 1, т. 2) — it asserts neither the чл. 15, ал. 1 keep-right duty nor the town lane choice, and can be shown only where a lesson stages a vehicle to overtake and arms the rule (the motorway lesson)"
+  },
   "След изпреварване се прибери вдясно веднага щом видиш изпреварания в огледалото за обратно виждане — лявата лента е за маневри, не за пътуване.": {
    "class": "duty"
   },
@@ -1720,6 +1720,10 @@
   },
   "Установи се стабилно в дясната лента с постоянна скорост и наблюдавай съседната лента.": {
    "class": "other"
+  },
+  "Целият камион е в огледалото — десен мигач и се прибираме плавно в дясната лента.": {
+   "class": "other",
+   "why": "a description of the recording (sc-ac-wind-truck-pass correct demo, after the pass): the return to the lane the overtake started from, once the whole truck is behind — it asserts neither the keep-right duty nor the town choice"
   },
   "Целта не е таванът, а ритъмът на потока — в дясната лента за движение.": {
    "class": "other"

@@ -228,6 +228,7 @@ const CASES = [
     base: { scenarioId: "sc-ac-crosswind" },
     committed: SC_AC_CROSSWIND.shadow.path,
     record: () => recordScAcCrosswindDrive(FO, "shadow-correct"),
+    held: WIND as HeldWheelWind,
     /** The stretch the lesson teaches on. */
     windy: (s: TraceSample) => s.speedKmh > 31 && s.speedKmh < 37,
   },
@@ -241,7 +242,19 @@ const CASES = [
     },
     committed: SC_AC_WIND_TRUCK_PASS.shadow.path,
     record: () => recordScAcWindTruckPassDrive(MW, "shadow-correct"),
-    windy: (s: TraceSample) => s.speedKmh > 66,
+    // The motorway sibling's wind has a LEE since the restage of 2026-10-08
+    // (sc-ac-wind-truck-pass:ff1d4290): the held wheel is computed from the
+    // sheltered force at each pose, against the truck the recorder stages.
+    held: {
+      ...WIND,
+      shelter: {
+        physics: SC_AC_WIND_TRUCK_PASS.physics,
+        stagedEvents: [...(SC_AC_WIND_TRUCK_PASS.staged ?? [])] as StagedEventSpec[],
+      },
+    } as HeldWheelWind,
+    // The open-wind stretch: the straight run after the return (the pass
+    // itself is made at 62 км/ч, part of it in the lee — measured below).
+    windy: (s: TraceSample) => s.y > 440 && s.speedKmh > 66,
   },
 ] as const;
 
@@ -249,7 +262,7 @@ describe("the held wheel changes the wheel channel and NOTHING else — poses, e
   for (const c of CASES) {
     it(`${c.id}: recorded with and without it`, () => {
       const plain = census(c.district, c.script(), c.base);
-      const held = census(c.district, c.script(), c.base, WIND);
+      const held = census(c.district, c.script(), c.base, c.held);
       // The production ticks the stack stepped and graded: the same objects.
       expect(held.ticks).toBe(plain.ticks);
       expect(held.tickSha).toBe(plain.tickSha);
@@ -345,34 +358,46 @@ describe("the committed correct demo SHOWS the held correction on the windy stre
     }
   });
 
-  it("sc-ac-wind-truck-pass: the wheel is held on the WHOLE drive — behind the truck and in the overtaking lane alike", () => {
-    // The caption this demo used to carry here said «вятърът мълчи». The wheel
-    // says otherwise, at the size the live car needs at these speeds.
+  it("sc-ac-wind-truck-pass: the wheel is held wherever the wind is — behind the truck and past it — and EASED to the lee's 30 % beside it", () => {
+    // Until the restage this demo held the whole open-wind correction through
+    // the overtaking lane too, because the wind had no lee (and the truck was
+    // 60 m up the road). It has one now (sc-ac-wind-truck-pass:ff1d4290), the
+    // briefing's step 6 says «отпусни корекцията плавно», and the demo's wheel
+    // does: on the metres the live car's wind is at 30 %, the ghost holds 30 %
+    // of the correction — exactly.
     const trace = parseScenarioTrace(loadJson(SC_AC_WIND_TRUCK_PASS.shadow.path))!;
     // Three STRAIGHT stretches, each more than a second clear of any polyline
     // vertex, so the wheel there is the held correction and nothing else:
-    // behind the truck in the cruise lane, in the overtaking lane on the
-    // stretch the old caption called its lee, and back in the cruise lane.
+    // behind the truck in the cruise lane (open wind), beside it in the
+    // overtaking lane (its full lee — the trace gate measures the truck there),
+    // and back in the cruise lane (open wind again).
     const regions = [
-      { name: "behind the truck (cruise lane, y 60–100)", keep: (s: TraceSample) => s.y > 60 && s.y < 100 && Math.abs(s.x) < 0.01 },
-      { name: "the overtaking lane (y 225–268)", keep: (s: TraceSample) => s.y > 225 && s.y < 268 && Math.abs(s.x + 8.12) < 0.01 },
-      { name: "after the return (cruise lane, y 500–560)", keep: (s: TraceSample) => s.y > 500 && s.y < 560 && Math.abs(s.x) < 0.01 },
-    ];
+      { name: "behind the truck (cruise lane, y 40–85)", share: 1, band: [0.006, 0.04], keep: (s: TraceSample) => s.y > 40 && s.y < 85 && Math.abs(s.x) < 0.01 },
+      { name: "beside the truck, in its lee (overtaking lane, y 240–262)", share: 0.3, band: [0.0015, 0.012], keep: (s: TraceSample) => s.y > 240 && s.y < 262 && Math.abs(s.x + 8.12) < 0.01 },
+      { name: "after the return (cruise lane, y 500–560)", share: 1, band: [0.006, 0.04], keep: (s: TraceSample) => s.y > 500 && s.y < 560 && Math.abs(s.x) < 0.01 },
+    ] as const;
     for (const r of regions) {
       const xs = trace.samples.filter(r.keep);
-      expect(xs.length, r.name).toBeGreaterThan(40); // two seconds and more
+      expect(xs.length, r.name).toBeGreaterThan(r.share === 1 ? 40 : 20); // a second and more
       for (const s of xs) {
-        const pull = crosswindSteerPullRad(-forceAt(s.tSec), s.speedKmh / 3.6);
-        // Held to the RIGHT — toward the truck from the overtaking lane, as
-        // step 7 says — and it is exactly the wheel that cancels the wind.
-        expect(s.steerRad, `${r.name} t=${s.tSec}`).toBeLessThan(-0.002);
+        const pull = crosswindSteerPullRad(-forceAt(s.tSec) * r.share, s.speedKmh / 3.6);
+        // Held to the RIGHT, and it is exactly the wheel that cancels the wind
+        // that reaches the car there.
+        expect(s.steerRad, `${r.name} t=${s.tSec}`).toBeLessThan(-0.0005);
         expect(Math.abs(s.steerRad + pull), `${r.name} t=${s.tSec}`).toBeLessThan(1e-9);
-        // 0.7–3.7 % of the lock at these speeds (the gust's lull and peak).
+        // 0.7–3.7 % of the lock in the open wind at these speeds (the gust's
+        // lull and peak); a third of that in the lee.
         const share = -s.steerRad / lockRad(s.speedKmh);
-        expect(share).toBeGreaterThan(0.006);
-        expect(share).toBeLessThan(0.04);
+        expect(share, r.name).toBeGreaterThan(r.band[0]);
+        expect(share, r.name).toBeLessThan(r.band[1]);
       }
     }
+    // …and it comes back within half a second of the cab: 0.6 s after the
+    // lee's last sample the wheel is the open wind's again.
+    const leeEnd = trace.samples.filter(regions[1].keep).pop()!;
+    const back = trace.samples.find((s) => s.tSec >= leeEnd.tSec + 2.2)!;
+    const openPull = crosswindSteerPullRad(-forceAt(back.tSec), back.speedKmh / 3.6);
+    expect(-back.steerRad).toBeGreaterThan(0.75 * openPull);
   });
 });
 
@@ -380,7 +405,7 @@ describe("the committed correct demo SHOWS the held correction on the windy stre
 // 4. The mistake demos keep their own wheel
 // ---------------------------------------------------------------------------
 
-describe("the mistake demos do not opt in — a loose hand shows a loose wheel", () => {
+describe("the loose-hand mistake demos do not opt in — a loose hand shows a loose wheel; the one whose mistake IS the hand does", () => {
   it("sc-ac-crosswind «Полет срещу поривите»: the wheel is at centre while the gust walks the car off its line", () => {
     const drive = recordScAcCrosswindDrive(FO, "mistake-full-speed");
     // y 150–185: the car is carried from x = 4.06 to x = 0.55 on a straight
@@ -390,12 +415,11 @@ describe("the mistake demos do not opt in — a loose hand shows a loose wheel",
     for (const s of drifting) expect(s.steerRad).toBe(0);
   });
 
-  it("neither lesson's mistake recorder passes a held wheel", () => {
+  it("the three loose-hand mistake recorders pass no held wheel", () => {
     for (const [name, rec] of [
       ["mistake-full-speed", () => recordScAcCrosswindDrive(FO, "mistake-full-speed")],
       ["mistake-overcorrect", () => recordScAcCrosswindDrive(FO, "mistake-overcorrect")],
       ["mistake-blown-out", () => recordScAcWindTruckPassDrive(MW, "mistake-blown-out")],
-      ["mistake-clip-truck", () => recordScAcWindTruckPassDrive(MW, "mistake-clip-truck")],
     ] as const) {
       const samples = rec().trace.samples;
       // The bicycle estimate of a polyline is 0 on every straight segment —
@@ -403,5 +427,30 @@ describe("the mistake demos do not opt in — a loose hand shows a loose wheel",
       const centred = samples.filter((s) => s.steerRad === 0).length;
       expect(centred, name).toBeGreaterThan(samples.length * 0.9);
     }
+  });
+
+  it("«Рязка корекция в тясната пролука» DOES (sc-ac-wind-truck-pass:ff1d4290 round 2, F-04): its title is about the hand, so its channel is the held wheel of its own path — the same function, the same sheltered wind", () => {
+    // Round 1: 0 on all 384 samples of a demo titled «рязка корекция». The
+    // channel is now `heldWheelChannel` of the recorded poses under the
+    // lesson's wind and the truck's lee (the correction itself — its size
+    // against what is held, and the arc under it — is measured in
+    // sc-ac-wind-truck-pass-traces.test.ts).
+    const drive = recordScAcWindTruckPassDrive(MW, "mistake-clip-truck");
+    const samples = drive.trace.samples;
+    expect(samples.filter((x) => x.steerRad === 0).length).toBeLessThan(samples.length * 0.15);
+    // On the open straight at 80 км/ч, before the truck's wake: the correction
+    // that cancels the wind — to the right, a few milliradians.
+    const open = samples.filter((x) => x.y > 150 && x.y < 175);
+    expect(open.length).toBeGreaterThan(15);
+    for (const x of open) {
+      expect(x.speedKmh).toBeGreaterThan(79);
+      expect(x.steerRad).toBeLessThan(-0.004);
+      expect(x.steerRad).toBeGreaterThan(-0.009);
+    }
+    // …and the blown-out demo's samples on the same stretch of the same road,
+    // in the same wind, are at centre: a loose hand.
+    const loose = recordScAcWindTruckPassDrive(MW, "mistake-blown-out").trace.samples.filter((x) => x.y > 190 && x.y < 235);
+    expect(loose.length).toBeGreaterThan(15);
+    for (const x of loose) expect(x.steerRad).toBe(0);
   });
 });
