@@ -5,6 +5,9 @@
  * - Edge hysteresis: once locked to an edge, the locator only switches when a
  *   rival edge is closer by EDGE_SWITCH_MARGIN_M, so positions jittering near
  *   a junction or a parallel road don't flip-flop.
+ *   One exception, on the way OUT of a roundabout: a ring edge also lets go
+ *   once the car has left the ring's carriageway for the rival's — see
+ *   RING_RELEASE_OUTSIDE_M.
  * - Lane hysteresis: within an edge, the lane id only changes once the vehicle
  *   is LANE_SWITCH_DEADBAND_M past the lane boundary.
  * - > OFF_ROAD_DISTANCE_M (30 m) from every centerline ⇒ edgeId null.
@@ -72,6 +75,57 @@ const LANE_SWITCH_DEADBAND_M = 0.35;
  * (wrong-way.test.ts holds).
  */
 const HEADING_GATE_DEG = 60;
+
+/**
+ * THE RING LETS GO AT ITS OWN KERB (sc-rb-lane-choice:ffdffd55, 2026-10-08).
+ *
+ * The steal rule above compares CENTRELINE distances, and on the way out of a
+ * roundabout that is the wrong ruler. A car leaving rb-2lane-v1 by the kerb lane
+ * of an arm is 12.19 m from that arm's axis BY DESIGN (four lanes, the kerb
+ * lane's centre is one and a half lane pitches out), so the arm could not win
+ * by EDGE_SWITCH_MARGIN_M until the car was 12.19 + 4 m from the ring's own
+ * axis — r ≈ 42.2 on a ring whose carriageway ends at r ≈ 34.1. For those 8 m
+ * the fix stayed on the ring edge, and two things the ring does there turned a
+ * stale lock into a conviction:
+ *
+ *  · `computeLane` clamps the lateral coordinate to the bank, so beyond the
+ *    kerb the lane offset reads exactly half a lane pitch (−4.06 m) however far
+ *    out the car is — a saturated number, not a measurement;
+ *  · a ring edge answers «are lane lines painted here» with yes everywhere
+ *    (`spatial.laneMarkingAt`, the reviewed ring exemption), where every other
+ *    edge answers no beyond its last dash. So POOR_LANE_KEEPING armed on it.
+ *
+ * MEASURED on the built district (`__tests__/ring-exit-handover.test.ts`): a car
+ * on the centre line of the west arm's kerb lane was read as 4.06 m off its lane
+ * for 9.55 m — 2.87 s at 12 км/ч, so any exit slower than 11.5 км/ч drew
+ * «Неустойчиво движение в лентата» against laneKeepSustainSec = 3 s. The rig's
+ * careful drive (11.6 км/ч, the lesson's own «около 12») drew it 5 times of 5.
+ * The single-lane rings carry the same lag, 4.0 m beyond the kerb and 4.85 m of
+ * false reading (convicts under 5.8 км/ч).
+ *
+ * THE RULE, and it is as narrow as the defect. A ROUNDABOUT edge gives up the
+ * fix to a rival that is NOT part of a ring — a road leaving it — when all of
+ * these hold, and the heading gate still applies:
+ *
+ *  · the car's centre is beyond the ring's carriageway by more than the lane
+ *    deadband (LANE_SWITCH_DEADBAND_M — the one tolerance this module already
+ *    has for «past a boundary», not a new number);
+ *  · it is INSIDE the rival's carriageway (`outsideM` 0), so a car on the
+ *    verge beside the mouth is still a car that left the ring's lane;
+ *  · it is ABEAM the rival — the projection falls inside the rival's polyline,
+ *    not on its end cap. An arm ends at the ring node, and its end cap reaches
+ *    back over the ring and the island; without this a car riding the central
+ *    island next to a mouth would be handed to that arm and stop being graded.
+ *
+ * Every other hand-over keeps the centreline rule byte for byte — one ring
+ * segment to the next, and every lock that is not a ring's: beyond its end a
+ * non-ring edge already answers «no line here», so its lag convicts nobody of
+ * lane keeping, and moving it would move the hand-over at every junction of
+ * every district at once.
+ */
+const RING_RELEASE_OUTSIDE_M = LANE_SWITCH_DEADBAND_M;
+/** Arclength slack for «the projection is inside the polyline, not on an end». */
+const ABEAM_EPS_M = 1e-6;
 
 export interface LocateFix {
   /** Index into DistrictIndex.edges, or -1 when off-road. */
@@ -180,6 +234,17 @@ export class Locator {
     return 180 - dFwd <= HEADING_GATE_DEG;
   }
 
+  /** Has the car left the locked RING for the rival's carriageway? — see
+   *  RING_RELEASE_OUTSIDE_M. */
+  private leftRingOnto(cur: EdgeHit, rival: EdgeHit): boolean {
+    if (!this.index.edgeRt(cur.edgeIdx).edge.roundabout) return false;
+    if (cur.outsideM <= RING_RELEASE_OUTSIDE_M) return false;
+    const rivalRt = this.index.edgeRt(rival.edgeIdx);
+    if (rivalRt.edge.roundabout) return false;
+    if (rival.outsideM > 0) return false;
+    return rival.sM > ABEAM_EPS_M && rival.sM < rivalRt.totalLen - ABEAM_EPS_M;
+  }
+
   private chooseEdge(x: number, y: number, headingDeg?: number): EdgeHit | null {
     const best = this.bestHit;
     const hasBest = this.index.nearestEdge(x, y, OFF_ROAD_DISTANCE_M, best);
@@ -187,10 +252,15 @@ export class Locator {
     if (this.lockedEdgeIdx >= 0) {
       const cur = this.index.projectOnEdge(this.lockedEdgeIdx, x, y, this.currentHit);
       if (cur.distM <= OFF_ROAD_DISTANCE_M) {
-        // Locked edge still plausible — switch only on a clear win, and (with
-        // a known heading) only onto a rival the heading is plausible for,
-        // unless the locked edge itself has become heading-implausible.
-        if (hasBest && best.edgeIdx !== this.lockedEdgeIdx && best.distM + EDGE_SWITCH_MARGIN_M < cur.distM) {
+        // Locked edge still plausible — switch only on a clear win (or, off a
+        // ring, once the car has left the ring's carriageway for the rival's),
+        // and (with a known heading) only onto a rival the heading is plausible
+        // for, unless the locked edge itself has become heading-implausible.
+        if (
+          hasBest &&
+          best.edgeIdx !== this.lockedEdgeIdx &&
+          (best.distM + EDGE_SWITCH_MARGIN_M < cur.distM || this.leftRingOnto(cur, best))
+        ) {
           if (
             headingDeg === undefined ||
             this.headingPlausible(best, headingDeg) ||

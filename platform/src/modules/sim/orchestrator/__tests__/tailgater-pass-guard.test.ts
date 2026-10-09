@@ -704,6 +704,21 @@ describe("E — RearTailgaterRunner's station law: IN its lane = his body over t
  * front of the car's the runner is still in the cruise it chose on the frame
  * before: only the pass guard can see him on that frame.
  */
+/**
+ * returnProbe's frame — the PHYSICS STEP, not this file's 30 Hz DT
+ * (sc-roundabout-entry:7b747c15). Staged actors are now integrated in steps
+ * of at most FIXED_DT on every cadence, with the student's pose interpolated
+ * across a longer frame; F4's claim — «on the frame his centre crosses ahead
+ * of the car's, the car is already braking» — is therefore a claim about
+ * that step. Measured at 1/30 after the change: the crossing the probe
+ * computes (his END-of-frame pose against the car's START-of-frame pose)
+ * lands in the frame's second staged step, whose start pose has the car
+ * 0.23 m further on, so the brake begins one physics step later — exactly
+ * where a 60 Hz frame puts it. At 1/60 the probe's frame and the step are
+ * the same thing, and the assertion is unchanged.
+ */
+const RETURN_DT = 1 / 60;
+
 function returnProbe(overtakeKmh = 72, behindAtReturnM = 3) {
   const LNM = tailgaterOf(SC_MERGE_LANE_END, "sc-mle-through-car");
   const tr = createTrafficSystem(district("ln-merge-v1"), { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
@@ -729,9 +744,9 @@ function returnProbe(overtakeKmh = 72, behindAtReturnM = 3) {
   const contactStarts: number[] = [];
   let crossing: { before: number; after: number; along: number } | null = null;
   const out: SimTickEvent[] = [];
-  for (let i = 0; i < Math.round(60 / DT); i++) {
-    t += DT;
-    py += (kmh / 3.6) * DT;
+  for (let i = 0; i < Math.round(60 / RETURN_DT); i++) {
+    t += RETURN_DT;
+    py += (kmh / 3.6) * RETURN_DT;
     const a0 = tr.staged(LNM.id)!;
     const firstCruise = log.findIndex((c) => c.cmd.type === "cruise");
     if (phase === "approach" && firstCruise >= 0 && py - a0.y <= 4.25) {
@@ -751,10 +766,10 @@ function returnProbe(overtakeKmh = 72, behindAtReturnM = 3) {
     // rewrites in place.)
     const along = (px - a0.x) * a0.dirX + (py - a0.y) * a0.dirY;
     const speedBefore = a0.speedMps;
-    tr.update(DT, { signalPhase: () => "green", playerPos: { x: px, y: py }, playerSpeedKmh: kmh, playerHeadingDeg: 0 });
+    tr.update(RETURN_DT, { signalPhase: () => "green", playerPos: { x: px, y: py }, playerSpeedKmh: kmh, playerHeadingDeg: 0 });
     const a = tr.staged(LNM.id)!;
     if (phase === "beside" && crossing === null && along > 0) crossing = { before: speedBefore, after: a.speedMps, along };
-    runner.step(port, { tSec: t, dtSec: DT, x: px, y: py, speedKmh: kmh, headingDeg: 0, brakePedal: 0, tickEvents: [] }, out);
+    runner.step(port, { tSec: t, dtSec: RETURN_DT, x: px, y: py, speedKmh: kmh, headingDeg: 0, brakePedal: 0, tickEvents: [] }, out);
     if (phase === "station" && stationAt < 0 && firstCruise >= 0 && isStation(log.slice(firstCruise + 1).map((c) => c.cmd), LNM.followBehindM)) {
       stationAt = t;
     }

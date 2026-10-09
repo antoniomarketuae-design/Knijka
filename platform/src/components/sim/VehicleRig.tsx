@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import {
   CuboidCollider,
   RigidBody,
+  useAfterPhysicsStep,
   useBeforePhysicsStep,
   useRapier,
   type RapierRigidBody,
@@ -38,6 +39,7 @@ import { isDistrictSurfaceUserData, setWindSway } from "@/modules/sim/world";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import type { SimAudio } from "@/modules/sim/scene/simAudio";
 import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
+import { recordPhysicsStep, type PlayerStepTrackRecorder } from "@/modules/sim/traffic";
 import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
 import { readNpcColliderUserData } from "./NpcColliders";
@@ -307,6 +309,7 @@ export function VehicleRig({
   cabinRef,
   audioRef,
   sampleRef,
+  stepTrackRef,
   paused,
   spawn = SPAWN,
   difficultyRef,
@@ -333,6 +336,14 @@ export function VehicleRig({
   cabinRef: RefObject<CabinControls | null>;
   audioRef: RefObject<SimAudio | null>;
   sampleRef: RefObject<VehicleSample>;
+  /**
+   * sc-roundabout-entry:7b747c15 — where this rig records the car after EVERY
+   * physics step. Since round 5 that record IS the lesson's session grid: the
+   * frame loop (LessonScene's RuntimeDriver) grades one grid point per step
+   * recorded here, reading the car at that step. Optional: absent, nothing is
+   * recorded — and nothing is graded.
+   */
+  stepTrackRef?: RefObject<PlayerStepTrackRecorder | null>;
   paused: boolean;
   spawn?: VehicleSpawn;
   /** Current driving-assist mode (Beginner/Normal/Advanced). Read each step. */
@@ -568,6 +579,16 @@ export function VehicleRig({
     sim.update(shaped, FIXED_DT, driveline);
   });
 
+  // The state each physics step LEFT — one record per step; the session grid
+  // is counted off these records (round 5) and the grade reads the car from
+  // them and from nowhere else. ROUND 7: the read itself is NOT in this
+  // closure. `recordPhysicsStep` (traffic/playerTrack.ts) is handed the rapier
+  // body and the vehicle sim and nothing else, so there is no `sampleRef` in
+  // its scope to read by mistake; this callback is that one call, on the three
+  // refs, and `scene/__tests__/live-grid-wiring.test.ts` cuts it out of this
+  // file and RUNS it against a body and a sim that differ from every sample.
+  useAfterPhysicsStep(() => recordPhysicsStep(stepTrackRef?.current, bodyRef.current, simRef.current));
+
   // Render-rate glue: kill-plane rescue, cabin clocks (blink/glance),
   // rule-engine sample, engine/indicator audio. The Vitok visual components
   // run their own useFrame for meshes/lamps/instruments.
@@ -598,7 +619,9 @@ export function VehicleRig({
         transmission: transmissionModeFor(difficultyRef?.current ?? DEFAULT_DIFFICULTY),
       });
       const chassis = chassisGroupRef.current;
-      if (chassis) updateVehicleSample(sampleRef.current, sim, chassis, cabin, input);
+      if (chassis) {
+        updateVehicleSample(sampleRef.current, sim, chassis, cabin, input);
+      }
     }
 
     // Interior fill: a soft floor so the cabin isn't near-black in daytime

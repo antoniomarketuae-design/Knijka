@@ -71,6 +71,23 @@
  */
 
 export { createTrafficSystem } from "./system";
+export {
+  NO_PHYSICS_STEPS,
+  recordPhysicsStep,
+  PlayerStepTrackBuffer,
+  PlayerStepTrackRecorder,
+  type PhysicsStepBody,
+  type PhysicsStepSim,
+  type PhysicsStepSource,
+  type PhysicsStepState,
+} from "./playerTrack";
+export {
+  PhysicsSessionClock,
+  SessionGridClock,
+  SESSION_GRID_EPS_SEC,
+  SESSION_GRID_MAX_POINTS,
+  type SessionGridSpan,
+} from "./sessionGrid";
 // Shared HERO car-paint recipes (player car + premium boxy SUV): clearcoat at
 // high, glossy MeshStandard fallback on med/low (docs/simulation/71 §4.8).
 export { carPaintMaterial, carPaintStandardMaterial } from "./vehicleFleet";
@@ -154,15 +171,19 @@ export type {
   DistrictNode,
   OncomingApproach,
   PedestrianVariant,
+  PlayerStepTrack,
   SignalPhaseFn,
   StagedActorSpec,
   StagedActorView,
   StagedCommand,
   StagedPedestrianSpec,
+  StagedSubstepListener,
+  StagedSubstepPlayer,
   StagedVehicleSpec,
   TrafficConfig,
   TrafficDistrict,
   TrafficPedestrianState,
+  TrafficRenderPose,
   TrafficSystem,
   TrafficSystemStats,
   TrafficUpdateContext,

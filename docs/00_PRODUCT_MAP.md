@@ -19,11 +19,16 @@
 
 ## 2. Simulator
 - [x] 150 scenario templates (18k+ exam variants); cockpit-first, real Sofia topology, rule-engine scoring
-  - [ ] **Scenario grading — the lesson's own mistake ([ADR-009](architecture/07_ARCHITECTURE_DECISION_RECORDS.md), founder Ruling A, 2026-09-17).** On a practice rung, committing the mistake the lesson exists to teach means the lesson is **not taken**, even the first time. That first occurrence costs no points, and the card still explains it. **ACCEPTED, implementation pending** — no code yet; lanes 0/R/A/B/C/D/E/F/H/P/G/I, docs first. Founder questions:
+  - [x] **Scenario grading — the lesson's own mistake ([ADR-009](architecture/07_ARCHITECTURE_DECISION_RECORDS.md), founder Ruling A, 2026-09-17).** On a practice rung, committing the mistake the lesson exists to teach means the lesson is **not taken**, even the first time. That first occurrence costs no points, and the card still explains it. **ACCEPTED and SHIPPED** — landed 2026-09-18 in `793335e`. Founder questions:
     - **F1 — decided:** repeats cost points as today.
     - **F2 — decided:** scenario lessons only; curriculum l0–l8, exam-bank variants and the exam card are out of scope.
     - **F3 — open, conditional:** where the pre-drive rule line goes, asked only if it does not fit the phone briefing.
 - [x] Headless clip renderer — Claude produces reels himself, no founder browser
+- [~] **Lesson-audit programme** ([doc 88](simulation/88_LESSON_AUDIT.md)) — every lesson driven on PC and phone, every defect filed with a frame, closed only on a re-drive judged by an adversarial verifier. **1,533 filed · 1,512 retired · 21 open (5 critical, 16 major)** on 2026-10-09; the running state lives outside the repo in the session handoff. Instruments that could not be built are registered in [doc 93](simulation/93_INSTRUMENT_GAPS.md).
+- [x] **The drive rig** (`/dev/drive-rig`, the real `LessonPlayShell`) — careful scripted drives on both lenses; it settled ten rows the audit harness could not, nine of them critical.
+- [x] **Grading decisions since ADR-009**, each in [the ADR file](architecture/07_ARCHITECTURE_DECISION_RECORDS.md): ADR-010 par time gates the stars, never the verdict · ADR-011 a roundabout entry is judged by what happened at the mouth (`fa18982`) · ADR-012 a crosswind steers the front wheels and ADR-013 the U-turn act is decided from the car's heading and the road (`2127d8f`). ADR-014 (one fixed physics step for the world and the grade) is landing with the rbcad lane.
+- [x] **Phone briefing, opted in → the whole numbered sheet** (`613bfc6`, founder delegation 2026-10-08). The phone capture that closes its two rows is owed.
+- [ ] **UI/UX 2027 review** — complete as a proposal, nothing built: a 9-section brief, 8 clickable mockups and a gallery, kept outside the repo in the review's own folder. 17 founder questions gate its Wave 3; Waves 0–2 need no ruling.
 - [ ] Founder visual audit of all 150 scenarios (the review-reel; the Half-B reels double as this)
 - [ ] 2 pilot taste-pass fixes still open: emergency-lane hard-block, overtake-ban reframe
 
@@ -63,7 +68,9 @@ actions.** DEFERRED: hero car (needs a FRESH session + live Blender — proven t
 fails; capital-B mcp__Blender__* does NOT speak this addon protocol), P8 (all 4 parts, founder approved),
 the P7 clip batch, the tutor voice (blocked on the founder audition).*
 
-*Last updated: 2026-07-26 — the **Simulator Quality & Innovation program** (docs/simulation/82) opened §2a above. Landed so far: the §2 performance envelope's desktop half + its four structural fixes, and 6 of the 7 §8 corrections including 248.8 MB of verified-unreferenced assets pruned. The one thing that would change the founder's verdict and has NOT happened is **§2.4, the phone measurement** — nothing in §2.2 is evidence until an A16 log is committed.*
+*Last updated: 2026-10-09 — §2 brought up to date: ADR-009 shipped, the lesson-audit programme and its open count, the drive rig, ADR-010–013, the phone briefing sheet and the UI/UX 2027 review. The §2a lines below were not re-checked and still describe 2026-07-26.*
+
+*Previously updated: 2026-07-26 — the **Simulator Quality & Innovation program** (docs/simulation/82) opened §2a above. Landed so far: the §2 performance envelope's desktop half + its four structural fixes, and 6 of the 7 §8 corrections including 248.8 MB of verified-unreferenced assets pruned. The one thing that would change the founder's verdict and has NOT happened is **§2.4, the phone measurement** — nothing in §2.2 is evidence until an A16 log is committed.*
 
 *Previously updated: 2026-07-25 — FULL AUDIT (docs/80_FULL_AUDIT_2026-07-24.md) executed in full at commit 165a58b: 1005/1089 questions approved, answer-leak + 4 rule-engine false-fails + GDPR + entitlements + perf + ops + 2 innovations shipped. Gate: tsc 0 / 7281 tests / build OK.*
 

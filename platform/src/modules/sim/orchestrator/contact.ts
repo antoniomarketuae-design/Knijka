@@ -531,7 +531,10 @@ export class ContactSentinel {
  */
 export function vruAheadMeters(
   cast: readonly ContactCastMember[],
-  traffic: StagedTrafficPort,
+  // Only the pose lookup is used — so the session grid (scene/gradeGrid.ts,
+  // the one caller in the product) can hand over the narrow traffic view it
+  // already holds.
+  traffic: Pick<StagedTrafficPort, "staged">,
   x: number,
   y: number,
   headingDeg: number,

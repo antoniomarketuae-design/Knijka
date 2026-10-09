@@ -463,6 +463,52 @@ export function initialParkingBrakeOnFor(ctx: SpawnParkingBrakeContext): boolean
   return ctx.brakeDrill ?? isParkingBrakeDrillLesson(ctx.lessonId);
 }
 
+/** Most looks the cabin holds for the frames to come (founder R3 #13). */
+export const GLANCE_SAMPLE_QUEUE_CAPACITY = 4;
+
+/**
+ * THE CABIN'S LOOK QUEUE — what stands between a press and the grader.
+ *
+ * A press (or a held look's refresh) latches a SAMPLE here, so two keys
+ * pressed inside one frame BOTH reach the rule engine instead of the second
+ * overwriting the first. Each render frame the VehicleSample builder takes
+ * ONE (`CabinControls.consumeGlanceSample` → `VehicleSample.mirrorGlance`),
+ * and a live lesson's RuntimeDriver hands whatever is left to the session
+ * grid in the same frame (`GradeGrid`'s `moreLooks` hook), where the looks
+ * are heard one per grid point — so the second look waits one physics step
+ * for its turn, not one frame. Bounded — a look that finds four waiting is
+ * dropped — so a stalled consumer can never grow it.
+ *
+ * A class of its own since sc-roundabout-entry:7b747c15 round 8, with no
+ * window and no clock in it, so that the replay harness
+ * (lessons/scenario/__tests__/liveChainReplay.ts) hands a tape's looks to the
+ * grade through THIS queue rather than through a copy of its law: what the
+ * census grades is then what a frame of the live lesson is handed.
+ */
+export class GlanceSampleQueue {
+  private readonly pending: MirrorGlanceKind[] = [];
+
+  /** Looks latched and not yet taken by a frame. */
+  get length(): number {
+    return this.pending.length;
+  }
+
+  /** Latch a look for the frames to come; dropped when four already wait. */
+  push(mirror: MirrorGlanceKind): void {
+    if (this.pending.length < GLANCE_SAMPLE_QUEUE_CAPACITY) this.pending.push(mirror);
+  }
+
+  /** The oldest look, exactly once — or null. One call per render frame. */
+  take(): MirrorGlanceKind | null {
+    return this.pending.shift() ?? null;
+  }
+
+  /** Forget every look not yet taken (a respawn). */
+  clear(): void {
+    this.pending.length = 0;
+  }
+}
+
 /**
  * Pure hold-to-glance state machine (extracted so it is unit-testable in
  * Node — CabinControls binds window listeners and cannot be constructed
@@ -635,8 +681,8 @@ export class CabinControls {
    *  one render frame (easy at low FPS on the 16 GB box) must BOTH reach the
    *  rule engine — the second drains one frame later instead of silently
    *  overwriting the first. Bounded (drop past 4) so a stalled consumer can
-   *  never grow it. */
-  private readonly pendingGlanceSamples: MirrorGlanceKind[] = [];
+   *  never grow it. (`GlanceSampleQueue`, above.) */
+  private readonly pendingGlanceSamples = new GlanceSampleQueue();
   private autocancelArmed = false;
   private disposed = false;
 
@@ -724,11 +770,23 @@ export class CabinControls {
 
   /**
    * The next queued glance, exactly once (VehicleSample.mirrorGlance is a
-   * one-frame event for the rule engine's mirror-check detector); glances
-   * queued in the same frame drain over consecutive frames.
+   * one-frame event for the rule engine's mirror-check detector). The sample
+   * builder takes one per frame; a live lesson's grid then takes the rest in
+   * the same frame and hears them at consecutive grid points.
    */
   consumeGlanceSample(): MirrorGlanceKind | null {
-    return this.pendingGlanceSamples.shift() ?? null;
+    return this.pendingGlanceSamples.take();
+  }
+
+  /**
+   * A respawn (LessonScene `resetCar`, sc-roundabout-entry:7b747c15 round 8):
+   * the looks latched and not yet handed to a frame were made in the drive
+   * that just ended — they are not looks at the road the car has been put back
+   * on. Only the SAMPLE queue is dropped; a key still held keeps the head on
+   * the mirror, and its next refresh is a look made after the respawn.
+   */
+  forgetPendingGlances(): void {
+    this.pendingGlanceSamples.clear();
   }
 
   // -- public control actions (A2) ---------------------------------------------
@@ -810,7 +868,7 @@ export class CabinControls {
 
   /** Bounded push into the sample queue (press latches and hold refreshes). */
   private enqueueGlanceSample(mirror: MirrorGlanceKind): void {
-    if (this.pendingGlanceSamples.length < 4) this.pendingGlanceSamples.push(mirror);
+    this.pendingGlanceSamples.push(mirror);
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {

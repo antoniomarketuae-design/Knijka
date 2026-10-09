@@ -8,6 +8,7 @@ import {
   type RuleEvent,
   type SimTick,
 } from "@/modules/sim/rules";
+import { PhysicsSessionClock } from "@/modules/sim/traffic";
 import { PHYSICS_MAX_FRAME_DT, sessionClockAdvance } from "../sessionClock";
 
 /**
@@ -223,7 +224,44 @@ describe("LessonScene's RuntimeDriver", () => {
   const code = SCENE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("advances the session clock through sessionClockAdvance", () => {
-    expect(code).toMatch(/const dt = sessionClockAdvance\(delta\);\s*\n\s*tRef\.current \+= dt;/);
+    // THE LINE MOVED ONE HOP (sc-roundabout-entry:7b747c15 round 5, 2026-10-08).
+    // It read `tRef.current += dt;`. The clamped delta is still the ONLY thing
+    // the session clock is fed — that is this file's whole subject — but it is
+    // now added inside `PhysicsSessionClock.frame` (traffic/sessionGrid.ts),
+    // which also holds the clock at its origin until the physics engine's
+    // first counted step, so the session clock, the car and the world start
+    // together whatever the first live frame's length. Both hops are pinned:
+    // the scene hands `dt` — nothing else — to the clock, and the clock adds it.
+    expect(code).toMatch(
+      /const dt = sessionClockAdvance\(delta\);\s*\n\s*tRef\.current = sessionClock\.frame\(dt, steps\.stepCount\);/,
+    );
+    expect(code).not.toMatch(/tRef\.current\s*\+=/);
+    const grid = readFileSync(resolve(__dirname, "../../../../modules/sim/traffic/sessionGrid.ts"), "utf8");
+    const frame = grid.slice(grid.indexOf("  frame(dtSec: number, stepCount: number): number {"));
+    expect(frame.length).toBeGreaterThan(100);
+    expect(frame.slice(0, frame.indexOf("\n  }\n"))).toContain("this.fed += dtSec;");
+  });
+
+  it("the clock that receives it is the plain sum of those deltas once the engine has stepped", () => {
+    // …and the behaviour, on the five frame times this file is measured at:
+    // with every physics step counted, the session clock IS Σ sessionClockAdvance.
+    const clock = new PhysicsSessionClock();
+    let sum = 0;
+    let acc = 0;
+    let steps = 0;
+    for (const delta of [SIXTY_FPS_S, 0.05, 0.1, PC_DSF1_FRAME_S, PC_DSF2_FRAME_S, SIXTY_FPS_S, 0.3]) {
+      const dt = sessionClockAdvance(delta);
+      // rapier's stepper, fed the same clamped delta.
+      acc += dt;
+      while (acc >= clock.stepSec) {
+        steps++;
+        acc -= clock.stepSec;
+      }
+      sum += dt;
+      expect(clock.frame(dt, steps)).toBe(sum);
+    }
+    // 0.0167 + 0.05 + 0.1 + 0.5 + 0.5 + 0.0167 + 0.3 — never the raw 2.33 / 3.57.
+    expect(sum).toBeCloseTo(1.45 + 2 * SIXTY_FPS_S, 9);
   });
 
   it("carries no second, hand-written frame ceiling", () => {

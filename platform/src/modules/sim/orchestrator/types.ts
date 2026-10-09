@@ -13,7 +13,12 @@
 
 import type { SignalPhase, StagedEventKind, StagedEventOutcome } from "../contracts";
 import type { SimTickEvent } from "../rules";
-import type { StagedActorSpec, StagedActorView, StagedCommand } from "../traffic";
+import type {
+  StagedActorSpec,
+  StagedActorView,
+  StagedCommand,
+  StagedSubstepListener,
+} from "../traffic";
 
 /**
  * The narrow imperative seam the director drives — structurally satisfied by
@@ -24,6 +29,13 @@ export interface StagedTrafficPort {
   stage(spec: StagedActorSpec): StagedActorView | null;
   stagedCommand(id: string, command: StagedCommand): void;
   staged(id: string): StagedActorView | null;
+  /**
+   * sc-roundabout-entry:7b747c15 — the staged world's sub-step hook (the live
+   * TrafficSystem implements it). Optional so a fake port in a test keeps the
+   * old once-per-frame director: absent, the director simply decides at frame
+   * boundaries, exactly as before.
+   */
+  setStagedSubstepListener?(listener: StagedSubstepListener | null): void;
 }
 
 /**

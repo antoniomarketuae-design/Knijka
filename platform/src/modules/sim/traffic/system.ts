@@ -85,6 +85,10 @@ import {
   type StagedActorSpec,
   type StagedActorView,
   type StagedCommand,
+  type StagedSubstepListener,
+  type StagedSubstepPlayer,
+  type TrafficRenderPose,
+  type PlayerStepTrack,
   type TrafficConfig,
   type TrafficDistrict,
   type TrafficPedestrianState,
@@ -185,6 +189,91 @@ export function trafficSubStepPlan(dtSec: number): TrafficStepPlan {
   const steps = frameDt > MAX_SUBSTEP_SEC ? Math.ceil(frameDt / MAX_SUBSTEP_SEC) : 1;
   return { steps, dt: frameDt / steps };
 }
+
+/**
+ * THE LARGEST STEP A STAGED ACTOR IS EVER INTEGRATED OVER, s — the ego car's
+ * own physics step (`vehicle/tuning.ts` FIXED_DT, rapier `timeStep`; pinned
+ * equal by `__tests__/staged-substep-clock.test.ts`).
+ *
+ * sc-roundabout-entry:7b747c15 [major], MEASURED at 2127d8f (w80 judge, then
+ * this lane's probe through liveChainReplay, sc-roundabout-entry L1–L5): the
+ * same lineStop(45 s, 12 км/ч) tape passed at 0 points on 60 Hz and was
+ * convicted of a COLLISION (10 т.) on a phone cadence, because the ring's
+ * staged circulator ran its whole lap up to ~1 m away from where the 60 Hz run
+ * put it at the same session time. Two clocks made that offset, and this
+ * constant is half of the repair:
+ *
+ *   · the staged actors were integrated in the AMBIENT sub-steps (up to
+ *     0.1 s): a car pulling away from a hold covers ½·v·dt more or less per
+ *     accelerating step depending on how the frames fall;
+ *   · the director that commands them (release, sync speed, lock) decided once
+ *     per FRAME, so a 0.5 s frame released the car up to 0.5 s late.
+ *
+ * Staged actors are few (one to five per lesson), so stepping them at the
+ * physics step costs nothing a frame can feel; the ambient fleet keeps its
+ * 0.1 s plan (its cost is the reason for that plan). The other half — the
+ * director deciding on this same clock — is `StagedSubstepListener`.
+ */
+export const STAGED_MAX_SUBSTEP_SEC = 1 / 60;
+
+/**
+ * Staged steps per ambient sub-step of `dt`: the fewest equal steps none of
+ * which is longer than `STAGED_MAX_SUBSTEP_SEC`. The 1e-9 keeps an exact
+ * 1/60 frame at ONE step (float division can land a hair above 1), so every
+ * 60 Hz frame is the single call it always was.
+ */
+export function stagedSubStepsPer(dt: number): number {
+  if (!(dt > 0)) return 0;
+  return Math.max(1, Math.ceil(dt / STAGED_MAX_SUBSTEP_SEC - 1e-9));
+}
+
+/**
+ * sc-roundabout-entry:7b747c15 round 2 — THE STAGED GRID IS THE SESSION'S.
+ *
+ * Round 1 cut each frame into equal staged steps of at most one physics step,
+ * so every cadence integrated the staged world on its OWN grid: at 60 Hz on
+ * k/60, on a phone's 0.277 s frame on 17 steps of 16.3 ms. Every trigger was
+ * then met within one step — but each on a different grid, and a body whose
+ * motion feeds back on itself (a matchPlayer lead closing on its station, a
+ * tailgater latching when its gap first dips under a bar, a car braking to a
+ * stop) integrates a slightly different curve on each. MEASURED with ambient
+ * traffic off over every committed demo (staged-pose-cadence.census.test.ts,
+ * full grid, before this constant existed): on a 0.25/0.4 s cadence — whose
+ * frames all END on the 60 Hz grid — 0 of 1,531 cells left one physics step of
+ * the 60 Hz staged poses; on the phone cadence, whose frames do not, 69 did (up
+ * to 5.7 steps: the tailgater of sc-follow-tailgater mistake-brake-check L5).
+ *
+ * So when the caller says what session time the frame ends at
+ * (`TrafficUpdateContext.sessionTimeSec`), the staged steps are cut at the
+ * session's physics grid k·FIXED_DT — the same instants on every cadence — and
+ * only the frame's own ends cut a step short. A boundary within this of a grid
+ * point IS that grid point (Σ 1/60 drifts from k/60 in the 13th digit).
+ *
+ * ROUND 3 removed the last clause: a frame end no longer cuts a step at all
+ * (`stepGrid`, the fixed-step accumulator) — its verifier measured what the
+ * cut still did on frames SHORTER than a step or ending off the grid (120 Hz,
+ * 144 Hz, a real desktop jitter). This tolerance now decides only whether a
+ * frame end IS a grid point.
+ */
+const STAGED_GRID_EPS_SEC = 1e-7;
+
+/** STAGED_GRID_EPS_SEC in units of grid steps (the accumulator's floor). */
+const GRID_EPS_STEPS = STAGED_GRID_EPS_SEC / STAGED_MAX_SUBSTEP_SEC;
+/** Most grid steps one frame may take: the 0.5 s session clamp is 30. */
+const GRID_MAX_STEPS = 64;
+/** A drawn segment longer than this between two grid states is a teleport
+ *  (a re-entry, a retry), m: drawn where the body now is, never swept across. */
+const RENDER_JUMP_M = 3;
+
+/** Shortest-arc heading interpolation, degrees. */
+function lerpHeadingDeg(from: number, to: number, f: number): number {
+  const d = ((((to - from) % 360) + 540) % 360) - 180;
+  return from + d * f;
+}
+
+/** A player pose step longer than this (beyond what his speed explains) is a
+ *  teleport, m — the director's own `PLAYER_JUMP_SLACK_M` (contact.ts). */
+const STAGED_PLAYER_JUMP_SLACK_M = 2;
 
 const VEHICLE_COLOR_VARIANTS = 4;
 const PED_COLOR_VARIANTS = 4;
@@ -349,6 +438,36 @@ class TrafficSystemImpl implements TrafficSystem {
     vehicles: this.circulatingRows,
   };
   private readonly stagedEnv: StagedEnv;
+  /** sc-roundabout-entry:7b747c15 — see `StagedSubstepListener`. */
+  private stagedListener: StagedSubstepListener | null = null;
+  /** The player pose the PREVIOUS update() was given (the interpolation's
+   *  start); `prevPlayerValid` false = none yet, or he left the world. */
+  private prevPlayerValid = false;
+  private prevPlayerX = 0;
+  private prevPlayerY = 0;
+  private prevPlayerKmh = 0;
+  private prevPlayerHeadingDeg = 0;
+  /** Reused per sub-step (the frame-loop zero-allocation law). */
+  private readonly subPlayer: StagedSubstepPlayer = { x: 0, y: 0, speedKmh: 0, headingDeg: 0 };
+  /** This frame's per-physics-step student track (`PlayerStepTrack`), or null
+   *  = interpolate along the chord; and the frame length it is measured in. */
+  private track: PlayerStepTrack | null = null;
+  private trackFrameSec = 0;
+  /** Round 3 — the fixed-step accumulator (stepGrid): the INTEGER index of
+   *  the last session grid point the world reached, and the session time the
+   *  last update ended at. */
+  private gridInit = false;
+  private gridK = 0;
+  private gridLastT = 0;
+  /** Round 3 — what is drawn (renderFraction): the poses before the last grid
+   *  step ([x, y, dirX, dirY] per published state) and the fraction of a step
+   *  the frame end lies past the newest grid state. */
+  private renderLerp = false;
+  private renderAlpha = 1;
+  private renderPrevVeh = new Float64Array(0);
+  private renderPrevVehCount = 0;
+  private renderPrevPed = new Float64Array(0);
+  private renderPrevPedCount = 0;
   /** The drawn lane width every lane of this system was resolved with — handed
    *  to each staged vehicle so its pass guard (and the runner reading its view)
    *  measure „in the lane" against the lane the product built. */
@@ -648,7 +767,10 @@ class TrafficSystemImpl implements TrafficSystem {
    */
   update(dtSec: number, ctx: TrafficUpdateContext): void {
     const { steps, dt } = trafficSubStepPlan(dtSec);
-    if (steps === 0) return;
+    if (steps === 0) {
+      this.stagedListener?.frameEnd();
+      return;
+    }
 
     const vEnv = this.vehicleEnv;
     const pEnv = this.pedestrianEnv;
@@ -683,33 +805,410 @@ class TrafficSystemImpl implements TrafficSystem {
     sEnv.playerY = vEnv.playerY;
     sEnv.playerSpeedMps = vEnv.playerSpeedMps;
 
-    // The player pose above is set ONCE per frame and every sub-step reads the
-    // same one: the caller sampled the car once and there is no intermediate
-    // pose to interpolate from. That is the one-frame staleness the header
-    // already documents, and it is unchanged — sub-stepping does not make it
-    // worse, and the hard anti-overlap clamps in vehicles.ts / staged.ts
+    // Without the session clock (`sessionTimeSec` absent: the recorder, the
+    // clip feed, unit fixtures) the AMBIENT agents read the player pose above,
+    // set ONCE per frame, on every ambient sub-step (the one-frame staleness the
+    // header documents) and staged actors read a pose interpolated from the
+    // previous update's. With it (LessonScene, the replay harness), every body
+    // advances in whole steps at the session's grid points and reads his pose
+    // AT the grid point its step ends on (`stepGrid`, sc-roundabout-entry:
+    // 7b747c15 round 3). The
+    // hard anti-overlap clamps in vehicles.ts / staged.ts
     // re-read the AGENT's own fresh pose on every sub-step, so the „never clip
     // the player" guarantee is re-asserted five times a frame instead of once.
     //
     // Staged actors last within each sub-step: they read the freshest player
     // pose and publish into the same state arrays; ambient agents never read
     // them (documented v1 limitation — see staged.ts header).
-    for (let k = 0; k < steps; k++) {
-      this.timeSec += dt;
+    //
+    // sc-roundabout-entry:7b747c15 — THE STAGED WORLD RUNS ON THE PHYSICS STEP.
+    // Within each ambient sub-step the staged actors take `per` equal steps of
+    // at most STAGED_MAX_SUBSTEP_SEC, and on a frame that has more than one of
+    // them the player's pose is interpolated across the frame instead of being
+    // held at its end — what the staged actors' guards read, and what the
+    // listener (the director) decides on between two steps. With one staged
+    // step in the frame (every 60 Hz frame) the end pose is used, no listener
+    // call is made, and the frame is the exact call sequence it always was.
+    const per = stagedSubStepsPer(dt);
+    const hS = dt / per;
+    const frameSec = steps * dt;
+    // With the session clock known the world runs on the FIXED-STEP GRID
+    // (`stepGrid`, round 3); otherwise into `per` equal steps per ambient
+    // sub-step, as round 1 did.
+    const sessionEnd = ctx.sessionTimeSec;
+    const aligned = sessionEnd !== undefined && Number.isFinite(sessionEnd);
+    const endX = sEnv.playerX;
+    const endY = sEnv.playerY;
+    const endMps = sEnv.playerSpeedMps;
+    const endKmh = endMps * 3.6;
+    const endHeading = ctx.playerHeadingDeg ?? this.prevPlayerHeadingDeg;
+    // Interpolate only across continuous motion: a pose step longer than the
+    // faster of the two speeds can carry in this frame (+ slack) is a respawn
+    // or a retry, and a drive across it never happened.
+    const continuous =
+      sEnv.hasPlayer &&
+      this.prevPlayerValid &&
+      Math.hypot(endX - this.prevPlayerX, endY - this.prevPlayerY) <=
+        (Math.max(Math.abs(endKmh), Math.abs(this.prevPlayerKmh)) / 3.6) * frameSec +
+          STAGED_PLAYER_JUMP_SLACK_M;
+    // C1 (round 2): where the vehicle simulation handed over the states it
+    // actually integrated inside this frame, the sub-steps read THOSE instead
+    // of the chord (see `PlayerStepTrack`) — and then nothing is being
+    // invented, so a pose step the speeds cannot explain is no reason to stop
+    // reading them: the jump sits between two real samples. MEASURED on
+    // sc-rb-ped-exit shadow-correct L2 at 0.25/0.4 s: the committed drive moves
+    // 4.48 m in the 0.4 s frame ending 31.6 s while its speed field reads
+    // 12 км/ч, so the chord test called it a teleport, the frame ran no
+    // sub-step, and the crosser was released at the frame end, 317 ms after the
+    // 60 Hz release — on a frame grid that is the 60 Hz grid exactly.
+    const tr = ctx.playerTrack;
+    const tracked = tr != null && tr.count > 0 && sEnv.hasPlayer && this.prevPlayerValid;
+    const readable = continuous || tracked;
+    this.track = readable && tracked ? tr : null;
+    this.trackFrameSec = frameSec;
+    const sp = this.subPlayer;
+    if (aligned) {
+      this.stepGrid(sessionEnd as number, frameSec, readable, ctx, endX, endY, endMps, endHeading);
+    } else {
+      const total = steps * per;
+      const interp = total > 1 && readable;
+      const listener = interp ? this.stagedListener : null;
+      // No fixed grid without the session clock: what is drawn is what is
+      // simulated (`renderFraction` 1).
+      this.renderLerp = false;
+      for (let k = 0; k < steps; k++) {
+        this.timeSec += dt;
+        vEnv.timeSec = this.timeSec;
+        for (let i = 0; i < this.pedestrianAgents.length; i++) {
+          updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
+        }
+        for (let i = 0; i < this.vehicleAgents.length; i++) {
+          updateVehicle(this.vehicleAgents[i], dt, vEnv);
+        }
+        for (let m = 0; m < per; m++) {
+          const j = k * per + m;
+          if (listener !== null && j > 0) {
+            this.playerAt(j / total, endX, endY, endKmh, endHeading, sp);
+            listener.substep(j * hS, hS, frameSec, sp);
+          }
+          if (interp) {
+            // The guards integrate over [j, j+1]: they read the pose at its end,
+            // as the single-step frame reads the frame's end.
+            this.playerAt((j + 1) / total, endX, endY, endKmh, endHeading, sp);
+            sEnv.playerX = sp.x;
+            sEnv.playerY = sp.y;
+            sEnv.playerSpeedMps = sp.speedKmh / 3.6;
+          }
+          for (let i = 0; i < this.stagedVehicles.length; i++) {
+            updateStagedVehicle(this.stagedVehicles[i], hS, sEnv);
+          }
+          for (let i = 0; i < this.stagedPeds.length; i++) {
+            updateStagedPedestrian(this.stagedPeds[i], hS, sEnv);
+          }
+        }
+      }
+      this.stagedListener?.frameEnd();
+    }
+    sEnv.playerX = endX;
+    sEnv.playerY = endY;
+    sEnv.playerSpeedMps = endMps;
+    this.prevPlayerValid = sEnv.hasPlayer;
+    this.prevPlayerX = endX;
+    this.prevPlayerY = endY;
+    this.prevPlayerKmh = endKmh;
+    this.prevPlayerHeadingDeg = endHeading;
+  }
+
+  /**
+   * sc-roundabout-entry:7b747c15 round 3 — THE FIXED-STEP ACCUMULATOR.
+   *
+   * The world (ambient fleet, staged actors), the director's runners and the
+   * contact sentinel advance ONLY at the session's grid points k·FIXED_DT, and
+   * `gridK` — an INTEGER — is the index of the last one reached. A frame ending
+   * at session time T takes exactly `floor(T / FIXED_DT) − gridK` steps of
+   * exactly FIXED_DT, each reading the student's state AT the grid point it
+   * ends on; a frame that crosses no grid point advances nothing. So every
+   * cadence integrates the same sequence of identical steps, and nothing
+   * accumulates in floating point between them (`gridK · FIXED_DT` is the
+   * clock, not a running sum).
+   *
+   * Round 2 had cut a step at every frame end instead. MEASURED by its verifier
+   * over every committed demo with ambient off: steady 120 Hz put 75 cells more
+   * than one physics step off the 60 Hz staged poses, 144 Hz 99, a real desktop
+   * jitter (PC_JITTER_MS) 40 cells up to 7.5 steps (2.47 m) — the director ran
+   * every 7–17 ms there and a student-distance latch fired 25–33 ms late.
+   *
+   * The director decides once per grid point, on the state the step left: after
+   * every step whose grid point lies inside the frame (listener `substep`,
+   * handed the grid time), and — when the frame ends ON a grid point, as every
+   * 60 Hz replay frame does — in its own frame step, which is then the exact
+   * call sequence it always was (`frameEnd(true)`). `frameEnd(false)` tells it
+   * the frame end is not a grid point: nothing is decided there.
+   *
+   * The student is integrated by rapier at the same FIXED_DT (LessonScene
+   * `<Physics timeStep={FIXED_DT}>`), on its own accumulator; his per-step
+   * states (`PlayerStepTrack`) are read at the grid points. What is DRAWN is
+   * interpolated between the last two grid states (`renderFraction`), exactly
+   * as rapier draws his car: one step behind the frame end, never off the
+   * segment between two simulated states.
+   */
+  private stepGrid(
+    sessionEnd: number,
+    frameSec: number,
+    readable: boolean,
+    ctx: TrafficUpdateContext,
+    endX: number,
+    endY: number,
+    endMps: number,
+    endHeading: number,
+  ): void {
+    const H = STAGED_MAX_SUBSTEP_SEC;
+    const vEnv = this.vehicleEnv;
+    const pEnv = this.pedestrianEnv;
+    const sEnv = this.stagedEnv;
+    const sp = this.subPlayer;
+    const endKmh = endMps * 3.6;
+    const frameStart = sessionEnd - frameSec;
+    const target = Math.floor(sessionEnd / H + GRID_EPS_STEPS);
+    // First frame (or a clock that went backwards): the grid starts at the
+    // frame's start, so this frame takes the steps inside it and no more.
+    if (!this.gridInit || sessionEnd < this.gridLastT - STAGED_GRID_EPS_SEC) {
+      this.gridK = Math.min(target, Math.floor(frameStart / H + GRID_EPS_STEPS));
+      this.gridInit = true;
+    }
+    this.gridLastT = sessionEnd;
+    let n = target - this.gridK;
+    if (n > GRID_MAX_STEPS) {
+      // Never reached through the 0.5 s session clamp; a guard, not a policy.
+      this.gridK = target - GRID_MAX_STEPS;
+      n = GRID_MAX_STEPS;
+    }
+    const endOnGrid = Math.abs(sessionEnd - target * H) <= STAGED_GRID_EPS_SEC;
+    // Decisions inside the frame need the student's state inside it; across a
+    // teleport there is none, and the director decides at the frame end.
+    const listener = readable ? this.stagedListener : null;
+    for (let i = 1; i <= n; i++) {
+      const k = this.gridK + 1;
+      const atEnd = i === n && endOnGrid;
+      const tau = atEnd ? frameSec : k * H - frameStart;
+      if (atEnd || !readable) {
+        sp.x = endX;
+        sp.y = endY;
+        sp.speedKmh = endKmh;
+        sp.headingDeg = endHeading;
+      } else {
+        this.playerAtTau(tau, endX, endY, endKmh, endHeading, sp);
+      }
+      sEnv.playerX = sp.x;
+      sEnv.playerY = sp.y;
+      sEnv.playerSpeedMps = sp.speedKmh / 3.6;
+      vEnv.playerX = sp.x;
+      vEnv.playerY = sp.y;
+      vEnv.playerSpeedMps = sp.speedKmh / 3.6;
+      pEnv.playerX = sp.x;
+      pEnv.playerY = sp.y;
+      pEnv.playerSpeedKmh = sp.speedKmh;
+      if (ctx.playerHeadingDeg !== undefined) {
+        const rad = (sp.headingDeg * Math.PI) / 180;
+        vEnv.playerDirX = Math.sin(rad);
+        vEnv.playerDirY = Math.cos(rad);
+      }
+      // What is drawn between this step and the next frame's: the pose before
+      // the frame's LAST step (`renderFraction`).
+      if (i === n) this.snapshotRender();
+      this.timeSec += H;
       vEnv.timeSec = this.timeSec;
-      for (let i = 0; i < this.pedestrianAgents.length; i++) {
-        updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
+      for (let a = 0; a < this.pedestrianAgents.length; a++) {
+        updatePedestrian(this.pedestrianAgents[a], H, pEnv);
       }
-      for (let i = 0; i < this.vehicleAgents.length; i++) {
-        updateVehicle(this.vehicleAgents[i], dt, vEnv);
+      for (let a = 0; a < this.vehicleAgents.length; a++) {
+        updateVehicle(this.vehicleAgents[a], H, vEnv);
       }
-      for (let i = 0; i < this.stagedVehicles.length; i++) {
-        updateStagedVehicle(this.stagedVehicles[i], dt, sEnv);
+      for (let a = 0; a < this.stagedVehicles.length; a++) {
+        updateStagedVehicle(this.stagedVehicles[a], H, sEnv);
       }
-      for (let i = 0; i < this.stagedPeds.length; i++) {
-        updateStagedPedestrian(this.stagedPeds[i], dt, sEnv);
+      for (let a = 0; a < this.stagedPeds.length; a++) {
+        updateStagedPedestrian(this.stagedPeds[a], H, sEnv);
+      }
+      this.gridK = k;
+      // The director decides on the state this step left, at this grid point —
+      // here when the point is inside the frame, in its own frame step when it
+      // is the frame's end.
+      if (listener !== null && !atEnd) listener.substep(tau, H, frameSec, sp, k * H);
+    }
+    // The frame's own pose, for every reader after the frame.
+    vEnv.playerX = endX;
+    vEnv.playerY = endY;
+    vEnv.playerSpeedMps = endMps;
+    pEnv.playerX = endX;
+    pEnv.playerY = endY;
+    pEnv.playerSpeedKmh = endKmh;
+    if (ctx.playerHeadingDeg !== undefined) {
+      const rad = (ctx.playerHeadingDeg * Math.PI) / 180;
+      vEnv.playerDirX = Math.sin(rad);
+      vEnv.playerDirY = Math.cos(rad);
+    }
+    this.renderLerp = true;
+    this.renderAlpha = Math.min(1, Math.max(0, (sessionEnd - this.gridK * H) / H));
+    if (endOnGrid) this.renderAlpha = 0;
+    this.stagedListener?.frameEnd(endOnGrid || !readable, H);
+  }
+
+  /** Copy every published pose: the start of the segment `renderFraction`
+   *  interpolates along. */
+  private snapshotRender(): void {
+    const nv = this.vehicles.length;
+    if (this.renderPrevVeh.length < nv * 4) this.renderPrevVeh = new Float64Array(nv * 8);
+    for (let i = 0; i < nv; i++) {
+      const v = this.vehicles[i];
+      const o = i * 4;
+      this.renderPrevVeh[o] = v.x;
+      this.renderPrevVeh[o + 1] = v.y;
+      this.renderPrevVeh[o + 2] = v.dirX;
+      this.renderPrevVeh[o + 3] = v.dirY;
+    }
+    this.renderPrevVehCount = nv;
+    const np = this.pedestrians.length;
+    if (this.renderPrevPed.length < np * 4) this.renderPrevPed = new Float64Array(np * 8);
+    for (let i = 0; i < np; i++) {
+      const p = this.pedestrians[i];
+      const o = i * 4;
+      this.renderPrevPed[o] = p.x;
+      this.renderPrevPed[o + 1] = p.y;
+      this.renderPrevPed[o + 2] = p.dirX;
+      this.renderPrevPed[o + 3] = p.dirY;
+    }
+    this.renderPrevPedCount = np;
+  }
+
+  /**
+   * Round 4 — the frame end, for what is DRAWN, when the caller advanced the
+   * world one grid point per `update(FIXED_DT, { sessionTimeSec: k·FIXED_DT })`
+   * call (scene/gradeGrid.ts): every such call ends ON its grid point
+   * (`renderFraction` 0), so the frame end past the newest one — or a frame
+   * that crossed no grid point at all, and made no call — is handed over
+   * here. Exactly `stepGrid`'s fraction: the frame end's distance past the
+   * newest grid state, in steps; nothing simulated moves.
+   */
+  setRenderSessionTime(sessionTimeSec: number): void {
+    if (!this.gridInit || !Number.isFinite(sessionTimeSec)) return;
+    const H = STAGED_MAX_SUBSTEP_SEC;
+    const past = sessionTimeSec - this.gridK * H;
+    this.renderLerp = true;
+    this.renderAlpha = Math.abs(past) <= STAGED_GRID_EPS_SEC ? 0 : Math.min(1, Math.max(0, past / H));
+  }
+
+  get renderFraction(): number {
+    return this.renderLerp ? this.renderAlpha : 1;
+  }
+
+  vehicleRenderPose(i: number, out: TrafficRenderPose): TrafficRenderPose {
+    return this.renderPose(this.vehicles[i], i, this.renderPrevVeh, this.renderPrevVehCount, out);
+  }
+
+  pedestrianRenderPose(i: number, out: TrafficRenderPose): TrafficRenderPose {
+    return this.renderPose(this.pedestrians[i], i, this.renderPrevPed, this.renderPrevPedCount, out);
+  }
+
+  private renderPose(
+    s: { x: number; y: number; dirX: number; dirY: number } | undefined,
+    i: number,
+    prev: Float64Array,
+    count: number,
+    out: TrafficRenderPose,
+  ): TrafficRenderPose {
+    if (s === undefined) return out;
+    out.x = s.x;
+    out.y = s.y;
+    out.dirX = s.dirX;
+    out.dirY = s.dirY;
+    if (!this.renderLerp || i >= count) return out;
+    const o = i * 4;
+    const px = prev[o];
+    const py = prev[o + 1];
+    // A teleport (a re-entry, a retry) is not a drive: draw where it now is.
+    if (Math.hypot(s.x - px, s.y - py) > RENDER_JUMP_M) return out;
+    const a = this.renderAlpha;
+    out.x = px + (s.x - px) * a;
+    out.y = py + (s.y - py) * a;
+    out.dirX = prev[o + 2] + (s.dirX - prev[o + 2]) * a;
+    out.dirY = prev[o + 3] + (s.dirY - prev[o + 3]) * a;
+    return out;
+  }
+
+  /** The player's pose a fraction `f` of the way through this frame: on the
+   *  vehicle simulation's own per-step states when the frame carries them
+   *  (`PlayerStepTrack`, linear between two physics steps), else on the chord
+   *  between the previous frame's pose and this one. */
+  private playerAt(
+    f: number,
+    endX: number,
+    endY: number,
+    endKmh: number,
+    endHeading: number,
+    out: StagedSubstepPlayer,
+  ): void {
+    this.playerAtTau(f * this.trackFrameSec, endX, endY, endKmh, endHeading, out);
+  }
+
+  /** …the same, `tau` seconds into the frame. A track sample within 1 ns of
+   *  `tau` IS the state there (the replay samples the drive at the grid
+   *  points themselves; float noise must not blend it with its neighbour). */
+  private playerAtTau(
+    tau: number,
+    endX: number,
+    endY: number,
+    endKmh: number,
+    endHeading: number,
+    out: StagedSubstepPlayer,
+  ): void {
+    const tr = this.track;
+    const frameSec = this.trackFrameSec;
+    if (tr === null) {
+      const f = frameSec > 0 ? tau / frameSec : 1;
+      out.x = this.prevPlayerX + (endX - this.prevPlayerX) * f;
+      out.y = this.prevPlayerY + (endY - this.prevPlayerY) * f;
+      out.speedKmh = this.prevPlayerKmh + (endKmh - this.prevPlayerKmh) * f;
+      out.headingDeg = lerpHeadingDeg(this.prevPlayerHeadingDeg, endHeading, f);
+      return;
+    }
+    let ta = 0;
+    let ax = this.prevPlayerX;
+    let ay = this.prevPlayerY;
+    let ak = this.prevPlayerKmh;
+    let ah = this.prevPlayerHeadingDeg;
+    let tb = frameSec;
+    let bx = endX;
+    let by = endY;
+    let bk = endKmh;
+    let bh = endHeading;
+    for (let k = 0; k < tr.count; k++) {
+      const tk = tr.tSec[k];
+      if (!(tk > 1e-9) || !(tk < frameSec - 1e-9)) continue;
+      if (tk <= tau + 1e-9) {
+        ta = tk;
+        ax = tr.x[k];
+        ay = tr.y[k];
+        ak = tr.speedKmh[k];
+        ah = tr.headingDeg[k];
+      } else {
+        tb = tk;
+        bx = tr.x[k];
+        by = tr.y[k];
+        bk = tr.speedKmh[k];
+        bh = tr.headingDeg[k];
+        break;
       }
     }
+    const g = tau <= ta + 1e-9 ? 0 : tb > ta ? Math.min(1, (tau - ta) / (tb - ta)) : 1;
+    out.x = ax + (bx - ax) * g;
+    out.y = ay + (by - ay) * g;
+    out.speedKmh = ak + (bk - ak) * g;
+    out.headingDeg = lerpHeadingDeg(ah, bh, g);
+  }
+
+  setStagedSubstepListener(listener: StagedSubstepListener | null): void {
+    this.stagedListener = listener;
   }
 
   stage(spec: StagedActorSpec): StagedActorView | null {

@@ -9,8 +9,12 @@
  *   VehicleRig („Виток" physics car) · TrafficLayer (cars + pedestrians) ·
  *   CameraRig (chase/cockpit) · WorldRuntime (signals + SimTick emission).
  *
- * Per frame: runtime.update → traffic.update → runtime.sample → onTick, which
- * feeds the lesson engine (rules + objectives + HUD) owned by LessonPlayShell.
+ * Per SESSION GRID POINT k·FIXED_DT (scene/gradeGrid.ts — rounds 4–5 of
+ * sc-roundabout-entry:7b747c15; a render frame brings one per step the physics
+ * engine took in it — zero, one or up to 30 — the first frame like any other):
+ * runtime.update → traffic.update → runtime.sample → director → onTick,
+ * which feeds the lesson engine (rules + objectives + HUD) owned by
+ * LessonPlayShell.
  */
 
 import {
@@ -96,7 +100,6 @@ import {
   createScenarioDirector,
   directorContactCast,
   lessonSeed,
-  vruAheadMeters,
   type ScenarioDirector,
 } from "@/modules/sim/orchestrator";
 // Exact body geometry for naming a live contact — the SAME module the
@@ -170,6 +173,9 @@ import {
   controllerCaptionDetailForLevel,
   createTrafficSystem,
   DEFAULT_TRAFFIC_CONFIG,
+  NO_PHYSICS_STEPS,
+  PhysicsSessionClock,
+  PlayerStepTrackRecorder,
   SCENARIO_TRAFFIC_DRAW_DISTANCE_M,
   TrafficLayer,
   type TrafficDistrict,
@@ -227,6 +233,8 @@ import { ImpactCut, type ImpactCutHandle, type ImpactShakeHandle } from "./Impac
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
+import { GradeGrid } from "@/modules/sim/scene/gradeGrid";
+import { createAttemptFeedState, feedAttemptPoint } from "@/modules/sim/scene/attemptFeed";
 import { buildMinimapPolylines } from "@/modules/sim/scene/lessonMinimap";
 import {
   applySignalModes,
@@ -2041,6 +2049,20 @@ export function ReadyScene({
   const cabinRef = useRef<CabinControls | null>(null);
   const audioRef = useRef<SimAudio | null>(null);
   const sampleRef = useRef<VehicleSample>(createVehicleSample());
+  /** The physics engine's own steps, counted, each with the state it left the
+   *  car in (VehicleRig records one after every rapier step). RuntimeDriver
+   *  grades one session grid point per step — sc-roundabout-entry:7b747c15
+   *  round 5, «one clock». Made once with the scene and never reset: the step
+   *  number IS the grid index, and the session runs on through a retry. */
+  const stepTrackRef = useRef<PlayerStepTrackRecorder | null>(null);
+  if (stepTrackRef.current === null) stepTrackRef.current = new PlayerStepTrackRecorder();
+  /** The session grid the graded chain runs on (scene/gradeGrid.ts). Owned
+   *  HERE, not by RuntimeDriver, since round 8: `resetCar` below must be able
+   *  to tell it that a respawn happened (the looks still waiting for a grid
+   *  point and the near-miss encounters still open belong to the drive before
+   *  it). One per mounted scene — the shell's «Повтори» remounts the scene
+   *  (`sceneEpoch`), which is what makes a new attempt a new grid. */
+  const [gradeGrid] = useState(() => new GradeGrid());
   /** The crash response (flash + exterior cut) — filled by `ImpactCut`. */
   const impactCutRef = useRef<ImpactCutHandle | null>(null);
   /** …and its third half, the camera's own jolt — filled by `CameraRig`, which
@@ -2362,7 +2384,14 @@ export function ReadyScene({
     simRef.current?.reset();
     // A8: retry re-stages every staged encounter (fresh attempt seed).
     directorRef.current?.reset();
-  }, []);
+    // sc-roundabout-entry:7b747c15 round 8 — and nothing PENDING crosses the
+    // respawn: a look the cabin or the grid still holds was made in the drive
+    // that just ended, and a near-miss window open against a car the student
+    // has just been lifted away from is not a pass (GradeGrid.reset). Executed
+    // by lessons/scenario/__tests__/live-grade-call.execution.test.ts.
+    cabinRef.current?.forgetPendingGlances();
+    gradeGrid.reset();
+  }, [gradeGrid]);
 
   // A2 performed pre-drive: raw transition queues, drained by RuntimeDriver's
   // frame loop and resolved to procedure steps (performedSteps.ts). Driveline
@@ -2832,6 +2861,7 @@ export function ReadyScene({
                 cabinRef={cabinRef}
                 audioRef={audioRef}
                 sampleRef={sampleRef}
+                stepTrackRef={stepTrackRef}
                 paused={physicsPaused}
                 spawn={spawn}
                 difficultyRef={difficultyRef}
@@ -2915,6 +2945,8 @@ export function ReadyScene({
               // reading the air for yourself is what L3 is.
               onWindPush={lesson.examMode === true ? undefined : setWindPushCue}
               sampleRef={sampleRef}
+              stepTrackRef={stepTrackRef}
+              gradeGrid={gradeGrid}
               simRef={simRef}
               inputRef={inputRef}
               cabinRef={cabinRef}
@@ -2944,6 +2976,7 @@ export function ReadyScene({
               onStuckStart={onStuckStart}
               onTransmissionChanged={onTransmissionChanged}
               onStagedOutcome={onStagedOutcome}
+              onNearMiss={onNearMiss}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
               rain={rain}
@@ -2956,12 +2989,13 @@ export function ReadyScene({
                 the player, so driving into traffic is a real contact the
                 rule engine grades by kind. Mounted AFTER RuntimeDriver —
                 its frame callback then reads this frame's fresh traffic
-                poses. Also runs the near-miss session stat (no grading). */}
+                poses. The near-miss session stat is NOT stepped here any
+                more: the session grid measures it (RuntimeDriver's
+                `nearMiss` hook), from the car at each grid point. */}
             <NpcColliders
               traffic={traffic}
               sampleRef={sampleRef}
               paused={physicsPaused}
-              onNearMiss={onNearMiss}
             />
             {/* Ambient life — cars + pedestrians. Render-only: RuntimeDriver
                 already steps traffic.update each frame (so it stays in lockstep
@@ -4649,6 +4683,8 @@ function RuntimeDriver({
   onSecondSwing,
   onWindPush,
   sampleRef,
+  stepTrackRef,
+  gradeGrid,
   simRef,
   inputRef,
   cabinRef,
@@ -4675,6 +4711,7 @@ function RuntimeDriver({
   onStuckStart,
   onTransmissionChanged,
   onStagedOutcome,
+  onNearMiss,
   minimapPolylines,
   isNight,
   rain,
@@ -4712,6 +4749,12 @@ function RuntimeDriver({
    */
   onWindPush?: (cue: WindPushCue | null) => void;
   sampleRef: React.RefObject<VehicleSample>;
+  /** The physics engine's step record — what drives the session grid (see
+   *  the graded block below, and VehicleRig's prop of the same name). */
+  stepTrackRef: React.RefObject<PlayerStepTrackRecorder | null>;
+  /** The session grid the graded chain runs on — LessonScene's, so that its
+   *  `resetCar` can reset it on a respawn (round 8). */
+  gradeGrid: GradeGrid;
   /** S0-View: live steer angle for the attempt recorder (visual channel). */
   simRef: React.RefObject<VehicleSim | null>;
   inputRef: React.RefObject<GatedSimInput | null>;
@@ -4765,6 +4808,9 @@ function RuntimeDriver({
     movedSelectorTo: SelectorPosition,
   ) => void;
   onStagedOutcome?: (outcome: StagedEventOutcome) => void;
+  /** The near-miss stat's sink (the shell's handler) — handed to the session
+   *  grid, which measures the stat at each grid point (round 7). */
+  onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
   rain: boolean;
@@ -4775,6 +4821,11 @@ function RuntimeDriver({
   paused: boolean;
 }) {
   const tRef = useRef(0);
+  // sc-roundabout-entry:7b747c15 — the session grid the graded chain runs on
+  // (round 4) is the `gradeGrid` prop (LessonScene owns it since round 8); this
+  // is the session clock that shares its origin with the physics engine's
+  // first counted step (round 5).
+  const sessionClock = useMemo(() => new PhysicsSessionClock(), []);
   const lastMinimapRef = useRef(0);
   // Scene-owned status-dashboard scratch (created on the first frame; the
   // shell's dashboardStatusRef is pointed at it — see the useFrame block).
@@ -4805,8 +4856,9 @@ function RuntimeDriver({
   const trackerRef = useRef<PreDriveSignalTracker>(createPreDriveSignalTracker());
   const pollRef = useRef<CabinPollState>(cabinPollBaseline(null, 0));
   const prevLockedRef = useRef(false);
-  // S0-View attempt recorder: last indicator setting → signal-on/off edges.
-  const recIndicatorRef = useRef<"off" | "left" | "right">("off");
+  // S0-View attempt recorder: the grid-point feed's own memory (the last
+  // indicator setting → signal-on/off edges) — scene/attemptFeed.ts.
+  const attemptFeedRef = useRef(createAttemptFeedState());
   // AC-12 «вторият замах»: the detector's own per-drive state plus the last
   // level we published, so the setState fires on edges only — the telltale
   // channel's contract, for the same reason (a per-frame setState is a
@@ -5013,8 +5065,21 @@ function RuntimeDriver({
     // `cabin.update(delta, …)` runs the blink/wiper/stall timers on the raw,
     // unclamped delta — so on a 3.57 s frame the indicator still blinks seven
     // times what the clock says.
+    //
+    // ══ ROUND 5 — ONE ORIGIN (sc-roundabout-entry:7b747c15) ══════════════════
+    //
+    // The session clock is still the sum of the clamped deltas — the numbers
+    // rapier's accumulator is fed on these very frames — so the frame end lies
+    // (clock − steps·FIXED_DT) past the newest physics step: the accumulator's
+    // own remainder, what everything DRAWN is interpolated by. It is advanced
+    // through `PhysicsSessionClock` against the engine's counted steps, which
+    // holds it at its origin until the car's first step and drops whole steps
+    // nothing could count (traffic/sessionGrid.ts) — so the session clock, the
+    // car, the world and the signal clock start together, whatever the first
+    // live frame's length.
+    const steps = stepTrackRef.current ?? NO_PHYSICS_STEPS;
     const dt = sessionClockAdvance(delta);
-    tRef.current += dt;
+    tRef.current = sessionClock.frame(dt, steps.stepCount);
     const sample = sampleRef.current;
 
     // Auto-reverse assist (founder 2026-07-17): press the brake at a
@@ -5132,23 +5197,168 @@ function RuntimeDriver({
       if (blocked !== null) onStuckStart?.(blocked);
     }
 
-    runtime.update(dt);
-    traffic.update(dt, {
-      signalPhase: (id) => runtime.signalPhase(id),
-      playerPos: { x: sample.position.x, y: sample.position.y },
-      playerSpeedKmh: sample.speedKmh,
-      playerHeadingDeg: sample.headingDeg,
-    });
-    const leadGap = traffic.leadGapMeters(
+    // ══ ROUND 4 — THE WORLD AND THE GRADE RUN ON ONE FIXED STEP ══════════════
+    //
+    // sc-roundabout-entry:7b747c15 (scene/gradeGrid.ts). The graded chain —
+    // signals → traffic → lead gap → runtime.sample → director → onTick — runs
+    // once per SESSION GRID POINT k·FIXED_DT, reading the car AT that point.
+    //
+    // ROUND 5 — ONE CLOCK: the grid is DRIVEN BY THE PHYSICS ENGINE'S OWN
+    // STEPS (`GradeGrid.stepPhysics`). Grid point k is the car's k-th rapier
+    // step (`stepTrackRef`, recorded by VehicleRig after every step): a frame
+    // brings exactly as many points as rapier took steps in it, the first
+    // frame's included, and the grid itself writes the car's pose, heading and
+    // speed at each point from that step — the `student` hook below supplies
+    // only the cabin's discrete channels and the pedals, and the grid measures
+    // the person-in-path distance itself (round 6), so nothing in this call
+    // reads this frame's pose, heading or speed (the whole call is read as a
+    // tree by scene/__tests__/live-grid-wiring.test.ts §3 and cut out and
+    // EXECUTED by lessons/scenario/__tests__/live-grade-call.execution.test.ts).
+    // THIS READ DEPENDS ON THE FRAME-HOOK ORDER: rapier's stepper (the
+    // first child of <Physics>) must run before this callback, which it does
+    // because RuntimeDriver is mounted INSIDE <Physics> and neither carries a
+    // useFrame priority — pinned by scene/__tests__/live-grid-wiring.test.ts.
+    // Round 4 derived the index from the session time instead and mapped it
+    // onto the step number through an offset it only ever lowered; that graded
+    // one state twice and read the car a step stale from then on.
+    //
+    // A frame in which rapier took no step (every other frame at 120 Hz)
+    // grades nothing and its one-shot mirror glance WAITS IN THE GRID'S QUEUE
+    // for a point — every frame's look, in order, one per grid point (round 8:
+    // through round 7 the grid kept one slot, and the next frame's look
+    // overwrote a look no point had heard yet); a 0.5 s phone
+    // frame is graded at all 30 points inside it. Round 3 had put the WORLD on
+    // the grid while the rule engine still read this frame's interpolated
+    // chassis at the frame end: its verifier measured the student-to-lead gap
+    // become a sawtooth at 120/144/59.94 Hz and on ±1 ms jitter (even ±0.2 µs),
+    // and FOLLOWING_TOO_CLOSE / YIELDED_TO_PRIORITY / OVERTAKING_AT_CROSSING
+    // flip between platforms on one drive. At an exact 60 Hz each frame is one
+    // grid point: the call sequence this block always made.
+    //
+    // What the student SEES stays on the frame: the speedometer, the HUD gap
+    // readouts, the drawn poses (`traffic.setRenderSessionTime`, inside
+    // stepFrame), the audio proximity below.
+    gradeGrid.stepPhysics(
+      steps,
+      tRef.current,
+      sample.mirrorGlance,
+      { runtime, traffic, director },
+      conditions,
+      {
+        student: (_k, _tSec, out) => {
+          // Every discrete channel is the frame's (the cabin is read per
+          // frame). The car's pose, heading and speed are NOT written here:
+          // the grid writes them from the physics step it grades.
+          out.indicator = sample.indicator;
+          out.headlights = sample.headlights;
+          out.seatbeltOn = sample.seatbeltOn;
+          out.handbrakeOn = sample.handbrakeOn;
+          out.gear = sample.gear;
+          out.stalled = sample.stalled;
+          out.fogLightsOn = sample.fogLightsOn;
+          out.throttlePedal = sample.throttlePedal;
+          out.engineOn = sample.engineOn;
+          return inputRef.current?.rawBrake ?? 0;
+        },
+        // EVERY LOOK THE CABIN STILL HOLDS (round 8). `sample.mirrorGlance`
+        // above is the one look VehicleRig's sample builder took this frame;
+        // two keys pressed inside one frame leave a second in the cabin's
+        // queue, which used to wait a whole FRAME for its turn — 17 ms on a
+        // PC, half a second on a phone drawing two frames a second. The grid
+        // takes them all now and hears them one per grid point.
+        moreLooks: () => cabinRef.current?.consumeGlanceSample() ?? null,
+        // THE PERSON IN THE PATH (`tick.vruAheadM`) is NOT measured here any
+        // more (round 6). `leadGap` answers „is a CAR standing on top of me";
+        // that channel answers it for the road user чл. 5, ал. 2 puts first,
+        // and the rule engine's В27 block acquits on it. It is graded input,
+        // so the GRID measures it — from the car at the grid point, off the
+        // `director` handed over above (its own contact cast) and the same
+        // traffic port `handleCollision` names bodies through. A hook here
+        // could read this frame's `sample` instead, and one that did passed
+        // every test: this call hands the grid no function that reads a pose.
+        // A8: the scenario director stepped AFTER traffic.update +
+        // runtime.sample at this grid point — it watched the player, commanded
+        // staged actors (effective at the next point) and appended its
+        // outcome events into the SAME tick the rule engine grades. The hazard
+        // flag drives TrafficLayer's L5 ball animation.
+        onPoint: (pt) => {
+          if (director && pt.staged) {
+            hazardActiveRef.current = director.hazardActive;
+            // N11 (VP-06): the cockpit-lamp channel — the cluster reads the
+            // ref per frame; the HUD cue + the attempt trace react on EDGES
+            // only. The rising-edge annotation marks the stimulus moment for
+            // the ghost story of the student's own attempt.
+            const lit = director.telltaleLit;
+            if (lit !== telltaleLitRef.current) {
+              telltaleLitRef.current = lit;
+              onTelltale?.(lit);
+              if (lit) {
+                recorder?.addEvent(
+                  "annotation",
+                  pt.tSec,
+                  "Светна ЧЕРВЕНА контролна лампа — температура на двигателя. Спри спокойно вдясно.",
+                );
+              }
+            }
+            const cautionLit = director.telltaleCautionLit;
+            if (cautionLit !== telltaleCautionLitRef.current) {
+              telltaleCautionLitRef.current = cautionLit;
+              onTelltaleCaution?.(cautionLit);
+              if (cautionLit) {
+                recorder?.addEvent(
+                  "annotation",
+                  pt.tSec,
+                  "Светна ЖЪЛТА контролна лампа — двигател. Жълто значи „внимателно, до сервиз“ — продължи плавно.",
+                );
+              }
+            }
+            if (onStagedOutcome) {
+              for (const o of pt.staged.outcomes) onStagedOutcome(o);
+            }
+          }
+          onTick(pt.tick);
+          // S0-View attempt recording (doc 76 §5), ON THE GRID since round 8:
+          // one sample per graded point, from the student state this point's
+          // tick was built from, and the look this point heard — so the
+          // rubric's observation moments, which are scored from this trace
+          // after the drive, are scored from the looks the grader heard, at
+          // the grid points that heard them, and the trace's samples are the
+          // same grid points on every display (scene/attemptFeed.ts; WHICH
+          // point hears a look is still the frame's to decide where a frame
+          // is longer than a step — scene/gradeGrid.ts). AFTER `onTick`, as the
+          // frame feed was: the tick that ends the session closes the trace
+          // (`finalizeLessonSession` → `finishTrace`) before its own point is
+          // pushed. The ring recorder decimates to ~20 Hz itself.
+          if (recorder) {
+            feedAttemptPoint(
+              recorder,
+              attemptFeedRef.current,
+              pt.tSec,
+              pt.student,
+              simRef.current?.steerRad ?? 0,
+              (inputRef.current?.rawBrake ?? 0) > 0.15,
+              (inputRef.current?.rawThrottle ?? 0) > 0.15,
+            );
+          }
+        },
+        // THE NEAR-MISS STAT («мина на косъм», unscored but shown — round 7):
+        // measured by the grid, from the car at the grid point; the shell's
+        // handler is handed each resolved encounter as it is. Not a function
+        // of this file: nothing here can choose the pose it is measured from.
+        nearMiss: onNearMiss,
+      },
+    );
+    // A6 audio pass: sticky scene state for the audio layer (rain patter +
+    // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
+    // What is HEARD stays on the frame (the car's drawn pose).
+    // Siren channel (VU-09): nearest ACTIVE (moving) emergency actor off the
+    // published traffic state — render-only scan, Infinity = no siren. A
+    // guard-stalled actor (speed 0) fades out; honest limit for now.
+    const audioGap = traffic.leadGapMeters(
       sample.position.x,
       sample.position.y,
       sample.headingDeg,
     );
-    // A6 audio pass: sticky scene state for the audio layer (rain patter +
-    // NPC proximity hum) — consumed by VehicleRig's per-frame audio update.
-    // Siren channel (VU-09): nearest ACTIVE (moving) emergency actor off the
-    // published traffic state — render-only scan, Infinity = no siren. A
-    // guard-stalled actor (speed 0) fades out; honest limit for now.
     let sirenM = Infinity;
     const tvs = traffic.vehicles;
     for (let i = 0; i < tvs.length; i++) {
@@ -5157,88 +5367,7 @@ function RuntimeDriver({
       const d = Math.hypot(tv.x - sample.position.x, tv.y - sample.position.y);
       if (d < sirenM) sirenM = d;
     }
-    audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap, sirenM });
-    // Weather/time read off the SAME object the dashboard publishes (see the
-    // `conditions` memo). That is the point of the memo: the grader and the
-    // display cannot disagree about whether it is snowing, which is the one
-    // thing they have already disagreed about twice (O28, O35).
-    // THE PERSON IN THE PATH, on the same frame the law is applied to.
-    // `leadGap` above answers „is a CAR standing on top of me"; this answers the
-    // same question for the road user чл. 5, ал. 2 puts first, and the rule
-    // engine's В27 block has been waiting for it since 2026-08-23 with the
-    // acquittal wired and nothing writing the field. Measured in the module
-    // (`orchestrator/contact.ts`), off the director's own cast and the same
-    // traffic port `handleCollision` names bodies through — one question, one
-    // answer. A lesson with no director, or with no staged people, yields the
-    // empty cast and therefore Infinity — which is what every caller that
-    // cannot answer says, and leaves its tick byte-identical to before.
-    const vruAhead = vruAheadMeters(
-      directorContactCast(director),
-      traffic,
-      sample.position.x,
-      sample.position.y,
-      sample.headingDeg,
-    );
-    const tick = runtime.sample(
-      sample,
-      tRef.current,
-      conditions.isNight,
-      conditions.rain,
-      leadGap,
-      conditions.fog,
-      conditions.snow,
-      vruAhead,
-    );
-
-    // A8: the scenario director steps AFTER traffic.update + runtime.sample —
-    // it watches the player, commands staged actors (effective next frame)
-    // and appends its outcome events into the SAME tick the rule engine
-    // grades. The hazard flag drives TrafficLayer's L5 ball animation.
-    if (director) {
-      const staged = director.step({
-        tSec: tRef.current,
-        dtSec: dt,
-        x: sample.position.x,
-        y: sample.position.y,
-        speedKmh: sample.speedKmh,
-        headingDeg: sample.headingDeg,
-        brakePedal: inputRef.current?.rawBrake ?? 0,
-        tickEvents: tick.events,
-      });
-      for (const e of staged.events) tick.events.push(e);
-      hazardActiveRef.current = director.hazardActive;
-      // N11 (VP-06): the cockpit-lamp channel — the cluster reads the ref per
-      // frame; the HUD cue + the attempt trace react on EDGES only. The
-      // rising-edge annotation marks the stimulus moment for the ghost story
-      // of the student's own attempt (the recorder never renders).
-      const lit = director.telltaleLit;
-      if (lit !== telltaleLitRef.current) {
-        telltaleLitRef.current = lit;
-        onTelltale?.(lit);
-        if (lit) {
-          recorder?.addEvent(
-            "annotation",
-            tRef.current,
-            "Светна ЧЕРВЕНА контролна лампа — температура на двигателя. Спри спокойно вдясно.",
-          );
-        }
-      }
-      const cautionLit = director.telltaleCautionLit;
-      if (cautionLit !== telltaleCautionLitRef.current) {
-        telltaleCautionLitRef.current = cautionLit;
-        onTelltaleCaution?.(cautionLit);
-        if (cautionLit) {
-          recorder?.addEvent(
-            "annotation",
-            tRef.current,
-            "Светна ЖЪЛТА контролна лампа — двигател. Жълто значи „внимателно, до сервиз“ — продължи плавно.",
-          );
-        }
-      }
-      if (onStagedOutcome) {
-        for (const o of staged.outcomes) onStagedOutcome(o);
-      }
-    }
+    audioRef.current?.setEnvironment({ rain, nearestNpcM: audioGap, sirenM });
 
     // ── AC-12: «ВТОРИЯТ ЗАМАХ», WATCHED WHILE HE MAKES IT ────────────────────
     //
@@ -5332,35 +5461,13 @@ function RuntimeDriver({
       }
     }
 
-    onTick(tick);
+    // onTick ran inside the grid loop above, once per graded grid point.
 
-    // S0-View attempt recording (doc 76 §5): the ring recorder decimates the
-    // frame feed to ~20 Hz itself — push() is zero-alloc, so this stays free
-    // when the prop is absent and cheap when it isn't.
-    if (recorder) {
-      recorder.push({
-        tSec: tRef.current,
-        x: sample.position.x,
-        y: sample.position.y,
-        headingDeg: sample.headingDeg,
-        steerRad: simRef.current?.steerRad ?? 0,
-        speedKmh: sample.speedKmh,
-        gear: sample.gear,
-        indicator: sample.indicator,
-        brakeOn: (inputRef.current?.rawBrake ?? 0) > 0.15,
-        throttleOn: (inputRef.current?.rawThrottle ?? 0) > 0.15,
-      });
-      // Sparse events: glances arrive as one-frame sample values; indicator
-      // edges become signal-on/off.
-      if (sample.mirrorGlance) {
-        recorder.addEvent(`glance-${sample.mirrorGlance}`, tRef.current);
-      }
-      if (sample.indicator !== recIndicatorRef.current) {
-        recIndicatorRef.current = sample.indicator;
-        if (sample.indicator === "off") recorder.addEvent("signal-off", tRef.current);
-        else recorder.addEvent("signal-on", tRef.current, undefined, sample.indicator);
-      }
-    }
+    // S0-View attempt recording (doc 76 §5) is NOT fed here any more (round
+    // 8): it was — once per render frame, from this frame's drawn chassis and
+    // its one-shot glance — and the rubric's observation moments are scored
+    // from that trace, so the score depended on the display. The feed runs in
+    // the grid loop above, once per graded point (`feedAttemptPoint`).
 
     const nowMs = tRef.current * 1000;
     if (nowMs - lastMinimapRef.current >= MINIMAP_MS) {

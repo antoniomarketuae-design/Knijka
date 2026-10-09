@@ -53,6 +53,29 @@
  *      (`components/sim/LessonScene.tsx`) calls the publisher and hands the
  *      result to `runtime.sample`; plus the GENERAL form of that question, put
  *      to every channel the law reads.
+ *
+ * THE ADDRESS MOVED ONE HOP (sc-roundabout-entry:7b747c15 round 4, 2026-10-07).
+ * The graded chain now runs once per session grid point in
+ * `scene/gradeGrid.ts`, so `runtime.sample(` is spelled THERE and the scene
+ * hands the publisher in as the `vruAheadM` hook of the grid's live frame —
+ * `stepPhysics` since round 5 (the grid is driven by the physics engine's own
+ * steps; `stepFrame` is the replay harness's entry and the scene may not call
+ * it). The walk follows both hops — scene → hook, hook → the eighth argument
+ * of `runtime.sample` — because asserting either alone would again pass with
+ * the other one cut.
+ *
+ * AND THE HOOK IS GONE (round 6, 2026-10-08). A hook the scene hands in can
+ * measure from whatever pose it likes, and one that read the scene's frame-end
+ * sample instead of the car at the grid point passed this file and every other
+ * (round 5's verifier: this file "only checks `vruAheadMeters(` appears").
+ * The GRID now calls the publisher itself, with the student at the grid point
+ * and the director's own cast; the scene hands over the director and the
+ * traffic port and no function. So the two hops are: scene → the world it
+ * hands `stepPhysics` (`{ runtime, traffic, director }`), grid → the
+ * publisher's call, argument by argument, → the eighth argument of
+ * `runtime.sample`. That the value is RIGHT at every grid point, on the scene's
+ * own call executed, is lessons/scenario/__tests__/
+ * live-grade-call.execution.test.ts.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -246,30 +269,78 @@ function stripComments(source: string): string {
 
 describe("the publisher is reachable from the page the student loads", () => {
   const scene = stripComments(read("components/sim/LessonScene.tsx"));
+  const grid = stripComments(read("modules/sim/scene/gradeGrid.ts"));
 
   it("the walk is looking at the real scene file", () => {
     // The self-check first: a path typo or a moved component would make every
     // assertion below vacuous, which is precisely how a dead-code gate reports
     // five live consumers as none.
     expect(scene.length).toBeGreaterThan(50_000);
-    expect(scene).toContain("runtime.sample(");
+    // The scene runs the graded chain through the grid, and nowhere else: a
+    // second `runtime.sample(` in the scene would be a frame-clocked grade
+    // beside the grid's (round 4's whole defect).
+    expect(scene).toContain("new GradeGrid()");
+    expect(scene).toContain(".stepPhysics(");
+    // Round 5: the session-time entry is the harness's; in the scene it would
+    // be a second clock beside the physics engine's.
+    expect(scene).not.toContain(".stepFrame(");
+    expect(scene).not.toContain("runtime.sample(");
+    expect(grid.split("runtime.sample(").length - 1).toBe(1);
   });
 
-  it("LessonScene imports the publisher through the module's public API", () => {
-    // doc 05: a component reaches a module only through its barrel. Importing
+  it("the grid imports the publisher through the module's public API — and the scene does not measure it at all", () => {
+    // doc 05: a module reaches another only through its barrel. Importing
     // `../orchestrator/contact` directly would work and would be a boundary
     // violation, so the barrel is what is asserted.
-    expect(scene).toContain("vruAheadMeters");
-    expect(scene).toContain('from "@/modules/sim/orchestrator"');
+    const at = grid.search(/import \{\s*directorContactCast,/);
+    expect(at).toBeGreaterThan(0);
+    const barrel = grid.slice(at);
+    expect(barrel.slice(0, barrel.indexOf(";") + 1)).toMatch(
+      /^import \{\s*directorContactCast,\s*vruAheadMeters,[\s\S]*?\} from "@\/modules\/sim\/orchestrator";$/,
+    );
+    // Round 6: the measurement is graded input, so it is the grid's. A scene
+    // that measured it could measure it from its frame-end sample.
+    expect(scene).not.toContain("vruAheadMeters");
+    expect(scene).not.toContain("vruAheadM:");
   });
 
-  it("…calls it, and hands the RESULT to runtime.sample — the step that was missing", () => {
+  it("…calls it at the grid point, and hands the RESULT to runtime.sample — the step that was missing", () => {
     // This is the whole assertion. `vruAheadM` was declared, read and tested
     // with no line anywhere doing these two things.
-    expect(scene).toContain("vruAheadMeters(");
-    const call = scene.slice(scene.indexOf("runtime.sample("));
-    const args = call.slice(0, call.indexOf(")"));
-    expect(args).toContain("vruAhead");
+    // Hop 1 — the scene: the world it hands the grid's `stepPhysics` carries
+    // the director (whose cast the people are) and the traffic port (where
+    // they stand).
+    const step = scene.slice(scene.indexOf(".stepPhysics("));
+    expect(step.indexOf("conditions,")).toBeGreaterThan(0);
+    expect(step.slice(0, step.indexOf("conditions,"))).toMatch(/\{\s*runtime,\s*traffic,\s*director\s*\},\s*$/);
+    // Hop 2 — the grid: it measures from the student AT the grid point (`s`
+    // is the sample the whole chain reads there), off that director's cast…
+    const castBind = "const cast = directorContactCast(director);";
+    expect(grid.split(castBind).length - 1).toBe(1);
+    expect(grid.split("vruAheadMeters(").length - 1).toBe(1);
+    const bind = "const vru = vruAheadMeters(cast, traffic, s.position.x, s.position.y, s.headingDeg);";
+    expect(grid.split(bind).length - 1).toBe(1);
+    expect(grid.indexOf(castBind)).toBeLessThan(grid.indexOf(bind));
+    // …AFTER the world moved to this grid point and after the car's pose at it
+    // was written (the physics step's, under `stepPhysics`)…
+    expect(grid.indexOf("s.speedKmh = this.stepState.speedKmh;")).toBeGreaterThan(0);
+    expect(grid.indexOf("s.speedKmh = this.stepState.speedKmh;")).toBeLessThan(grid.indexOf(bind));
+    expect(grid.indexOf("traffic.update(dtSec, ctx);")).toBeGreaterThan(0);
+    expect(grid.indexOf("traffic.update(dtSec, ctx);")).toBeLessThan(grid.indexOf(bind));
+    // …no hook can replace it…
+    expect(grid).not.toContain("hooks.vruAheadM");
+    expect(grid).not.toMatch(/vruAheadM\?\(/);
+    // …and the RESULT is an argument of `runtime.sample`.
+    const call = grid.slice(grid.indexOf("runtime.sample("));
+    const args = call
+      .slice("runtime.sample(".length, call.indexOf(")"))
+      .split(",")
+      .map((a) => a.trim());
+    expect(grid.indexOf(bind)).toBeLessThan(grid.indexOf("runtime.sample("));
+    expect(args).toContain("vru");
+    // …and it is the EIGHTH argument, the one `WorldRuntime.sample` names
+    // `vruAheadM` (§2 above pins what the runtime does with that position).
+    expect(args.indexOf("vru")).toBe(7);
   });
 });
 

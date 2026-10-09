@@ -118,6 +118,19 @@ const GUARD_LATERAL_M = 3.0;
  * all, however close he is.
  */
 const CROSS_WATCH_M = 60;
+/**
+ * …and „closing" means closing by MORE THAN FLOAT NOISE, m per staged step
+ * (sc-roundabout-entry:7b747c15 round 2). A strict `<` on two distances that
+ * differ in the 13th digit is a coin: MEASURED on sc-merge-accel-lane
+ * mistake-stop-at-end L5 with ambient traffic off, the student settling onto
+ * x = 0 at the end of his merge read „closing" on one cadence and not on the
+ * other because his pose was sampled at Σ(1/60) on one and at k·(1/60) on the
+ * other — and the returning `sc-mrg-oncoming-3` braked on one of them and ran
+ * the rest of its lap 1.888 m (3.4 physics steps) away from itself. 1 µm per
+ * step is 60 µm/s of lateral approach — no student who is actually coming
+ * onto the road is below it, and no stationary one is above it.
+ */
+const CROSS_CLOSING_EPS_M = 1e-6;
 /** Guard aims to stop this far short of the player, m. */
 const GUARD_STOP_SHORT_M = 6;
 /**
@@ -171,6 +184,37 @@ const EXIT_CLEAR_M = 70;
  * slower. 4 m/s is a walking-pace pull-away, not a lurch.
  */
 const EXIT_MIN_SPEED_MPS = 4;
+/**
+ * sc-roundabout-entry:7b747c15 round 2 — THE PATH END, THE RETIREMENT AND THE
+ * RE-ENTRY HAPPEN AT THE INSTANT THEY ARE DUE, NOT AT A STEP BOUNDARY.
+ *
+ * The staged world runs on steps of at most one physics step whatever the frame
+ * rate (system.ts STAGED_MAX_SUBSTEP_SEC), but the steps do not fall on the same
+ * instants on every cadence. Three things here used to be decided „at the step
+ * that noticed", so each cadence gained a different fraction of a step:
+ *
+ *  · THE PATH END threw the overshoot away (`s = path.length`) and then ALSO
+ *    drove a full `exitSpeed·dt` retirement step in the same step. MEASURED by
+ *    the round-1 verifier on sc-ov-solid-return mistake-late-cut L4, ambient
+ *    off: the oncoming stream cars were 0.124 m behind the 60 Hz cars before
+ *    their path end and 0.264 / 0.315 m behind after it (one step + 1 cm =
+ *    0.21 m), 117–164 m from the student. The finishing step now drives only
+ *    what is left of it: the time the car spent past its last node, at the
+ *    retirement speed.
+ *  · THE END OF THE RETIREMENT RUN clamped the step at EXIT_CLEAR_M and
+ *    forgot when inside the step it got there (`retiredSec` keeps it);
+ *  · THE RE-ENTRY happened on whichever step next asked (`carrySec` owes the
+ *    returned car the part of that step after it fell due).
+ *
+ * RETURN_DUE_SEC is the pause between „the run is over" and „it comes back":
+ * one physics step, which is what a 60 Hz frame always gave it (re-entry on
+ * the step after the one that finished the run). It makes the re-entry instant
+ * a property of the session clock, so it is the same instant on every cadence
+ * to within the step grid, and the returned car's pose agrees with it. A
+ * re-entry REFUSED when due (not yet clear of the student or a body) is a
+ * condition, met on whichever step first sees it met, as every trigger is.
+ */
+const RETURN_DUE_SEC = 1 / 60;
 /**
  * FR-B5-RETURN (sweep161, 2026-08-18) — …AND THEN IT HAS TO COME BACK.
  *
@@ -505,6 +549,15 @@ export interface StagedVehicleAgent {
   /** Speed of the retirement run, m/s (0 = not retiring; set once, at the
    *  frame the actor runs out of path, so the run is a constant coast). */
   exitSpeed: number;
+  /** sc-roundabout-entry:7b747c15 round 2 — seconds since the retirement run
+   *  reached EXIT_CLEAR_M, measured to the instant it got there INSIDE the step
+   *  (−1 = not retired). See RETURN_DUE_SEC. */
+  retiredSec: number;
+  /** Seconds of a re-entry that fell due INSIDE the step that performed it:
+   *  added to the next step's longitudinal integration, so the returned car
+   *  is where it would be had it re-entered at the instant it was due (0 =
+   *  nothing owed — every actor that never returns). See RETURN_DUE_SEC. */
+  carrySec: number;
   /** How many times this actor has come back round (0 for every actor that
    *  never retires — the counter a test can read without a stopwatch). */
   returns: number;
@@ -986,6 +1039,8 @@ function rewindTo(agent: StagedVehicleAgent, arc: number): void {
   agent.latRate = 0;
   agent.exitM = 0;
   agent.exitSpeed = 0;
+  agent.retiredSec = -1;
+  agent.carrySec = 0;
 }
 
 export function createStagedVehicle(
@@ -1048,6 +1103,8 @@ export function createStagedVehicle(
     indicator: "off",
     exitM: 0,
     exitSpeed: 0,
+    retiredSec: -1,
+    carrySec: 0,
     returns: 0,
     playerPathDist: Infinity,
     playerDirX: 0,
@@ -1427,7 +1484,8 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       env.playerX,
       env.playerY,
     );
-    const closing = proj.dist < agent.playerPathDist;
+    // „Closing" by more than float noise (CROSS_CLOSING_EPS_M, round 2).
+    const closing = proj.dist < agent.playerPathDist - CROSS_CLOSING_EPS_M;
     agent.playerPathDist = proj.dist;
     const ahead = proj.s - agent.s;
     if (
@@ -1482,21 +1540,26 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
 
   // 3) Integrate speed toward the target (asymmetric accel/brake ramps).
   const speedBefore = agent.speed;
+  // A re-entry that fell due inside the previous step is owed the rest of that
+  // step (RETURN_DUE_SEC): this step integrates it too. 0 for every other step,
+  // so `dtI === dt` and the arithmetic below is the one that always ran.
+  const dtI = agent.carrySec > 0 ? dt + agent.carrySec : dt;
+  agent.carrySec = 0;
   if (agent.speed < target) {
-    agent.speed = Math.min(target, agent.speed + accel * dt);
+    agent.speed = Math.min(target, agent.speed + accel * dtI);
   } else if (agent.speed > target) {
-    agent.speed = Math.max(target, agent.speed - brakeCap * dt);
+    agent.speed = Math.max(target, agent.speed - brakeCap * dtI);
   }
   // The same ramp toward the target the actor would have had WITHOUT the
   // student — the reference step 3d measures his share against.
   const speedNoPlayer = !playerBound
     ? agent.speed
     : speedBefore < targetNoPlayer
-      ? Math.min(targetNoPlayer, speedBefore + accel * dt)
-      : Math.max(targetNoPlayer, speedBefore - brakeCapNoPlayer * dt);
+      ? Math.min(targetNoPlayer, speedBefore + accel * dtI)
+      : Math.max(targetNoPlayer, speedBefore - brakeCapNoPlayer * dtI);
   let playerClamped = false;
   const sBefore = agent.s;
-  agent.s += agent.speed * dt;
+  agent.s += agent.speed * dtI;
 
   // 3b) Hard anti-overlap vs ambient cars, from ANY angle. The corridor guard
   //     in 2b handles same-lane following; it cannot see a car crossing the
@@ -1586,8 +1649,14 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     // or `actor.s` sees the identical number on the identical frame. What
     // changes is only where the BODY is: it keeps going in its final direction
     // until it is EXIT_CLEAR_M past the end, then comes to rest off-scene.
+    //
+    // RETURN_DUE_SEC: on the step that FINISHES the path, only the time the car
+    // spent past its last node is retirement time — the overshoot `s` is pinned
+    // away from is exactly that distance, driven at `speed`.
+    const fresh = !agent.finished;
+    const past = agent.s - agent.path.length;
     agent.s = agent.path.length;
-    if (!agent.finished) {
+    if (fresh) {
       agent.finished = true;
       agent.exitSpeed = Math.max(agent.speed, EXIT_MIN_SPEED_MPS);
     }
@@ -1597,7 +1666,9 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       // it, and „never clip" does not lapse because the path did. BOTH halves
       // of that promise: the ambient fleet (step 2b) and the player (step 2).
       // See `closesOnPlayer` for what the missing half measured.
-      const step = Math.min(agent.exitSpeed * dt, EXIT_CLEAR_M - agent.exitM);
+      const runSec = !fresh ? dt : agent.speed > 0 ? Math.min(dtI, past / agent.speed) : 0;
+      const room = EXIT_CLEAR_M - agent.exitM;
+      const step = Math.min(agent.exitSpeed * runSec, room);
       if (
         (env.ambient.length > 0 && closesOnAmbient(agent, env, step)) ||
         closesOnPlayer(agent, env, step)
@@ -1605,7 +1676,13 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
         agent.speed = 0;
       } else {
         agent.exitM += step;
-        agent.speed = agent.exitM >= EXIT_CLEAR_M ? 0 : agent.exitSpeed;
+        if (agent.exitM >= EXIT_CLEAR_M) {
+          agent.speed = 0;
+          // …and WHEN inside this step it got there (RETURN_DUE_SEC).
+          agent.retiredSec = Math.max(0, runSec - room / agent.exitSpeed);
+        } else {
+          agent.speed = agent.exitSpeed;
+        }
       }
     } else {
       // FR-B5-RETURN (see RETURN_CLEAR_M): the run is over, the actor is out of
@@ -1613,12 +1690,26 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       // map the camera draws 420 m of. So it comes back round rather than
       // standing at the horizon in the lane the briefing is about — under the
       // command it left with, because staged actors never invent their own.
-      const arc = reentryArc(agent, env);
-      if (arc >= 0) {
-        rewindTo(agent, arc);
-        agent.returns++;
-      } else {
+      //
+      // …ONE PHYSICS STEP AFTER THE RUN ENDED, ON THE SESSION CLOCK
+      // (RETURN_DUE_SEC), and owed whatever of this step came after that.
+      const before = agent.retiredSec < 0 ? 0 : agent.retiredSec;
+      agent.retiredSec = before + dt;
+      if (agent.retiredSec + 1e-9 < RETURN_DUE_SEC) {
         agent.speed = 0;
+      } else {
+        const arc = reentryArc(agent, env);
+        if (arc >= 0) {
+          // Fell due inside THIS step → the returned car is owed the rest of
+          // it. A return refused when due and allowed later is a condition met
+          // on this step, and is owed nothing.
+          const owed = before + 1e-9 < RETURN_DUE_SEC ? agent.retiredSec - RETURN_DUE_SEC : 0;
+          rewindTo(agent, arc);
+          agent.carrySec = owed > 0 ? owed : 0;
+          agent.returns++;
+        } else {
+          agent.speed = 0;
+        }
       }
     }
   }

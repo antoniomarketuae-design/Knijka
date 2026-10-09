@@ -30,24 +30,26 @@
  *     cyclist proxies are tagged via traffic.vehicleCollisionKind (their
  *     staged spec's curb offset — audit C3's honest v1 cyclist model).
  *
- * Near-miss detection (no grading change): the pure stepNearMiss detector
- * runs over the FULL agent arrays (~50 agents — trivially cheap) so even
- * ghost NPCs register a squeeze. Encounters resolve into the additive
- * NearMissStats session stat (contracts) for A15's feedback map.
+ * Near-miss detection is NOT here any more (sc-roundabout-entry:7b747c15
+ * round 7). This component stepped the pure stepNearMiss detector once per
+ * render frame from the frame's drawn chassis, so the «мина на косъм» count a
+ * student was shown depended on his display's frame length. The session grid
+ * steps it now, once per grid point, from the car and the traffic state AT
+ * that point (scene/nearMissMeter.ts, run by scene/gradeGrid.ts) — over the
+ * same FULL agent arrays, ghosts included.
  *
  * Physics cost expectation: 12 colliders + 12 kinematic bodies added to the
  * world, at most 12 potential contact pairs (each shell vs the one dynamic
  * player chassis — kinematic-vs-fixed and kinematic-vs-kinematic pairs are
  * skipped by rapier). Per frame: <=12 kinematic pose writes + one O(agents)
- * scan per 0.5 s + one O(agents) near-miss pass. Well under 0.1 ms — no
- * measurable frame budget impact.
+ * scan per 0.5 s. Well under 0.1 ms — no measurable frame budget impact.
  *
  * Coordinates: district (x = east, y = north) -> three.js (x, -z), y-up;
  * yaw = atan2(dirX, -dirY) — the same mapping TrafficLayer renders with, so
  * shells sit exactly on the visuals.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   CapsuleCollider,
@@ -55,21 +57,13 @@ import {
   RigidBody,
   type RapierRigidBody,
 } from "@react-three/rapier";
-import type {
-  NearMissEvent,
-  NearMissStats,
-  VehicleSample,
-} from "@/modules/sim/contracts";
+import type { VehicleSample } from "@/modules/sim/contracts";
 import {
   assignPool,
-  createNearMissTracker,
-  DEFAULT_NEAR_MISS_CONFIG,
   selectNearest,
-  stepNearMiss,
   type TrafficSystem,
   type VehicleProfile,
 } from "@/modules/sim/traffic";
-import { CHASSIS_HALF_EXTENTS } from "@/modules/sim/vehicle";
 import { actorObb, PEDESTRIAN_BODY_RADIUS_M } from "@/modules/sim/collision";
 
 // --- Shell-pool budget (doc 68 A11). Keep these small and fixed: every shell
@@ -178,21 +172,11 @@ export function npcShellHalfExtents(profile: VehicleProfile | undefined): {
   return { halfWidthM: box.halfWidthM, halfLengthM: box.halfLengthM };
 }
 
-/** Car-sized shell — the declarative mount size and the near-miss envelope.
- *  Every shell is re-fitted to its agent on its first rebind, so this is only
- *  ever the size of a shell that is parked at PARK_Y and bound to nobody. */
+/** Car-sized shell — the declarative mount size. Every shell is re-fitted to
+ *  its agent on its first rebind, so this is only ever the size of a shell
+ *  that is parked at PARK_Y and bound to nobody. (The near-miss stat's body
+ *  envelopes moved with the detector: scene/nearMissMeter.ts.) */
 const CAR_SHELL = npcShellHalfExtents(undefined);
-
-// --- Near-miss body envelopes (meters). Player from the chassis collider;
-// NPC vehicles at the CAR envelope; pedestrians ~capsule radius + a margin.
-// One envelope for the whole array by design: `stepNearMiss` is a session
-// STAT (contracts NearMissStats), never a ViolationCode, and it sweeps all
-// ~50 agents with one number. It is NOT the contact body — that is the shell
-// above, which is now per-profile — and this file does not widen a stat into
-// a grading channel on the way past.
-const NEAR_MISS_VEH_HALF_W = CAR_SHELL.halfWidthM;
-const NEAR_MISS_VEH_HALF_L = CAR_SHELL.halfLengthM;
-const NEAR_MISS_PED_ENVELOPE = 0.35;
 
 /** Mutable collision tag on each shell body — VehicleRig reads it through
  *  the rapier collision payload (`other.rigidBody.userData`). The object
@@ -262,13 +246,9 @@ export interface NpcCollidersProps {
   /** Player pose channel (district space) — LessonScene's shared sample. */
   sampleRef: React.RefObject<VehicleSample>;
   paused: boolean;
-  /** A11 near-miss stat channel (additive; omit = stats still tracked, just
-   *  unreported). Called once per resolved encounter with the running
-   *  session aggregate. */
-  onNearMiss?: (event: NearMissEvent, stats: NearMissStats) => void;
 }
 
-export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcCollidersProps) {
+export function NpcColliders({ traffic, sampleRef, paused }: NpcCollidersProps) {
   const vehBodies = useRef<(RapierRigidBody | null)[]>(
     Array.from({ length: VEHICLE_SHELL_COUNT }, () => null),
   );
@@ -296,6 +276,11 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
   // lengths are fixed after LessonScene stages the lesson's actors).
   const pools = useMemo(
     () => ({
+      // The system the bindings below index into. They are INDICES into its
+      // agent arrays, so a new traffic system gets new pools — which is why
+      // this memo stays keyed on `traffic` now that the near-miss trackers
+      // (which used to size themselves off it here) have moved to the grid.
+      system: traffic,
       vehAssign: new Int32Array(VEHICLE_SHELL_COUNT).fill(-1),
       vehBound: new Int32Array(VEHICLE_SHELL_COUNT).fill(-1),
       vehSelIdx: new Int32Array(VEHICLE_SHELL_COUNT),
@@ -304,16 +289,6 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
       pedBound: new Int32Array(PED_SHELL_COUNT).fill(-1),
       pedSelIdx: new Int32Array(PED_SHELL_COUNT),
       pedSelD2: new Float64Array(PED_SHELL_COUNT),
-      vehTracker: createNearMissTracker(traffic.vehicles.length),
-      pedTracker: createNearMissTracker(traffic.pedestrians.length),
-      player: {
-        x: 0,
-        y: 0,
-        headingDeg: 0,
-        speedMps: 0,
-        halfWidthM: CHASSIS_HALF_EXTENTS.x,
-        halfLengthM: CHASSIS_HALF_EXTENTS.z,
-      },
       pos: { x: 0, y: PARK_Y, z: 0 },
       rot: { x: 0, y: 0, z: 0, w: 1 },
       // Shell re-fitting state. `vehFitBody` is an IDENTITY witness, not a
@@ -330,52 +305,11 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
     [traffic],
   );
 
-  const clockRef = useRef(0);
   const reassignAtRef = useRef(0);
-  const statsRef = useRef<NearMissStats>({ count: 0, worst: null });
-  const onNearMissRef = useRef(onNearMiss);
-  useEffect(() => {
-    onNearMissRef.current = onNearMiss;
-  }, [onNearMiss]);
-
-  // Emit adapters — bound once per traffic system; a real near-miss is rare,
-  // so the per-event object allocation is fine (the per-frame path is free).
-  const emitters = useMemo(() => {
-    const report = (event: NearMissEvent) => {
-      const stats = statsRef.current;
-      stats.count += 1;
-      if (!stats.worst || event.clearanceM < stats.worst.clearanceM) {
-        stats.worst = event;
-      }
-      onNearMissRef.current?.(event, stats);
-    };
-    return {
-      vehicle: (i: number, clearanceM: number, relSpeedMps: number) => {
-        const state = traffic.vehicles[i];
-        report({
-          tSec: clockRef.current,
-          kind: traffic.vehicleCollisionKind(state.id),
-          npcId: state.id,
-          clearanceM,
-          relSpeedMps,
-        });
-      },
-      pedestrian: (i: number, clearanceM: number, relSpeedMps: number) => {
-        report({
-          tSec: clockRef.current,
-          kind: "pedestrian" as const,
-          npcId: traffic.pedestrians[i].id,
-          clearanceM,
-          relSpeedMps,
-        });
-      },
-    };
-  }, [traffic]);
 
   useFrame((_, delta) => {
     if (paused) return;
     const dt = Math.min(delta, 0.1);
-    clockRef.current += dt;
     const sample = sampleRef.current;
     const px = sample.position.x;
     const py = sample.position.y;
@@ -483,33 +417,6 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
         body.setNextKinematicTranslation(pos);
       }
     }
-
-    // --- Near-miss detection over the FULL agent arrays (ghosts included).
-    const player = pools.player;
-    player.x = px;
-    player.y = py;
-    player.headingDeg = sample.headingDeg;
-    player.speedMps = sample.speedKmh / 3.6;
-    stepNearMiss(
-      pools.vehTracker,
-      dt,
-      player,
-      traffic.vehicles,
-      NEAR_MISS_VEH_HALF_W,
-      NEAR_MISS_VEH_HALF_L,
-      DEFAULT_NEAR_MISS_CONFIG,
-      emitters.vehicle,
-    );
-    stepNearMiss(
-      pools.pedTracker,
-      dt,
-      player,
-      traffic.pedestrians,
-      NEAR_MISS_PED_ENVELOPE,
-      NEAR_MISS_PED_ENVELOPE,
-      DEFAULT_NEAR_MISS_CONFIG,
-      emitters.pedestrian,
-    );
   });
 
   return (

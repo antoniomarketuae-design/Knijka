@@ -120,10 +120,19 @@ import {
 import type {
   DistrictEdge,
   TrafficDistrict,
+  TrafficRenderPose,
   TrafficSystem,
   TrafficUpdateContext,
   VehicleIndicator,
 } from "./types";
+
+/**
+ * sc-roundabout-entry:7b747c15 round 3 — the pose a body is DRAWN at: between
+ * its last two fixed-step grid states (TrafficSystem.renderFraction), one
+ * physics step behind the frame end like rapier draws the student car. Reused
+ * per body inside one frame loop iteration (zero allocation).
+ */
+const DRAWN: TrafficRenderPose = { x: 0, y: 0, dirX: 0, dirY: 1 };
 import {
   assignCivilianModel,
   BOXY_MAX_INSTANCES,
@@ -2293,12 +2302,13 @@ export function TrafficLayer({
       let blinkColorDirty = false;
       for (let i = 0; i < nVeh; i++) {
         const v = system.vehicles[i];
-        const tx = v.x;
-        const tz = -v.y;
+        const drawn = system.vehicleRenderPose(i, DRAWN);
+        const tx = drawn.x;
+        const tz = -drawn.y;
 
         // Smooth the heading (kills the snap through turns) — do this even when
         // culled so re-entry doesn't pop.
-        const targetYaw = Math.atan2(v.dirX, -v.dirY);
+        const targetYaw = Math.atan2(drawn.dirX, -drawn.dirY);
         if (!scratch.seeded[i]) {
           scratch.dispYaw[i] = targetYaw;
           scratch.prevYaw[i] = targetYaw;
@@ -2578,8 +2588,9 @@ export function TrafficLayer({
       let bubblePosture = -1;
       for (let i = 0; i < nPed; i++) {
         const p = system.pedestrians[i];
-        const tx = p.x;
-        const tz = -p.y;
+        const drawnP = system.pedestrianRenderPose(i, DRAWN);
+        const tx = drawnP.x;
+        const tz = -drawnP.y;
         const dx = tx - cam.x;
         const dz = tz - cam.z;
         if (dx * dx + dz * dz > maxD2) {

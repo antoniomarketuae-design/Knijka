@@ -11027,3 +11027,128 @@ Nothing changes for a student who has not opted in (ruling 2026-09-20 #1), nor o
 - **A stale dev-rig fixture.** `app/dev/popup-rig/Adr009Gallery.tsx` fixture «briefing-phone» still builds a peek the product no longer paints.
 - **To tell the founder (not decided under the delegation).** With the full sheet, an opted-in student’s reading time at arrival always counts toward par (stars only, ruling 21).
 - The cue appears from the second painted frame, because its count is measured by a ResizeObserver (as for every fold cue at base).
+
+## Landed: the world and the grade run on one 1/60 s grid counted off the physics steps (ADR-014) — `sc-roundabout-entry:7b747c15` (2026-10-09)
+
+Lane `rbcad`, eight rounds. Rounds 1–7 were each adversarially verified and refuted. Round 8 was SIGNED OFF WITH CONDITIONS. The patch is
+`rbcad-result-r8.patch` (sha256 8425ad97…, 33 files, built on `2127d8f`; none of its files changed on main since then).
+
+**Why.** One careful drive got two sheets depending on the display. A line stop held 45 s passed at 0 points on 60 Hz and was convicted of a COLLISION
+(10 pts) on a phone's frame lengths, because everything that decides a lesson ran once per render frame (w80 note above).
+
+**What landed.**
+- The world, the scenario director, the contact sentinel, the grade, the near-miss count and the student's attempt trace run once per grid point (k/60 s).
+  The grid points are counted off rapier's own physics steps: a frame brings exactly the points whose steps the engine took in it, the first frame included.
+  The car at point k is the car after step k.
+- Mirror and shoulder looks are a queue. Each frame hands the grid every look the cabin holds, and the grid hears them one per grid point, oldest first.
+  Through round 7 the grid held one look, and on a 120/144 Hz display the next frame's look could overwrite it.
+- A respawn (key R, «Рестарт») drops the looks and near-miss windows still pending. «Повтори» starts a new grid.
+- No rule, threshold or sentence wording changed. The decision is ADR-014; the builder's full note, corrected, is doc 94.
+
+**What the verifier reproduced.**
+- Each cadence against its own 60 Hz run, 0 sheet splits:
+  - 1,531 staged cells × 10 cadences, ambient on (0 shown differences too);
+  - the same cells × 7 cadences with ambient off, including a 2 s stall and a 0.29 s first frame;
+  - 903 cells without staged traffic × 6 cadences;
+  - all 2,434 cells with every look moved 7 ms off the grid × 9 cadences;
+  - two looks pressed together, and on consecutive frames: 437 cells × 9 cadences each, one sheet per cell.
+- On its own 45 roundabout tapes × L1–L5 × 17 cadences (3,825 runs): 0 sheet splits. The 45 s line stop is «yielded», 0 points, on all 17.
+- Through the product glance path, every look was heard once, in order, and never later than at 60 Hz, on every cadence driven. On the real fiber and rapier
+  libraries, headless, 28 scenarios lost, repeated or reordered no press. The two exceptions are by design: at 240 Hz, with up to 11 keys inside two steps,
+  one look was dropped and counted, and looks pending at a respawn were not heard after it.
+- At 60 Hz against base: 0 sheet changes. What is shown differs on round 7's eight cells, and on 20 cells whose rubric «Ориентировъчно време» line prints
+  a whole second different (stars and points equal). Base re-run with an exact clock (t = frame/60) matched the tree on every measure over all 2,434 cells.
+  So every one of those differences is base's float-sum clock.
+- Mutants: 87 run one at a time; 86 die on assertion text, every named one included. The survivor is C-RESETPREVK (below). tsc is at the baseline 22
+  errors. Every targeted set passes except three test files that need `tools/mobile/`, which the lane does not hold.
+
+**The four conditions, and how each was handled.**
+- **C-RESETPREVK.** A mutant that makes `GradeGrid.reset()` also zero the grade's step memory survived. After a respawn the first grid point would then
+  get a dt equal to the whole session so far, and the signal clock and the world would jump. Nothing executes a respawn and then checks the next point.
+  `reset()` is correct as built (it clears only the waiting looks and the near-miss windows). CLOSED AT LANDING: `live-grade-call.execution.test.ts` §5 now drives a respawn through the scene's own `stepPhysics` and
+  `resetCar` (60 Hz, 120 Hz, 0.5 s, phone B) and checks the next point's dt, the signals and the staged world against the same drive with no
+  respawn. The mutant fails on «Expected … 0.016666666666666666, Received 1.5166666666666666». The pin runs `resetCar` with a stub director, so the
+  director's own re-staging is not exercised by it.
+- **C-PINBOUND.** The census pin says a look is heard earlier than at 60 Hz by less than one of its frames. With presses 7 ms off the grid on a phone's
+  cadence, a look came 30 points early, one more than the pin allows; the sheet was unaffected. ADR-014 (D5) states the bound from the press: up to 29 grid
+  points before it inside a clamped 0.5 s frame, and up to a whole frame before its own 60 Hz point. CLOSED AT LANDING: the census pin's `heardTooEarly` measures from the press with the span of the frame that took the
+  look, and a teeth test moves presses to 1 ms past the first grid point after a phone-B frame end. The integration skeptic first found the bound
+  used the cadence's longest frame (its mutant P2 survived); with the per-frame span P2 is red on both C-PINBOUND tests, reproduced by the
+  integrator, and the census file is 11/11 clean.
+- **C-KNIFEEDGE.** A look pressed within one step (fast display) or one frame (long frames) of a rule's decision edge can get a different sheet, pass/fail
+  included, on a different display. Base does the same. The builder's «no sheet differs anywhere I measured» holds only for the committed tapes. ADR-014
+  (D3) states this plainly: one sheet per tape is claimed for the committed demos and the census tapes, no wider.
+- **C-MOMENTS.** Scored observation moments differ by cadence on cells and cadences beyond those the builder named and the census pin's five: sc-park-night
+  mistake-no-lights (60 Hz ±1 ms, 75 Hz, VRR), and sc-park-narrow mistake-wide-swing also at 144 and 75 Hz and VRR, with off-grid or paired presses. Stars
+  are equal everywhere. ADR-014 (D4) states this as a class, not a list.
+
+**Integrator decisions (ADR-014).** D1: the broader design is accepted, where a frame hands the grid every look the cabin holds (reproduced by the verifier).
+D2: the 60 Hz differences from base are accepted, since the verifier proved them base's clock cell by cell. D5: the look-timing bound is measured from the
+press.
+
+**Integration checks.**
+- The wiring test pins places in `LessonPlayShell.tsx`, which the briefing-sheet commit `613bfc6` changed after the lane was built. Read against the file
+  at `613bfc6`, every pinned form still matches: the regex `<SceneSlot\s+key=\{sceneEpoch\}` (lines 7813–7814), `setSceneEpoch((e) => e + 1);` inside
+  `retry`, the opening of `handleTick` with its one `onTick={handleTick}`, no `sampleRef`/`simRef`/`stepTrackRef` in the shell, and SceneSlot's
+  `return <LessonScene {...props} />;`. It passed (36/36) in a scratch worktree at `613bfc6` + the patch.
+- The three tests that were red in the lane only for want of `tools/` (guidance-lane-align-span §7, touchHintLifetime, reverseAssist-audit-harness) passed with `tools/` present in that worktree: 15/15, 43/43 and 40/40.
+
+- Proven together with lane rbexit (no shared file) in the same worktree before the gate: rbexit's three files 28/28, `runtime/__tests__` 48 files /
+  875 tests, the roundabout family 12 files / 392 tests, the roundabout traces 89/89, rbcad's grid, wiring, execution, census, pose and property
+  sets, and the text-truth tests 131/131.
+- Live check before the gate (drive rig, patch applied but uncommitted, NO verdict posted): a careful sc-roundabout-entry drive at L3 gave one sheet on
+  PC (headless Chromium, 16.7 ms frames) and on the phone lens (headless WebKit, 269–792 ms frames): 0 т., «ИЗДЪРЖАН», both tasks, the yield
+  commended, no fault. Earlier PC attempts by the capture agent drew a near miss with a pedestrian on the south-arm kerb corner (0.5–0.6 м); its
+  own entry line swung the car's side to that corner, and with the line moved the closest pass was 3.5 m. Frames: `.audit-frames/rig-rbcad-live/`.
+
+**Nothing closes by this landing.** `sc-roundabout-entry:7b747c15`, `sc-rb-busy-gap:7bbdd45e` and `sc-roundabout-entry:08a0b701` stay OPEN. Each is closed
+only after it is re-judged in process on the cadence grid and driven in the rig.
+
+**Owed.**
+- A drive of the live wiring on a REAL phone and on a 120/144 Hz display (the pre-gate check above was headless). It should log the first frame's length and the steps it took, and
+  two-key looks with the ticks that heard each one.
+- A published step counter, so that «grid points equal physics steps» can be observed live; today it is not.
+- A quiet-machine whole-chain cost A/B and a phone frame-time reading. No budget is claimed as held.
+- The replay harness keeps the lever and the stalk ideal at every grid point, while the product samples them once per frame. Its long-frame
+  observation-moment differences are therefore partly the harness's own.
+- `STAGED_POSE_FULL=1`, which neither the builder nor the verifier ran.
+
+## Landed: a lawful roundabout exit is no longer billed for lane keeping on a ring it has already left — `sc-rb-lane-choice:ffdffd55` clause 1b (2026-10-09)
+
+Lane `rbexit`, round 1, built on `43b4109` from the rig-w2 judge's measured cause. SIGNED OFF WITH CONDITIONS by its adversarial verifier. The patch is
+`rbexit-result-r1.patch` (sha256 5e68253a…, 7 files: one product file, `runtime/locator.ts`, and six test files and helpers).
+
+**Why.** The rig drove sc-rb-lane-choice's exit lawfully at the lesson's pace and was billed POOR_LANE_KEEPING. The locator kept the car locked to the
+ring edge after it had left the ring: the lock moved to the exit arm only when the arm's centreline was 4 m closer than the ring's, so on the two-lane
+roundabout the car stayed «on the ring» until about r = 42 m. Its lane offset was then clamped to the edge of the ring's carriageway (−4.06 m), and at
+12 km/h that lasted past `laneKeepSustainSec` (3 s).
+
+**What landed.** `chooseEdge` gains one release rule, `leftRingOnto`. A locked ring edge gives up the fix to a NON-ring rival when the car is more than
+0.35 m (`LANE_SWITCH_DEADBAND_M`) outside the ring's carriageway, inside the rival's carriageway and abeam it. The heading gate still applies. Ring-to-ring
+hand-overs are unchanged. No threshold moved: `laneKeepMaxOffsetM` (3.25) and `laneKeepSustainSec` (3) are untouched, and both are pinned as literals by
+the new tests.
+
+**What the verifier reproduced, on its own drives (base vs tree).**
+- The lawful exit held at 8 and 10 km/h: base bills POOR_LANE_KEEPING and «НЕ Е ВЗЕТ»; the tree bills nothing and passes. At 12–13 km/h both pass, and the
+  tree's longest stretch past the band falls from 3.00 s to 1.03 s. The hand-over now comes 0.35–0.41 m beyond the ring kerb (base: 4–8.1 m).
+- Every roundabout lesson's correct demo re-driven at 10, 12 and 15 km/h at every rung, and 60 exit geometries of its own: the tree never adds a code; it
+  only removes the false POOR_LANE_KEEPING, and once a false right-hand-rule FAILED_TO_YIELD on the exit arm (the builder's disclosed second conviction,
+  from the same stale lock).
+- The lesson's own outer-lane mistake is still billed at 10, 12 and 15 km/h at every rung, and a real straddle on the arm is still billed.
+- Grading census: 87 family demo drives and 129 replays of every committed trace on a district with a ring (the six rb lessons and the three d2-v1 exam
+  lessons). All 216 are identical, debrief text included, apart from the false conviction removed.
+- One change the builder did not name: a non-authored drive that leaves the kerb lane leftwards across the arm with the right indicator on and no left
+  glance now draws LANE_CHANGE_WITHOUT_INDICATOR and LANE_CHANGE_WITHOUT_MIRROR_CHECK. Both are true; base hid them behind the stale ring lock. No lawful
+  drive, authored demo or committed trace draws them.
+- Mutants: 10 of the verifier's own and the builder's 12, all killed on assertion text. Regression: 74 files / 1,554 tests. No shown text changed.
+
+**Integration.** The patch shares no file with rbcad (ADR-014). Both were applied together on `613bfc6` in a scratch worktree and their test sets run
+there before the gate (below). The main tree's `locator.ts` was CRLF by checkout over an LF blob; it was restored from the index (identical blob) before
+the patch was applied.
+
+**Nothing closes by this landing.** `sc-rb-lane-choice:ffdffd55` stays OPEN until the rig re-drives it at phone-L3, pc-L1 and pc-L3 and photographs
+«ИЗДЪРЖАН» (rig-w3).
+
+**Owed (the builder's list, carried forward).** The d2-v1 non-ring hand-over e23040421.0 → e856821052.0 lags 6.5 m, which is billable; d2-v1 ring exits
+sit 2.7–4.05 m inside the ring band; a ring-to-ring hand-over under-reads a wander (about 1.35 s late on the wandering-line demo); sc-rb-busy-gap shadow L5
+COLLISION (pre-existing); a stale comment in `traces/scRbLaneChoice.ts` («measured 2.8 s at the join»).

@@ -88,7 +88,7 @@
 
 ## ADR-009: A practice lesson is not taken when its own mistake occurs (Founder Ruling A)
 
-- **Date / Status:** 2026-09-17 · **Accepted** (founder Ruling A, given in chat; follow-up questions F1 and F2 answered the same day) — **implementation pending.** This ADR is written before its code, as CLAUDE.md requires: no product code implements it yet, and the lanes that will are listed under *Implementation*. Every figure below carries one of three labels. **MEASURED** means measured on the product as it stands, in the worktree at HEAD `98bf8ae`. **DERIVED** means computed by a scratch script that applies the rule proposed here to the real `compileScenario` output and catalogue — the derivation the product will do, done by hand; no product code computes any of it. **PROTOTYPE-MEASURED** means measured once on a patched scratch copy of `platform/src`; none of those figures is a property of shipped code until lane I reproduces it in the repo.
+- **Date / Status:** 2026-09-17 · **Accepted** (founder Ruling A, given in chat; follow-up questions F1 and F2 answered the same day) — **implemented: landed 2026-09-18 in `793335e`** (lane B in `6344092`). The rest of this paragraph is kept as written on 2026-09-17. This ADR is written before its code, as CLAUDE.md requires: no product code implements it yet, and the lanes that will are listed under *Implementation*. Every figure below carries one of three labels. **MEASURED** means measured on the product as it stands, in the worktree at HEAD `98bf8ae`. **DERIVED** means computed by a scratch script that applies the rule proposed here to the real `compileScenario` output and catalogue — the derivation the product will do, done by hand; no product code computes any of it. **PROTOTYPE-MEASURED** means measured once on a patched scratch copy of `platform/src`; none of those figures is a property of shipped code until lane I reproduces it in the repo.
 - **Planned names.** None of these exists at HEAD `98bf8ae` — a grep over `platform/src` returns 0 hits for each: `lessonMistakeTargets`, `incidentalCodeRefs`, `lessonMistakes`, `foldLessonMistakes`, `lessonMistake.ts`, `DETECTOR_OPT_IN_CODES`, `sheetRoutePassed`. Where this ADR writes them in the present tense it is describing the design, not the tree. `compileScenario`, `buildLessonResult`, `gradeFinishWire` and every `file:line` cited below do exist today. **Paths** are under `platform/src/`, and sim-module paths under `modules/sim/` — so `lessons/engine.ts` is `platform/src/modules/sim/lessons/engine.ts`, `gamification/xp.ts` is `platform/src/modules/gamification/xp.ts`.
 - **Problem:** Scenario lessons grade by teach-first ([doc 65 §5](../simulation/65_SCENARIO_BASED_LEARNING_ENGINE.md), `scenarios/policy.ts`): the first occurrence of a coachable (non-опасна) code pauses, explains and costs 0 points, and `LessonResult.passed` is „official sheet passed ∧ route completed ∧ not aborted" (`lessons/engine.ts:3093`, `lessons/wire.ts:765`). A practice lesson that exists to teach one mistake is therefore **passed by a student who commits exactly that mistake once**, unless its template happens to carry one of a few hand-coded `require*Clean` gates.
   - MEASURED (in-process census of every mistake demo × authored rung, before any change): mistake demos passed **42 of 336 at L1, 37/336 at L2, 34/336 at L3 and 24/292 at L5 — 34, 32, 29 and 21 of them with ★★★.** At L1 and at L3 a code from the demo's own `codeRefs` — опасна codes included, so a wider set than the targets below — was charged or coached on 334 of 336 demos; the other 2 commit it after the lesson has already completed. Detection was not the problem; the verdict was.
@@ -320,3 +320,107 @@ of its new direction is a new crossing. The crossing reason never says «нас�
 **A new member on SimTick.edgeAlignment.** `axisClearM` — how far the car's body is from the road axis (≥ 0 = wholly on one bank, < 0 =
 astride). Published on every two-way edge frame, read only under `solidCrossUTurnEnabled`; it decides «изцяло» versus «Застъпи…» on the bill.
 This extends the 2026-09-20 ruling that published the signed direction signal.
+
+## ADR-014: The world and the grade run on one fixed 1/60 s grid, counted off the physics engine's steps
+
+**Status.** Accepted by the integrator, 2026-10-09. Lane `rbcad`, rounds 1–8 (row `sc-roundabout-entry:7b747c15`). Rounds 1–7 were each adversarially
+verified and refuted; round 8 was SIGNED OFF WITH CONDITIONS. Landed with the commit that carries this entry. Not a founder ruling: no rule, no threshold
+and no sentence's wording changes. It decides WHEN the existing rules are evaluated, and from which pose. Before landing it was driven once through the drive rig, headless, on PC and on the phone lens (Consequences); never on a real phone or a 120/144 Hz display.
+
+**Context.** One drive got two grades depending on the frame cadence. At `2127d8f` a line stop held 45 s passed at 0 points on 60 Hz, 30 Hz and a steady
+0.5 s, and was convicted of a COLLISION (10 pts) on a phone's frame lengths. Everything that decides a lesson ran once per render frame, and paired whatever
+the frame end was with whatever the world was then. Seven rounds each fixed one layer and were refuted on the next. The lesson: any graded link on the render
+clock, any second clock beside the engine's, any graded or shown number measured from a pose the grid did not choose, and any one-place buffer between a
+frame and the grid is a platform split.
+
+**Decision.**
+- **One grid, one clock.** Grid point k is session time k·FIXED_DT (1/60 s, the vehicle physics step), with k an integer, never a running float sum. Point 0
+  is the origin and is never graded; point k ≥ 1 is the state after rapier's k-th step. Every frame, the first one included, brings exactly the points whose
+  steps rapier took in it: `GradeGrid.stepPhysics` counts them off the step record that VehicleRig's after-step callback writes
+  (`recordPhysicsStep(recorder, body, sim)` in `traffic/playerTrack.ts`). Nothing is derived from the session time. The session clock shares the origin;
+  it positions what is drawn and stamps what is booked per frame.
+- **The graded chain runs once per grid point** (`scene/gradeGrid.ts`), in its old order: signals, traffic (staged and ambient), the near-miss count,
+  physics contacts (in the replay harness, its stand-in for rapier's; live, rapier's contacts are frame-timed, below), lead gap, the person-in-path
+  distance, `runtime.sample`, the scenario director (runners, staged triggers, the contact sentinel), then the lesson engine. Every interval is
+  (k − kPrev)·FIXED_DT. The car's position, heading and speed at point k are the recorded state after step k, written by the grid itself, and the grid
+  measures the lead gap, the person-in-path distance and the near-miss count from that state. The scene's hook supplies only the cabin's discrete channels
+  and the pedals.
+- **Looks are a FIFO, heard one per grid point.** The cabin latches a mirror or shoulder look on the press (`GlanceSampleQueue`, four deep). Each frame the
+  sample builder takes one look, and the grid then takes every look the cabin still holds through the `moreLooks` hook. The grid hears them one per point,
+  oldest first, and writes each point's look itself, so its queue is the only way a look reaches a tick. THE RULE: a look is heard at the first grid point
+  graded at or after the frame that sampled it, plus one point for every look still ahead of it. The queue holds 8 looks. A look that finds it full is
+  dropped and counted (`droppedLooks`). A look still waiting when the session ends is not graded; `pendingLooks` counts it.
+- **The attempt trace is fed on the grid.** `feedAttemptPoint` (`scene/attemptFeed.ts`) runs once per graded point, after that point's tick. It writes the
+  point's time, the student's state there and the look that point heard, so the rubric's observation moments are scored from the graded looks.
+- **A respawn drops only what was pending.** `resetCar` (key R, «Рестарт») also empties the cabin's latched looks and calls `GradeGrid.reset()`, which
+  drops the waiting looks and every open near-miss window. The session clock, the grid index, the grade's step memory and the near-miss total run on.
+  «Повтори» remounts the scene (`<SceneSlot key={sceneEpoch}`, LessonPlayShell), so a new attempt gets a new grid.
+- **Stated as frame-timed.** The cabin's discrete channels and the pedals (every point in a frame sees the frame's value), the performed pre-drive steps,
+  the moment a look is SAMPLED, and rapier's physical contacts, reported once per frame (contact with staged actors is the sentinel's, on the grid). A
+  checklist step, a manual finish and an abort are stamped at the click. The trace's `driveline` events, «втори замах» annotation, steering angle and pedal
+  flags are the frame's; no score reads them. What the student sees while driving stays on the frame.
+
+**Alternatives rejected.** (1) Interpolate each trigger's crossing in a frame: a solver per trigger kind, and the detectors are not triggers. (2) Sub-step
+only the staged world (rounds 1–2): refuted twice. (3) Fixed-step world, frame-end grade (round 3): the student-to-world phase became a platform signal.
+(4) Frame-end grade against an interpolated world: timers and crossings still see one sample per frame. (5) Cap the frame length: a grading defect becomes
+an availability defect. (6) Grid index from session time plus an offset onto rapier's steps (round 4): it repeats or skips a car state. (7) Start the world
+one step in: after a long first frame it lags the car all drive. (8) A scene hook for the person-in-path distance, pinned by text (round 5): a text pin does
+not stop it reading the frame's pose. (9) Clock origin from a remainder threshold: no threshold tells an uncounted step from float noise. (10) The
+after-step read in VehicleRig's closure, pinned by text (rounds 5–6): rigs that read the frame's sample passed every test. (11) Near-miss count on the
+render frame: it is shown to the student. (12) A float-sum time label to copy base: it copies base's rounding defect. (13) One held look (rounds 4–7): the
+second of two frames between points erased the first one's look. (14) A grid queue with the cabin drained one look per frame: inside long frames a second
+look came up to 58 points (0.97 s) LATER than at 60 Hz. (15) Stamp each look with its press time: the other controls a frame samples act from its first
+step, and the wall-clock mapping cannot be verified without a browser. (16) The attempt trace on the render frame: its observation moments are shown.
+
+**Boundaries.** `scene/gradeGrid.ts` owns the order of the graded chain, the car's pose at a grid point, every measurement from that pose
+(`scene/nearMissMeter.ts` is its near-miss count), the queue of looks and which point hears each. `traffic/playerTrack.ts` owns the step record and the one
+function that writes it; VehicleRig calls it after every step and does nothing else there. `scene/cabin.ts` owns the latch: only the sample builder
+(`scene/vehicleSample.ts`) and the `moreLooks` hook drain it, and `forgetPendingGlances` empties it on a respawn. `scene/attemptFeed.ts` is the one feed of
+the trace's samples, looks and indicator edges. LessonScene owns the grid's lifetime and resets it in `resetCar`; it never calls `runtime.sample` or
+`stepFrame`, and its grid call reads no pose, heading or speed of the frame. NpcColliders owns rapier's collider pool only. The replay harness
+(`liveChainReplay`) runs the same `GradeGrid`, the cabin's queue class, the `moreLooks` path and `feedAttemptPoint`.
+
+**Consequences.**
+- **Reproduced by the verifier,** each cadence against its own 60 Hz run: 0 sheet splits and 0 shown differences on 1,531 staged cells × 10 cadences
+  (ambient on) and × 7 (ambient off), 903 cells without staged traffic × 6, and all 2,434 cells with every look moved 7 ms off the grid × 9; one sheet per
+  cell for two looks pressed together or on consecutive frames (437 cells × 9 each). Through the product glance path every look was heard once, in order,
+  never later than at 60 Hz, on every cadence the verifier drove. On the real fiber and rapier libraries headless (28 scenarios: 60–165 Hz, VRR, a phone's
+  cadence, 0.5 s frames, stalls, respawns, 240 Hz) no press was lost, repeated or reordered; the two exceptions are by design (at 240 Hz with up to 11 keys
+  inside two steps one look was dropped and counted; looks pending at a respawn were not heard after it). On its 45 roundabout tapes × L1–L5 × 17 cadences:
+  0 sheet splits; the 45 s line stop is «yielded», 0 points, on all 17. Of its 87 mutants 86 die on assertion text; the survivor is condition C-RESETPREVK, which the landing commit's respawn pin kills (below).
+- **D1 — the broader `moreLooks` design is accepted.** A frame hands the grid every look the cabin holds; inside frames longer than a step a look is never
+  heard later than at 60 Hz (reproduced). The cost: on a display slower than 60 Hz two looks in one frame are heard one step apart, where base heard them a
+  frame apart. The bound holds as stated: at 240 Hz, with up to 11 keys inside two steps, one look was dropped and counted.
+- **D2 — the 60 Hz differences from base are accepted.** At 60 Hz the sheet is base's on all 2,434 cells. What is shown differs on round 7's eight cells
+  (four sc-fo-brakelight-chain mistake-late-brake rungs show one more coached row; four sc-crossing-child-ball mistake-collision rungs stamp their near miss
+  one step earlier) and on 20 cells whose rubric time line prints a whole second different (stars and points equal). Base re-run with an exact clock
+  (t = frame/60, one line changed) matched the tree on every measure over all 2,434 cells, so every one of these is base's float-sum clock (R-BASE60).
+- **D3 — the knife edge.** One sheet per tape is shown for the committed demos and the census tapes, and no wider. WHEN a look is sampled stays the frame's
+  decision, so a look pressed within one step (fast display) or one frame (frames longer than a step) of a rule's decision edge can still get a different
+  sheet on a different display, pass/fail included, as on base. The verifier's scans: 565 of 1,573 shifted-look rows split on at least one cadence (555 only
+  on a phone's cadence, 0.5 s or 0.25/0.4 s); in 1 ms steps across three fast-display edges, 130 of 410 rows split on 144, 90, 165, 100 or 75 Hz, VRR or
+  60 Hz ±1 ms (never at 120 or 240 Hz). Base splits on the same tapes.
+- **D4 — observation moments, as a class.** A moment scored from a look heard close to an edge of the window it is scored in (the windows sit around the
+  reverse phase, read from the trace's gear) may differ by display, wherever a look can be heard earlier than at 60 Hz: one point on a display faster than
+  60 Hz or a jittery 60 Hz, up to a frame inside long frames. The verifier saw it beyond the census pin's five cells, with shifted or paired presses, at 144,
+  90 and 75 Hz, VRR and 60 Hz ±1 ms. Stars were equal everywhere. The census pin's named cells are examples, not the boundary.
+- **D5 — the look-timing bound is measured from the press.** Inside a clamped 0.5 s frame a look can be heard up to 29 grid points before the press; on a
+  fast display, one point before. Against its own 60 Hz point it can come a whole frame early (30 points measured on a phone's cadence with presses 7 ms
+  off the grid; the sheet did not change). It is never heard later than at 60 Hz. The census pin states the bound from the press with the span of the
+  frame that TOOK the look (`heardTooEarly` in `grade-grid-cadence.census.test.ts`), and a teeth test goes red if a press made after a long frame ended
+  is handed to that frame (the integration skeptic's mutant P2, reproduced red by the integrator).
+- **No budget is claimed as held.** Round 8 adds one queue read and the attempt feed's call per grid point; the builder timed the feed alone at 79–106 ns
+  per point on a shared machine and did not re-run the whole-chain bench.
+- **Pins added at landing.** C-RESETPREVK: `live-grade-call.execution.test.ts` §5 drives a respawn through the scene's own `stepPhysics` and
+  `resetCar` on 60 Hz, 120 Hz, 0.5 s and a phone's cadence and checks that the first point after key R gets dt = 1/60 and that the signals and the
+  staged world match the same drive with no respawn; the mutant fails on «Expected … 0.016666666666666666, Received 1.5166666666666666». It runs
+  `resetCar` with a stub director, so the director's own re-staging is not exercised by this pin. C-PINBOUND: the per-frame bound above.
+- **Live check before landing** (drive rig, the real LessonPlayShell, patch applied but uncommitted; no verdict posted): a careful sc-roundabout-entry
+  drive at L3 gave the same sheet on PC (headless Chromium; frames 16.7 ms mean, 23.6 ms max) and on the phone lens (headless WebKit, 852×393; frames
+  of 269–792 ms): 0 points, «ИЗДЪРЖАН», both tasks, the yield commended, no fault. A look pair was pressed on consecutive animation frames on both
+  lenses; the rig publishes no glance field, so how many looks the grade heard was not observed live.
+- **D6 — owed, not shown.** The live wiring was never driven on a real phone or on a 120/144 Hz display. That grid points equal physics steps, and which
+  point heard each look, are not observed live: no step counter or glance field is published. A quiet-machine cost A/B and a phone frame-time reading
+  are owed. The replay harness keeps the lever and the stalk ideal at every grid point, where the product samples them once per frame, so its
+  long-frame moment differences are partly its own. `STAGED_POSE_FULL=1` was run by neither the builder nor the verifier.
+- **Full design note:** [doc 94](../simulation/94_ADR014_FIXED_STEP_NOTE.md), the builder's note with nine passages corrected against the verifier.

@@ -185,6 +185,18 @@ export interface EventRunner {
    *  and not a colour field, because the scene seam is a per-lamp boolean the
    *  cluster reads per frame: red lights `temp`, amber lights `engine`. */
   readonly telltaleCautionLit?: boolean;
+  /**
+   * sc-roundabout-entry:7b747c15 — true for a runner that must decide ONLY at
+   * frame boundaries. The director normally also steps every runner between
+   * the staged world's physics sub-steps inside a long frame (see director.ts
+   * `substep`), so a trigger is met on the clock the actors move on. A runner
+   * that reads or re-times the SIGNAL clock cannot: `runtime.update(dt)` has
+   * already advanced the signals to the frame's end before any sub-step runs,
+   * so a sub-step decision would pair an earlier player pose with a later
+   * signal phase. Those runners stage no body to release (a signal phase is
+   * the stimulus) and stay on the frame clock, the clock the signals keep.
+   */
+  readonly frameClocked?: boolean;
   /** (Re)stage the actor + redraw per-attempt jitters. `firstTime` stages the
    *  actor into the traffic system; later calls reset it to its hold pose. */
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void;
@@ -1972,6 +1984,8 @@ export class AmberDilemmaRunner implements EventRunner {
 
   /** No actor: the dilemma stages a signal phase, not a body. Nothing to hit. */
   readonly contactCast: readonly ContactCastMember[] = [];
+  /** Re-times the signal cluster — frame clock only (EventRunner.frameClocked). */
+  readonly frameClocked = true;
 
   stage(_traffic: StagedTrafficPort, rng: Rng, _firstTime: boolean): void {
     // No actor to stage — only the per-attempt jitter draw (determinism:
@@ -3290,6 +3304,9 @@ export class TrafficControllerRunner implements EventRunner {
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
   contacted = false;
+  /** Posts the officer's timetable onto the signal cluster — frame clock only
+   *  (EventRunner.frameClocked). */
+  readonly frameClocked = true;
 
   private sawHold = false;
   /**

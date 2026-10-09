@@ -497,6 +497,52 @@ export interface TrafficUpdateContext {
   playerSpeedKmh?: number;
   /** Player heading (0 = north, cw). Lets agents follow a moving player. */
   playerHeadingDeg?: number;
+  /**
+   * sc-roundabout-entry:7b747c15 round 2 — the student's car AS THE VEHICLE
+   * SIMULATION INTEGRATED IT inside this frame (one sample per physics step,
+   * see `PlayerStepTrack`). Optional: absent or empty, the staged world reads
+   * the straight chord between the previous frame's pose and this one.
+   */
+  playerTrack?: PlayerStepTrack | null;
+  /**
+   * sc-roundabout-entry:7b747c15 — the SESSION time this frame ends at, s (the
+   * lesson clock the tick carries). Given (round 3), the world advances ONLY at
+   * the session's grid points k·FIXED_DT, in whole steps, the same instants on
+   * every frame cadence (system.ts `stepGrid`, the fixed-step accumulator); a
+   * frame that crosses no grid point advances nothing. Absent, each frame is
+   * cut into equal steps of at most one physics step (round 1). LessonScene
+   * and the replay harness pass it; the recorder, which steps at exactly
+   * FIXED_DT, needs not.
+   */
+  sessionTimeSec?: number;
+}
+
+/**
+ * sc-roundabout-entry:7b747c15 round 2 (verifier condition C1) — the student's
+ * per-physics-step states within ONE frame, oldest first.
+ *
+ * The ego car is integrated by rapier at FIXED_DT whatever the render rate
+ * (LessonScene `<Physics timeStep={FIXED_DT}>`, VehicleRig's
+ * `useBeforePhysicsStep`), so inside a long phone frame the real states exist.
+ * Without them the staged world's sub-steps (and the director that decides on
+ * them) read a straight line between two frame poses, and a car that comes to
+ * rest inside the frame is „still moving" on that chord: MEASURED by the
+ * round-1 verifier, twoStop(3,6,8,12) at a 0.25/0.4 s alternation locked the
+ * roundabout circulator 116.7 ms early (the chord's speed crossed the 2.5 km/h
+ * stopped bar ~88 ms before the car did; chord speed error 1.1–1.5 km/h).
+ *
+ * `tSec[k]` is seconds from the START of the frame being updated; samples at or
+ * before 0 or at or after the frame's own end are ignored (the frame's end pose
+ * is the context's `playerPos`). Speed follows the same sign convention as the
+ * context's `playerSpeedKmh`.
+ */
+export interface PlayerStepTrack {
+  readonly count: number;
+  readonly tSec: ArrayLike<number>;
+  readonly x: ArrayLike<number>;
+  readonly y: ArrayLike<number>;
+  readonly speedKmh: ArrayLike<number>;
+  readonly headingDeg: ArrayLike<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -948,6 +994,63 @@ export interface RearBodyBehind {
   readonly kind: "vehicle" | "cyclist";
 }
 
+/**
+ * The player's pose at a staged sub-step — linearly interpolated between the
+ * pose the previous `update()` was given and the one this `update()` was given
+ * (heading along the shortest arc). `speedKmh` is the context's own number,
+ * interpolated the same way, so it carries whatever sign the caller passed.
+ */
+export interface StagedSubstepPlayer {
+  x: number;
+  y: number;
+  speedKmh: number;
+  headingDeg: number;
+}
+
+/**
+ * sc-roundabout-entry:7b747c15 — the hook through which the staged world's
+ * commander runs on the staged world's clock.
+ *
+ * WITHOUT the session clock (`TrafficUpdateContext.sessionTimeSec` absent:
+ * the recorder, the clip feed, fixtures) `substep` is called BEFORE every
+ * staged integration step of a frame except the first (the first is covered by
+ * the commander's own per-frame step of the previous frame), at
+ * `elapsedSec` = that step's start, measured from the start of the frame, and
+ * `frameEnd()` carries no argument: the commander decides at the frame end as
+ * it always did. Never called on a frame with one staged step.
+ *
+ * WITH it (round 3, the fixed-step accumulator — system.ts `stepGrid`) the
+ * world advances only at the session's grid points k·FIXED_DT, and `substep`
+ * is called AFTER every grid step whose grid point lies strictly inside the
+ * frame, with `gridTimeSec` = k·FIXED_DT and `elapsedSec` = that point
+ * measured from the frame's start. `frameEnd(decideAtEnd)` then says whether
+ * the frame's END is itself a grid point the commander must decide at (true:
+ * every 60 Hz replay frame, and a frame whose inside could not be read) or not
+ * (false: nothing is decided at the frame end; the next grid point decides).
+ *
+ * Never called across a discontinuity in the player's pose (a respawn or a
+ * retry teleports him; interpolating across it would invent a drive he never
+ * made) — that frame is decided at its end.
+ */
+export interface StagedSubstepListener {
+  substep(
+    elapsedSec: number,
+    stepSec: number,
+    frameSec: number,
+    player: Readonly<StagedSubstepPlayer>,
+    gridTimeSec?: number,
+  ): void;
+  frameEnd(decideAtEnd?: boolean, gridStepSec?: number): void;
+}
+
+/** A body's DRAWN pose (round 3, `TrafficSystem.renderFraction`). */
+export interface TrafficRenderPose {
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+}
+
 export interface TrafficSystem {
   /**
    * Advance all agents. Call ONCE per render frame, after WorldRuntime.update
@@ -1140,6 +1243,42 @@ export interface TrafficSystem {
   stagedCommand(id: string, command: StagedCommand): void;
   /** Live view of a staged actor, or null. */
   staged(id: string): StagedActorView | null;
+  /**
+   * sc-roundabout-entry:7b747c15 — the staged world's own clock. Staged actors
+   * are integrated in steps of at most `STAGED_MAX_SUBSTEP_SEC` (the ego car's
+   * physics step), and between two of those steps inside one long frame the
+   * listener is handed the sub-step time and the player's interpolated pose, so
+   * whoever COMMANDS the staged actors (the scenario director) can decide on
+   * the same clock they move on. One listener at a time; null detaches. See
+   * system.ts `update()` for the exact call order.
+   */
+  setStagedSubstepListener(listener: StagedSubstepListener | null): void;
+  /**
+   * sc-roundabout-entry:7b747c15 round 3 — WHAT IS DRAWN, never what is graded.
+   * With the session clock the world advances on the fixed FIXED_DT grid, so a
+   * frame ends up to one step past the newest simulated state. Every renderer
+   * draws each body interpolated between its last two grid states by this
+   * fraction — the frame end's distance past the newest one, in steps — i.e.
+   * exactly one physics step behind the frame end, the lag rapier draws the
+   * student's own car at (`<Physics interpolate>`: lerp(previous, current,
+   * accumulator / timeStep)). 0 on a frame that ends ON a grid point (the
+   * previous grid state, exactly); 1 without the session clock (no grid: the
+   * drawn pose is the simulated one). Grading, the director, the contact
+   * sentinel and every detector read `vehicles` / `pedestrians` themselves.
+   */
+  readonly renderFraction: number;
+  /**
+   * Round 4 — the frame's END for the drawn pose when the world was advanced
+   * one grid point per `update()` (scene/gradeGrid.ts): sets `renderFraction`
+   * to the frame end's distance past the newest grid state, in steps, exactly
+   * as `update()` would have for the whole frame. Moves nothing simulated.
+   */
+  setRenderSessionTime(sessionTimeSec: number): void;
+  /** The drawn pose of `vehicles[i]` (see `renderFraction`); a teleport between
+   *  the two grid states draws the newest. Writes and returns `out`. */
+  vehicleRenderPose(i: number, out: TrafficRenderPose): TrafficRenderPose;
+  /** …of `pedestrians[i]`. */
+  pedestrianRenderPose(i: number, out: TrafficRenderPose): TrafficRenderPose;
   /**
    * A11: how a published VEHICLE state should read in a collision
    * (`SimTickEvent` collision `withWhat`). Staged curb-riding cyclist proxies
