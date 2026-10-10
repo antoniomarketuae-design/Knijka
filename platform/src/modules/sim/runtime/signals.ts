@@ -90,6 +90,11 @@ export type SignalClusterMode = "live" | "dark" | "flashingAmber" | "controlled"
 export interface SignalControllerSchedule {
   haltedGroup: Axis;
   flipAtSec?: number;
+  /**
+   * The lesson authors this junction's lamps as OUT (TrafficControllerSpec.lamps "dark"): no graded read may take a
+   * lamp phase here (`controllerLampsDark`). Absent = the live, misleading-but-visible lamps of the hierarchy drills.
+   */
+  lampsDark?: boolean;
 }
 
 /**
@@ -457,6 +462,18 @@ export class SignalController {
         : "ns"
       : schedule.haltedGroup;
     return group === halted ? "halt" : "proceed";
+  }
+
+  /**
+   * True when a controller is posted at this cluster AND its lesson authors the lamps as OUT — the one case in
+   * which the cluster's phase machine is still running (it is "controlled", not "dark": the officer governs, the
+   * right-hand rule does not) but nothing the student is graded on may read it. sc-sig-controller-postures:f7e046c4:
+   * the runtime used to stamp that hidden phase onto every crossing, and the praise for reading the officer followed
+   * the session-clock moment of the crossing. Out-of-range indices and every other mode: false.
+   */
+  controllerLampsDark(clusterIdx: number): boolean {
+    if (this.clusterMode(clusterIdx) !== "controlled") return false;
+    return this.controllers[clusterIdx]?.lampsDark === true;
   }
 
   /**

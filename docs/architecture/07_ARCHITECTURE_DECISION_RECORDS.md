@@ -513,3 +513,335 @@ from its own traffic-model account (`StagedActorView.playerShedMps`).
 - **Not driven in a browser.** Every number is in-process: VehicleSim under rapier, the live rung chain, and the real traffic system and director
   with a kinematic car. The rig's lee wiring is held by a source pin and an executed test of `createRigWindShelter`, not by a browser frame. The gust
   chip's state machine is unexecuted. The row stays open until a drive through the rig on both lenses and a re-capture of the clips.
+
+## ADR-016: The follower's braking is what bills a brake check below the 35 км/ч floor
+
+**Status.** Accepted by the integrator. Implemented 2026-10-09 in 59be0de and recorded 2026-10-10. Lane `tailbrake` ran two rounds, each adversarially verified. Round 1 was REFUTED. Round 2 was SIGNED OFF WITH CONDITIONS: row `sc-follow-tailgater:63c0c28c`, critical, row clauses C1 and C2a; patch `tailbrake-result-r2.patch`, sha256 3cb8db66…, 10 files, cumulative against c38086a.
+- **Where it comes from.** It applies the integrator decision recorded in rig-w2 and told to the founder on 2026-10-08. That decision takes the principle of two founder rulings and applies it to a staged close follower. The rulings are «bill the forced braking» of 2026-09-30 (made for the lane-drop lessons) and its roundabout companion of 2026-10-05. The principle: a conviction about another car rests on what that car actually had to do. This ADR is not itself a founder ruling.
+- **What it changes.** No speed threshold is added or moved, and no shown sentence changes. The one new authored value is FTG_LEAD's floor (below), and it equals the lead's existing cap. This is a contract change in the ADR-015 family: one new SimTickEvent and the engine reading it. It runs on ADR-014's grid.
+- **Why it is late.** The round-1 builder proposed it as ADR-016, and it has been owed since the landing. This entry discharges that.
+
+**Context.**
+- **The floor.** HARSH_BRAKING_NO_CAUSE bills only from `harshBrakeMinSpeedKmh`, 35 км/ч («low-speed stabs are clumsy, not dangerous»). The onset speed is read on the harsh window's anchor frame, one frame after the pedal. The round-1 builder puts that at about 0.6 км/ч below the speed at the pedal on a 9.5 m/s² stop.
+- **Where the floor is wrong.**
+  - The rig-w2 judge photographed a full-pedal brake check with the лепка of `sc-follow-tailgater` 8.5–8.9 m behind, made from 32.3–34.9 км/ч. It escaped entirely: no card, «ИЗДЪРЖАН» ★★★, «Чисто и спокойно каране».
+  - The same pedal from 38.4 км/ч failed the lesson.
+  - The lesson's own task 1 says «дръж под 36», so the student who obeys it is the one the floor hides.
+- **What the car behind did.** The round-1 builder measured this at c38086a through the live rung chain, on a tape of the rig's mode-T drive with brake checks from 32.3 and 34.9 км/ч (40 cells):
+  - On the 23 cells where the лепка was still glued behind him, it braked at a mean 9.77–10.04 m/s² over 0.4 s and shed 3.9–4.0 m/s.
+  - On the other 17, its pass had already begun.
+  - Nothing was billed on any of the 40.
+- **Why the engine could not see it.** `RearTailgaterRunner` published nothing, so the engine had no way to know that the car behind had been forced to brake.
+
+**Decision.**
+- **The report: `followerBraked`** (`rules/types.ts`, a new SimTickEvent). It is a report, not a verdict. Its fields:
+  - `vehicleId`;
+  - from the harsh window the follower's own speed went through: `decelMps2` (its mean), `heldSec` and `qualifiedSec`;
+  - `shedMps`;
+  - `speedMps`, the follower's speed at the start of that window (its speed now plus `shedMps`);
+  - `gapM`, bumper to bumper on the frame of the report.
+- **Who publishes it.** Only `RearTailgaterRunner.stepFollowerAccount` (`orchestrator/runners.ts`), and only while the car is GLUED. Glued means all three of these hold:
+  - it is latched in the лепка pose;
+  - it is under its `matchPlayer` law, either before the pass is commanded or in a passShiftM-0 pass kept as a station. That law's only input is the student's pace and the gap to him, so every m/s it sheds there is shed because of him;
+  - the student is ahead of it in its lane (`playerAheadInActorLane`). A view without a lane width answers false, so nothing is read.
+- **How the account runs.**
+  - Any frame on which one of the three conditions fails restarts the account.
+  - A car that is un-glued and later glued again starts from the speed it has at that moment.
+  - The runner reports once per braking episode.
+  - It reports nothing without a published state id.
+- **What decides «had to brake hard».** The product's own harsh-brake rule decides it: the same line the student's own brake is judged at, not a new line.
+  - The runner puts the follower's speed loss, measured from its speed on the first glued frame, through ADR-015's pure step `stepHarshBrakeTrack`. It runs on `OVERTAKE_HARSH_LINE` (runners.ts), which uses the engine's defaults: a deceleration over 7 m/s², held 0.4 s, mean exclusive, read as a 0.04 s windowed derivative.
+  - The engine re-checks every report against the lesson's own config with the one predicate `isHarshBrakeWindow`, exactly as it does for `laneEntryAnswer`.
+- **The floor-lift** (`rules/engine.ts`, «THE FLOOR LIFTS FOR A FOLLOWER IT PUT AT RISK»):
+  - **Recorded as floored.** Some student episodes are causeless and emergency-grade by every other gate, and the floor alone acquits them. Such an episode is recorded as floored (`flooredSince`, `flooredAt`). Nothing is billed at that point, and without a report nothing ever is.
+  - **When it bills.** It bills HARSH_BRAKING_NO_CAUSE once per pedal application (`flooredBilled`). The report must fall on or after the episode's window start and no later than `flooredAt + followerAnswerSec`.
+  - **If the pedal is still down at the bill,** the episode is marked emitted. The praise gates then read it as billed, exactly as for a bill from over the floor.
+  - **Resets.** A new pedal application resets the floored record. A cause that appears mid-brake clears it.
+  - **Untouched:** the cause ledger, the mean and accrual gates, and the 35 км/ч floor.
+- **The answer window is derived, not tuned.** `followerAnswerSec` = the follower's `speedMps` / `harshBrakeDecelMps2`, its own hard stop. This is the derivation the forced-braking bill already uses for `laneEntryAnswer`. For the лепка at 9.0–9.7 m/s it is 1.29–1.39 s.
+- **The staging fix** (`templates-following.ts`, FTG_LEAD: `minMatchSpeedMps: 11.5`):
+  - It uses the product's existing floor mechanism (sc-ov-crest-curve:b26aaa0b), set equal to the lead's own authored cap.
+  - The lead therefore holds the constant 11.5 m/s cruise that three places already claimed: the template doc, instruction 4 and the sc-ftg-ease note.
+  - Only `sc-follow-tailgater` uses FTG_LEAD.
+- **Shown text.** None is added or changed. The bill uses the catalogue copy «Рязко спиране без причина» («…Внезапното силно спиране изненадва движещите се зад теб…»). It held on the bills the verifiers examined:
+  - the round-1 verifier found nothing ahead within reach, and the car behind braking hard, on the drives it billed;
+  - in round 2, every bill under 35 км/ч has a follower report behind it.
+- **What stays unbilled:**
+  - every brake from at or over the floor, which is unchanged;
+  - every lesson without a car glued behind the student, which keeps the floor exactly;
+  - a brake that has a cause, as the cause ledger decides;
+  - gentle ease-offs at 1–5 m/s² (0 of 125 billed, 0 reports);
+  - the lane-condition C1 class below.
+- **Lane condition C1 (the verifier's C1, the round-1 F2): a brake check while the лепка's pass is already under way. INTEGRATOR DECISION: it stays unbilled.** The principle bills only when the follower was actually put at risk, and risk is measured by the product's own harsh line. The decision covers the whole class the verifier reported, which is wider than «pulling out, not braking»:
+  - On the verifier's tapes it has 33 escape cells, with the pass commanded 0.03–0.41 s after the pedal.
+  - In some of them the лепка, still in lane 7.2–8.0 m behind, brakes at about 9.3–10 m/s² for up to 0.38 s before it pulls out. Its in-lane loss is 3.78 m/s at L3 h25 y125 (56% of its 6.76 m/s), 3.75 m/s at L4 h32 y155 and 3.69 m/s at L2 h20 y170.
+  - Its qualified time peaks at 0.383 s, under the 0.4 s sustain, so by the product's own line it was not forced.
+  - The judge's two L1 tasks-first rig drives (32.3 and 34.8 км/ч) are in this class. At the pedal the лепка was already pulling out and accelerating.
+  - **Pinned:** the 6-cell F2 row in `follow-tailgater-brake-check-under-floor.test.ts`. It holds the round-1 verifier's six cells, where the лепка sheds about 1 m/s and never brakes hard.
+  - **Not pinned:** the wider round-2 cells above. They are decided but have no pin.
+- **Lane condition C4 (the verifier's N4): the w71 three-stop leg. INTEGRATOR DECISION: the moved pin is ACCEPTED.** `follow-tailgater-brake-check-rates.test.ts` now reads `["coached","none","charged"]` at all 7 rates.
+  - **Stop 3.** It is a full-pedal stop from 58 км/ч after the lead has left the 400 m road, with nothing ahead.
+  - **Why stop 3 was acquitted on the 2026-10-04 tree.** It was acquitted with the lead 129–140 m ahead and closing at 4.6 m/s. The lead was there only because, tied to the student by matchPlayer, it had waited for him through his 8 s rest. A lead tied to the student is the mechanism round 1 was refuted on.
+  - **Now.** The lead holds its own pace, so the global rule applies above the floor and HARSH_BRAKING_NO_CAUSE is charged. The builder reports STOPPED_WITHOUT_CAUSE charged as well. Under R1 the verifier's run of the row turns red with a lead at 135.5 m.
+  - **Stop 2** (the lead at 209–213 m, still closing at 4.61 m/s) stays acquitted by the round-4 far-closing ruling.
+  - The 2026-10-04 landing's line «stops 2–3 … acquitted like base» no longer holds for stop 3.
+
+**Alternatives rejected.**
+- **Moving or removing the 35 км/ч floor.** The principle reads what the follower did and adds no speed number. The floor stays for every lesson without a close follower.
+- **Round 1 on the old staging.** Refuted.
+  - On the verifier's tapes, 150 of 204 glued low-speed cells were billed and 54 escaped, at 20, 22 and 25 км/ч on every rung.
+  - In every escape `causeSeen` was true. FTG_LEAD (matchPlayer, `followGapM` 150) mirrored the slow student (leadV 9.0 → 1.9 m/s), and the far-lead ledger stamped a cause the student had created himself.
+  - At L4 those drives showed the unscoped «Чисто и спокойно каране».
+  - Four of the verifier's seven mutants survived.
+- **A lower lead floor of 9 m/s** (mutant R2). The lead still slowed from 11.5 to 9, and 39 of the 50 new lesson cells stayed acquitted.
+- **A `scheduledCruise` for the lead.** It would put the speed in a second number beside `maxMatchSpeedMps`, which is the single value `following-claim-gates` checks the pace cap against.
+- **A separate «still inside the window now» conjunct** (`t <= flooredAt + followerAnswerSec`, mutant MD). Every field the condition reads is written only on a frame where it is set to that frame's t, or is nulled, so the conjunct is provably equivalent. It was removed rather than pinned, and the verifier agrees with the proof.
+- **Reading the follower after its pass is commanded.** At c38086a its pass guard was measured not to brake for a student who keeps to his own lane, so there is nothing of his to read.
+
+**Boundaries.**
+- `RearTailgaterRunner` measures and publishes, and nothing else publishes `followerBraked`.
+- In the engine, `case "followerBraked"` only re-checks and records. The bill belongs to the harsh-brake detector.
+- `rules/harshBrakeEpisode.ts` (ADR-015) owns the step and the predicate. The runner imports the step (`stepHarshBrakeTrack`), and the engine imports the predicate (`isHarshBrakeWindow`).
+- The `contracts.ts` change (the `RearTailgaterSpec` doc) is comments only.
+
+**Consequences.**
+- **Reproduced by the round-2 verifier** (round 1 reversed, round 2 applied, its own probes). Under 35 км/ч, billed out of glued cells:
+  - low sweep: 200/204;
+  - dense, every hold from 20 to 35 км/ч, braking at y35–330, L1–L5: 379/395;
+  - densetf: 190/197;
+  - sweep: 94/100;
+  - partial brakes: 48/52;
+  - taskfirst: 65/66.
+
+  Further results on the same tapes:
+  - 0 escapes carry `causeSeen`, and FTG_LEAD holds 11.5 m/s through the pedal.
+  - In every sweep, every drive with a follower report is billed, and every bill under the floor has a report behind it.
+  - On each rung the bill takes the form of the over-the-floor brake check: a coached lesson mistake at L1/L2/L3/L5, charged at L4, never passed.
+  - Across all 5,295 probe drives, no billed drive showed the unscoped «Чисто и спокойно каране». At L4 at early y, billed drives can show the scoped form («— но само на отделни отсечки…»). Over-the-floor L4 bills show the same form.
+- **Census (the verifier).** Every template × committed demo × L1–L5, base c38086a against the tree, compared on violation code@t and a sha1 of the debrief: 2,515 cells, 81 of them the same ScenarioCompileError on both trees. Of the other 2,434, none differ.
+- **Where reports appear (the builder's census).** 14 cells carry `followerBraked` reports.
+  - In the sc-follow-tailgater brake-check demo (L1–L5) the bill was already made from 45.9 км/ч, and its time is unchanged.
+  - In sc-merge-lane-end (no-indicator at L1–L5; push-out at L1–L3 and L5), reports appear but nothing is billed: the student's brake there is not a floored causeless episode.
+- **Mutants.**
+  - The builder: 23/23 killed on assertion text.
+  - The verifier: 12 run. The round-1 survivors MA, MC and MF now die.
+  - Two survive: X5 (the reference speed ratchets to the highest seen) and X7 (the report lags the pedal by 0.3 s). The verifier calls both near-equivalent, and neither reaches its stop rule. Both are owed.
+- **The integrator's integrated-set gate.** The set: truck-pass round 3 + fix 1 + fix 2, meetcars, islandcoach, crashcam and tailbrake staged, run one directory at a time. 0 failed in every set:
+
+  | set | files | tests |
+  |---|---|---|
+  | `lessons/__tests__` | 124 | 2,336 |
+  | `lessons/scenario/__tests__` | 176 | 4,200 |
+  | `components/sim/lesson-ui/__tests__` | 43 | 717 |
+  | `orchestrator/__tests__` | 37 | 458 |
+  | `rules/__tests__` | 97 | 1,765 |
+  | `traffic/__tests__` | 37 | 441 |
+  | `scene/` | 45 | 740 |
+
+  - tsc is at the 21-error Prisma baseline.
+  - The merge verifier reproduced `rules/__tests__` (97/1,765) itself. Its re-run of the other directories did not finish.
+  - The lane verifier's own catalogue-wide run also did not finish.
+- **ADR-015 TP-5 is NOT discharged by this ADR.**
+  - Only `RearTailgaterRunner` publishes the report.
+  - The truck-pass truck is staged by `CutInLeadCarRunner`, whose watch reads nothing after it closes.
+  - So a brake check in front of the truck after a clean return stays unbilled. It stays owed.
+- **Old frames.** Because of the mirroring, the w71/w69 recordings had the lead at 131–140 m at stops 2–3. On this tree the front lead is in a different place, so evidence that rests on those frames needs a new frame.
+- **Not driven in a browser.** Every number above is in-process. `sc-follow-tailgater:63c0c28c` stays OPEN until a rig re-drive photographs two things:
+  - the brake check under 35 км/ч, on the lens and level the row was filed on;
+  - the phone lens for row clauses C2b (the guilty acceleration) and C4 (59 in a posted 50). w74 found a PC/phone split on both, and rig-w2 settled only the PC half.
+
+  Expected on that re-drive:
+  - An L3-like geometry, where the лепка brakes hard still in its lane, is billed. The judge's trail for pc-L3-brake-tasksfirst gives 9.0 → 1.65 m/s; the round-1 builder gives 9.0 → 3.2 m/s for the L3 rig drives.
+  - The L1 tasks-first geometry stays unbilled under lane condition C1.
+- **Owed.**
+  - Pins for X5 and X7, or a recorded near-equivalence argument for each.
+  - A pin for the wider F2 cells (L3 h25 y125, L4 h32 y155, L2 h20 y170).
+  - A reading of the `n38.ts` HARSH_BRAKING_NO_CAUSE rationale against forced-follower bills. That rationale says a brake that creates a предпоставка would be COLLISION or CLOSING_ON_LEAD_TOO_FAST.
+- **Open, for the founder or the integrator.** Should a causeless slam under 35 км/ч, with a car pulling out 8 m behind, withhold «Чисто и спокойно каране» even though it is not billed? The question includes the F2 cells, where the follower sheds over half its speed for up to 0.38 s.
+  - As decided today, such a drive with no other fault keeps the unscoped praise.
+  - The verifier saw this on L4 h32 y155 and L2 h20 y170. The builder saw it on L4 h28 y140, L4 h30 y150 and taskfirst L5 h34.9 y180.
+
+**Five questions.**
+1. **Learning outcomes.** A brake check is taught as the mistake it is, at the speed the lesson itself asks for.
+2. **Safer drivers.** Yes. Braking hard at a car on your bumper is the act the lesson exists to prevent.
+3. **Retention.** Neutral. No new card or sentence is added.
+4. **Measurable progress.** In process, a drive that made the car behind brake hard by the product's own line no longer passes and no longer gets the unscoped «Чисто и спокойно каране».
+5. **Business value.** It repairs a critical «a dangerous act is praised» defect, in process, without adding a speed threshold. The row stays open until the rig re-drive.
+
+**Update 2026-10-10 (rig-w3b at 59be0de).** The rig re-drive left clause C2a OPEN: a 24.5 km/h full-pedal stab with the лепка glued 4.8 m behind (peak 9.22 m/s², no follower report because it then swerves out) still escapes as ИЗДЪРЖАН ★★★ (evidence `D:/knijka-lanes/scratch/rig-w3b/sc-follow-tailgater/attempts/pc-L3-TTF25-2026-10-10T0159/`). The follower DID brake hard, so under this ADR’s own principle the case should bill; the gap is that `followerBraked` is published only from the follower’s report, which a swerve-out never sends. Owed: repair lane «tailbrake3» (publish from the follower’s measured deceleration, keeping the F2 decision that a follower already pulling out stays unbilled). The 35 km/h floor itself is not moved — that would be a founder decision.
+
+## ADR-017: The drive rig is referenced to the physics step
+
+**Status.** Accepted by the integrator on 2026-10-10. This is a technical decision, not a founder ruling: no rule, threshold or wording changes.
+- **Lane.** `rigstep`, round 1, SIGNED OFF WITH CONDITIONS by its adversarial verifier. The conditions C1–C4 are carried below as limits L1–L4.
+- **Patch.** `rigstep-result-r1.patch` (sha256 b84cd022…, 8 files, +1674/−62), built on 59be0de.
+- **Landing.** It lands with the commit that carries this entry. The lane's regression (below) ran on 59be0de + rigstep alone. The run on the integrated set (with ltapnote r2, uturnedge r2 and praiselamp r1 staged) was cut by a PC restart, and it must pass before that commit.
+- **Origin.** It comes from the read-only design review `adr016-design-review.json`: the attack's corrected ADR, sections D-1 to D-4 and D-6 (D-5, the review's A13, is carried as owed), and findings A4–A8, A10 and A15. The review numbered it ADR-016. It became 017 because ADR-016 went to the tailbrake `followerBraked` contract.
+- **What it decides.** When the drive rig's command reaches a physics step, and where a rig script starts. It also confirms the frame-start rule for human input.
+- **This is an INSTRUMENT change.** No session outside the rig changes behaviour. The step handle is dev-only, and a production bundle is checked for its absence. It repairs no product behaviour and CLOSES NO ROW.
+- **Evidence.** The proof is in-process only. The rig has not been driven in a browser since the change.
+
+**Context.**
+- **What W81 settled.** W81 (integrator note 2026-10-10) judged `sc-rb-busy-gap:7bbdd45e` and `sc-roundabout-entry:08a0b701` in process on ADR-014's grid. On every cadence, one input gives one sheet.
+- **How the rows were posted.** Both rows were posted PARTIAL and held open on (i) frame-timed pedals and (ii) a founder question.
+  - 08a0b701: its verifier refuted the closure.
+  - 7bbdd45e: its verifier did not refute the closure. The row is PARTIAL by integrator decision, on the same standard.
+- **The live PC/phone difference on sc-rb-busy-gap's S drive was the go.**
+  - On the phone lens the rig's go landed about 3 steps (0.05 s) later.
+  - That moved the circulating follower's rear across ADR-011's clearing edge (+0.040 m against −0.186 m), and the sheet from 20 to 10 points.
+  - Moving the PC go 4 steps later gives the phone's sheet. Moving the phone go 1 step earlier gives the PC's.
+- **F5: the rig decided per grid point but applied per frame.**
+  - `DriveRig.onTick` ran `stepDriveScript` inside the grade loop, after rapier had already taken the frame's n steps.
+  - Its `pad.set` overwrote itself across the frame's points. Only the last point's decision reached the NEXT frame's steps: 1 to n steps after the state it read, against exactly 1 at 60 Hz.
+  - Frames of 269–792 ms aliased its 0.22 s ON / 0.12 s OFF standstill pulse.
+  - Its recorded pedal columns held the previous point's decision, not the input that was applied.
+  - Its script started at `handle.last.tSec`, wherever a `page.evaluate` landed, so the start was wall-timed (A7).
+- **The pad needs no production seam (A5).** The synthetic pad is a live JS object. `SimInput.mergeGamepad` polls `navigator.getGamepads()` on every `read()`, including every physics step's. A VehicleRig input-provider seam would have bypassed GatedSimInput (A4).
+
+**Decision.**
+- **D-1. Human input keeps the frame-start rule.** No channel maps event timestamps onto grid points. That covers the keyboard, touch, the mouse pedals, cabin keys and buttons, and looks. Real Gamepads expose no change time.
+  - **Reason.** For a human, the right reference is the picture.
+    - A press made between frames acts from the next frame's first step. That back-dates it by up to one frame (U(0, frame)).
+    - The picture the driver reacted to was itself up to a frame stale on that display, so on average the two offset each other.
+    - Mapping wall-clock timestamps onto the grid would remove the back-dating but keep the staleness. That would add up to a frame's delay to every reaction-timed rule (BRAKE_ONSET, the narrow-meeting stand-down, `respondingOnBrake`), and it would do so on exactly the slow devices.
+  - **Stated as lost.** A press and release inside one gap between frames (F2) never reaches a read.
+  - **Consequence for W81's (i).** For a human, frame-timed pedals remain ADR-014's stated limit. This ADR does not change them.
+- **D-2. The drive rig is step-keyed** (dev only, no production seam).
+  - **The lazy pad.** The `getGamepads` shim first calls `DriveRig.syncToStep()`.
+    - When the step track's `stepCount` is newer than the last count evaluated, the rig runs `stepDriveScript` ONCE per new count c, oldest first. Each run uses `stateAtStep(c)` at t = the grid clock's `timeOf(c)`, and caches the command. Repeated reads at the same count return the cache.
+    - So step k+1's before-step applies the decision taken on the state after step k. Neither read order nor the render-rate reads can move it.
+    - At one step per frame this is exactly the old behaviour. That equality is the regression anchor.
+    - A catch-up never reaches past the step track's 64-step ring. A count whose state is gone is counted as `blindSteps`.
+  - **The whole product path.** The command travels SimInput's merge → GatedSimInput (reverse remap, raw capture, pre-drive gate, blocked-throttle latch) → `applyDifficulty` → VehicleSim. Nothing replaces SimInput. `GatedSimInput` is exported from LessonScene for the census alone, with no behaviour change.
+  - **`onTick` only records.** A sample's pedal columns at point k are the command the pad handed step k, that is, the last read at count k−1. `DRIVE_RIG_VERSION` moves from 2 to 3 because the columns changed meaning. `onTick` keeps three frame-timed jobs:
+    - starting a «drive» script at the phase flip;
+    - freezing the command where the lesson ends;
+    - re-keying held keys at the grid point whose decision changed the script step.
+  - **The start is referenced to a step.** `run(steps, { startAt })` returns what it armed.
+    - **A named step N.** The session-time origin is `timeOf(N)`. The first decision is taken on the state after step N and applied from step N+1. A start that has passed is refused with a RangeError; it is never moved.
+    - **«drive».** The first grid point of the lesson's driving phase.
+    - **«next».** The old `run()`: the step count at the call. It stays the default for existing callers (`glance-graded.mjs`, `wave3-drive.mjs`, and the rig-wave capture scripts that call `run(steps)`). It is NOT step-referenced.
+    - **`?script=`** arms at `publish()`, which by design comes before the scene's first physics step (unobserved live, L4). It re-arms after a StrictMode dispose/publish.
+    - **`?start=drive|N`** chooses the start. The default is step 1 (named) for a lesson with no pre-drive procedure, and «drive» otherwise.
+    - **`tools/clips/headless/drive-rig.mjs`** arms in ONE `page.evaluate` with `--start-at auto|<seconds>|step:N|now`, and fails the run if a start is refused. It drives Chromium only, at a 1280×720 viewport.
+  - **The dev-only read handle.**
+    - LessonScene publishes `window.__rigStepSource`, a READ view: `steps` {stepCount, stateAtStep} and `clock` {timeOf, indexAt, stepSec}. It offers no `record` and no clock to advance.
+    - It is published from a `useLayoutEffect` whose first statement is `if (process.env.NODE_ENV === "production") return;`, so that it exists before the Canvas takes its first step. LessonScene imports the devrig types only.
+    - The pad never throws into a physics step. Errors are swallowed and counted (`readErrors`), and drive-rig.mjs treats any of them as a soft failure.
+- **D-3. What the per-step decision does NOT make invariant** (stated, not fixed).
+  - **Script KEY edges stay frame-timed.**
+    - This covers indicators, looks, gear, holds and the PRE_KEYS taps.
+    - They are dispatched from `onTick` at the grid point whose decision changed the script step, which is the same point on every cadence.
+    - They land after that frame's steps have run: up to 27 steps late at 2 fps, as the verifier measured.
+    - The grade reads the cabin through the frame's sample and the look FIFO (ADR-014).
+  - **The invariance covers pedals and steer only, and only for scripts whose held keys do not touch physics** (verifier condition C2).
+    - Looks (KeyQ/E/F) were measured to leave the pedals identical.
+    - A script step whose `keys` include W/S/A/D or the arrows, a gear key or the parking brake changes the closed loop's state, or the reverse remap, at a frame-timed moment. Every later pedal decision of the rig can then differ by cadence.
+  - **Scripts must not put a discrete edge within one phone frame of a rule edge.** Otherwise any split such an edge produces is classified as frame-timed.
+  - **A «drive» start on a pre-drive lesson is learned from the grade.** Decisions for steps that a long frame had already taken are counted as `lateDecisions` and never applied. A named start has no late decisions.
+  - **`run()` with no start, and `--start-at now`, are wall-timed starts.**
+  - **The headless `keyboard.press("KeyX")`** is a fullscreen control, not an input (A8), and is left alone.
+  - **The rest of ADR-014's frame-timed list is unchanged.** That includes:
+    - the driveline stall timer on the unclamped render delta (the review's A13 and D-5, owed as a separate ADR-014 amendment);
+    - the `cabin.update` clocks;
+    - reverseAssist;
+    - NpcColliders;
+    - the lee.
+- **D-4. Deferred: per-step human pedal integration.** It is not built here, and `engine/input.ts` is unchanged. It would be built as one piece (the review's D-A + D-B + D-C, with A1, A3, A9, A10 and A11 folded in), and only when D-6 fires.
+- **D-6. The trigger to revisit D-1 and D-4.** A published step counter must exist first. Revisit when BOTH of these hold:
+  - (a) on the target device class (a budget Android and an iPhone, with Low Power Mode on and off), the median is 3 or more steps per frame, or the p95 is 6 or more;
+  - (b) a human-driven cross-device split is shown on a real device.
+
+  Keyboard driving measured below 30 fps reopens D-4 on its own.
+
+**Limits (the verifier's conditions).**
+- **L1 (C1). After the lesson's end point, the rig's commands are frame-timed.** The completing frame's later steps read live decisions before `onTick` sets the freeze.
+  - The verifier measured this with a reachZone completing at grid point 414.
+  - The post-end sequence is identical on 60, 30 and 144 Hz, on vsync drift and on desktop jitter.
+  - On the w69 phone deltas (both orders) and at 2, 1.3 and 3 fps, step 416 applies 0.154686 throttle against 60 Hz's frozen 0.154649.
+  - Nothing is graded after the end, and the product's own pause on `ended` is a frame-timed React commit anyway.
+  - The car's final pose, and so an end-of-drive photograph, can still differ by lens.
+- **L2 (C2).** The invariance holds for pedals and steer only, in scripts whose held keys do not touch physics (D-3).
+- **L3 (C3). Some starts depend on when the call lands.**
+  - **`--start-at auto`** names ceil((step+60)/60)·60, so calls at steps 0–120 name 60, 120 or 180. It is call-dependent. A cross-lens comparison must use one named start: `--start-at <seconds>`, `step:N`, or `run(steps, { startAt: N })`.
+  - **A named start before the pre-drive gate opens** has its rig pedals zeroed until a frame-timed React commit, while the script integrates against a car that is standing still. A comparison drive must confirm phase=driving at the named step.
+  - **Pre-drive lessons.** The default `?start=` for a pre-drive lesson is «drive», which counts `lateDecisions`.
+  - **Minor:** an empty `?start=` parses as step 0, not as an error.
+- **L4 (C4). The live wiring is unobserved, and the CLI default moved.**
+  - No browser has shown that the layout effect publishes before the first rapier step, or that every physics step reads the pad.
+  - drive-rig.mjs's default moved from start-now to `auto`. That delays a script by 1–2 s of world time against runs made before this ADR, so the traffic phase differs from earlier evidence.
+
+**Alternatives rejected.**
+1. **A VehicleRig StepInputProvider.** It is a production seam that bypasses GatedSimInput (A4).
+2. **Mapping timestamps onto the grid for the rig.** The pad is polled and has no change time.
+3. **Deciding in `onTick` and re-applying per step.** The grade runs after the steps it would need to drive.
+4. **Running the grade inside rapier's after-step.** That is a rewrite of ADR-014.
+5. **Re-evaluating on every read.** A decision would then depend on how many times a frame read the pad, because the controller's integral decays on a 0 s step. Mutant 1 shows it.
+6. **Dispatching script key edges from inside a physics step's read.** That puts DOM events inside rapier's step callback. The grade still reads the cabin per frame, so the edge would move without becoming per-step.
+7. **Keeping the wall-timed start.** It leaves an offset of up to a frame that per-step decisions cannot remove.
+8. **A wall-time rig pulse.** It reproduces the aliasing.
+9. **A GPU WebKit lens.** It narrows the problem without removing it.
+10. **Timestamped human input.** The W81 integrator note suggested this as a candidate repair for (i); nothing measured it. Rejected by D-1.
+
+**Boundaries.**
+- `devrig/rig.ts` owns the step-keyed pad, the start policy, and the per-count decision and applied records.
+- LessonScene owns the read view's publication, dev-gated in a layout effect, and nothing else of the rig.
+- `traffic/playerTrack.ts`, `SessionGridClock`, `engine/input.ts` and GatedSimInput's behaviour are unchanged. The rig reads the step track and the clock only through the view.
+- `tools/clips/headless/drive-rig.mjs` owns its harness's start policy.
+- ADR-014's boundaries stand.
+
+**Consequences.**
+- **On every cadence modelled in process,** rig pedals and steer get the same command at the same physics step, up to the lesson's end point (L1), in scripts whose held keys do not touch physics (L2). The cadences are 7 in the builder's census and 10 in the verifier's. Discrete rig edges do not get this.
+- **A one-step-per-frame drive is bit-identical to the rig before ADR-017.** In process, the 144 Hz, desktop-jitter and w69 phone-delta cadences now match it too; before, they differed by up to a frame. Whether the live WebKit phone lens does is G3.
+- **Rig evidence from before `DRIVE_RIG_VERSION` 3 cannot be compared step for step** with evidence made after it (L4: the start policy moved too).
+- **The lens still says nothing about a human's experience of a slow display.**
+- **Proven in process by the builder** (`rig-step-keyed.census.test.ts`, 18 tests).
+  - The components are the real code: the pad, `stepDriveScript`, GatedSimInput, `applyDifficulty`, VehicleSim on headless rapier, `recordPhysicsStep` and `SessionGridClock`.
+  - The frame loop is a model that follows rapier's stepper line for line (clamp 0.5 s, an accumulator, 1/60 s steps), then render reads, then one `onTick` per new point through the real `applyTick`. The drive runs 780 steps.
+  - On 7 cadences, the applied throttle, brake and steer and the car's states are bit-identical at every step, and so is the script log. The cadences:
+    - 60, 30 and 144 Hz;
+    - desktop jitter with a 983 ms hitch;
+    - the w69 phone deltas in two phases, one opening with the 7.505 s stall;
+    - 2 fps.
+  - An oracle that recomputes each decision once from the recorded state after step k matches what step k+1 applied.
+  - 0, 1, 3 or 7 render reads per frame give one sequence.
+  - A named step 120 gives one drive from each arming point tested: 3 frame boundaries × 3 places in a frame, on each cadence.
+  - Its anchor is a transcription of the old `advance()`. The old rig does not match itself across cadences.
+- **Reproduced by the verifier's own census.** It ran the REAL rig.ts from 59be0de as the anchor, not a transcription.
+  - It covered 10 cadences, both the normal and the beginner tier, and 1,500 steps on a 10-step closed-loop script. Gated and raw pedals, steer and the car's states are bit-identical, and the oracle is exact. `lateDecisions`, `readErrors` and `blindSteps` are 0.
+  - 160 start-call-jitter drives with a named start of 137 are identical. They arm at 4 frame boundaries × 4 places in a frame.
+  - At one step per frame the new rig matches the base rig bit for bit (applied commands, states, sample columns, key-edge events), through a lesson end as well.
+  - The pre-drive gate zeroes every rig pedal while it is locked, and the remap swaps them.
+  - Pause, a 6 s hidden tab, a 7.5 s stall and a blur apply nothing twice.
+- **Mutation.**
+  - The builder: 5 of 5 sabotages red on assertion text. Among the messages: «step 182 applied … but the decision from the state after step 181 is …» and «the production bundle must not carry the step handle».
+  - The verifier: 10 of 10 killed, each restore sha-verified.
+- **Production absence** (`rig-production-absence.test.ts`, 7 tests).
+  - The handle's name appears only in LessonScene.tsx and rig.ts.
+  - DriveRig is value-imported only by the drive-rig client, whose route calls `notFound()` in production, and by the devrig barrel. Production code already value-imports that barrel (LessonPlayShell and RouteGuidance, for publishRoadProbe*). So the pad's absence from production rests on the bundle check.
+  - A minified rolldown production bundle of the student's simulator route carries neither the handle nor the pad. A development bundle carries the handle, as the positive control.
+  - This approximates Next's SWC build; it is NOT a `next build`.
+- **Regression, on 59be0de + rigstep in the verifier's lane** (vitest, one worker): all green, and tsc is at the 21-error Prisma baseline.
+  - 196 devrig + app/dev tests;
+  - 990 engine + scene tests;
+  - 1,551 components/sim tests;
+  - 608 tests in 20 other files that import the input, the rig or LessonScene.
+
+  The integrated-set run is owed (Status).
+- **Owed.**
+  - **The integrated-set directory gate** with rigstep staged.
+  - **G3: re-drive both rows on the PC and phone lenses with ONE named start.** The rows are `sc-rb-busy-gap:7bbdd45e` S and `sc-roundabout-entry:08a0b701`, driven through `/dev/drive-rig`.
+    - drive-rig.mjs drives Chromium only. The phone lens (WebKit 852×393, DPR 3) needs its capture script to arm `window.__driveRig.run(steps, { startAt: N })` in one evaluate, with the same N as the PC drive.
+    - Choose N late enough that neither lens's arming call has passed it.
+    - Expected: the same go step and the same sheet, with phase=driving at the named step. `status()` should show `lateDecisions` 0, `readErrors` 0 and `sourceResets` 0.
+  - **The live wiring** (L4).
+  - **G4 / ADR-014 D6:** a real-phone frame-time reading and a published step counter.
+  - **The review's A13:** the stall timer on the unclamped render delta.
+  - **The callers that still use the «next» start:** `glance-graded.mjs`, `wave3-drive.mjs` and the rig-wave capture scripts.
+
+**Five questions.**
+1. **Learning outcomes.** Indirect. The audit stops reporting rig artefacts as product defects.
+2. **Safer drivers.** Neutral.
+3. **Retention.** D-1 protects learners on slow phones from a harsher reaction clock. D-2 is dev only.
+4. **Measurable progress.** For pedals and steer, one rig script now gives one applied command sequence on every cadence tested in process, up to the lesson's end. Whether that gives one sheet live is G3.
+5. **Business value.** It stops a class of false phone-lens splits from consuming audit waves. It adds no production behaviour: a dev-gated no-op effect, an erased type import and an export.

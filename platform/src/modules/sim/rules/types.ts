@@ -105,6 +105,13 @@ export type SimTickEvent =
        * pre-JU-18 engine) → the lightState grading below, byte-identical.
        */
       controller?: "halt" | "proceed";
+      /**
+       * The lamps at this junction are OUT by the lesson's own authoring (TrafficControllerSpec.lamps "dark") — set
+       * only beside `controller`, and then `lightState` is ABSENT: a cluster an officer runs keeps its phase
+       * machine turning underneath, and that hidden phase is not a lamp the student was shown
+       * (sc-sig-controller-postures:f7e046c4). Absent = a live lamp (or no controller), byte-identical.
+       */
+      lampsDark?: true;
     }
   /**
    * Vehicle entered the approach zone of a pedestrian crossing (engine should

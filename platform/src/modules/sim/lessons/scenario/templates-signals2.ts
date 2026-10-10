@@ -772,6 +772,18 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
  * with no offset pin the crossing simply carries the permission the reducer
  * grades; the natural lamp phase is never the point and never read.
  *
+ * „NEVER READ" WAS A COMMENT, NOT A FACT, UNTIL `lamps: "dark"` (rig-w3a,
+ * sc-sig-controller-postures:f7e046c4). The runtime stamped the natural phase
+ * onto every crossing as `lightState`, and the reducer's praise for going on the
+ * officer's permission was gated on that lamp being red — so five careful rig
+ * drives got the commendation or lost it by the session-clock second they
+ * crossed (credited at t 42.2 / 45.2 / 47.8, not at 49.3 / 58.8). The flag below
+ * makes the sentence true where it is graded: the crossing carries `lampsDark`
+ * and the permission, the approach context no phase while he permits, and every
+ * proceed crossing is credited (rules/engine.ts says which lines of this
+ * template decide that). The head is still PAINTED live — see the flag's note in
+ * contracts.ts for why that half is owed rather than done here.
+ *
  * GRADING IS 100% THE PRODUCTION PIPELINE: stopLineCrossed carries the
  * controller permission and the reducer grades it (halt → CONTROLLER_SIGNAL_
  * VIOLATED regardless of lamp, proceed → innocent). Both mistakes cross while
@@ -877,7 +889,9 @@ export const SC_SIG_CONTROLLER_POSTURES_EVENT: TrafficControllerSpec = {
   facing: { x: 0, y: -1 },
   haltedGroup: "ns",
   flipAtSec: 30,
-  // NO signalOffsetSec: the lamps are dark, the posture is the law.
+  // NO signalOffsetSec: the lamps are dark, the posture is the law — and the
+  // grade is told so, so no graded read takes the hidden phase (f7e046c4).
+  lamps: "dark",
   lineDistM: 27.7,
 };
 

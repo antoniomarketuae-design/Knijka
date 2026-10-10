@@ -68,7 +68,7 @@ export interface SignalDirectorPort {
    */
   setSignalClusterController?(
     signalNodeId: string,
-    schedule: { haltedGroup: "ns" | "ew"; flipAtSec?: number } | null,
+    schedule: { haltedGroup: "ns" | "ew"; flipAtSec?: number; lampsDark?: boolean } | null,
   ): void;
 }
 

@@ -1674,6 +1674,26 @@ export interface TrafficControllerSpec extends StagedEventBase {
    *  visible lamp staging — e.g. green for the halted player); absent = the
    *  map's natural FNV-1a offset. */
   signalOffsetSec?: number;
+  /**
+   * "dark" — the lesson AUTHORS the junction's lamps as OUT (загаснал светофар) and the officer's posture as the
+   * only signal there is (sc-sig-controller-postures: «светофарът на кръстовището е ЗАГАСНАЛ … Тук важи само
+   * неговата поза»). Then NOTHING GRADED READS A LAMP PHASE at this cluster: the runtime stamps the crossing
+   * `lampsDark: true` with no `lightState`, and the approach context carries no phase while the officer permits
+   * (a halt still reads "red" — the effective signal). Absent = the lamps keep running, misleading-but-visible,
+   * which is the hierarchy teach of the two live-lamp drills (they pin `signalOffsetSec`); the two are exclusive.
+   *
+   * WHY IT IS A FLAG AND NOT „no signalOffsetSec": an absent pin used to mean «the natural phase, never read» in a
+   * comment, while the runtime read it on every crossing — and the praise for reading the officer followed the
+   * session-clock moment the car crossed (sc-sig-controller-postures:f7e046c4, rig-w3a). A property nothing reads
+   * cannot be the switch.
+   *
+   * THE RENDER IS NOT YET DARK, and that is a known, reported gap rather than an oversight: `signals.lampState`
+   * still paints the live cycle for every "controlled" cluster, and a plain "dark" head is captioned by the world
+   * with the UNCONTROLLED junction's «Пропусни идващия ОТДЯСНО» (`signalHeadLabels.ts`) — false at an officer's
+   * junction. Darkening the head needs that caption, the yield voice's «на червено» and the ambient cross stream
+   * (which keeps obeying the cycle) settled together; this flag only guarantees the grade never reads the phase.
+   */
+  lamps?: "dark";
   /** Approximate player stop-line setback from the junction node, m (scopes
    *  which stopLineCrossed events belong to this junction). */
   lineDistM: number;

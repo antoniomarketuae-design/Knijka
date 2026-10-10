@@ -23,6 +23,19 @@
 // --probe N drives a plain N-second 20 km/h roll first and prints the objective
 // geometry, so the next run's stop points are COPIED rather than guessed.
 //
+// --start-at WHERE (ADR-017) — the PHYSICS STEP the script starts at. The rig's
+// pad decides once per physics step, so a drive is a function of its start
+// step and nothing else — but only if the start is a STEP, not „whenever the
+// page.evaluate below happened to land" (which on the 2–4 fps phone lens is a
+// different step every run, and was the second half of the w81 split):
+//   auto        (default) the next whole world second at least 1 s after the
+//               arming call — a named step, printed; the call itself can land
+//               anywhere before it without changing the drive
+//   <seconds>   that session time, e.g. --start-at 24 → step 1440: the SAME
+//               step on every lens and every run (refused if already passed)
+//   step:<N>    physics step N exactly
+//   now         the pre-ADR-017 behaviour (the step the call lands on)
+//
 // Writes PNGs + the full telemetry JSON to --out (default: the scratchpad).
 // Frames NEVER go in the repo.
 
@@ -63,6 +76,8 @@ const ACK = opt("ack", "1") !== "0";
  * is measured. Default `on`, which is what a student gets. See settleFullscreen.
  */
 const FULLSCREEN = opt("fullscreen", "on");
+/** `--start-at auto|now|<seconds>|step:<N>` — see the header (ADR-017). */
+const START_AT = opt("start-at", "auto");
 
 let SCRIPT = opt("script", null);
 if (SCRIPT && SCRIPT.startsWith("@")) SCRIPT = readFileSync(SCRIPT.slice(1), "utf8");
@@ -265,7 +280,31 @@ async function main() {
     steps = [{ label: "roll", speedKmh: 20, forSec: 10 }];
   }
   log(`running ${steps.length} step(s): ${steps.map((s) => s.label ?? `${s.speedKmh}km/h`).join(" → ")}`);
-  await page.evaluate((s) => window.__driveRig.run(s), steps);
+  // ARM AT A STEP, IN ONE EVALUATE (ADR-017): the step count is read and the
+  // start step named inside the page, so no round trip can fall between them.
+  // A start the rig cannot meet THROWS here and fails the run — it is never
+  // quietly moved to a later step, which would be a different drive.
+  const arm = await page.evaluate(
+    ({ s, where }) => {
+      const rig = window.__driveRig;
+      const now = rig.stepNow();
+      let startAt;
+      if (where === "now") startAt = "next";
+      else if (now === null) throw new Error("the scene has published no step clock yet — cannot name a start step");
+      else if (where === "auto") {
+        const perSec = Math.round(1 / now.stepSec);
+        startAt = Math.ceil((now.step + perSec) / perSec) * perSec;
+      } else if (where.startsWith("step:")) startAt = Number(where.slice(5));
+      else startAt = Math.round(Number(where) / now.stepSec);
+      const armed = rig.run(s, { startAt });
+      return { ...armed, stepNow: now };
+    },
+    { s: steps, where: START_AT },
+  );
+  log(
+    `  armed: start ${arm.startStep === null ? String(arm.startAt) : `step ${arm.startStep} (t=${(arm.startStep * (arm.stepNow?.stepSec ?? 1 / 60)).toFixed(3)} s)`}` +
+      `, called at step ${arm.stepCountAtCall ?? "?"} (--start-at ${START_AT})`,
+  );
   await page.evaluate(() => window.__driveRig.clear());
 
   // Poll until the script finishes; shoot a frame on every step handover.
@@ -322,7 +361,9 @@ async function main() {
       shots += 1;
     }
 
-    if (st.stepIndex !== lastStep) {
+    // An armed script that has not reached its start step yet has nothing to
+    // photograph (stepIndex -1, the same value as „no script").
+    if (st.stepIndex !== lastStep && !(st.armed && st.stepIndex < 0)) {
       lastStep = st.stepIndex;
       const s = await page.evaluate(() => window.__driveRig.last);
       const name = `${TAG}-step${String(Math.max(0, lastStep)).padStart(2, "0")}-t${(s?.tSec ?? 0).toFixed(1)}-v${(s?.speedKmh ?? 0).toFixed(0)}`;
@@ -340,6 +381,14 @@ async function main() {
   shots += 1;
 
   const dump = await page.evaluate(() => window.__driveRig.dump());
+  // ADR-017 — what the step-keyed pad says about its own drive.
+  const sc = dump.script;
+  if (sc.readErrors > 0) softFailures.push(`the rig's pad threw on ${sc.readErrors} read(s) — the commands are not trustworthy`);
+  if (sc.sourceResets > 0) softFailures.push(`the scene's step track was replaced ${sc.sourceResets}× (a remount) — two drives spliced`);
+  if (sc.armError) softFailures.push(`the script was refused after arming: ${sc.armError}`);
+  log(
+    `  step-keyed pad: start step ${sc.startStep ?? "-"}, evaluated to step ${sc.evaluatedStep}, late decisions ${sc.lateDecisions}, blind steps ${sc.blindSteps}`,
+  );
   // The geometry every frame in this run was measured through, stored WITH the
   // telemetry — a PNG whose canvas size is not recorded cannot be compared to
   // the next one.

@@ -144,8 +144,13 @@ describe("the drive rig carries the road reference", () => {
     // dump „this run predates the road reference" from „the runtime published
     // nothing" — the same absent-means-what ambiguity `edgeAlignment` exists
     // to remove, one layer up. The harness prints it into the evidence log.
+    //
+    // 3 (ADR-017): the pedal columns changed MEANING — the command the pad
+    // handed the step that produced the point, not the previous point's
+    // decision — so the version moved again, for the same reason: a reader of
+    // a phone-lens dump must be able to tell which of the two it holds.
     const rig = record([tick(1, { edgeAlignment: RING })]);
-    expect(rig.handle.dump().meta.version).toBe(2);
+    expect(rig.handle.dump().meta.version).toBe(3);
     expect(rig.handle.dump().meta.version).toBe(DRIVE_RIG_VERSION);
   });
 

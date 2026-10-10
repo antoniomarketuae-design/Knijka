@@ -1993,6 +1993,20 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // acquit) and the permission; the reducer grades ONLY the permission.
       const controllerPerm = signals.controllerPermission(line.clusterIdx, line.group ?? "ns");
       if (controllerPerm !== null) {
+        // …UNLESS THE LESSON AUTHORS THE LAMPS AS OUT. Then there is no lamp truth to carry: the phase machine
+        // still runs underneath the "controlled" cluster, and stamping it here put the session-clock moment of the
+        // crossing into the grade (sc-sig-controller-postures:f7e046c4 — the praise for reading the officer was on
+        // the sheet of a crossing at t 45.15 and off the sheet of the same driving at t 49.32). The event says so
+        // instead, and carries the permission alone.
+        if (signals.controllerLampsDark(line.clusterIdx)) {
+          events.push({
+            kind: "stopLineCrossed",
+            control: "trafficLight",
+            lampsDark: true,
+            controller: controllerPerm,
+          });
+          return;
+        }
         events.push({
           kind: "stopLineCrossed",
           control: "trafficLight",
@@ -2207,7 +2221,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             // braking for the halt always has a cause); a PERMITTED approach
             // reads the live lamp state.
             const perm = signals.controllerPermission(line.clusterIdx, line.group ?? "ns");
-            nextStopLineState = perm === "halt" ? "red" : lightStateOf(line);
+            // A PERMITTED approach under lamps the lesson authors as OUT reads NO phase: the live one would be the
+            // hidden cycle showing through — billing HESITATION_AT_GREEN («Светна зелено…») at a dark junction, or
+            // excusing a stop on a red nobody is shown, by the session-clock moment (f7e046c4). The halt keeps its
+            // "red": that is the effective signal, not a lamp.
+            nextStopLineState =
+              perm === "halt"
+                ? "red"
+                : perm === "proceed" && signals.controllerLampsDark(line.clusterIdx)
+                  ? undefined
+                  : lightStateOf(line);
           }
         }
       }

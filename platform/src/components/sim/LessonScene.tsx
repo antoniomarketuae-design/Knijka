@@ -21,6 +21,7 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -263,6 +264,8 @@ import {
 } from "./lesson-ui/demoDeckLifetime";
 import { worldNameBg } from "@/modules/sim/scene/worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
+// Types only — erased at build. The drive rig itself is never imported here.
+import type { RigStepSource, RigStepSourceHost } from "@/modules/sim/devrig";
 
 // Minimal structural mirrors of the district shapes we read here — the runtime
 // and world modules each validate the full document.
@@ -968,8 +971,13 @@ function shouldShowTouchHint(): boolean {
  * latched so the scene can surface the "завърши подготовката" explanation
  * exactly once per attempt. Interim seam until real ignition/handbrake state
  * lands (Phase 1 A1) — the physics core and VehicleRig stay untouched.
+ *
+ * EXPORTED for one reader only (ADR-017): the drive rig's input-command census
+ * (devrig/__tests__/rig-step-keyed.census.test.ts) drives the rig's pad through
+ * THIS class — the remap, the raw capture, the gate and the latch — to prove the
+ * rig's command cannot reach physics any other way. Nothing else constructs it.
  */
-class GatedSimInput extends SimInput {
+export class GatedSimInput extends SimInput {
   driveLocked = false;
   /** Auto-reverse assist rule b (engine/reverseAssist.ts): while true —
    *  selector R × automatic box × non-exam lesson, kept current by the
@@ -2064,6 +2072,39 @@ export function ReadyScene({
    *  it). One per mounted scene — the shell's «Повтори» remounts the scene
    *  (`sceneEpoch`), which is what makes a new attempt a new grid. */
   const [gradeGrid] = useState(() => new GradeGrid());
+  // ADR-017 — THE DRIVE RIG'S STEP REFERENCE, DEV BUILDS ONLY. /dev/drive-rig's
+  // synthetic pad decides once per physics step, on the car this step track
+  // holds after the previous step, at the grid clock's time of that step
+  // (modules/sim/devrig/rig.ts). It reads both through this READ view — no
+  // `record`, no clock to advance — on `window.__rigStepSource`. A LAYOUT
+  // effect, so the view is in place before the Canvas takes its first physics
+  // step. A production build returns before the view exists and drops the
+  // rest: devrig/__tests__/rig-production-absence.test.ts pins the gate in
+  // the source AND its absence from a production bundle.
+  useLayoutEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const steps = stepTrackRef.current;
+    if (steps === null) return;
+    const clock = gradeGrid.clock;
+    const view: RigStepSource = {
+      steps: {
+        get stepCount() {
+          return steps.stepCount;
+        },
+        stateAtStep: (n, out) => steps.stateAtStep(n, out),
+      },
+      clock: {
+        timeOf: (k) => clock.timeOf(k),
+        indexAt: (tSec) => clock.indexAt(tSec),
+        stepSec: clock.stepSec,
+      },
+    };
+    const host = window as unknown as RigStepSourceHost;
+    host.__rigStepSource = view;
+    return () => {
+      if (host.__rigStepSource === view) delete host.__rigStepSource;
+    };
+  }, [gradeGrid]);
   /** The crash response (flash + exterior cut) — filled by `ImpactCut`. */
   const impactCutRef = useRef<ImpactCutHandle | null>(null);
   /** …and its third half, the camera's own jolt — filled by `CameraRig`, which

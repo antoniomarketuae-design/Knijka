@@ -2113,6 +2113,29 @@ const LTAP_YIELD_KMH = 8;
 const LTAP_CLEAR_ARC_M = 40;
 /** turnStarted farther than this from the junction is some other corner, m. */
 const LTAP_COMMIT_NEAR_M = 45;
+/** The FLOOR of the hold radius: an uncommitted player within this of the
+ *  junction is still AT it, and the encounter waits for his turn rather than
+ *  resolving behind his back, m. The figure this hold has always used (it was
+ *  `d <= 60` inline); unchanged. The radius itself is `ltapHoldNearM` below. */
+const LTAP_HOLD_NEAR_M = 60;
+/**
+ * How near the junction an uncommitted player still counts as AT it, m: the
+ * hold's own floor, or the distance this encounter ARMS at, whichever is
+ * larger. sc-turn-left-oncoming:d079e687 round 2 — the encounter is triggered
+ * by a student at ≤ 8 km/h anywhere inside `armDistM` (the armed phase
+ * returns early only for `d > s.armDistM`), and the catalogue's sites arm at
+ * 65 m (sc-ltap-tight / sc-ltap-follow, sc-jxeq-oncoming / -2, sc-rxtl-tram;
+ * sc-edpr-oncoming at 60). A student who stopped 60.2–64.5 m out started the
+ * encounter from a distance the 60 m hold did not cover, so it resolved
+ * «clear, committed: false» while he stood there, and the turn he then made
+ * printed «завоят не беше започнат» under its ✓ (round-2 verifier: 120 lawful
+ * cells of 420, both layouts, every cadence). A distance from which the
+ * encounter can START is, by the product's own definition, a distance at
+ * which the student is at it. No new figure: the bound is the spec's.
+ */
+function ltapHoldNearM(s: OncomingLeftTurnSpec): number {
+  return Math.max(LTAP_HOLD_NEAR_M, s.armDistM);
+}
 
 export class OncomingLeftTurnRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -2122,7 +2145,6 @@ export class OncomingLeftTurnRunner implements EventRunner {
 
   private gapSec = 0;
   private committed = false;
-  private sawYield = false;
   private acceptedGapSec: number | undefined;
 
   /** The oncoming car — a moving body from the first frame. */
@@ -2159,7 +2181,6 @@ export class OncomingLeftTurnRunner implements EventRunner {
     this.phase = "armed";
     this.outcome = null;
     this.committed = false;
-    this.sawYield = false;
     this.acceptedGapSec = undefined;
     this.contacted = false;
   }
@@ -2244,19 +2265,36 @@ export class OncomingLeftTurnRunner implements EventRunner {
     }
 
     // triggered — the runtime tracker adjudicates; we only watch for the end.
-    if (input.speedKmh <= LTAP_YIELD_KMH && Math.abs(carArc) <= 36 && d <= s.armDistM) {
-      this.sawYield = true; // waited while the oncoming held the junction
-    }
     if (carArc > 6) {
       traffic.stagedCommand(s.id, { type: "cruise", speedMps: s.clearSpeedMps });
     }
     if (carArc > LTAP_CLEAR_ARC_M || actor.finished) {
-      // A yielding player's commendation lands at their LATER commit — hold
-      // the resolution open while they are still at the junction about to
-      // take the (now clear) turn.
-      if (this.sawYield && !this.committed && d <= 60) return null;
-      // Otherwise: a clean-gap turn (accepted gap recorded for the rubric),
-      // or the encounter dissolved without a commitment.
+      // THE ENCOUNTER STAYS LIVE UNTIL HE TURNS OR LEAVES. A student still at
+      // the junction who has not begun his turn has not finished this
+      // encounter: the runtime's verdict on his yield (`prioritySituation`)
+      // lands at his LATER commit, and so does the one fact this outcome
+      // exists to carry — whether he turned, and with how many seconds to the
+      // oncoming when he did. So the resolution
+      // waits while he is within `ltapHoldNearM(s)` and uncommitted.
+      //
+      // sc-turn-left-oncoming:d079e687 (clause 5). Until 2026-10-09 this hold
+      // was granted only to a student a `sawYield` latch had caught — at or
+      // under 8 km/h while the car was within 36 m of the node. That latch is
+      // a window a few tenths of a second wide on a correct drive, and a
+      // student who missed it was resolved «clear, committed: false» seconds
+      // BEFORE he turned. objectives.ts reads committed: false as «he never
+      // turned», and the debrief printed «Интервал: завоят не беше започнат»
+      // under the ✓ of the turn it had just credited. Measured: the rig-w2
+      // phone drives at 43b4109 (4 of 4; the frame cadence decided the latch)
+      // and, on the 60 Hz grid, the same tape driven 0.1 s later (the timing
+      // decides it). A drive he really leaves without turning still resolves
+      // here, committed: false, once he is past `ltapHoldNearM(s)` — the hold's
+      // 60 m floor or the distance the encounter arms at, whichever is larger
+      // (round 2: a student who started the encounter from 60–65 m out is at
+      // it too).
+      if (!this.committed && d <= ltapHoldNearM(s)) return null;
+      // A clean-gap turn (accepted gap recorded for the rubric), or the
+      // encounter left behind without a commitment.
       return this.resolve(input, true, "clear");
     }
     return null;
@@ -3403,6 +3441,9 @@ export class TrafficControllerRunner implements EventRunner {
     this.signals.setSignalClusterController?.(this.spec.signalNodeId, {
       haltedGroup: this.spec.haltedGroup,
       ...(flipAtSec !== undefined ? { flipAtSec } : {}),
+      // Posted with the schedule on every write, so the lamps a lesson authors as out stay out across the
+      // first-metre rebase and every retry (`stage()`), exactly like the halt they belong to.
+      ...(this.spec.lamps === "dark" ? { lampsDark: true } : {}),
     });
   }
 

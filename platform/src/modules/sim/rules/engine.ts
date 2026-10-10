@@ -3181,6 +3181,112 @@ function solidCrossOnEdge(
 }
 
 /**
+ * The hold a frame on ANOTHER road is read under (`solidCrossTurnHoldsRoad`):
+ * `"turn"` — R7-1, a turn-round in progress; `"approach"` — R7-2, the approach
+ * to one; `null` — none (`solidCrossOnEdge` decides the frame, as before).
+ */
+type SolidCrossHold = "turn" | "approach" | null;
+
+/**
+ * R7-1 — A TURN-ROUND BEGUN WHERE THE AXIS IS BROKEN KEEPS ITS ROAD
+ * (sc-mv-uturn-ban:e98407b1 clause 4b). `true` when this frame's edge is
+ * ANOTHER road (`solidCrossOnEdge` would begin a fresh tracker there, or none)
+ * while the car is in the middle of an excursion on the tracker's road that
+ * BEGAN where the axis is broken (`turnPlace === false`), and the swing
+ * carrying it is still going (`swSense`) or can still resume as the same
+ * swing (R6-5: within RESUME_MAX_M of its last degree — so a path drawn in
+ * coarse vertices holds exactly as a smooth one does).
+ *
+ * WHY. The lawful turn-round at the gap is made in the mouth of the side
+ * street, and the locator hands the tick to whichever centreline is nearer: an
+ * arc from the inner lane that reaches y ≈ 277 is handed to `mvu-e-cross`
+ * 80–100° round (rig-w2 R-edge-handoff: pc at y 279.05, phone at y 276.37; in
+ * process 64.5–148.5° round over a sweep of stops and radii). A fresh tracker
+ * on the side street never confirmed the turn-round that had begun on the
+ * boulevard, `turnsAtBrokenAxis` stayed 0 and the praise was withheld from
+ * a student who stopped where instruction 4 told him to («На 280-ия метър»).
+ *
+ * WHAT IT DOES. Such a frame is read against the road the excursion began on:
+ * the nose against that road's last bearing (`bearingDeg`), its bank and any
+ * crossing HELD, no station (`solidHere` null) — the heading half only, the
+ * frame past the kerb of R5-3 (`stepSolidCrossTurnOffRoad`) — and like that
+ * frame it may CONFIRM the turn-round, by the one confirmation, at the place it
+ * was given where it began. Nothing here defines the act a second time.
+ *
+ * WHAT IT CANNOT DO. A turn-round begun where the axis is broken names no
+ * crossing (`naming` needs `turnPlace === true`) and the heading half bills
+ * nothing, so no bill and no name can come of a held frame. A turn-round begun
+ * on the SOLID span, or unplaced, is never held: another road drops it exactly
+ * as R6-1 ruled (`solid-cross-uturn-act.test.ts` «another ROAD drops the
+ * reference»). Another EDGE of the same road is never held either: R6-1
+ * carries everything there.
+ *
+ * WHERE IT ENDS. Once the excursion is over — confirmed, back along the road,
+ * or its swing ended for good (a left turn INTO the side street straightens at
+ * 90° and is no turn-round) — the next frame on the other road is its first
+ * sight, as before, with the drive's record carried.
+ *
+ * R7-2 — …AND SO DOES THE APPROACH TO ONE (round 2, verifier F1). The locator
+ * can hand the tick to the side street BEFORE the nose has left the 45° band:
+ * a car that stops in the inner lane at y 262–268, creeps 12–15 m at 30–43°
+ * across the dashes toward the mouth and then sweeps round on a 5 m radius is
+ * on `mvu-e-cross` 30.0–43.0° round. No excursion is open there yet, so R7-1
+ * could not hold it, the side street began a fresh tracker, and the
+ * turn-round — begun at y 277.7–283.3, in the gap — was never counted (10
+ * lawful drives × L1–L5: place {0, 0}, no praise). So a frame on another road
+ * is ALSO read against this road while
+ *
+ *   · the car is still ALONG it (`dir` set and no excursion: the nose was
+ *     inside the 45° band on the previous frame), and
+ *   · the last station this road had on the car is where its axis is BROKEN
+ *     (`lastPlace === false`), and
+ *   · the nose is not along both roads at once (a fork meeting this road at
+ *     less than 90°, whose band overlaps this one's: a car inside both has
+ *     taken the fork, and the fork's own tracker has it, as before).
+ *
+ * Such a frame is the R7-1 frame with ONE difference: its station is the one
+ * the road last had (`solidHere` = `lastPlace`, broken) — the only station
+ * there is to give it, since the other road has none on this one. It is the
+ * station a swing that begins out here, or an excursion that opens out here
+ * with no swing, is placed at; a swing that began on the road before the
+ * handoff keeps the place it began at (so one begun on the SOLID span and
+ * carried out past the handoff is still begun there, and R7-1 then lets the
+ * other road drop it). From the frame after the nose leaves the band R7-1
+ * holds the excursion, with no station (`solidHere` null), exactly as in
+ * round 1 — so once that turn-round is confirmed, or forgotten, `lastPlace`
+ * is null, the approach cannot be held again, and the other road sees the car
+ * for the first time, with the drive's record carried.
+ *
+ * It is the frame R7-1 already reads and the ONE confirmation: nothing here
+ * defines the act a second time, and nothing bills or names — a turn-round
+ * begun where the axis is broken names no crossing, and the heading half bills
+ * none.
+ */
+function solidCrossTurnHoldsRoad(
+  prev: SolidCrossTurnState,
+  edgeId: string,
+  bearingDeg: number,
+  headingDeg: number,
+): SolidCrossHold {
+  if (prev.edgeId === null || prev.edgeId === edgeId || prev.bearingDeg === null || prev.bank === 0) return null;
+  const off = Math.abs(solidCrossDeltaDeg(prev.bearingDeg, bearingDeg));
+  if (off <= SOLID_CROSS_SAME_ROAD_DEG || off >= 180 - SOLID_CROSS_SAME_ROAD_DEG) return null; // the same road
+  if (prev.turning) {
+    // R7-1 — the excursion in progress.
+    if (prev.turnPlace !== false) return null; // begun on the solid span, or unplaced
+    const live = prev.swSense !== 0 || (prev.swEndedSense !== 0 && prev.swDegM <= SOLID_CROSS_SWING_RESUME_MAX_M);
+    return live ? "turn" : null;
+  }
+  // R7-2 — the approach to it.
+  if (prev.dir === 0 || prev.lastPlace !== false) return null;
+  const toOther = Math.abs(solidCrossDeltaDeg(bearingDeg, headingDeg));
+  const toThis = Math.abs(solidCrossDeltaDeg(prev.bearingDeg, headingDeg));
+  const alongOther = toOther <= SOLID_CROSS_WITH_BANK_DEG || toOther >= 180 - SOLID_CROSS_WITH_BANK_DEG;
+  const alongThis = (prev.dir === 1 ? toThis : 180 - toThis) <= SOLID_CROSS_WITH_BANK_DEG;
+  return alongOther && alongThis ? null : "approach";
+}
+
+/**
  * R6-2 — A TURN-ROUND HAS BILLED THE U-TURN. From here to the end of its
  * swing a further crossing is the same act (`tailBillT`: not billed again);
  * when the swing ends, `solidCrossRehome`. MUTATES `s`.
@@ -5598,6 +5704,9 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const solidCrossMeasured = solidCrossBank !== null && solidCrossEa !== undefined && !solidCrossEa.offCarriageway;
   /** This frame's tracker state refers to this frame's edge (`solidCrossOnEdge`). */
   let solidCrossOnRoad = false;
+  /** This frame is on another road, read against the road a turn-round in
+   *  progress, begun where the axis is broken, began on (`solidCrossTurnHoldsRoad`, R7-1). */
+  let solidCrossHeld: SolidCrossHold = null;
   if (solidCrossEa !== undefined) {
     // R6-1 — FIRST, PUT THE TRACKER ON THE EDGE THE CAR IS ON: the same road
     // handed to its next edge carries everything over; a road that sees the
@@ -5605,6 +5714,19 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     // before the plain detector below is asked anything, so that detector
     // never reads a reference that belongs to another edge — or none at all.
     if (solidCrossBank !== null && solidCrossEa.deg !== null && solidCrossEa.edgeId !== null) {
+      solidCrossHeld = solidCrossTurnHoldsRoad(
+        s.solidCrossTurn,
+        solidCrossEa.edgeId,
+        tick.headingDeg - solidCrossEa.deg,
+        tick.headingDeg,
+      );
+    }
+    if (
+      solidCrossHeld === null &&
+      solidCrossBank !== null &&
+      solidCrossEa.deg !== null &&
+      solidCrossEa.edgeId !== null
+    ) {
       const onEdge = solidCrossOnEdge(
         s.solidCrossTurn,
         solidCrossEa.edgeId,
@@ -5618,7 +5740,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       }
     }
     const ref = s.solidCrossTurn;
-    if (solidCrossMeasured) {
+    if (solidCrossMeasured && solidCrossHeld === null) {
       onReferenceBank = ref.bank === solidCrossBank;
       if (solidCrossEa.axisClearM !== undefined) bodyAcross = solidCrossEa.axisClearM >= 0;
     } else {
@@ -5706,7 +5828,25 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       let turn: SolidCrossTurnStep | null = null;
       // Metres since the previous frame — the swing's yardstick.
       const stepM = (speed / 3.6) * Math.min(dt, 2);
-      if (solidCrossOnRoad && solidCrossBank !== null && ea.deg !== null && ea.edgeId !== null) {
+      const held = s.solidCrossTurn;
+      if (solidCrossHeld !== null && held.bearingDeg !== null && held.bank !== 0) {
+        // R7-1 — another road has the car, mid turn-round on this one (begun
+        // where the axis is broken): the heading half against this road's
+        // bearing, the bank held, no station. R7-2 — …or on the approach to
+        // one: the same, at the broken station this road last had.
+        turn = stepSolidCrossTurnOffRoad(
+          held,
+          {
+            bank: held.bank,
+            deg: solidCrossDeltaDeg(held.bearingDeg, tick.headingDeg),
+            bearingDeg: held.bearingDeg,
+            solidHere: solidCrossHeld === "approach" ? held.lastPlace : null,
+            stepM,
+            t,
+          },
+          cfg.solidLineCrossSustainSec,
+        );
+      } else if (solidCrossOnRoad && solidCrossBank !== null && ea.deg !== null && ea.edgeId !== null) {
         const frame = {
           bank: solidCrossBank,
           deg: ea.deg,
@@ -8709,7 +8849,32 @@ function handleTickEvent(
           // and the route task can never disagree about what happened. On a
           // green lamp the officer and the lamp agree and nothing hard was
           // done — crossing there is ordinary driving and stays uncredited.
-          else if (e.lightState === "red" || e.lightState === "redYellow") {
+          //
+          // AT A JUNCTION WHOSE LAMPS THE LESSON AUTHORS AS OUT there is no
+          // lamp to forbid or to agree, and the gate above was reading the
+          // hidden cycle under the officer's cluster: rig-w3a drove one careful
+          // drill five times and the praise was on the sheets that happened to
+          // cross at t 42.2 / 45.2 / 47.8 and off the ones at 49.3 / 58.8
+          // (sc-sig-controller-postures:f7e046c4). The runtime now stamps
+          // `lampsDark` and no phase, and the case is decided by what that
+          // lesson promises, in its own words (templates-signals2.ts):
+          //   instruction 1  «светофарът на кръстовището е ЗАГАСНАЛ … Тук важи
+          //                   само неговата поза»;
+          //   instruction 3  «Няма лампа за четене — четеш човека»;
+          //   instruction 5  «Щом се обърне със СТРАНИЧЕН ПРОФИЛ … премини
+          //                   решително и спокойно на север»;
+          //   task 2         «Премини кръстовището, когато позата разреши
+          //                   посоката ти» — graded by `requireControllerProceed`
+          //                   (objectives.ts), i.e. on EVERY proceed crossing;
+          //   examiner       «гледа кого четеш при загаснал светофар … решително
+          //                   преминаване чак при страничния профил».
+          // Reading the man and going on his permission IS that drill's whole
+          // credited act, so it is credited on every proceed crossing — and the
+          // praise and the route task agree on every one, as the paragraph
+          // above requires. The title («Правилно изпълнен сигнал на
+          // регулировчика») is the only part any surface prints, and it is true
+          // with no lamp at all.
+          else if (e.lampsDark === true || e.lightState === "red" || e.lightState === "redYellow") {
             out.push(makeCommendation("CONTROLLER_SIGNAL_OBEYED", t));
           }
           break;

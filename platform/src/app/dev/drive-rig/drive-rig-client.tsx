@@ -15,7 +15,12 @@
  *   ?scenario=<templateId>[&level=1..5]   compile a scenario rung (default)
  *   ?lesson=<lessonId>                    a hand-authored curriculum lesson
  *   ?quality=low|medium|high              scene preset (default medium)
- *   ?script=<url-encoded JSON DriveStep[]> run this drive as soon as ticks start
+ *   ?script=<url-encoded JSON DriveStep[]> arm this drive at mount (ADR-017)
+ *   ?start=drive|<step>                   where an armed ?script= starts: the
+ *                                         first step of the driving phase
+ *                                         (default; step 1 on a lesson with no
+ *                                         pre-drive procedure) or a NAMED
+ *                                         physics step index
  *   ?buf=<samples>                        ring-buffer depth (default 20000)
  *   ?readout=0                            hide the on-screen readout
  *
@@ -32,7 +37,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ScenarioLevel } from "@/modules/sim/lessons";
-import { DriveRig, parseDriveScript, type DriveStep } from "@/modules/sim/devrig";
+import { DriveRig, parseDriveScript, type DriveRigStart, type DriveStep } from "@/modules/sim/devrig";
 import { LessonPlayShell } from "@/components/sim/lesson-ui/LessonPlayShell";
 import type { QualityPreset } from "@/components/sim/lesson-ui/types";
 import { resolveRigLesson } from "./resolveLesson";
@@ -46,6 +51,8 @@ interface RigConfig {
   quality: QualityPreset;
   script: DriveStep[] | null;
   scriptError: string | null;
+  /** `?start=` — null: the default (see `autorunStartFor`). */
+  start: DriveRigStart | null;
   buffer: number;
   readout: boolean;
 }
@@ -60,13 +67,23 @@ function readConfig(): RigConfig {
   const rawScript = p.get("script");
   const script = rawScript === null ? null : parseDriveScript(rawScript);
   const bufRaw = Number(p.get("buf") ?? "0");
+  const startRaw = p.get("start");
+  const startStep = startRaw === null ? Number.NaN : Number(startRaw);
+  const start: DriveRigStart | null =
+    startRaw === "drive" ? "drive" : Number.isInteger(startStep) && startStep >= 0 ? startStep : null;
   return {
     scenario: p.get("scenario"),
     level,
     lesson: p.get("lesson"),
     quality: q === "low" || q === "high" ? q : "medium",
     script,
-    scriptError: rawScript !== null && script === null ? "?script= is not a valid DriveStep[]" : null,
+    scriptError:
+      rawScript !== null && script === null
+        ? "?script= is not a valid DriveStep[]"
+        : startRaw !== null && start === null
+          ? `?start=${startRaw} is neither "drive" nor a step index — the script was not armed`
+          : null,
+    start,
     buffer: Number.isFinite(bufRaw) && bufRaw > 0 ? bufRaw : 0,
     readout: p.get("readout") !== "0",
   };
@@ -85,6 +102,17 @@ export function DriveRigClient() {
   return <Mounted cfg={cfg} />;
 }
 
+/**
+ * ADR-017 — where a `?script=` starts when `?start=` names nothing: the first
+ * step of the driving phase. A lesson with no pre-drive procedure is in that
+ * phase from its first physics step, so it is NAMED (step 1) — known before any
+ * step is taken, hence the same step on every cadence. A pre-drive lesson's
+ * phase flips at a graded point the rig learns from the grade ("drive").
+ */
+function autorunStartFor(preDrive: boolean): DriveRigStart {
+  return preDrive ? "drive" : 1;
+}
+
 function Mounted({ cfg }: { cfg: RigConfig }) {
   // NOTHING IS SUBSTITUTED HERE. An unknown `?scenario=` used to fall through
   // to the free polygon and drive it — see resolveLesson.ts for what that did
@@ -101,7 +129,11 @@ function Mounted({ cfg }: { cfg: RigConfig }) {
         lessonId: lesson?.id ?? "(none)",
         lessonTitleBg: lesson?.titleBg ?? "",
         ...(cfg.buffer > 0 ? { buffer: cfg.buffer } : {}),
-        ...(cfg.script !== null ? { autorun: cfg.script } : {}),
+        // A ?start= the rig cannot read arms NOTHING (the readout says why):
+        // starting somewhere else would be a different drive.
+        ...(cfg.script !== null && cfg.scriptError === null
+          ? { autorun: cfg.script, autorunStart: cfg.start ?? autorunStartFor(lesson?.preDrive === true) }
+          : {}),
       }),
   );
 
@@ -198,6 +230,12 @@ function Readout({
       className="pointer-events-none fixed bottom-12 left-1 z-[60] rounded bg-black/75 px-2 py-1 font-mono text-[11px] leading-tight text-lime-300"
     >
       {scriptError !== null ? <div className="text-red-400">{scriptError}</div> : null}
+      {st.armError !== null ? <div className="text-red-400">script refused: {st.armError}</div> : null}
+      {st.armed ? (
+        <div>
+          script armed — starts at {st.startStep === null ? "the drive phase" : `step ${st.startStep}`}
+        </div>
+      ) : null}
       <div data-testid="drive-rig-lesson">lesson={mountedLessonId}</div>
       {s === null ? (
         <div>drive-rig: waiting for first tick…</div>

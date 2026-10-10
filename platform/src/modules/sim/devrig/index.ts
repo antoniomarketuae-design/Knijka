@@ -34,13 +34,21 @@ export {
   DEFAULT_BUFFER,
   DRIVE_RIG_VERSION,
   DriveRig,
+  RIG_STEP_SOURCE_GLOBAL,
+  readRigStepSource,
+  type DriveRigArm,
   type DriveRigDump,
   type DriveRigEvent,
   type DriveRigHandle,
   type DriveRigObjective,
   type DriveRigOptions,
+  type DriveRigRunOptions,
   type DriveRigSample,
+  type DriveRigStart,
   type DriveRigStatus,
+  type DriveRigStepNow,
+  type RigStepSource,
+  type RigStepSourceHost,
 } from "./rig";
 
 // `window.__roadProbe` (W59 steering spec §2.3, founder RULING-2) — the road

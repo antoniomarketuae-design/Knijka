@@ -11701,3 +11701,533 @@ On a re-drive, expect two different outcomes on the brake check:
 - The w71/w69 recordings had the lead at 131–140 m at stops 2–3 because of the mirroring. A re-drive on this tree shows a different front-lead geometry, so evidence that rests on those frames needs a new frame.
 - The `n38.ts` HARSH_BRAKING_NO_CAUSE rationale (a brake that creates a предпоставка would be COLLISION or CLOSING_ON_LEAD_TOO_FAST) should be read against forced-follower bills.
 - touchHintLifetime needs `tools/` in the tree to run.
+
+## Wave C verdicts — 2026-10-10
+
+This run retired 4 row(s). Their evidence frames were driven at (unattributable: 4 of 4) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`59be0dee3e54`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 4 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 5 |
+
+**Open list: 19 → 15**, out of 1534 filed across the whole programme (1515 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3b (integrator note, 2026-10-10)
+
+Six rows were driven through `/dev/drive-rig` (the real LessonPlayShell, `drive-rig-client.tsx` line 36) at `59be0de`. That is the commit that landed truckpass, meetcars, islandcoach, crashcam and tailbrake. Lenses: PC (Chromium 1440×900) and the phone lens (WebKit iphone16-landscape 852×393, DPR 3); the postures capture also used a WebKit desktop context (LP5). Workflow `wf_d9085bac-569`. Every row had a capture and a judge, and every CLOSED proposal had an adversarial verifier. On every capture the commit gate held before the first drive and after the last: TP2 = HEAD = 59be0de, parent a30c833, platform/ and content/ clean, health at 59be0de with db ok.
+
+**Provenance.** The ledger prints «unattributable» for all four retirements again, because its provenance reader still does not parse rig sidecars (owed since rig-w3a, tools). Every sidecar of this wave records `healthCommit`, `gitHead` and `tp2Commit` = `59be0dee3e5417486563ed13bc72384fe041fbb1`.
+
+**Closed (each verified by an adversarial verifier):**
+- `sc-ac-wind-truck-pass:ff1d4290` — the restage (ADR-015), seen live. 23 cells (the capture's note says 22; its drive list and sidecars number 23).
+  - **The careful pass.** P62 at PC L1–L5, P53 at PC L3, the committed shadow's line (P-SHADOW) at PC L1, P62 at phone L1/L3 and P53 at phone L3. All are ИЗДЪРЖАН 0 т., with SAFE_LANE_CHANGE ×2 and CLEAN_DRIVING ×3.
+  - **The truck.** It starts dormant at y 95, then holds 40 км/ч and sheds 0. Task 1 ticks level with the cab (gapAhead −3.93 to −4.02), and at task 2 the truck is 36–52 m behind. Settle to task 2 is 1.4333 s (86 grid points) in every cell where task 2 ticked, on both lenses.
+  - **The wrong returns are graded.** H returns (guard gap 4.94–5.08 m) make the truck shed 3.47–3.62 m/s and bill LANE_ENTRY_FORCED_BRAKING 10; tasks 2 and 3 never tick. F lifts (guard gap 9.76–9.87 m, shed 0.53–0.80 m/s) withhold the return praise: a pausing first-encounter card at PC L1, 3 т. at L4.
+  - **The lee.** The shelter factor is below 1 for 3.88–4.03 s at 62 км/ч and 6.78–6.83 s at 53, and the chip «Поривът отслабва» shows in the lee.
+  - The ruling relied on is delegation item 2, for the remedy only.
+- `sc-ln-obstacle-meeting:114706e0` (critical) — meetcars' `oneRun`, seen live. 16 rig drives:
+  - PC L1 at W 0.5/4/6.5/9/25 s after the lane emptied, and PC L3 at W 4/6.5/9/25;
+  - a PC L1 W6.5 repeat, bit-identical over 4,373 grid points (inputs, pose, all four vehicles);
+  - a 15 км/ч approach;
+  - PC L5 night at W25;
+  - phone L1 W6.5/W25 and phone L3 W9/W25.
+  - Every one is ИЗДЪРЖАН 0 ★★★, with only YIELDED_TO_PRIORITY, exactly 2 arrivals, 0 re-entries and no car ahead in the oncoming lane after the move-off (in W0.5 car #2 was alongside at the go, not ahead). In every W25 cell both cars end parked at (−4.063, −70); in the others the last rows show them parked at y −70 or leaving the road.
+  - **The 8 harness runs.** 5 are ИЗДЪРЖАН. 3 are НЕ Е ВЗЕТ for the lesson mistake «Настъпване на осевата линия» under Ruling A: the harness never signals, and its loop was closed only 61–68% of the time. None has a 10-point charge, and all ended by themselves, with drive loops of 135–167 s.
+- `sc-roundabout-entry:4ab693eb` (critical) — islandcoach, seen live.
+  - **PC L3, advisor on.** The coach line «Излез от кръговото с десен мигач» is gone at +0.083 s, in the same rAF as the chase cut. From +5.133 s the recovery card «Съвсем леко назад…» and the «притисната» banner take over.
+  - **Other cells.** At PC L1 the pause card replaces the coach line at +0.017 s. With the advisor off, no coach line ever appears. The phone L1 cell shows no exit line after the crash.
+  - **The second-contact state, captured live for the first time (SC2).** The recovery card and banner held through both contacts. The objective line came back only at 74.517 s, after the car had rested, reversing at −4.3 км/ч about 6 m clear.
+  - **The careful drive** (PC L1 A) is 0 т. ИЗДЪРЖАН. The verifier computed its minimum radius from the ring centre (0.5 s telemetry) as 17.63 m, against the 15.4 m contact radius.
+  - The island stops the car on asphalt at the kerb (centre r 15.41–15.50).
+- `sc-sig-controller-postures:f7e046c4` — on the four filed clauses.
+  - **Clause 1, the briefing.** Ruling 2026-09-20 #1, with LP2-01 (phone default, no sheet), plus LP7 (opted in, one-tap sheet).
+  - **Clause 2, the list.** Ruling 2026-10-08 (1), with LP7-01 numbered 1.–5. and no lead.
+  - **Clause 3, the XP.** From code: `xp.ts` has no platform term, and 150 against 100 is the one-time first-pass bonus.
+  - **Clause 4, pass and fail.** Every phone cell is ИЗДЪРЖАН with tasks 2/2. The matched pairs give identical sheets on both lenses: MX-red is 3 т. with the same HESITATION_AT_GREEN times, and MX-other is 2 т. The pairs cross 3.28 s (MX-red) and 2.22 s (MX-other) apart, so they are only roughly matched.
+  - **The phone launch stall, attributed to the rig by the capture** (no judge or verifier ruled on it). `rig.run()` zeroes the pad on every re-issue. Across 22 stalled launches, frames with a re-issue read throttle 0 in 468 of 468, and frames without one read the pedal in 79 of 79. The keyboard launch (LP3) has no stall. Chromium stretched to phone cadence (LP6) reproduces it, and PC with the getGamepads shim (LP8) does not. On two phone line launches (MX-phone-red, MX-phone-other) the rAF order flipped and the literal decision rule named the product's input layer, although the cross-tab showed the same zeroing.
+  - **The praise follows the hidden lamp, not the lens.** The repair is the praiselamp landing above.
+
+**Still open, and what each rests on:**
+- `sc-hz-brake-dont-swerve:f0023997` — the judge proposed CLOSED; the verifier REFUTED it. On PC the clip and flat-wall clauses are answered: cameraInsideADrawnBody 0 on all five PC cells, no flat world frame (the flagged L1 frames are the teach-pause sheet), a 0.92 flash, a chase cut at +103 to +167 ms, and the card over a legible street. The brakelight-chain «blue slab» is the struck car's rear seen from the cockpit, not a clip. But the same capture shows the row's own symptoms on the phone:
+  - **phone-L3-late.** The unchanged late drive stopped dead against the block, 49.63 → −3.48 км/ч at y 186.69. There was no COLLISION and no rule event, flashMax 0, no flip and no chase cut. Shake was 10.1 px against 14.4 px of noise. The result card reads «0 ИЗПИТНИ Т. Издържан — виж разбора».
+  - **Its declared repeat** (phone-L3-laterep) billed COLLISION −10 with a chase cut at +135 ms. The harness mobile-wrong leg also missed a 58.87 км/ч contact.
+  - **No phone cell shows shake.** phone-L3-laterep peaks at 8.8 px against 11.9 of noise, and phone-L3-swerve at 17.3 against 19.3. phone-L3-swerve's chase came at +1097 ms and lasted one frame.
+  - So clauses 2, 3 and 5 are closed on PC only. The 2026-09-27 ruling retires clause 4 once frames show flash, shake and chase cut. The verifier reads ADR-014 as requiring that on every display, and on the phone it is not shown. The verifier also notes that the PC L3-late shake (33 px) is measured against a chase-render reference that includes the rig's own damping; L3-swerve's cockpit-referenced 47.6 px is the cleaner figure.
+  - Posted PARTIAL. The judge proposed moving the phone miss to a row of its own. The verifier's reading stands: these are the row's own symptoms at this commit.
+- `sc-follow-tailgater:63c0c28c` (critical) — PARTIAL, judge only (no verifier runs on a PARTIAL).
+  - **Closed.** C1, C2b, C3 and C4 on both lenses. C2b and C4 on the phone are new, since rig-w2 settled only PC. The authored brake check and speed-up drives bill the lesson mistake under Ruling A («НЕ Е ВЗЕТ», ★☆☆, the modal). The harness pc-wrong and mobile-wrong legs now read 5 т. НЕ Е ВЗЕТ. 59 км/ч in a posted 50 draws SPEEDING_OVER_LIMIT as the lesson mistake.
+  - **C2a is closed** as authored (45.9 км/ч), and below 35 км/ч when the лепка files a hard-braking report, as measured on these cells: billed at 25.0 and 32.3 км/ч on PC L1, at 32.3 on phone L1, and at about 31.7 on PC and phone L3 with both tasks done.
+  - **Open: C2a below the floor without a report.** The evidence is attempt pc-L3-TTF25: a full-pedal stab from 24.48 км/ч, task 1 done, with the лепка glued 4.79 m behind. The лепка peaked at 9.22 m/s², spent 0.25 s at ≥ 7 m/s² and lost 2.3 m/s in lane, then swerved out 0.28 s later. It filed no report, and the drive got ИЗДЪРЖАН ★★★ with «Чисто и спокойно каране». This is the class the tailbrake C1 integrator decision leaves unbilled: 0.25 s is under the 0.4 s sustain. So what stays open is the founder or integrator question already owed there: should such a slam withhold the unscoped praise?
+  - pc-L1-TASF348 (34.18 км/ч, the pass begun 0.067 s before the pedal, the лепка lost 0) is unbilled and praised, but it put no one at risk.
+  - **The evidence frame is outside the audit tree.** It is a superseded attempt in `D:/knijka-lanes/scratch/rig-w3b/sc-follow-tailgater/attempts/pc-L3-TTF25-2026-10-10T0159/`, and the capture misreported that folder as under `.audit-frames`. Owed: copy it under `.audit-frames/rig-w3b/` before the scratch is pruned.
+
+**What these closures do NOT show:**
+- **A real phone.** The phone lens is headless WebKit, driven by injected keys or the rig's pad, not by touch. Its frame times ranged from a 21 ms median (truck-pass phone cells) to about 80–110 ms (postures, hz), with screenshot stalls of 0.44–0.80 s.
+- **A 120/144 Hz display.**
+- **The XP.** It is judged from code: the rig drives logged out.
+- **The truck-pass extras.**
+  - No clip was re-captured, though the truckpass landing named that as a closing condition. The judge closed on the rig drives.
+  - The correct-demo caption «Готово: изпреварихме камиона» never reached the glass: the deck folds at about 9.8 s with an empty caption box.
+  - Drift beside the trailer was not measured: the lee holds aborted about 8 m before it.
+  - The interior mirror near the return trigger is not settled. In the about-11 m frame (pc-L3-P62-16) the capture saw no truck, and the judge, on an enlarged crop, saw only a grey sliver at the glass's right edge. The frame meant for the 12 m trigger landed 0.55 s late, inside the right look. So «the truck in the mirror at 10.25 m» is still unshown.
+- **The meeting cars.** Car #1 always passed while the student was still rolling in (about 4.5 км/ч on the 30 км/ч approach, 15 км/ч on the 15 км/ч approach), never with the car at rest. At the L5 night look (t 54.78) neither retired car was parked yet: both were still moving, drawn with head lamps.
+- **The island.**
+  - Speeds above about 15 км/ч were not driven.
+  - Islandcoach C4 (the line coming back through the 6 m radius before the car rests) was not driven on the island, whose wall stops the car in 1–2 ticks. The capture routed it to the hz swerve cells. There, on pc-L1-swerve60, the objective line did not come back after the contact, and the first coach text came at rest, 136.7 m from the contact; the L3 swerve cells had the advisor off. No judge or verifier ruled on C4.
+  - The bare task banner still reads «Премини през кръговото и излез с десен мигач» for the first 5 s. The judge reads it as the task title, not a coach order.
+- **The postures phone launch** with a real touch input on a real device.
+
+**Observations outside these rows** are in the candidate list returned with this note. Among them:
+- the phone crash-detection split;
+- the lit postures head and the red-light yield card;
+- a low-speed second island strike with no rule event;
+- a billed pedestrian hit listed under «Разминавания на косъм … нищо не се удари»;
+- the phone-only lane-change bills on the swerve;
+- the gear reading R at rest on the phone spawn.
+
+**Process.** The first sc-follow-tailgater capture agent hung for about 2.7 h on a permission prompt for a delete command (`rm -f sheets/*`). It was resumed under the same key. Its cells had already been driven: the resumed session only finalized five re-drive sidecars, built contact sheets, rebuilt the cells table and ran the two harness legs. Nothing was re-driven and no drive was lost. Separately, the obstacle-meeting capture deleted two boot frames of a car that never moved (pilot2) instead of moving them to `attempts/`. Its kept cells are unaffected.
+
+### W81 (integrator note, 2026-10-10)
+
+W81 is the in-process judge of the two roundabout grading rows rig-w3a left open: `judge-w81-band`, workflow `wf_4a581d86-d55`, worktree `D:/knijka-lanes/w81-wt` at `59be0de`. The judge read `git diff a30c833..59be0de` as leaving the roundabout chain untouched: worldRuntime, the director, contact, gradeGrid and the collision code. The verifier found that the lessons/engine.ts hunk is roundabout-named (islandcoach), but it is commented as coaching only and grades nothing at the entry, so the chain claim «mostly holds». Every drive ran through `liveChainReplay` on the fixed 1/60 s GradeGrid (ADR-014). The judge proposed CLOSED on both rows. **Both are posted PARTIAL.**
+
+**`sc-roundabout-entry:08a0b701` — the verifier REFUTED the closure.**
+- **What the judge measured** (its own tapes; W80's roll-in tapes were not in the named folders). Roll-ins at 12 and 18 км/ч, L1–L5:
+  - a 1,420-cell scan at 60 Hz;
+  - 1,144 band and transition cells, on 60 Hz, 30 Hz, PC jitter, phone A, phone B, phone C (with the 7.5 s stall inside the second band) and a steady 0.5 s;
+  - plus 225 phone D cells (a stall at 18.45 s inside the first band).
+- **0 sheet splits and 0 stream splits** against 60 Hz. The verifier recounted the file. The non-reference runs number 6,864 + 225 = 7,089; the judge's quote says 7,689, which is wrong.
+- **Product against oracle (the judge's count):** 1,142 of 1,144 agree. The two that differ (L5 12 км/ч, phase 29.60 and 29.61) are touches 0.00 m from clearing the mouth, inside the oracle's half-metre band.
+- **W80's 10-against-20 is now an input band on every cadence alike.** At L1 18 км/ч:
+  - phase 1.7 gives FAILED_TO_YIELD + COLLISION 20: the circulator lost 2.9 m/s and was touched at 17.433, before it cleared at 19.633;
+  - phase 1.9 gives COLLISION 10: it cleared at 17.383 and was touched at 17.633. It shed nothing before clearing and 3.06 m/s after, which is not counted.
+- **Why the verifier refuted it.**
+  - The tapes are the open-loop authored chord, identical input on every cadence by construction. They cannot exercise frame-timed pedals.
+  - The live check recorded phone frames of 269–792 ms, against roll-in cells 0.2 s apart in start time that give 20 and 10 (phase 1.7 against 1.9).
+  - The judge's own text concedes that a live phone's pedal can land one human roll-in on either side of an edge. The brief says such a split is reported AS the ADR-014 limit and never called fixed.
+  - Its third ground, the unexplained live phone S contact at 52.083 against «cleared at 53.667», is answered (in the integrator's reading) by the busy-gap measurement below: the 53.667 came from the rig script's own mouth constant.
+
+**`sc-rb-busy-gap:7bbdd45e` — the verifier did not refute.** Clauses 1, 2 and 3a stay closed by rig-w3a. Clause 3b is measured on 5 cadences (60 Hz, 30 Hz, PC jitter with a 983 ms hitch, phone A with a 7.505 s stall, phone B):
+- (A) rig-w3a's own four S tapes, replayed bit-for-bit (20 cells). They reproduce the live rule events exactly on every cadence: phone-L1-S is COLLISION only at 52.083, and pc-L1-S, pc-L3-S and phone-L3-S are FAILED_TO_YIELD + COLLISION.
+- (B) The same tapes with the go moved −30 to +36 grid steps: 268 tapes.
+- (C) The authored short-gap chord and the full flat chord at L1 and L3, with the wait swept 5.00–6.60 s, plus a 0.004 s fine sweep at 6.040–6.100 s: 164 tapes.
+- B and C together are 432 tapes × 5 cadences = 2,160 cells. Sections B, C and D each report `cadenceSplits []` and `contactBeforeClearWithoutYield []` (268, 132 and 32 groups).
+- The 08a0b701 judge separately ran 402 S-like busy-gap cells on 7 cadences, with 0 splits.
+
+**PROVEN, positive and in process:**
+- **One input gives one sheet on every cadence.** No tape got two sheets, for 08a0b701's roll-ins and for the busy-gap drives alike.
+- **No unbilled contact before clearing.** No contact with a priority-set car before its rear clears the mouth goes without FAILED_TO_YIELD, at L1 or L3, on any cadence, at any go time. The tracker's box test and the sentinel's COLLISION fall on the same grid step at every first contact.
+- **The live PC/phone difference is the input.**
+  - The phone go was 0.05 s later, its line crossing 0.167 s later and its contact 0.117 s later. By then the follower's rear was +0.040 m past the mouth, against −0.186 m on PC.
+  - Moving the PC go 4 steps later gives the phone's sheet. Moving the phone go 1 step earlier gives the PC's.
+- **rig-w3a's premise was wrong.** Its «rear cleared the mouth at 53.667» used the rig script's own `PHI_M = 28°`, not the product's mouth: φ 16.729°, where the student's nose came over the ring edge. Every rig-w3a busy-gap sidecar and raw dump carries `PHI_M: 28`.
+
+**OPEN:**
+- **(i) The frame-timed pedals.** On a live phone the drive reaches ADR-011's clearing edge through frame-timed pedals. ADR-014 states this as its limit: «the pedals (every point in a frame sees the frame's value)», and D6 says the wiring was «never driven on a real phone». The edges are narrow: one grid step of go on the rig's busy-gap tapes, 0.01 s of authored wait (6.05 against 6.06 s), and roll-in cells 0.2 s apart that give 20 and 10. So one human act on a slow phone frame can land on either side. The integrator suggests grid-accurate, timestamped input as a candidate repair; nothing has measured it. Nothing was driven on a real device.
+- **(ii) A question for the founder.** His 2026-10-05 ruling reads «or there is contact», with no qualifier. ADR-011 narrows it to a touch «before it has cleared». A touch 0–0.5 s after the circulator's rear cleared the entry bills COLLISION only, though in those cells the follower lost 3.4–3.9 m/s. Does «or there is contact» also bill FAILED_TO_YIELD for a touch just after the circulating car cleared the entry? If yes, the 10-against-20 band shape on 08a0b701 changes too.
+
+**INTEGRATOR DECISION (2026-10-10): 7bbdd45e is recorded PARTIAL although its verifier did not refute.** This holds it to the same standard as 08a0b701 in the same wave. The W81 brief says a split that falls inside a limit ADR-014 states is reported AS that limit and never called fixed. This judge itself wrote «WHAT IS NOT CALLED FIXED: the PC/phone difference reaches this 4 cm edge through frame-timed input». Both rows stay open on (i) and (ii). Neither needs another in-process wave: they move on a repair to the input path or a ruling, then a live drive.
+
+**What W81 does NOT show:**
+- A live drive of any kind: it is in process only, and it opened no PNG.
+- A real phone.
+- W80's own roll-in tapes, which were not found. The judge drove its own.
+- Phone D beyond the first band.
+
+## Landed: a turn the student made is no longer reported as «завоят не беше започнат» — `sc-turn-left-oncoming:d079e687`, clause 5 (2026-10-10)
+
+Lane `ltapnote`, two rounds, built on `c38086a`. Round 1 was REFUTED by its adversarial verifier. Round 2 was SIGNED OFF WITH CONDITIONS. The patch is `ltapnote-result-r2.patch` (sha256 550f1cd6…, cumulative against `c38086a`, 7 files, +1062/−11, 0 CR bytes).
+- **One product file:** `orchestrator/runners.ts`. The patch changes only `OncomingLeftTurnRunner` and the constants just above it, in four hunks at base lines 2113–2262.
+- **Six test files:** four tests and two fixtures, the rig-w2 phone tapes and PC tapes.
+- **Overlap with 59be0de.** The lane never saw 59be0de, which also changes `runners.ts`:
+  - meetcars adds `oneRun` to the `NarrowMeetingRunner` and `OncomingStreamRunner` stage calls (base ~2457 and ~4862);
+  - tailbrake changes `RearTailgaterRunner` (base 4464–4595).
+  The line ranges do not overlap. Whether the merge holds is the merge-test line below.
+- **No shown sentence was added or changed,** and the reviewed-text manifest was not re-recorded.
+
+**Why.** In rig-w2, all four lens × level drives (pc-L1, pc-L3, phone-L1, phone-L3) passed with 0 points, both tasks ✓ and the single commendation «Правилно отстъпено предимство». Their sheets were otherwise identical. But under the ✓ turn, the phone debrief (L1 and L3) printed «Интервал: завоят не беше започнат…» for a turn the product had ticked and commended. PC printed the measured interval (34.3 s / 39.3 s).
+
+The cause is in the runner that measures the interval, not in the end screen.
+- **The latch.** At base, the encounter waited for a later turn only if a `sawYield` latch had caught the student. The latch needed him at or under 8 km/h, within `armDistM`, while the oncoming car was within 36 m of the node. On a careful drive that window is a few tenths of a second wide.
+- **Missing the latch.** A student who missed it was resolved «clear, committed: false» as soon as the car was 40 m past the node, before he turned.
+  - `objectives.ts` `oncomingGapReport` reads that as `noTurn`.
+  - `SessionEndScreen.tsx` then prints the sentence under the ✓.
+  - In process, on the rig-w2 phone tape in its raced world, the follow encounter resolved at t ≈ 31.7 s, and the student turned at about 44 s.
+- **Why the phone and not PC** (the round-1 builder, in process at 43b4109).
+  - The phone's ~10.6 Hz frame cadence decided the latch.
+  - In that harness the director was given the rig's pre-spawn pose (0, 0) for the first frame only. That is the «start race» every phone load had.
+- **The same defect at `c38086a`.** ADR-014 removed the cadence. Reading the source, the builder concluded it also removed the race; that was not photographed. With the race stood in at the director, the phone-L1 tape on the 60 Hz grid, started 0.1, 0.5 or 1.0 s later, still printed «не беше започнат» under the ✓.
+
+**Round 1, refuted** (patch sha256 1b5ee9dd…).
+- **What it changed.** The `sawYield` latch was removed. The encounter was held while `!committed && d <= LTAP_HOLD_NEAR_M`, and the existing inline 60 m was given that name.
+- **What the verifier reproduced.**
+  - On base, 9 of the 16 new tests were red; on the tree, 16/16 were green.
+  - Its sweep covered 6 rig-w2 tapes × the held and raced worlds × 60 Hz, phone cadence and a 0.5 s first frame × 13 time shifts. The verifier counts this as 390 cells, although the listed factors multiply to 468.
+  - Base flagged 69 cells, all in the raced world. The tree flagged 0.
+  - All 96 straight-on drives still printed noTurn.
+- **F1, the refutation.** The student stops 60.2–64.5 m from the node, waits 15 s or more, rolls up to the line and turns. That lawful drive still printed «Интервал: завоят не беше започнат…» under «✓ Завърши левия завой на юг…». This held on both layouts, at all three cadences and in the held world.
+  - It was 120 clean cells out of 420; base gives the same.
+  - The cause: the encounter arms at `s.armDistM`, which is 65 m on sc-turn-left-oncoming, sc-jx-equal-left and sc-rx-tram-left, but the hold covered only 60 m.
+  - The verifier's candidate, `max(LTAP_HOLD_NEAR_M, s.armDistM)`, flagged 0 of the 420 cells.
+- **F4, surviving mutants.** v2 survived on the lane's new hold line: dropping `!this.committed`. v3 (no 45 m commit radius) and v5 (no `|| actor.finished`) survived on guards the lane had not touched.
+
+**What round 2 changes.**
+- The hold radius is now `ltapHoldNearM(s) = Math.max(LTAP_HOLD_NEAR_M, s.armDistM)`, so the hold line reads `if (!this.committed && d <= ltapHoldNearM(s)) return null;`.
+- This adds no new figure. The bound is the spec's own arming distance, and the existing 60 m stays as the floor. The builder's derivation: a distance from which the encounter can start is, by the product's own definition, a distance at which the student is at the junction.
+- The radius is 65 m on five catalogue specs and 60 m on sc-edpr-oncoming.
+- **New tests:**
+  - `oncoming-left-turn-hold-radius.test.ts` (6 tests): the 63 m early stop, the 64.9 / 65.1 m edge, the 60 m floor, and pins for the round-1 survivors v2, v3 and v5;
+  - `ltap-early-stop-band.live.test.tsx` (16 tests): the verifier's 420 band cells plus 48 drives on the printed figure;
+  - the PC tape fixture.
+- The round-1 tests were updated for the 65 m radius.
+
+**What the round-2 verifier reproduced** (r1 reversed, r2 applied, its own probes):
+- **The round-1 refutation no longer reproduces.**
+  - Its band probe flags 0 of 420 cells on the tree, with 0 layout differences. All 420 cells match its round-1 armDistM candidate cell for cell.
+  - The endings are clear 90, no row 216 and collision 114, and every collision cell bills COLLISION.
+  - With the r1 `runners.ts` swapped in, 14 tests go red on assertion text: 12 band tests and 2 hold-radius tests.
+- **180 new adversarial cells** (4 tapes × 3 cadences):
+  - turns slowed ×1.3 to ×3;
+  - an early stop at 63 m followed by a slow turn;
+  - waits at the line of 45–120 s;
+  - early stops at 64.9 m with waits of 60–90 s, and at 62, 70 and 80 m.
+
+  The tree flags 0 of them, with 0 layout differences. Base flags 30, all noTurn under a ✓. On the tree those 30 give no row or «clear».
+- **Why a slow turn can no longer print noTurn.** Only sc-turn-left-oncoming prints the row, because it is the one template that authors `reportOncomingGapSec`. Its session ends at the turn zone (−4.06, −50), at d ≈ 41–50 m, which is inside the 65 m hold.
+- **Truth probe.** 120 cells, with early stops at 59.5, 63 and 66 m and line waits of 5–90 s, show no noTurn under a ✓. Its round-1 straight-on probe (96 cells, all noTurn) is unaffected.
+- **Mutants.** The suite is 91 tests, one mutant at a time, each restore checked by sha256.
+  - The round-1 survivors now die on assertion text: v2 with 6 red, v3 with 1, v5 with 1.
+  - Its own new mutants also die: radius +20 m (4 red), radius +0.5 m (2 red), and the hold released once carArc > 100 (23 red).
+- **The printed figure.** The builder's measurements reproduce: the figure equals the runner car's distance divided by its speed at the commit. The builder's gloss, «the true time to the junction», does not hold literally; see C1.
+- **Regression.**
+  - Targeted run: 49 files, 724 tests, green.
+  - Catalogue-wide (`lessons/scenario/__tests__`, `lessons/__tests__`, `lesson-ui/__tests__`, sim/traces, runtime left-turn-yield): 509 files, 9,354 passed, 7 failed.
+  - The 7 failures are exactly the `c38086a` base set: task-cap-lesson-census ×3 («expected 509 to be 513»), lane11-data-truth («expected 18 to be 19»), route-runout ×2, and touchHintLifetime (ENOENT `tools/mobile/lesson-audit.mjs`).
+  - tsc: 22 errors, byte-identical to its round-1 baseline, none in touched files.
+  - No copy changed; reviewed-text-manifest and caption-truth are green.
+- **Reported by the builder, not re-run by the verifier.** A demo census of every demo of the four oncomingLeftTurn lessons × L1–L5 × {60 Hz, phone cadence}: 120 cells, base against tree, 0 different. The 30 cells that print the row are all measured: 1.37–1.76 s on the cut-gap demos (task not done) and 8.47–8.64 s with the turn ✓.
+
+**The conditions, and how each stands.** All three verifier conditions are pre-existing and identical on base. None is a sentence this lane wrote.
+- **C1 (R2-F5, carried from round-1 F6): the figure is distance ÷ speed at the commit, not the car's arrival.** OPEN; it belongs to the `sc-turn-left-oncoming:7974670c` gap-figure family. A future repair must decide whether a car braking for its own red counts as inbound.
+  - On the rig-w2 tape replayed in process, the follow car brakes after the commit and stops at its west stop line, about −44 m out, on red. It does not reach the junction within the session, yet the screen prints 9.96–10.19 s.
+  - With 3–5 s more patience at a green line, the screen prints «Интервал: зави при 19.9 с / 43.2 с — над нормата». The car actually restarts and reaches the node about 13–14 s after the commit.
+  - With 5–7 s more wait, the car is at 0.2–0.9 m/s, under the 1 m/s floor, and the screen prints «лентата беше чиста» for a car stopped at its red line 44 m out.
+  - The verifier's track probe is byte-identical on base and tree. The verdict's direction is never wrong, because the true arrival is 7 s or more, above the 4 s norm.
+- **C2 (R2-F6; builder owed item 1): «лентата беше чиста» is printed while a moving oncoming car is 10.8–16.7 s out.** OPEN, in the same family.
+  - In the early66 cells (base and tree) the follow car is 10.8–11.3 s out at 7 m/s. The tight runner resolves committed:true with no figure, and the follow runner, which holds the figure, resolves only after the session ends.
+  - One verifier cell is new on the tree: pc-L1 early63+45. It printed the false «не беше започнат» on base and now prints «clear» while the restaged tight car is 66.9 m out at 4 m/s (16.7 s).
+  - The builder's truth probe counts 20 such cells on base and 23 of 172 on the tree. The 3 extra cells printed the false noTurn on base.
+- **C3 (R2-F7): a slow turn emits no `turnStarted`.** OPEN; a turn-detector limit outside this clause.
+  - The detector (`runtime/turns.ts`: 55° within a 3 s window, 40 m junction area) never fires when the tape's turn is slowed by ×1.3 or more, about 11 km/h or less.
+  - The runner then never commits, there is no YIELDED_TO_PRIORITY, and no Интервал row is printed.
+  - Base printed the false noTurn in the early-stop variant. A missing row is not a false sentence, but a careful slow turner gets neither the interval nor the praise.
+- **Disclosed by the builder (owed item 2) and by the round-1 verifier (F5), not a round-2 condition: no row under a ✓ turn when no encounter resolved before the session ended.** This is the case where both staged cars stood still at the commit. In the band it is 120 cells on base and 216 on the tree; the extra 96 printed the false noTurn on base.
+  - In the stuck-hold case, a student stops 60 m or less from the node and waits 10–20 s. The staged car finishes its path and is reset to its hold, standing at about −62.7 m, so the runner never resolves.
+  - Showing nothing is not a false sentence, but the student is not given his interval.
+- **The live shell (round-1 F6; builder owed item 0).** The builder reads in the code that the «start race» world is gone at `c38086a`. That path is `gradeGrid` `stateAtStep`, fed by `useAfterPhysicsStep`. It has not been photographed.
+
+**Integration.** Every directory run in this lane was on `c38086a`, without truckpass fix1/fix2.
+- Per the integrator, six of the seven lane reds are the pins those fixes address in 59be0de: task-cap-lesson-census ×3, route-runout ×2 and lane11-data-truth. This lane did not run them on 59be0de.
+- touchHintLifetime is red only because the lane has no `tools/`, so it must run in the main tree.
+- On 59be0de all seven must be green.
+
+**PROVEN TOGETHER ON 59be0de (integrator, 2026-10-10):** ltapnote r2 and uturnedge r2 were 3-way applied in order onto 59be0de in the scratch worktree D:/knijka-lanes/integ-lu with no conflict (runners.ts and engine.ts: the lanes’ hunks and 59be0de’s meetcars / tailbrake hunks sit in disjoint runners and state; the integrated files are byte-identical to `git merge-file` of lane, c38086a and 59be0de). Every catalogue-wide directory ran to completion, one at a time: orchestrator 39 files / 467 tests, rules 98 / 1,779, traffic 37 / 441, runtime 48 / 875, scene 45 / 740, lesson-ui 43 / 717, lessons 124 / 2,336 (+165 in-file skips), scenario 179 / 4,339 — 0 failed; tsc 21 (the Prisma-client baseline). The seven reds both lanes saw on c38086a (task-cap-lesson-census ×3, route-runout ×2, lane11-data-truth, touchHintLifetime) are green on 59be0de. No shown text changed; the reviewed-text manifest is untouched. The adversarial merge verifier ACCEPTED: it re-ran each lane’s key tests and one of its verifier’s mutants (killed on assertion text), and re-ran lessons, scenario and rules itself with the same counts. Combined patch `gate-lu.patch` sha256 0098301c…, 10 files, 0 CR bytes.
+
+**Nothing closes by this landing.** `sc-turn-left-oncoming:d079e687` stays OPEN until a careful re-drive through `/dev/drive-rig` on both lenses, phone and PC, photographs two things on the integrated build:
+- the end screen's «Задачи от маршрута» section;
+- the Интервал row under the ✓ turn, on the compact and full layouts.
+
+That is the drive the round-1 verifier named (F6) and the round-2 builder carries. Every lane number above is in-process: rig tapes replayed through `liveChainReplay`. The 60.2–64.5 m early-stop band has never been driven on the rig, and neither verifier asked for it.
+
+**Owed.**
+- The rig re-drive above.
+- C1 and C2, as rows in the `7974670c` gap-figure family: what the figure measures for a car braking for its own red, and «лентата беше чиста» printed with a car inbound.
+- C3, a row for the turn detector's slow-turn limit.
+- The disclosed no-row case, as a candidate row.
+- The six base catalogue pins, green on 59be0de.
+- touchHintLifetime, in the main tree.
+- Carried from the rig-w2 judge, outside this clause and untouched: on phone, the РЕЗУЛТАТ end prompt instead of the end screen, and the НАУЧИ cards missing at phone L1.
+
+## Landed: a lawful U-turn at the side-street mouth is praised even when the car crosses into the side street during the turn — `sc-mv-uturn-ban:e98407b1`, clause 4b (2026-10-10)
+
+Lane `uturnedge`, two rounds, built on `c38086a`. Round 1 was REFUTED by its adversarial verifier. Round 2 was SIGNED OFF WITH CONDITIONS.
+- **The patch.** `uturnedge-result-r2.patch` (sha256 423a7e08…, cumulative against `c38086a`, 3 files, +1146/−2, 0 CR bytes).
+- **One product file,** `rules/engine.ts`. It changes two places:
+  - `solidCrossTurnHoldsRoad`, new after `solidCrossOnEdge` at base line 3159;
+  - the solid-cross block of `reduceTick`, at base lines 5577–5691.
+- **Two test files.**
+- **`lessons/engine.ts` is unchanged,** and so is the praise gate `uTurnPastSolidAxisEarned`.
+- **Overlap with 59be0de.** The lane never saw 59be0de, which also changes `rules/engine.ts`. Tailbrake:
+  - adds `RuleEngineState` fields (base ~677);
+  - touches `createRuleEngine` (~2486);
+  - adds the floor-lift block in `reduceTick` (~8116–8181);
+  - changes `handleTickEvent` (~9235).
+
+  The line ranges do not overlap. Whether the merge holds is the merge-test line below.
+- **No shown sentence was added or changed.** The title «Подмина забраната, обърна на прекъснатата осева» (approved under the 2026-10-08 delegation) is now given on more lawful drives.
+
+**Why.** rig-w2 found that the praise is lost when the turn's arc reaches y ≥ ~277. That is exactly where the lesson's own instruction 4 says to stop: «На 280-ия метър». Three lawful drives got the praise, and two equally lawful ones did not.
+
+The round-1 builder traced the cause.
+- **The gate was right.** `uTurnPastSolidAxisEarned` (`lessons/engine.ts` ~1830) found `uTurnPlaceRecord = {0,0}` and correctly refused at G1. The record was empty because the turn-round was never confirmed.
+- **The hand-off.** In the middle of the arc, the locator hands the tick from `mvu-e-ban` to the side street `mvu-e-cross`:
+  - in the rig sidecars at pc t 58.79 (x −4.99, y 279.05, 95° round) and phone t 63.05 (x −7.65, y 276.37, 102° round);
+  - in process at 64.5–148.5° round.
+- **The dropped excursion.** On another road, `solidCrossOnEdge` starts a fresh tracker. That drops the open excursion that began on the boulevard where the axis is broken, and the side-street tracker never sees a reversal against its own bearing.
+- **In process at base, L3:** a stop at y 264 is praised; stops at y 269, 272, 275, 278 and 280 are not.
+
+**Round 1, refuted** (patch sha256 990b04fa…).
+- **R7-1.** While an excursion that began where the axis is broken is still swinging, or can still resume within `SOLID_CROSS_SWING_RESUME_MAX_M`, a frame on another road is still read against the boulevard. It steps through the existing `stepSolidCrossTurnOffRoad`, so the one ADR-013 confirmation confirms the turn-round where it began.
+- **What reproduced.**
+  - On base, 33 tests were red; on the tree, 65/65 passed and the 25-file targeted suite 874/874.
+  - On the verifier's 455 tapes, base and tree differed only in praise and place, always 0 → 1.
+  - The refusals held. An in-span turn-round at y 219.3 followed by the edge turn gave place {1,2} and no praise. Nothing billed FAILED_TO_YIELD or COLLISION was praised.
+- **F1 (stop rule a).** 50 lawful, completed drives were still not praised on the tree or on base: 10 geometries × L1–L5.
+  - The drive: stop in the inner lane at y 262–268, creep 12–15 m in a straight line at 30–43° across the dashes toward the side-street mouth, then make one r5 sweep round to the south.
+  - Every one passed with score 0, both tasks done, no refused code, and YIELDED_TO_PRIORITY.
+  - The pose-only oracle counted exactly one turn-round, begun where the axis is broken at y 277.7–283.3, with 0 solid crossings.
+  - The tick reached `mvu-e-cross` at 30.0–43.0° round. That is before the nose leaves the 45° band, so no excursion was open yet and R7-1 never engaged.
+- **F2 (stop rule c).** The builder's owed item 2 called this case unreachable, citing a minimum in-process hand-off of 64.5°. The verifier reached it from the shadow demo's own stop at y 264; for example, «dsweep y264 d30 m15 r5» is handed off at 30.0°.
+- **F4.** Three mutants of the held-frame step survived both the suite and the 455-tape probe: MV2 (heading sign), MV3 (bank) and MV4 (sustain).
+
+**What round 2 changes.** `solidCrossTurnHoldsRoad` now returns `"turn" | "approach" | null`.
+- **"turn"** is R7-1, unchanged.
+- **"approach" (R7-2).** A frame on another road is also read against the boulevard when all three hold:
+  - the car was along the boulevard on the previous frame (`prev.dir ≠ 0`) and no excursion is open;
+  - the boulevard's last station on the car was where the axis is broken (`prev.lastPlace === false`);
+  - the nose is not along both roads at once. A fork whose 45° band overlaps the boulevard's still takes the car.
+- **Held frames.** Both kinds go through the same `stepSolidCrossTurnOffRoad`: heading half, bank held, no crossing measured.
+  - An "approach" frame takes the station `held.lastPlace` (broken), so a swing that opens there is placed where the axis is broken.
+  - A swing begun on the solid span keeps its solid place, and the other road drops it, as R6-1 ruled.
+  - After confirmation, `lastPlace` is null and nothing is held again.
+- **One definition of the act (ADR-013).** The confirmation and the act are the same as before.
+  - Nothing can bill or name from a held frame.
+  - No threshold is new or loosened. The constants are the existing `SOLID_CROSS_SAME_ROAD_DEG`, `SOLID_CROSS_WITH_BANK_DEG` and `SOLID_CROSS_SWING_RESUME_MAX_M`.
+- **Scope.** The tracker runs only where `cfg.solidCrossUTurnEnabled` is set. Its only setter is `templates-parking2.ts:1475`, sc-mv-uturn-ban.
+
+**What the round-2 verifier reproduced.** It reversed r1 to a clean base and applied r2; the `engine.ts` sha256 was e7c7aa8d…, the builder's.
+- **Base red, tree green.** The builder's two files pass 124/124 on the tree. On the base engine 87 fail, all on assertion text, none timeouts:
+  - 30 rows in H1/H2;
+  - 50 in H7;
+  - 7 in the rules file.
+- **The round-1 refutation no longer reproduces.**
+  - Its 10 lost geometries pass 50/50 at L1–L5, each praised once with place {1,0}.
+  - The full diagonal sweep (160 geometries × L1–L5, 800 drives) praises all 575 lawful, completed drives. The other 225 never finish the turn task, as in round 1.
+- **Stop rule (a) holds across 2,490 of its own tapes, each compared against base.** The tape sets:
+  - the 455 round-1 tapes;
+  - 605 new adversarial tapes: shallow and late diagonals, pauses, a three-point turn in the mouth, no wait, contact, in-span then diagonal, a crossing back over the solid axis at y 150, a side-street detour, a left turn away, and past the mouth;
+  - 580 gap-grid tapes: stops at y 222–285, and reversing into the side street;
+  - the lost set and the diagonal sweep.
+
+  The results:
+  - no row goes from praised to not praised;
+  - no praised row carries CROSSED_SOLID_LINE, CENTER_LINE_TOUCHED, FAILED_TO_YIELD or COLLISION;
+  - no lawful, completed, clean row is unpraised;
+  - in-span-then-edge and in-span-then-diagonal give {1,2} and are never praised;
+  - a diagonal followed by the crossing back at y 150 bills CROSSED_SOLID_LINE and is not praised;
+  - every praised row is praised exactly once.
+- **Its round-1 probe (455 tapes).**
+  - Against base, 268 rows gain the praise and none lose it. Against round 1, 5 rows gain it («diaglong y266 d40 m12»).
+  - On 41 drives the place record changes but the drive stays unpraised: {0,0} → {1,0} or {0,2} → {1,2}. All of them are refused drives (contact, cut-in, in-span-then-edge, no wait at L5).
+  - Where the praise changed, the debrief differs only by the added praise bullet. Events, scored, coached, taught, tasks, phase, pass and score are identical.
+  - Its 18 «never» reds are the same as in round 1: no-wait drives and cut-in p1.5 at L1–L4, praised, with no FAILED_TO_YIELD billed. That follows the forced-braking rulings and the product's yield verdict, which this lane does not change.
+- **The round-1 survivors now die, each on assertion text:**
+  - MV2: «expected { atBrokenAxis: 1, elsewhere: 0 } to deeply equal { atBrokenAxis: 0, elsewhere: 0 }»;
+  - MV3: «expected [ { kind: 'violation' … } ] to deeply equal []»;
+  - MV4: «handoff at 5.33 s: expected [records] to deeply equal [records]».
+- **Its own mutants of R7-2.** A3 and A4 die. A1, A2, A5, A7 and A9 survive (C1).
+- **Regression.**
+  - Targeted: 22 files, 912/912. This includes the ADR-014 grid census files, reviewed-text-manifest, caption-truth, keep-right-claim-census, the sc-mv-uturn-ban traces and every mv-uturn-ban-* and solid-cross-uturn-* file.
+  - `rules/__tests__`: 1,765/1,765.
+  - `lessons/scenario/__tests__`: 4,247/4,248. The one red is lane11-data-truth («expected 18 to be 19»); the verifier checked that it fails the same way on the base engine.
+  - tsc: 22 errors, the environment baseline.
+- **Reported by the builder, not re-run by the verifier.**
+  - `lessons/__tests__`: 2,320 passed, 165 skipped, with route-runout ×2 red (sc-ac-wind-truck-pass).
+  - `lesson-ui/__tests__`: 708/712, with task-cap-lesson-census ×3 and touchHintLifetime (ENOENT `tools/`) red.
+  - Each of those reds fails the same way on the base engine.
+  - The demo census (shadow-correct, mistake-cross-solid and mistake-into-stream × L1–L5, plus the recorder hashes) shows 0 differences.
+
+**The conditions, and how each stands.**
+- **C1 (V4): five surviving mutants of R7-2.** Each gives 0 differences against the tree on the 455-, 605- and 580-tape probes, so none reaches stop rule (a). The verifier's summary calls all five unreachable in this world, but its finding argues this for four of them only:
+  - A1 (`alongThis` ignores the sign of dir) and A2 (`alongOther` drops the reverse band): there is no fork here.
+  - A5 (held frames measure `onReferenceBank` against the side street): the side street has no solid axis; the only `solidCenterLine` zone is `mvu-e-ban` y 40–220.
+  - A7 (approach hold only when travelling north): a southbound second turn-round cannot change the praise.
+  - A9 (stepM 0 on approach frames): the verifier gives no unreachability argument, only that the swing yardstick on approach frames is not pinned and that it showed 0 probe differences.
+
+  OWED: rules-level pins for A7 and A9, as the verifier suggests. For A1, A2 and A5, a recorded near-equivalence argument, or a pin once a district has a fork or a side street with a solid axis.
+- **C2 (V6, the judge's F5): the in-process replay is not the product photographed.** OWED: the rig re-drive below.
+- **Notes outside this lane (V7, V8):**
+  - **The turn-task corridor (V7).** A lawful turn-round at y 243–258, where the axis is already broken, never completes the lesson, on base and tree alike. The cause is the `completeManeuver` corridor, centred on y 280 with halfLength 20 (`templates-parking2` ~1324). The place record counts these turn-rounds, but the praise is never reached. The verifier suggests it may deserve its own ruling.
+  - **The side-street detour (V8).** It already records {1,0} on base and stays unpraised on both trees, for TURN_WITHOUT_INDICATOR or STOP_SIGN_NO_FULL_STOP. Reversing into the side street goes from {0,0} to {1,0} but stays unpraised because the turn task is not done. Both follow the one definition of the act.
+
+**Integration.** Every directory run in this lane was on `c38086a`, without truckpass fix1/fix2. Its reds were lane11-data-truth, route-runout ×2, task-cap-lesson-census ×3 and touchHintLifetime, the same base set as the ltapnote lane. The builder hands them to the integrator. On 59be0de the six catalogue pins must be green, and touchHintLifetime must run in the main tree.
+
+**PROVEN TOGETHER ON 59be0de (integrator, 2026-10-10):** ltapnote r2 and uturnedge r2 were 3-way applied in order onto 59be0de in the scratch worktree D:/knijka-lanes/integ-lu with no conflict (runners.ts and engine.ts: the lanes’ hunks and 59be0de’s meetcars / tailbrake hunks sit in disjoint runners and state; the integrated files are byte-identical to `git merge-file` of lane, c38086a and 59be0de). Every catalogue-wide directory ran to completion, one at a time: orchestrator 39 files / 467 tests, rules 98 / 1,779, traffic 37 / 441, runtime 48 / 875, scene 45 / 740, lesson-ui 43 / 717, lessons 124 / 2,336 (+165 in-file skips), scenario 179 / 4,339 — 0 failed; tsc 21 (the Prisma-client baseline). The seven reds both lanes saw on c38086a (task-cap-lesson-census ×3, route-runout ×2, lane11-data-truth, touchHintLifetime) are green on 59be0de. No shown text changed; the reviewed-text manifest is untouched. The adversarial merge verifier ACCEPTED: it re-ran each lane’s key tests and one of its verifier’s mutants (killed on assertion text), and re-ran lessons, scenario and rules itself with the same counts. Combined patch `gate-lu.patch` sha256 0098301c…, 10 files, 0 CR bytes.
+
+**Nothing closes by this landing.** `sc-mv-uturn-ban:e98407b1` stays OPEN until a rig re-drive through `/dev/drive-rig`, on PC and on phone, photographs «Подмина забраната, обърна на прекъснатата осева» on two drives:
+- a lawful turn stopped at or near y 280, with the arc's max y ≥ 277;
+- a diagonal creep to the side-street mouth, handed off at under 45° round.
+
+This is the drive the round-2 verifier names (V6), the judge's F5. The rig-w2 sidecar hand-off readings are the only rig numbers above. Every other number is in-process: the live rung chain, or rules-level frames.
+
+**Owed.**
+- The rig re-drive above. Photograph the end screen's «Какво се получи добре» bullet. Per the round-1 builder's note from the rig-w2 judge, the PC toast is in the DOM for about 4 s but covered by the end screen.
+- C1: pins for A7 and A9, and an argument or a pin for A1, A2 and A5.
+- V7: a ruling or a row for the turn-task corridor (lawful turn-rounds at y 243–258 never complete the lesson).
+- The six base catalogue pins green on 59be0de, and touchHintLifetime in the main tree.
+- Kept as R6-1 ruled: a turn-round begun on the solid span and handed to another road mid-turn is dropped, not counted in `elsewhere` (§8 pins the drop). The round-1 builder calls this case unreachable in this district because the side street is 60 m past the span end. No verifier tested that claim, and the same builder's other «unreachable» claim was refuted (round-1 F2).
+- Whether R7-1 and R7-2 need an ADR-013 addendum is the integrator's call. They add no second definition of the act, and the patch adds no ADR.
+
+## Landed: the officer's praise no longer depends on a lamp the lesson says is dark — `sc-sig-controller-postures:f7e046c4` (2026-10-10)
+
+Lane `praiselamp`, round 1, built on `59be0de` from cause (a) of the rig-w3a refutation (above). SIGNED OFF WITH CONDITIONS by its adversarial verifier. The patch is `praiselamp-result-r1.patch` (sha256 923aed3e…, 10 files, +496/−4, 0 CR bytes). Eight are product files: `contracts.ts`, `orchestrator/types.ts`, `runtime/signals.ts`, `orchestrator/runners.ts` (TrafficControllerRunner `postSchedule`), `runtime/worldRuntime.ts` (`fireLine` and the `nextStopLineState` approach read), `rules/types.ts`, `rules/engine.ts` (the stopLineCrossed OBEYED arm of `handleTickEvent`) and `lessons/scenario/templates-signals2.ts`. The other two are a new test and its fixture.
+
+**The row is already closed.** rig-w3b (below) CLOSED f7e046c4 at 59be0de on its four filed clauses: the phone briefing, the list starting at «2.», the XP, and pass on PC against fail on the phone. rig-w3b's capture, not its judge or verifier, also attributed the phone launch stall that rig-w3a left open (cause (b)) to the rig's own pad reset, `rig.run()` zeroing the pad on every re-issue. On two phone line launches (MX-phone-red, MX-phone-other) the capture's literal decision rule named the product's input layer instead, although the re-issue cross-tab there showed the same zeroing. So this landing does not close the row. What it repairs is the praise's dependence on the hidden lamp phase. rig-w3a's verifier refuted the earlier closure on that dependence, and rig-w3b's judge placed it outside the row's claim. rig-w3b's capture re-measured it on both lenses at matched crossing times: OBEYED on every crossing in red or redYellow, and on none in green.
+
+**The cause, on 59be0de.**
+- When an officer is posted, `fireLine` stamped the crossing with `lightState: lightStateOf(line)`. That is the cluster's natural 50 s cycle on the session clock. Nothing pins it on this lesson: there is no `signalOffsetSec`, and `postSchedule` leaves the lamps alone.
+- The engine credited CONTROLLER_SIGNAL_OBEYED only on red or redYellow, so the praise depended on the second at which the car crossed.
+- The same hidden phase reached the approach context through `nextStopLineState` (`perm === "halt" ? "red" : lightStateOf(line)`). From there it fed HESITATION_AT_GREEN, the needless-stop, ban-zone and overshoot logic, and the harsh-brake signal cause.
+- The template comment said the phase was «never the point and never read». The runtime read it on every crossing.
+- The builder replayed rig-w3a's five careful drives through the live chain and reproduced them exactly: pc-L1 and pc-L3 crossed on red and were praised, phone-L1 (58.83 s) and phone-L3 (49.27 s) crossed on green and were not, and phone-optin crossed on red and was praised.
+
+**A finding the brief did not expect: the lamp is not hidden.** A "controlled" cluster renders the live cycle, on the same clock and offset as the graded phase. rig-w3a frames pc-L1-C-11/13/19 and rig-w3b LP1-16 show a head at the junction lit red, while the lesson's sheet says «ЗАГАСНАЛ». The builder made the GRADE follow the authored text and did NOT darken the render. A plain "dark" head is captioned «ЗАГАСНАЛ СВЕТОФАР · Кръстовището е равнозначно · Пропусни идващия ОТДЯСНО · ЗДвП чл. 48 · правилото на дясното» (`signalHeadLabels.ts`), which would be false and dangerous at an officer's junction. Darkening the head is owed (below).
+
+**What landed.**
+- `TrafficControllerSpec.lamps?: "dark"`. Its doc says the lesson authors the lamps out, nothing graded reads a phase, the field and `signalOffsetSec` are exclusive, and the render gap is owed.
+- `postSchedule` posts `lampsDark: true` with the schedule on every write when `spec.lamps === "dark"`, so the flag survives the first-metre rebase and retries. `signals.ts` gains `controllerLampsDark(clusterIdx)`, which is true only for a "controlled" cluster whose schedule says the lamps are dark.
+- `fireLine` emits a dark-lamp controlled crossing as `{kind: "stopLineCrossed", control: "trafficLight", lampsDark: true, controller}` with no `lightState`.
+- `nextStopLineState`: on a dark-lamp approach the officer has released, it reads undefined. Under a halt it still reads "red", the effective signal, unchanged.
+- The engine credits OBEYED when `e.lampsDark === true`, or on red or redYellow as before. The comment quotes the authored lines that decide it.
+- SC_SIG_CONTROLLER_POSTURES_EVENT gets `lamps: "dark"`. Live-lamp lessons carry no flag and grade exactly as before.
+- No shown sentence was added or changed, and the manifest was not re-recorded. No threshold moved.
+
+**The decision, taken from the lesson's own text: credit every proceed crossing.**
+- Instruction 1: «светофарът на кръстовището е ЗАГАСНАЛ … Тук важи само неговата поза».
+- Instruction 3: «Няма лампа за четене — четеш човека».
+- Instruction 5: «Щом се обърне със СТРАНИЧЕН ПРОФИЛ … премини решително и спокойно на север».
+- Task 2, «Премини кръстовището, когато позата разреши посоката ти», is graded by `requireControllerProceed` and DELIBERATELY not by `requireRedMet`.
+- The only commendation text any surface prints is its title, «Правилно изпълнен сигнал на регулировчика». It is true with no lamp at all.
+
+**One behaviour change beyond the praise.** Once the officer has released, this junction carries no phase. HESITATION_AT_GREEN («Светна зелено…») can no longer be billed there from a hidden green, and a hidden red no longer excuses a stop there. On 59be0de rig-w3b measured exactly such bills: −1 each at 61.78, 104.02 and 111.78 while the student waited on the side profile (MX-pc-red / MX-phone-red; MX-pc-other / MX-phone-other at 61.78 and 104.02), with teach pauses about a green light. Their absence on the tree is shown in process only (the builder's matrix, the verifier's late-go probe); no drive has shown it yet. No committed demo moves.
+
+**What the verifier reproduced** (its own probes through `liveChainReplay`; base = src reverted, tree = patch):
+- **The builder's test.** On base, 5 of 8 are red on assertion text, among them «phone-L1-C: expected [] to include 'CONTROLLER_SIGNAL_OBEYED'» and «expected 3 to be 1». On the tree, 8 of 8 are green.
+- **The fixture is genuine.** All 3,149 rows of the five drives match rig-w3a's raw `rigDump.samples` within 0.0005.
+- **The ambient fleet ON**, which the builder had excluded: 5 rig drives × 0–45 s of pre-drive rest × L1/L3 × each drive's own cadence = 100 cells.
+  - Base: 15 distinct sheets. The praise followed the hidden lamp.
+  - Tree: exactly 1 sheet per level on every non-collision cell (OBEYED, 0 т., passed, both tasks, 3 stars, the praise line in the debrief). Every crossing is `{lampsDark: true, controller: 'proceed'}`.
+- **Late go:** pc-L1-C and phone-L3-C with an extra wait of 0/3/6/12 s after the flip × 0–45 s rest × L1–L4, ambient off = 200 cells. Base: 14 sheets, including HESITATION_AT_GREEN on 3 L4 cells. Tree: 1 sheet per level.
+- **Demo census:** 3 controller lessons × every demo × every rung × 60 Hz and the phone cadence = 78 cells. Sheet changes: 0. Event changes: 24, all on postures (`lightState` → `lampsDark`). The live lessons keep OBEYED on red, and every mistake stays CONTROLLER_SIGNAL_VIOLATED at 10 т.
+- **The decision is grounded.** Only three TrafficControllerSpecs exist, and postures is the only dark one. Postures has no passSignal, so `requireRedMet` cannot disagree with the praise. On the tree, OBEYED holds exactly when task sc-sctp-cross is done.
+- **Regression**, one worker, one run at a time:
+  - scenario: 177 files, 4,208 tests;
+  - lessons: 124 files, 2,336 passed, 165 skipped;
+  - traces: 168 files, 2,146;
+  - rules: 97 files, 1,765;
+  - runtime + orchestrator + sim: 86 files, 1,337;
+  - lesson-ui: 43 files, 717 (the builder reported 543; touchHintLifetime needs `tools/mobile/lesson-audit.mjs`, which the lane tar lacks, and passed with it copied in);
+  - tsc: 22 errors, none in a touched file.
+- **Mutants:** 5, one at a time, each restored and md5-checked.
+  - V6 (lampsDark not re-posted on the rebase) is killed (2 red).
+  - V8 (a dark crossing always stamped 'proceed') survives the builder's test, but signals2-controller-clock and controller-claim-gates kill it (12 red).
+  - V15 (the dark released approach reads 'green') is killed by the one-sheet assertion.
+  - V1 and V9 survived. They are the conditions below.
+
+**The conditions, and how each stands.**
+- **C1 (V1). The released dark approach's undefined phase is not pinned.** A mutant that reads 'red' there passed 42/42 (the builder's test, sc-sig-controller-postures-traces, signals2-controller-clock). Read from the code, under it `finish.ts` would again give the 'redLight' yield card «Защо чакаш: червен сигнал» after the officer has released, and every signal excuse would come back, constant in time. Required: pin `tick.nextStopLineState === undefined` for a dark approach after release, or pin that the yield-voice reason is not 'redLight' there. PINNED AT INTEGRATION: <the integrator fills this in only with V1 re-run red on assertion text against the pin; otherwise «NOT YET PINNED»>
+- **C2 (V9). The halt branch's 'red' is not pinned.** A mutant that reads no phase under halt too passed 66/66 (the builder's test, postures-traces, signals2-controller-clock, controller-claim-gates), with 0 sheet changes over the census, ambient and late-go probes. So the halt's 'red' does not carry the grade on these drives. It is also what keeps the yield voice saying «червен сигнал» before the flip at a lamp the text calls ЗАГАСНАЛ (owed item (b) below, pre-existing). Required: pin the halt branch, or settle it together with the owed render and yield-voice item. PINNED AT INTEGRATION: <the integrator fills this in only with V9 re-run red on assertion text against the pin; otherwise «NOT YET PINNED»>
+- **N2, not new.** In the ambient-on matrix, all 11 collision cells carry OBEYED next to COLLISION. These are open-loop tapes shifted into the cross stream, and the ambient cross car does not obey the officer. Base did the same on its hidden-red cells.
+
+**Integration.** praiselamp shares two files with the two lanes staged before it (gate-lu.patch, sha256 0098301c…):
+- `orchestrator/runners.ts` with ltapnote: ltapnote touches OncomingLeftTurnRunner, praiselamp only TrafficControllerRunner `postSchedule`;
+- `rules/engine.ts` with uturnedge: uturnedge touches the solid-cross tracker (after `solidCrossOnEdge`) and `reduceTick`, praiselamp only the stopLineCrossed arm of `handleTickEvent`.
+`rules/types.ts` is touched by praiselamp alone.
+**PROVEN TOGETHER ON 59be0de (integrator, 2026-10-10):** praiselamp r1 was 3-way applied onto the staged ltapnote r2 + uturnedge r2 set in the scratch worktree D:/knijka-lanes/integ-lu with no conflict. **C1 and C2 are PINNED AT INTEGRATION** by `lessons/scenario/__tests__/controller-dark-lamp-approach-phase.test.ts`, which replays the five rig-w3a drives through liveChainReplay and takes the officer’s release from the product’s own timetable (first tick at ≥ 5 km/h + flipAtSec, ±0.25 s, cross-checked by the crossing’s controller value): V1 (the released dark approach reads ‘red’) now fails «released dark-lamp approach ticks that carry a lamp phase: expected [ '35.567:red', … ] to deeply equal []»; V9 (no phase under the halt) fails «halted dark-lamp approach ticks that do not read the effective red: expected [ '0.017:undefined', … ]»; each restored byte for byte (sha256 c3fdcff4…). The wait’s REASON (the «червен сигнал» voice at a lamp the lesson calls ЗАГАСНАЛ) is deliberately not pinned — it is owed. Every catalogue-wide directory ran to completion on the combined set: lessons 2,336 (+165 in-file skips), scenario 4,349, lesson-ui 717, orchestrator 467, rules 1,779, traffic 441, runtime 875, scene 740, and the 31 signal/controller test files 583 — 0 failed; tsc 21 (the Prisma-client baseline). No shown text changed. The adversarial merge verifier ACCEPTED (patch = staged diff; every shared-file hunk survives; it applied V1 and V9 itself and saw both pins kill them).
+
+**Owed.**
+- **Draw the postures head dark.** Today it paints the live cycle (rig-w3a pc-L1-C-11/13/19, rig-w3b LP1-16), which contradicts «светофарът … е ЗАГАСНАЛ». Three things must be settled together:
+  - (a) the dark-head caption «Пропусни идващия ОТДЯСНО · ЗДвП чл. 48 · правилото на дясното» must be suppressed or replaced at an officer's junction;
+  - (b) the yield voice's red-light card «Защо чакаш: червен сигнал … на червено това е правилното» needs an officer branch. `stepYieldVoice` cannot see the officer, and rig-w3b's capture saw the card on every drive;
+  - (c) the ambient cross stream must obey the officer, not the cycle. The rig-w3a judge's note (b) saw the westbound car leave its halt line while the officer was side-on, and rig-w3b LP4 saw it move off its halt line again (a known world defect).
+- **`COMMENDATIONS.CONTROLLER_SIGNAL_OBEYED.explanationBg`** says «макар лампата да забраняваше». That is false at a dark junction. No surface prints it today (catalog census). If one ever does, it needs a dark-lamp variant keyed on `lampsDark`.
+- **A rig re-drive after landing** that photographs «Похвали ✓ Правилно изпълнен сигнал на регулировчика» on a phone crossing that lands in a hidden green. The cells to repeat are rig-w3b's phone cells that crossed in green without the praise: L3-phone (49.85 s) and MX-phone-other (112.22 s), plus MX-pc-other (110.00 s) for PC. LP5 (49.05 s, also green, no praise) was the WebKit desktop context, not the phone lens. The re-drive should also show no HESITATION_AT_GREEN on the MX side-profile waits.
+- **A question for the integrator or the founder.** After this repair nothing coaches a student who waits long after the officer's release: the only code that did, HESITATION_AT_GREEN, carried a false «Светна зелено». Does the examiner line «решително преминаване чак при страничния профил» need an officer-keyed hesitation note? No row asks for one yet.
+
+### rigstep (instrument, ADR-017) — integrator note, 2026-10-10
+
+Lane `rigstep`, round 1, built on `59be0de`. Its adversarial verifier SIGNED it OFF WITH CONDITIONS. The patch is `rigstep-result-r1.patch` (sha256 b84cd022…, 8 files, +1674/−62). The decision and its limits are ADR-017.
+
+It is staged with ltapnote r2, uturnedge r2 and praiselamp r1 in the integration worktree (staged diff against 59be0de: sha256 b784904f…, 27 files). Its test runs on that integrated set were cut by a PC restart. The directory gate with rigstep staged is owed before the commit, and every regression number below is from the lane (59be0de + rigstep alone).
+
+**This is an instrument change. It closes no row.** No product grading, threshold or sentence changed. A harness change is not a repair. In process, it removes two sources of cadence dependence from the rig's evidence: the per-frame application of its pedal and steer commands (F5), and the wall-timed start. Only a new frame moves a row.
+
+**What changed in the rig.** Before, the rig decided per grid point but applied per frame. Only the last point's decision of a frame reached the NEXT frame's steps, and the script started wherever a `page.evaluate` landed. Now:
+- **The pad is step-keyed.** The synthetic pad is evaluated lazily, ONCE per physics step count, on the recorded state after that step, and the command is cached. Step k+1 applies the decision taken on the state after step k, on every cadence modelled in process.
+- **It goes through the product.** The command still travels SimInput → GatedSimInput → `applyDifficulty` → VehicleSim, and nothing bypasses the pre-drive gate.
+- **`onTick` only records.** Its pedal columns are the applied command, so `DRIVE_RIG_VERSION` moves from 2 to 3.
+- **A script can start at a named physics step** instead of a wall-timed moment. The entry points: `run(steps, {startAt})`, `?start=drive|N`, and `drive-rig.mjs --start-at auto|<seconds>|step:N|now`, armed in one evaluate.
+  - `run()` without a start, and `--start-at now`, are still wall-timed.
+  - `auto` depends on when the call lands.
+- **A dev-only read handle.** LessonScene publishes the step track and the grid clock as a read view, `window.__rigStepSource`, from a layout effect that returns at once in production.
+- **Human input is unchanged.** Keyboard, touch, mouse pedals, cabin keys and looks keep the frame-start rule (ADR-017 D-1).
+
+**What it proves, in process only.**
+- **The builder's census** (18 tests):
+  - Applied pedals, steer and car states are bit-identical at every step on 7 modelled cadences, from 60 Hz down to the w69 phone deltas with the 7.505 s stall, and 2 fps.
+  - An oracle reproduces every applied command.
+  - A named start gives one drive from each arming point tested (3 frame boundaries × 3 places in a frame).
+  - At one step per frame the drive is bit-identical to a transcription of the old rig, while the old rig does not match itself across cadences.
+- **The verifier's own census**, anchored on the REAL 59be0de rig.ts:
+  - 10 cadences × 2 tiers × 1,500 steps, all bit-identical.
+  - 160 start-call-jitter drives are identical.
+  - The pause, hidden-tab, stall and blur cases apply nothing twice.
+  - 10 of 10 mutants are killed.
+- **Production absence:** a source census, plus a rolldown production bundle of the simulator route without the handle or the pad. This approximates the build; it is not a `next build`.
+- **Regression (lane only):** devrig + app/dev, engine + scene, components/sim and 20 other importing files, all green. tsc is at the Prisma baseline.
+
+**What it does NOT show.**
+- **The integrated set.** Its test runs were cut by the restart.
+- **No browser drive yet.** The live wiring is unobserved: that the layout effect publishes before rapier's first step, and that every physics step reads the pad.
+- **No real phone and no 120/144 Hz display.** The real-phone frame-time reading and a published step counter (ADR-014 D6) are still owed.
+- **Pedals and steer only.** Script key edges (indicators, looks, gear, holds, PRE_KEYS) stay frame-timed. A script that holds a driveline or pedal key is not cadence-invariant for the pedals either.
+- **Only up to the lesson's end point.** After the end, the rig's commands are frame-timed, so the final pose, and with it an end photograph, can differ by lens.
+- **Old evidence is not comparable.** Rig evidence from before version 3 cannot be compared step for step. drive-rig.mjs's default start moved from «now» to «auto», which shifts the traffic phase by 1–2 s of world time against earlier frames.
+- **Human input.** Nothing about a human's frame-timed pedals changed. For a human, W81's open item (i) is ADR-014's stated limit, as ADR-017 D-1 confirms.
+
+**Next: re-drive the two W81 rows with one step-named start on both lenses.** The drives are `sc-rb-busy-gap:7bbdd45e` (the S drive) and `sc-roundabout-entry:08a0b701`, through `/dev/drive-rig`, on the PC lens (Chromium) and the phone lens (WebKit 852×393, DPR 3).
+- **Arming.** Both lenses must use ONE named start (step N).
+  - drive-rig.mjs drives Chromium only, at 1280×720. It has `--start-at <seconds>` / `step:N`.
+  - The phone lens's capture script must arm `window.__driveRig.run(steps, { startAt: N })` in one evaluate. The current rig-wave example, `scratch/capture-w81/uturn-drive.mjs`, calls `run(st)` with the legacy start, so it and the capture brief must change first.
+  - `auto` is call-dependent and is not to be used for a comparison.
+  - Choose N late enough that neither lens's arming call has passed it.
+- **Each drive must show:**
+  - phase=driving at the named step;
+  - `status()` with `lateDecisions` 0, `readErrors` 0 and `sourceResets` 0;
+  - the go step on each lens;
+  - no driveline or pedal key held by the script.
+- **Expected:** the same go step and the same sheet on both lenses.
+- **If they match,** the busy-gap S drive's live 20-against-10 split was the instrument. That is consistent with W81's in-process finding (the sheet follows the go step) and with the design review's F5.
+- **If they do not match,** first rule out the rig paths that stay frame-timed: key edges (L2), the phase at the named step (L3) and the post-end freeze (L1). Only then does the row need a new diagnosis before any repair.
+- **Either way, this lane does not touch the founder question W81 raised.** W81 asks him whether his 2026-10-05 «or there is contact» also bills FAILED_TO_YIELD for a touch just after the circulating car's rear cleared the entry.
+
+**Owed.**
+- The integrated-set directory gate with rigstep staged.
+- The re-drive above, including a phone-lens arming path with a named start.
+- The live-wiring readout.
+- The real-phone frame-time reading.
+- The review's A13 (the driveline stall timer on the unclamped render delta), as a separate ADR-014 amendment.
+- Moving `glance-graded.mjs`, `wave3-drive.mjs` and the rig-wave capture scripts off the legacy «next» start before their evidence is compared across lenses.
