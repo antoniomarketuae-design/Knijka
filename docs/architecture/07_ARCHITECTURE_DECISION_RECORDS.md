@@ -425,6 +425,57 @@ the trace's samples, looks and indicator edges. LessonScene owns the grid's life
   long-frame moment differences are partly its own. `STAGED_POSE_FULL=1` was run by neither the builder nor the verifier.
 - **Full design note:** [doc 94](../simulation/94_ADR014_FIXED_STEP_NOTE.md), the builder's note with nine passages corrected against the verifier.
 
+**Amendment 2026-10-11 — rapier's physical contacts are recorded per physics step and heard at their own grid point.** Lane `hzcontact`, round 1, row `sc-hz-brake-dont-swerve:a7d0dd29`; SIGNED OFF WITH CONDITIONS; landed with the commit that carries this paragraph (doc 88). Not a founder ruling. It closes no row.
+
+- **What it corrects.** Two passages of this ADR are superseded from this date:
+  - in the Decision's graded-chain bullet, the words «live, rapier's contacts are frame-timed, below»;
+  - in «Stated as frame-timed», the item «rapier's physical contacts, reported once per frame».
+
+  Doc 94's item (c) is superseded with them, except its last sentence on staged actors, and so is the first clause of its «NOT claimed» (3). ADR-017's «the rest of ADR-014's frame-timed list is unchanged» now reads without this one item; the items ADR-017 names there all stay.
+- **Why.** A frame-timed contact was not only mis-timed; it could be lost.
+  - @react-three/rapier 2.2.0 takes all of a frame's steps and then drains its collision events once (checked by the verifier in the dist).
+  - It calls the chassis handler for a started pair only for manifolds rapier still holds at that drain (same check).
+  - Inside a long frame, a car that had already rebounded off the block was never reported. One still reported was read at the drain's speed and booked at the frame's first grid point, up to 29 steps before the step it began at. These are the builder's base measurements; the verifier re-ran the builder's test on base (24 red) but not these readings.
+- **What is true now.**
+  - **Recorded per step.** After every rapier step, `recordPhysicsStep` also records the contacts the chassis BEGAN at that step (`PlayerStepTrackRecorder.watchContacts`). It reads `VehicleSim.forEachChassisContact`, a pure read. A pair is in contact when a manifold holds a solver contact; the builder states this is rapier's own STARTED criterion. A `StepContact` carries the step, the struck body's `userData` and the relative speed after that step. One is logged per manifold the pair holds.
+  - **Heard on the grid.** `GradeGrid.stepPhysics` hands each contact of step k to `hooks.stepContact` at grid point k, with the student at that point. In the chain's order this is after the replay's stand-in (`hooks.contacts`) and before `runtime.sample`.
+  - **Judged by the same code, named from the grid.** VehicleRig's `hearChassisContact` judges it with the unchanged threshold. LessonScene's `handleCollision` names the struck body from that point's student, not from the frame's sample. The chassis carries no `onCollisionEnter`.
+- **Boundaries.**
+  - `traffic/playerTrack.ts` owns the contact record together with the step record. VehicleRig's after-step callback is still the one call. `VehicleSim` owns the read.
+  - VehicleRig owns the ear. LessonScene owns the ref, forwards the grid's hook to the ear, and still names and pushes the graded collision.
+  - The contact log holds 64 entries and is pruned to the step ring. A contact pushed out is counted (`droppedContacts`); nothing in the product reads the counter.
+- **Reproduced by the verifier,** in process, for walls, props and the district's own colliders only:
+  - 44 cells × 12 cadences, with frames of up to 30 steps, plus a 0.37 s hitch at 15 positions around the impact on the 42 cells with an impact step: 0 differences from 60 Hz in judged contacts, COLLISION bills, the sheet and the impact step. 40 of the 44 cells bill a graded contact at 60 Hz; three are below the 10 km/h tolerance and one judges no contact;
+  - base against tree: 0 differences at 60 Hz and at 120 Hz.
+- **Pins added at landing** (each mutant re-run red on assertion text by the integration verifier or, for the last, by the integrator).
+  - The ear's layout effect, cut out of `VehicleRig.tsx` with its dependency argument and run under R3F's reconciler: a deps array of `[]`, `[onCollision]`, `[collisionMinKmh]` or `[contactListenerRef]` fails.
+  - A 60 Hz audit of all 80 census cells against rapier's own STARTED events, one per held manifold: counting only manifolds in solver contact fails on 9 cells.
+  - LessonScene's `handleCollision`, cut out of the scene and run on the lesson's live runtime: a scene that stops pushing static-object collisions fails 6 tests.
+  - The JSX link `onCollision={handleCollision}` on LessonScene's one `<VehicleRig>`, read from the AST: `onCollision={undefined}` fails.
+  - Limit: the first and third execute a statement cut out of the product source, not the mounted component. Only the owed device re-drive holds the mounted chain.
+- **What still IS frame-timed after this landing.**
+  - **The rest of this ADR's list, unchanged:**
+    - the cabin's discrete channels and the pedals;
+    - the performed pre-drive steps;
+    - the moment a look is SAMPLED;
+    - a checklist step, a manual finish and an abort, stamped at the click;
+    - the trace's `driveline` events, «втори замах» annotation, steering angle and pedal flags;
+    - what the student sees while driving.
+  - **The items ADR-017 D-3 names beside them:** the driveline stall timer on the unclamped render delta (the review's A13, still owed as its own amendment), the `cabin.update` clocks, reverseAssist and the lee.
+  - **The other body of a contact with an NPC shell, ambient or staged.** NpcColliders still moves rapier's kinematic shells once per render frame, for whichever agents are nearest (doc 94 «NOT claimed» (3), second clause, unchanged). Read from source, not measured:
+    - The step at which rapier's world begins such a contact is now recorded. But inside a long frame the shell stands at its last frame's pose, so whether and when the chassis meets it can still differ by display.
+    - Rapier derives the shell's velocity from that once-per-frame move, so the other body's share of the judged impact speed is the frame's too.
+    - Which agents hold a shell at all is re-chosen on NpcColliders' own clock (every 0.5 s, advanced by at most 0.1 s per render frame) from the frame's drawn sample.
+
+    No census measures any of this: the builder's harness does not model NpcColliders' shells, and the verifier's cells mount none.
+  - **What the student hears and sees of a contact.** The thump and the haptic pattern (the ear) and the impact cut (LessonScene) are presentation. They are called in the grid loop at the contact's point, but every point of a frame runs in that frame's one callback, so they play with the frame that carries the step.
+- **Unchanged, and on the grid as before.** Contact with STAGED actors is also decided by the director's sentinel. The replay harness has no rapier and keeps its stand-in at grid points.
+- **Two things this amendment does not settle.** Neither is a frame-timing matter:
+  - **The impact speed is read after the contact step's solve,** on base and tree alike. That is a latent defect that needs its own lane or a ruling (doc 88).
+  - **Vehicle and pedestrian naming at 60 Hz.** A contact is now named from the pose one step later than on base. This is not measured.
+- **No rule or threshold changes.** No point value or shown sentence changes either. `gradedContactMinKmh`, the `>=` comparison, `COLLISION_MIN_KMH` (10) and the thump formula are verbatim. At 60 Hz the impact speed is the number base read; the verifier reproduced that for static obstacles only.
+- **D6 stands.** Nothing here was driven in a browser. The live re-drive on PC and the phone lens is owed (doc 88).
+
 ## ADR-015: A pass is judged by what the overtaken vehicle really had to do
 
 **Status.** Accepted by the integrator under the founder's delegation of 2026-10-08 (doc 88, «Founder delegation», item 2: restage the truck-pass

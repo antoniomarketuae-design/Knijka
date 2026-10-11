@@ -71,7 +71,49 @@ export interface PhysicsStepSource {
    *  untouched) when that step is not held (not taken yet, or older than the
    *  ring). */
   stateAtStep(n: number, out: PhysicsStepState): boolean;
+  /** The contacts the chassis BEGAN at step `n` (see `StepContact`), in the
+   *  order rapier listed them; empty when none, or when `n` is not held.
+   *  Optional: a source that records no contacts has none to give. */
+  contactsAtStep?(n: number): readonly StepContact[];
 }
+
+/**
+ * sc-hz-brake-dont-swerve:a7d0dd29 — A CONTACT THE CHASSIS BEGAN, AS THE STEP
+ * RECORD HOLDS IT.
+ *
+ * WHY THE STEP RECORD. A crash used to reach the grade through
+ * @react-three/rapier's `onCollisionEnter`, which r3r calls once per render
+ * FRAME, after every physics step the frame owed, and only from inside
+ * `world.contactPair(…)` — once per manifold rapier still held at that
+ * moment. A car that rebounds off a wall leaves solver contact within a few
+ * steps, so inside a phone's frame of 7–30 steps the started pair was drained
+ * with no manifold left and the crash was never reported (the 50 km/h block
+ * crash certified ИЗДЪРЖАН 0 ★★★ on the phone lens), and where it was reported
+ * its speed was read at the frame's END. Here a contact is recorded at the
+ * step it began, with the speed of that step, and the session grid hears it at
+ * that step's own grid point (scene/gradeGrid.ts) — the same step, the same
+ * speed and the same grid point on every display.
+ *
+ * `impactKmh` is |v_chassis − v_other| after step `step`: at 60 Hz exactly the
+ * number VehicleRig's `onCollisionEnter` read (r3r drained right after that
+ * step). A pair holding several manifolds is recorded once per manifold, as
+ * r3r called the handler once per manifold.
+ */
+export interface StepContact {
+  /** The physics step — the session grid point — the contact began at. */
+  readonly step: number;
+  /** The struck rigid body's `userData` (the classification and threshold
+   *  read it; undefined for an untagged or bodiless collider). */
+  readonly otherUserData: unknown;
+  /** Relative speed of the two bodies after that step, km/h. */
+  readonly impactKmh: number;
+}
+
+/** No contacts — the shared empty answer of `contactsAtStep`. */
+const NO_STEP_CONTACTS: readonly StepContact[] = Object.freeze([]);
+/** Contacts the recorder keeps (oldest dropped past this — and counted). A
+ *  real drive begins a handful a minute; the ring of steps holds 64. */
+const CONTACT_LOG_CAPACITY = 64;
 
 /** A source that never steps: nothing is graded against it. */
 export const NO_PHYSICS_STEPS: PhysicsStepSource = {
@@ -117,7 +159,7 @@ export class PlayerStepTrackRecorder implements PhysicsStepSource {
   }
 
   stateAtStep(n: number, out: PhysicsStepState): boolean {
-    if (!(n >= 1) || n > this.stepsRecorded || n <= this.stepsRecorded - this.ringCount) return false;
+    if (!this.holds(n)) return false;
     const slot = (n - 1) % STEP_RING;
     out.x = this.ring.x[slot];
     out.y = this.ring.y[slot];
@@ -125,6 +167,71 @@ export class PlayerStepTrackRecorder implements PhysicsStepSource {
     out.headingDeg = this.ring.headingDeg[slot];
     return true;
   }
+
+  /** Step `n` has been taken and is still in the ring. */
+  private holds(n: number): boolean {
+    return n >= 1 && n <= this.stepsRecorded && n > this.stepsRecorded - this.ringCount;
+  }
+
+  // ── the contacts the chassis began (sc-hz-brake-dont-swerve:a7d0dd29) ────
+
+  /** Colliders in solver contact after the previous recorded step / this one. */
+  private touchingBefore = new Set<number>();
+  private touchingNow = new Set<number>();
+  /** Contacts begun, oldest first (steps ascending). */
+  private readonly contactLog: StepContact[] = [];
+  private contactsDropped = 0;
+
+  /** Contacts that found the log full and pushed the oldest out (0 in any
+   *  drive a person can make — see CONTACT_LOG_CAPACITY). */
+  get droppedContacts(): number {
+    return this.contactsDropped;
+  }
+
+  /**
+   * After `record` of step k: every body the chassis is in contact with now
+   * and was not after step k−1 BEGAN its contact at step k — rapier's own
+   * STARTED edge (`VehicleSim.forEachChassisContact` reads its criterion).
+   * Called by `recordPhysicsStep` only, right after the step's `record`.
+   */
+  watchContacts(contacts: ChassisContactSource): void {
+    const k = this.stepsRecorded;
+    const now = this.touchingNow;
+    now.clear();
+    contacts.forEachChassisContact((c) => {
+      now.add(c.otherHandle);
+      if (this.touchingBefore.has(c.otherHandle)) return;
+      for (let i = 0; i < c.manifolds; i++) {
+        if (this.contactLog.length === CONTACT_LOG_CAPACITY) {
+          this.contactLog.shift();
+          this.contactsDropped++;
+        }
+        this.contactLog.push({ step: k, otherUserData: c.otherUserData, impactKmh: c.impactKmh });
+      }
+    });
+    this.touchingNow = this.touchingBefore;
+    this.touchingBefore = now;
+    // Nothing older than the ring can be asked for again.
+    const oldest = this.stepsRecorded - this.ringCount;
+    while (this.contactLog.length > 0 && this.contactLog[0].step <= oldest) this.contactLog.shift();
+  }
+
+  contactsAtStep(n: number): readonly StepContact[] {
+    if (!this.holds(n) || this.contactLog.length === 0) return NO_STEP_CONTACTS;
+    let out: StepContact[] | null = null;
+    for (const c of this.contactLog) {
+      if (c.step === n) (out ??= []).push(c);
+      else if (c.step > n) break;
+    }
+    return out ?? NO_STEP_CONTACTS;
+  }
+}
+
+/** What the contact watch reads after a step — `VehicleSim`, structurally. */
+export interface ChassisContactSource {
+  forEachChassisContact(
+    f: (c: { otherHandle: number; manifolds: number; otherUserData: unknown; impactKmh: number }) => void,
+  ): void;
 }
 
 /** The physics engine's rigid body, as far as the step record reads it
@@ -137,6 +244,9 @@ export interface PhysicsStepBody {
 /** The vehicle simulation, as far as the step record reads it. */
 export interface PhysicsStepSim {
   readonly speedKmh: number;
+  /** The bodies the chassis touches after the step (`VehicleSim`'s pure
+   *  read). A sim without it records no contacts. */
+  forEachChassisContact?: ChassisContactSource["forEachChassisContact"];
 }
 
 /**
@@ -159,9 +269,14 @@ export interface PhysicsStepSim {
  *
  * A null `rec`, `body` or `sim` (a rig mid-mount, or no recorder handed in)
  * records nothing and returns false.
+ *
+ * sc-hz-brake-dont-swerve:a7d0dd29 — and the contacts the chassis BEGAN at
+ * this step (`PlayerStepTrackRecorder.watchContacts`), from the sim's pure
+ * read of rapier's contact graph, so a crash is part of the step record like
+ * the pose: at its step, with its step's speed, whatever the frame.
  */
 export function recordPhysicsStep(
-  rec: Pick<PlayerStepTrackRecorder, "record"> | null | undefined,
+  rec: (Pick<PlayerStepTrackRecorder, "record"> & Partial<Pick<PlayerStepTrackRecorder, "watchContacts">>) | null | undefined,
   body: PhysicsStepBody | null | undefined,
   sim: PhysicsStepSim | null | undefined,
 ): boolean {
@@ -173,5 +288,8 @@ export function recordPhysicsStep(
   const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
   const headingDeg = ((Math.atan2(fx, -fz) * 180) / Math.PI + 360) % 360;
   rec.record(t.x, -t.z, sim.speedKmh, headingDeg);
+  if (rec.watchContacts !== undefined && sim.forEachChassisContact !== undefined) {
+    rec.watchContacts(sim as ChassisContactSource);
+  }
   return true;
 }

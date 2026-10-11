@@ -56,14 +56,21 @@ const ALL_STATES: readonly SignalLampState[] = [
   "yellow",
   "green",
   "dark",
+  "darkControlled",
   "amberFlashOn",
   "amberFlashOff",
 ];
 
 describe("which heads get a caption (B35)", () => {
-  it("captions exactly the two states whose lenses cannot be read", () => {
+  it("captions exactly the states whose lenses cannot be read", () => {
     const labelled = ALL_STATES.filter((s) => signalLabelKindFor(s) !== null);
-    expect(labelled).toEqual(["dark", "amberFlashOn", "amberFlashOff"]);
+    expect(labelled).toEqual(["dark", "darkControlled", "amberFlashOn", "amberFlashOff"]);
+  });
+
+  it("the officer's dead head (sc-sig-controller-postures:784b2ca7) gets HIS card, never the right-hand rule's", () => {
+    expect(signalLabelKindFor("darkControlled")).toBe("officer");
+    expect(SIGNAL_HEAD_LABELS.officer.line2Bg).not.toMatch(/ОТДЯСНО/);
+    expect(SIGNAL_HEAD_LABELS.officer.lawRef).not.toMatch(/чл\.\s*48/);
   });
 
   it("says nothing over a head that is lit — the lens IS the message", () => {
@@ -97,9 +104,16 @@ describe("the caption itself (THEO-4 — never a bare verdict)", () => {
       expect(c.headlineBg.length, k).toBeGreaterThan(6);
       expect(c.line1Bg.length, k).toBeGreaterThan(12);
       // The instruction half. A caption that named the state and stopped would
-      // be the „bare correct/wrong verdict" the theory rule forbids.
-      expect(c.line2Bg, k).toMatch(/Пропусни/);
-      expect(c.line2Bg, k).toMatch(/ОТДЯСНО/);
+      // be the „bare correct/wrong verdict" the theory rule forbids. At the two
+      // UNCONTROLLED heads that is the right-hand rule; at the officer's dead
+      // head it is reading him, and the right-hand rule would be the lie.
+      if (k === "officer") {
+        expect(c.line2Bg, k).toMatch(/поза/);
+        expect(c.line2Bg, k).not.toMatch(/ОТДЯСНО/);
+      } else {
+        expect(c.line2Bg, k).toMatch(/Пропусни/);
+        expect(c.line2Bg, k).toMatch(/ОТДЯСНО/);
+      }
     }
   });
 
@@ -117,8 +131,9 @@ describe("the caption itself (THEO-4 — never a bare verdict)", () => {
     expect(new Set(kinds.map((k) => SIGNAL_HEAD_LABELS[k].headlineBg)).size).toBe(kinds.length);
   });
 
-  it("distinguishes a dead head from a blinking one by colour as well as text", () => {
-    expect(SIGNAL_HEAD_LABELS.dark.accent).not.toBe(SIGNAL_HEAD_LABELS.amberFlash.accent);
+  it("distinguishes a dead head from a blinking one — and from the officer's — by colour as well as text", () => {
+    const accents = kinds.map((k) => SIGNAL_HEAD_LABELS[k].accent);
+    expect(new Set(accents).size).toBe(kinds.length);
   });
 });
 

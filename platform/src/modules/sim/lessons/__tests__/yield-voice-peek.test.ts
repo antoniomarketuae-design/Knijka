@@ -91,7 +91,7 @@ interface Episode {
  * away, and roll the verdict window out. The timings are the voice's own
  * (1.2 s name, 10 s settle, 4 s verdict); nothing here is graded.
  */
-function episode(reason: YieldReason, railPriority = false): Episode {
+function episode(reason: YieldReason, railPriority = false, officerLampsDark = false): Episode {
   const held: YieldWaitState = {
     holding: true,
     sinceSec: 0,
@@ -108,7 +108,7 @@ function episode(reason: YieldReason, railPriority = false): Episode {
     { t: 16, speedKmh: 12, wait: free },
   ];
   for (const f of frames) {
-    const step = stepYieldVoice(v, { ...f, violations: [], railPriority });
+    const step = stepYieldVoice(v, { ...f, violations: [], railPriority, officerLampsDark });
     said.push(...step.notices);
     v = step.state;
   }
@@ -119,7 +119,7 @@ function episode(reason: YieldReason, railPriority = false): Episode {
     throw new Error(`${reason}${railPriority ? " (rails)" : ""}: expected 3 notices, got ${said.length}`);
   }
   return {
-    label: `${reason}${railPriority ? "+rails" : ""}`,
+    label: `${reason}${railPriority ? "+rails" : ""}${officerLampsDark ? "+officerDark" : ""}`,
     reason,
     named: said[0],
     settled: said[1],
@@ -131,6 +131,9 @@ const EPISODES: readonly Episode[] = [
   ...REASONS.map((r) => episode(r)),
   // The rail-red copy is a different record with its own three titles.
   episode("redLight", true),
+  // …and so is the officer's halt at a junction whose lamps are out
+  // (sc-sig-controller-postures:784b2ca7).
+  episode("redLight", false, true),
 ];
 
 const EVERY_NOTICE = EPISODES.flatMap((e) =>
@@ -143,8 +146,8 @@ const EVERY_NOTICE = EPISODES.flatMap((e) =>
 );
 
 describe("every line the yield voice speaks carries a summary", () => {
-  it("covers all seven reasons plus the rail-red record — twenty-four notices", () => {
-    expect(EVERY_NOTICE).toHaveLength(24);
+  it("covers all seven reasons plus the rail-red and officer-dark records — twenty-seven notices", () => {
+    expect(EVERY_NOTICE).toHaveLength(27);
     for (const { where, notice } of EVERY_NOTICE) {
       expect(notice.kind, where).toBe("lesson");
       expect(typeof notice.peekBg, where).toBe("string");

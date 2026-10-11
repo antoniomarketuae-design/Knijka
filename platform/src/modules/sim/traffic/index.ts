@@ -80,6 +80,8 @@ export {
   type PhysicsStepSim,
   type PhysicsStepSource,
   type PhysicsStepState,
+  type ChassisContactSource,
+  type StepContact,
 } from "./playerTrack";
 export {
   PhysicsSessionClock,

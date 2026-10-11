@@ -13,6 +13,7 @@ export {
   IDLE_INPUT,
 } from "./VehicleSim";
 export type {
+  ChassisContactReading,
   VehicleInput,
   VehicleDebugState,
   VehicleSimOptions,

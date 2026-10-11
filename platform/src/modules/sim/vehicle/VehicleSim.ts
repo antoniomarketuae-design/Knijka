@@ -71,6 +71,19 @@ export const IDLE_INPUT: Readonly<VehicleInput> = {
   handbrake: false,
 };
 
+/** One body the chassis is in solver contact with after a physics step —
+ *  what `VehicleSim.forEachChassisContact` hands its callback. */
+export interface ChassisContactReading {
+  /** The struck collider's rapier handle (the pair's identity). */
+  otherHandle: number;
+  /** Manifolds rapier holds for the pair now (≥ 1). */
+  manifolds: number;
+  /** The struck rigid body's `userData` (undefined: no body, or untagged). */
+  otherUserData: unknown;
+  /** |v_chassis − v_other| after the step, km/h (own |forward speed| with no body). */
+  impactKmh: number;
+}
+
 export interface VehicleDebugState {
   position: Vec3;
   rotation: Quat;
@@ -890,6 +903,56 @@ export class VehicleSim {
   /** Accumulated rolling rotation of wheel i (rad). */
   wheelRotationRad(i: number): number {
     return this.controller.wheelRotation(i) ?? 0;
+  }
+
+  /**
+   * THE BODIES THE CHASSIS IS IN CONTACT WITH, AFTER THE PHYSICS STEP JUST
+   * TAKEN — sc-hz-brake-dont-swerve:a7d0dd29. PURE READ: no force, no impulse,
+   * no state of this sim or of rapier changes.
+   *
+   * „In contact" is rapier's own criterion for a collision event: a pair whose
+   * manifolds hold at least one SOLVER contact (rapier flips a pair's
+   * `has_any_active_contact` — and emits STARTED / STOPPED — exactly when that
+   * changes). Read after each step, the pairs this reports turning on are the
+   * pairs rapier reported STARTED in that step: measured step for step, 0
+   * mismatches over six drives into the block, a kerb, a façade, a weave and a
+   * kinematic crosser (the lane's probe; re-proven by the cadence census
+   * `hz-static-contact-cadence.test.ts`).
+   *
+   * For each such body, `f` gets: the collider's handle; how many manifolds the
+   * pair holds now (@react-three/rapier called a body's `onCollisionEnter`
+   * once per manifold — the count is kept so a contact is heard exactly as
+   * often as it was at 60 Hz); the struck rigid body's `userData` (the tag the
+   * contact threshold and the classification read); and the IMPACT speed — the
+   * relative speed |v_chassis − v_other| after this step, km/h, or the car's
+   * own |forward speed| when the collider has no body: the same expression
+   * VehicleRig's `onCollisionEnter` evaluated at r3r's drain, which at 60 Hz
+   * is this very moment.
+   */
+  forEachChassisContact(f: (reading: ChassisContactReading) => void): void {
+    if (this.disposed) return;
+    const world = this.world;
+    const chassis = world.getCollider(this.chassisColliderHandle);
+    if (!chassis) return;
+    world.contactPairsWith(chassis, (other) => {
+      let manifolds = 0;
+      let active = false;
+      world.contactPair(chassis, other, (m) => {
+        manifolds++;
+        if (m.numSolverContacts() > 0) active = true;
+      });
+      if (!active) return;
+      const otherBody = other.parent();
+      let impactKmh: number;
+      if (otherBody) {
+        const pv = this.body.linvel();
+        const ov = otherBody.linvel();
+        impactKmh = Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6;
+      } else {
+        impactKmh = Math.abs(this.speedKmh);
+      }
+      f({ otherHandle: other.handle, manifolds, otherUserData: otherBody?.userData, impactKmh });
+    });
   }
 
   /** Narrow debug readout (numeric harness + future debug HUD). */

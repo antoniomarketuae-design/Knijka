@@ -45,8 +45,11 @@
 import type { SignalLampState } from "../../contracts";
 import type { WorldLabelCopy } from "./worldLabel";
 
-/** The two head states a driver cannot read off the lenses. */
-export type SignalLabelKind = "dark" | "amberFlash";
+/**
+ * The head states a driver cannot read off the lenses: the two uncontrolled
+ * ones, and the officer's junction whose lesson authors the lamps as OUT.
+ */
+export type SignalLabelKind = "dark" | "amberFlash" | "officer";
 
 export const SIGNAL_HEAD_LABELS: Readonly<Record<SignalLabelKind, WorldLabelCopy>> = {
   dark: {
@@ -66,6 +69,33 @@ export const SIGNAL_HEAD_LABELS: Readonly<Record<SignalLabelKind, WorldLabelCopy
     // The colour of the lens the student is being told to read.
     accent: "#ffc23d",
   },
+  /*
+   * THE DEAD HEAD AT AN OFFICER'S JUNCTION — sc-sig-controller-postures:784b2ca7.
+   *
+   * Every lens unlit, like «Загаснал светофар», and the opposite rule: here the
+   * junction is NOT равнозначно and nobody is let through from the right by the
+   * right-hand rule — the officer directs it, and ЗДвП чл. 6, т. 2 binds his
+   * orders «независимо от светлинните сигнали, пътните знаци, маркировката на
+   * пътя и правилата за движение» (re-read out of content/law/acts by
+   * controller-dark-lamp-head-and-voice.test.ts). The `dark` card above would
+   * put «Пропусни идващия ОТДЯСНО» over the one junction where that is wrong.
+   *
+   * THE WORDS ARE THE LESSON'S OWN (instruction 1 of the only lesson that posts
+   * this junction: «светофарът на кръстовището е ЗАГАСНАЛ, а движението нарежда
+   * РЕГУЛИРОВЧИК. Тук важи само неговата поза.»), cut to the card: the WHO, the
+   * state of the lamp, and what to read instead. Nothing here names a posture —
+   * the officer's own bubble does that, posture by posture.
+   */
+  officer: {
+    headlineBg: "РЕГУЛИРОВЧИК",
+    line1Bg: "Светофарът е ЗАГАСНАЛ",
+    line2Bg: "Тук важи само неговата поза",
+    lawRef: "ЗДвП чл. 6, т. 2",
+    // Neither the dead head's cold grey-blue (that card is the right-hand rule)
+    // nor amber (the blinking drill): a plain white — the officer's gloves are
+    // what the student is being told to read.
+    accent: "#f4f6fa",
+  },
 };
 
 /**
@@ -74,10 +104,13 @@ export const SIGNAL_HEAD_LABELS: Readonly<Record<SignalLabelKind, WorldLabelCopy
  *
  * Red, amber and green need no caption: the lens IS the message, and a card
  * over a working head would be noise on ~150 scenarios. `redYellow` is a lit,
- * legible state too. Only the two unreadable ones are labelled.
+ * legible state too. Only the unreadable ones are labelled — the two uncontrolled
+ * states, and the officer's dead head ("darkControlled").
  */
 export function signalLabelKindFor(state: SignalLampState): SignalLabelKind | null {
   if (state === "dark") return "dark";
+  // The officer's junction with the lamps out: dead lenses, HIS card.
+  if (state === "darkControlled") return "officer";
   if (state === "amberFlashOn" || state === "amberFlashOff") return "amberFlash";
   return null;
 }

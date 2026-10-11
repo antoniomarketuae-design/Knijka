@@ -2316,6 +2316,79 @@ export function lessonYieldsToRailVehicle(lesson: LessonSpec): boolean {
 }
 
 /**
+ * Does this lesson post an officer at a junction whose lamps it AUTHORS AS OUT
+ * (`TrafficControllerSpec.lamps: "dark"`)? — sc-sig-controller-postures:784b2ca7.
+ *
+ * Read off the staged event, the structured marker praiselamp gave this case,
+ * never off the copy. There, and only there, the `redLight` reason has exactly
+ * one source: the runtime publishes NO phase on that approach while the officer
+ * permits (worldRuntime.ts, `controllerLampsDark`) and the effective "red"
+ * while he HALTS it — so a `redLight` hold on such a lesson IS the officer's
+ * halt, and the lamp's own words («Защо чакаш: червен сигнал», «…секунди на
+ * червено са просто цикълът на светофара») describe a lamp the lesson says is
+ * dark. `controller-dark-lamp-head-and-voice.test.ts` pins the other half of
+ * that argument: the one lesson this is true of has one signalized node, his.
+ *
+ * NOT the two live-lamp officer drills. There a `redLight` hold is either his
+ * halt over ANY lamp or a red lamp while he permits, and the voice cannot tell
+ * the two apart — so they keep the generic copy, which carries his exception in
+ * every stage (see `redLight`'s `settledBg` note).
+ */
+export function lessonOfficerLampsDark(lesson: LessonSpec): boolean {
+  return (lesson.stagedEvents ?? []).some((e) => e.kind === "trafficController" && e.lamps === "dark");
+}
+
+/**
+ * WHAT THE INSTRUCTOR SAYS WHILE THE OFFICER HOLDS HIM AT A JUNCTION WHOSE
+ * LAMPS ARE OUT — the red-light wait's three stages, with the lamp taken out of
+ * all of them (sc-sig-controller-postures:784b2ca7).
+ *
+ * MEASURED BEFORE (the rig's five careful drives, replayed through the live
+ * chain at 2e9268f): every drive heard «Защо чакаш: червен сигнал · Спрял си
+ * пред стоп-линията и на червено това е правилното», then «N секунди на червено
+ * са просто цикълът на светофара», then «Изчака сигнала и тръгна чисто» — over a
+ * lesson whose instruction 1 says «светофарът на кръстовището е ЗАГАСНАЛ … Тук
+ * важи само неговата поза» and instruction 3 «Няма лампа за четене — четеш
+ * човека».
+ *
+ * EVERY SENTENCE IS THE LESSON'S OWN (instructions 1–5 of
+ * sc-sig-controller-postures, ADR-002: authored copy, never free recall), and
+ * the article is the catalogue row that grades this very duty
+ * (CONTROLLER_SIGNAL_VIOLATED), so the coach and the fault cite one spelling.
+ *
+ * WHAT IT MAY NOT SAY, for the reasons the generic rows give: where he stopped
+ * (it is handed no pose — «ПРЕДИ стоп-линията» is the rule, not a claim), which
+ * posture the officer holds at this instant (the halt is chest/back AND the
+ * raised arm, so the copy names both and claims neither), or that the officer
+ * released him (the verdict is said of the departure, and only the graded
+ * channel knows whether that departure obeyed him — a conviction mutes it).
+ *
+ * The card fields are the card this junction already shows
+ * (`controllerWaitAdvisorPrompt` displaces `redLight` on every officer lesson);
+ * `yieldWaitAdvisorPrompt` never reads them from here.
+ */
+const OFFICER_LAMPS_DARK_HALT_COPY: YieldVoiceCopy = {
+  cardBg: CONTROLLER_WAIT_CARD_BG,
+  convictedCardBg: CONTROLLER_WAIT_CARD_BG,
+  cardPeekBg: "Гледай регулировчика, не лампата.",
+  convictedCardPeekBg: "Гледай регулировчика, не лампата.",
+  namedTitleBg: "Защо чакаш: регулировчикът",
+  namedBg:
+    "Светофарът на кръстовището е ЗАГАСНАЛ и движението нарежда РЕГУЛИРОВЧИК — няма лампа за четене, четеш човека. Тук важи само неговата поза. ГЪРДИ ИЛИ ГРЪБ към теб: минава напречното, ти спираш ПРЕДИ стоп-линията и чакаш там. РЪКА НАГОРЕ: не минава никой — той сменя фазите и предимството в този миг не е на никого. Тръгваш едва при СТРАНИЧЕН ПРОФИЛ, когато застанеш срещу рамото му: тогава посоката ти е отворена и предимството е твое — премини решително и спокойно.",
+  // Instruction 1's last sentence, whole: the one line the phone can finish.
+  namedPeekBg: "Тук важи само неговата поза.",
+  settledTitleBg: "Чакането Е маневрата — четеш човека",
+  settledBg: (sec) =>
+    `${sec} секунди чакане по позата на регулировчика не са грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги, за да четеш човека: вдигнатата ръка НЕ е „тръгвай“ — тогава спират всички посоки; посоката ти се отваря едва когато се обърне със СТРАНИЧЕН ПРОФИЛ и застанеш срещу рамото му.`,
+  settledPeekBg: "Чакането не струва точки.",
+  verdictTitleBg: "Изчака регулировчика",
+  verdictBg: (sec) =>
+    `Изчака ${sec} с и премина — без отчетено нарушение на сигнала на регулировчика. При загаснал светофар разрешението идва само от неговата поза — страничен профил, ти срещу рамото му — и то е разрешение да минеш, не заповед да тръгнеш веднага: огледай кръстовището и мини решително, но спокойно.`,
+  verdictPeekBg: "Разрешението не е заповед.",
+  lawRef: VIOLATIONS.CONTROLLER_SIGNAL_VIOLATED.lawRef,
+};
+
+/**
  * WHAT THE INSTRUCTOR SAYS WHILE THE STUDENT IS STOPPED AT A RED WITH RAILS
  * AHEAD — the same three stages, with the tram put back into all of them.
  *
@@ -2384,7 +2457,10 @@ export function railPriorityWaitAdvisorPrompt(convicted = false): CoachedAdvisor
  * drill is exactly what its own card says it is — the same scoping the officer
  * displacement uses, and for the same reason.
  */
-function yieldVoiceCopyFor(reason: YieldReason, railPriority: boolean): YieldVoiceCopy {
+function yieldVoiceCopyFor(reason: YieldReason, railPriority: boolean, officerLampsDark: boolean): YieldVoiceCopy {
+  // The officer first, as the card asks him first: on a lesson whose lamps are
+  // out a `redLight` hold is his halt and nothing else (`lessonOfficerLampsDark`).
+  if (officerLampsDark && reason === "redLight") return OFFICER_LAMPS_DARK_HALT_COPY;
   return railPriority && reason === "redLight"
     ? RAIL_PRIORITY_RED_COPY
     : YIELD_VOICE_COPY[reason];
@@ -2687,6 +2763,14 @@ export interface YieldVoiceInput {
    */
   railPriority?: boolean;
   /**
+   * Does this LESSON post an officer at a junction whose lamps it authors as OUT
+   * (`lessonOfficerLampsDark`)? Then a `redLight` hold is his halt, and the
+   * voice speaks `OFFICER_LAMPS_DARK_HALT_COPY` instead of the lamp's
+   * (sc-sig-controller-postures:784b2ca7). Optional, absent means „no" — the
+   * generic copy, byte-identical, on every other lesson and test double.
+   */
+  officerLampsDark?: boolean;
+  /**
    * WHERE the car is this frame, and where round the route's nearest ring
    * (`yieldVoiceSiteAt`). sc-roundabout-entry:8be266cf — the two facts the
    * voice needed and was never handed: which site a conviction belongs to, and
@@ -2882,6 +2966,7 @@ export function stepYieldVoice(
 ): YieldVoiceStep {
   const { t, wait, violations, site } = input;
   const railPriority = input.railPriority === true;
+  const officerLampsDark = input.officerLampsDark === true;
   const base: YieldVoiceState = prev ?? createYieldVoice();
   const notices: YieldVoiceNotice[] = [];
   const moving = Math.abs(input.speedKmh) > YIELD_VOICE_STANDSTILL_KMH;
@@ -2977,7 +3062,7 @@ export function stepYieldVoice(
       // still on the ring, the line is true and is said.
       !(pending.ring !== undefined && input.ringEntryOpen === true)
     ) {
-      const copy = yieldVoiceCopyFor(pending.reason, railPriority);
+      const copy = yieldVoiceCopyFor(pending.reason, railPriority, officerLampsDark);
       notices.push(
         say(
           copy,
@@ -3036,7 +3121,7 @@ export function stepYieldVoice(
     endedAtSec = null;
 
     const heldSec = t - sinceSec;
-    const copy = yieldVoiceCopyFor(wait.reason, railPriority);
+    const copy = yieldVoiceCopyFor(wait.reason, railPriority, officerLampsDark);
     // A CONVICTED EPISODE IS NOT NARRATED, and `spoken` does not advance: it
     // counts lines SAID, and a wait that was never told anything has no verdict
     // owed to it either (section 3 below reads the same counter).

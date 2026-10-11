@@ -196,6 +196,11 @@ const SCENE_NAMES = [
   "attemptFeedRef",
   "feedAttemptPoint",
   "simRef",
+  // sc-hz-brake-dont-swerve:a7d0dd29: VehicleRig's ear for a contact the step
+  // record holds. These drives record no contacts (the recorder is filled
+  // from a tape), so it is never called here; the rapier-driven census
+  // hz-static-contact-cadence.test.ts runs it.
+  "contactListenerRef",
 ] as const;
 
 /** Two names the call does NOT read today, handed over all the same: a scene
@@ -425,6 +430,7 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
     attemptFeedRef: { current: createAttemptFeedState() },
     feedAttemptPoint,
     simRef: { current: null },
+    contactListenerRef: { current: null },
   };
   const ordered = [...SCENE_NAMES.map((n) => args[n]), NO_PHYSICS_STEPS, vruAheadMeters, directorContactCast];
   const dur = c.trace.meta.durationSec;
@@ -1061,6 +1067,7 @@ function driveLooks(
       attemptFeedRef: { current: createAttemptFeedState() },
       feedAttemptPoint,
       simRef: { current: sim },
+      contactListenerRef: { current: null },
     };
     const ordered = [...SCENE_NAMES.map((n) => args[n]), NO_PHYSICS_STEPS, vruAheadMeters, directorContactCast];
     const resetCar = opts.resetCar ? opts.resetCar(args.simRef, directorRef, args.cabinRef, gradeGrid) : null;

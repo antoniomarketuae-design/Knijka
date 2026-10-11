@@ -91,8 +91,20 @@ export type SignalPhase = "red" | "redYellow" | "green" | "yellow";
  * phase: dark/flashing clusters grade as UNCONTROLLED junctions and render
  * unlit/blinking; live and "controlled" clusters render the live cycle
  * ("controlled" lamps stay misleading-but-visible by design, ЗДвП чл. 7).
+ *
+ * "darkControlled" — the one "controlled" cluster whose lesson AUTHORS the
+ * lamps as OUT (`TrafficControllerSpec.lamps: "dark"`): every lens unlit, like
+ * "dark", but the junction is the OFFICER's, not an uncontrolled one — so the
+ * world captions it with his card, never the right-hand rule's
+ * (sc-sig-controller-postures:784b2ca7: the head used to cycle under a lesson
+ * that says «светофарът на кръстовището е ЗАГАСНАЛ»).
  */
-export type SignalLampState = SignalPhase | "dark" | "amberFlashOn" | "amberFlashOff";
+export type SignalLampState =
+  | SignalPhase
+  | "dark"
+  | "darkControlled"
+  | "amberFlashOn"
+  | "amberFlashOff";
 
 export interface WorldRuntime {
   /** Advance signal phases etc.; call once per render frame. */
@@ -1687,11 +1699,11 @@ export interface TrafficControllerSpec extends StagedEventBase {
    * session-clock moment the car crossed (sc-sig-controller-postures:f7e046c4, rig-w3a). A property nothing reads
    * cannot be the switch.
    *
-   * THE RENDER IS NOT YET DARK, and that is a known, reported gap rather than an oversight: `signals.lampState`
-   * still paints the live cycle for every "controlled" cluster, and a plain "dark" head is captioned by the world
-   * with the UNCONTROLLED junction's «Пропусни идващия ОТДЯСНО» (`signalHeadLabels.ts`) — false at an officer's
-   * junction. Darkening the head needs that caption, the yield voice's «на червено» and the ambient cross stream
-   * (which keeps obeying the cycle) settled together; this flag only guarantees the grade never reads the phase.
+   * THE RENDER IS DARK TOO (sc-sig-controller-postures:784b2ca7): `signals.lampState` answers "darkControlled"
+   * for such a cluster — every lens unlit — and the world captions that head with the OFFICER's card
+   * (`signalHeadLabels.ts` "officer"), never the uncontrolled junction's «Пропусни идващия ОТДЯСНО». The yield
+   * voice is told the same thing (`advisor.ts lessonOfficerLampsDark`), so a halted wait here is narrated with his
+   * reason and never «червен сигнал». STILL OWED: the ambient cross stream keeps obeying the hidden cycle.
    */
   lamps?: "dark";
   /** Approximate player stop-line setback from the junction node, m (scopes

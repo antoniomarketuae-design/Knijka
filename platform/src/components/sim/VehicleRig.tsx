@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject, type RefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import {
   CuboidCollider,
@@ -40,7 +40,7 @@ import { isDistrictSurfaceUserData, setWindSway } from "@/modules/sim/world";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 import type { SimAudio } from "@/modules/sim/scene/simAudio";
 import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
-import { recordPhysicsStep, type PlayerStepTrackRecorder } from "@/modules/sim/traffic";
+import { recordPhysicsStep, type PlayerStepTrackRecorder, type StepContact } from "@/modules/sim/traffic";
 import { INTERIOR_LAYER, VitokCockpit } from "./vitok/VitokCockpit";
 import { HeroCarBody } from "./HeroCarBody";
 import { readNpcColliderUserData } from "./NpcColliders";
@@ -115,6 +115,70 @@ export function gradedContactMinKmh(otherUserData: unknown, collisionMinKmh: num
     ? Math.max(collisionMinKmh, COLLISION_MIN_KMH)
     : collisionMinKmh;
 }
+
+/**
+ * WHAT THE RIG DOES WITH A CONTACT THE CHASSIS BEGAN — sc-hz-brake-dont-swerve:
+ * a7d0dd29. This is the body of the chassis' old `onCollisionEnter`, unchanged
+ * in every number: the thump at min(1, impact/50 + 0.15), the classification
+ * off the struck body's NPC-shell tag (untagged = a static object), the
+ * threshold the BODY decides (`gradedContactMinKmh`), the graded branch (the
+ * collision and its haptic pattern) and the sub-threshold nudge tap.
+ *
+ * WHAT CHANGED IS WHERE IT IS CALLED FROM AND WHAT IT IS HANDED. @react-three/
+ * rapier called `onCollisionEnter` once per render frame, after every physics
+ * step the frame owed, and only from inside `world.contactPair(…)` — once per
+ * manifold rapier STILL held at that moment; and the rig read the impact speed
+ * off `linvel()` then. A car that rebounds off a wall leaves solver contact in
+ * about three steps, so in a phone's frame of 7–30 steps the crash was drained
+ * with no manifold left and never reported (the 50 км/ч block crash certified
+ * ИЗДЪРЖАН 0 ★★★), and a crash still reported was read at the frame's end
+ * (2.9 км/ч where 60 Hz read 4.7, the collision booked up to 29 steps early).
+ * Now the step record holds each contact at the step it began, with that
+ * step's speed (traffic/playerTrack.ts `StepContact`), and the session grid
+ * hands it here at that step's own grid point (scene/gradeGrid.ts
+ * `stepContact`) — one step, one speed, one grid point on every display, and
+ * at 60 Hz exactly what `onCollisionEnter` saw.
+ *
+ * Returns whether the contact was graded.
+ */
+export interface ChassisContactEffects {
+  /** The audible contact, every contact (volume 0..1). */
+  thump(volume01: number): void;
+  /** A graded contact: the collision itself and its haptic pattern. */
+  graded(impactKmh: number, withWhat: CollisionWithWhat): void;
+  /** A sub-threshold contact (a kerb scuff, a bumper nudge): one short tap. */
+  nudge(): void;
+}
+
+export function hearChassisContact(
+  contact: Pick<StepContact, "otherUserData" | "impactKmh">,
+  collisionMinKmh: number,
+  fx: ChassisContactEffects,
+): boolean {
+  // A11: classify the contact — NPC shells carry a userData tag
+  // (NpcColliders); anything untagged (world meshes, props, kerbs) stays a
+  // static object.
+  const tag = readNpcColliderUserData(contact.otherUserData);
+  // Impact severity = RELATIVE speed at the step the contact began: a moving
+  // NPC striking a stopped player is still a real crash. Static geometry has
+  // zero velocity, so the pre-A11 own-speed behaviour is preserved there.
+  const impactKmh = contact.impactKmh;
+  fx.thump(Math.min(1, impactKmh / 50 + 0.15));
+  // The body decides the threshold, not the lesson alone — see
+  // `gradedContactMinKmh`.
+  if (impactKmh >= gradedContactMinKmh(contact.otherUserData, collisionMinKmh)) {
+    fx.graded(impactKmh, tag?.kind ?? "staticObject");
+    return true;
+  }
+  // Sub-threshold contact — a kerb scuff or a bumper nudge. NOT graded, and
+  // this call cannot make it graded: nothing here feeds the rule engine.
+  fx.nudge();
+  return false;
+}
+
+/** The rig's ear for the step record's contacts: LessonScene's grid hook calls
+ *  it with each contact at its grid point and the student there. */
+export type ChassisContactListener = (contact: StepContact, student: Readonly<VehicleSample>) => void;
 
 /** Stable empty default for gripPatches — a shared frozen constant so the
  *  prop is value-stable across renders and the patch branch below never runs
@@ -317,6 +381,7 @@ export function VehicleRig({
   lessonMaxLegalKmh,
   lessonRequiredKmh,
   onCollision,
+  contactListenerRef,
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
   rain = false,
@@ -366,8 +431,16 @@ export function VehicleRig({
   lessonRequiredKmh?: number;
   /** Fired on a real (fast-enough) impact so the rule engine can grade it.
    *  A11: `withWhat` classifies the contact from the other body's NPC-shell
-   *  userData tag — untagged bodies (world meshes) are static objects. */
-  onCollision?: (impactKmh: number, withWhat: CollisionWithWhat) => void;
+   *  userData tag — untagged bodies (world meshes) are static objects.
+   *  `student` is the car at the grid point of the step the contact began
+   *  (sc-hz-brake-dont-swerve:a7d0dd29) — the pose a contact is named from. */
+  onCollision?: (impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) => void;
+  /** Where the rig puts its ear for the step record's contacts
+   *  (`hearChassisContact` with this rig's threshold, audio, haptics and
+   *  `onCollision`); LessonScene's grid hook calls it at each contact's own
+   *  grid point. Filled on mount, emptied on unmount. Without it the rig
+   *  hears no contact. */
+  contactListenerRef?: MutableRefObject<ChassisContactListener | null>;
   /** Minimum impact speed (km/h) that grades as a collision. Defaults to the
    *  street nudge-tolerance COLLISION_MIN_KMH (10). Parking scenarios pass a
    *  low/zero threshold (S0 seam — see ScenarioObstacles) so ANY bumper
@@ -617,6 +690,33 @@ export function VehicleRig({
   // file and RUNS it against a body and a sim that differ from every sample.
   useAfterPhysicsStep(() => recordPhysicsStep(stepTrackRef?.current, bodyRef.current, simRef.current));
 
+  // THE RIG'S EAR FOR A CONTACT (sc-hz-brake-dont-swerve:a7d0dd29). The step
+  // record above also records each contact the chassis BEGAN, at its step and
+  // with that step's speed; the session grid hands it here at that step's own
+  // grid point, with the student there. This replaces the chassis'
+  // `onCollisionEnter`, which @react-three/rapier called once per frame and
+  // only for a pair still in contact at that moment (see
+  // `hearChassisContact`). Re-pointed on every render so the threshold, the
+  // callback and the refs are always this render's; emptied on unmount.
+  useLayoutEffect(() => {
+    if (!contactListenerRef) return;
+    contactListenerRef.current = (contact, student) => {
+      hearChassisContact(contact, collisionMinKmh, {
+        thump: (volume01) => audioRef.current?.thump(volume01),
+        graded: (impactKmh, withWhat) => {
+          onCollision?.(impactKmh, withWhat, student);
+          // F5: the graded-collision pattern, redundant with the thump and
+          // with the terminating „опасна" verdict on screen.
+          hapticsRef.current?.collision(impactKmh);
+        },
+        nudge: () => hapticsRef.current?.curb(),
+      });
+    };
+    return () => {
+      contactListenerRef.current = null;
+    };
+  });
+
   // Render-rate glue: kill-plane rescue, cabin clocks (blink/glance),
   // rule-engine sample, engine/indicator audio. The Vitok visual components
   // run their own useFrame for meshes/lamps/instruments.
@@ -753,35 +853,10 @@ export function VehicleRig({
       rotation={[0, spawn.yawRad, 0]}
       angularDamping={CHASSIS_ANGULAR_DAMPING}
       linearDamping={CHASSIS_LINEAR_DAMPING}
-      onCollisionEnter={(payload) => {
-        // A11: classify the contact — NPC shells carry a userData tag
-        // (NpcColliders); anything untagged (world meshes, props, kerbs)
-        // stays a static object.
-        const tag = readNpcColliderUserData(payload.other.rigidBody?.userData);
-        // Impact severity = RELATIVE speed: a moving NPC striking a stopped
-        // player is still a real crash. Static geometry has zero velocity,
-        // so the pre-A11 own-speed behavior is preserved there.
-        const pv = payload.target.rigidBody?.linvel();
-        const ov = payload.other.rigidBody?.linvel();
-        const impactKmh =
-          pv && ov
-            ? Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6
-            : Math.abs(simRef.current?.speedKmh ?? 0);
-        audioRef.current?.thump(Math.min(1, impactKmh / 50 + 0.15));
-        // The body decides the threshold, not the lesson alone — see
-        // `gradedContactMinKmh`.
-        if (impactKmh >= gradedContactMinKmh(payload.other.rigidBody?.userData, collisionMinKmh)) {
-          onCollision?.(impactKmh, tag?.kind ?? "staticObject");
-          // F5: the graded-collision pattern, redundant with the thump above
-          // and with the terminating „опасна" verdict on screen.
-          hapticsRef.current?.collision(impactKmh);
-        } else {
-          // Sub-threshold contact — a kerb scuff or a bumper nudge. One short
-          // tap, redundant with the same thump. NOT graded, and this call
-          // cannot make it graded: nothing here feeds the rule engine.
-          hapticsRef.current?.curb();
-        }
-      }}
+      // NO onCollisionEnter (sc-hz-brake-dont-swerve:a7d0dd29): a contact is
+      // heard from the step record at its own grid point — see
+      // `hearChassisContact` and `contactListenerRef` above. r3r drained it
+      // once per frame and lost the ones that had already rebounded.
     >
       <CuboidCollider
         args={[h.x, h.y, h.z]}

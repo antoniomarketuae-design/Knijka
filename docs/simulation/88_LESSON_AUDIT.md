@@ -12231,3 +12231,225 @@ It is staged with ltapnote r2, uturnedge r2 and praiselamp r1 in the integration
 - The real-phone frame-time reading.
 - The review's A13 (the driveline stall timer on the unclamped render delta), as a separate ADR-014 amendment.
 - Moving `glance-graded.mjs`, `wave3-drive.mjs` and the rig-wave capture scripts off the legacy «next» start before their evidence is compared across lenses.
+
+## Wave C verdicts — 2026-10-11
+
+This run retired 2 row(s). Their evidence frames were driven at (unattributable: 2 of 2) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2e9268fe7ec0`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 1 |
+| UNJUDGED (re-drive did not exercise it) | 17 |
+
+**Open list: 28 → 26**, out of 1547 filed across the whole programme (1519 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3c: seven rows re-driven through the step-keyed drive rig (integrator note, 2026-10-11)
+
+Workflow `rig-wave-w3c` (wf_9f2a466b-33e) ran at `2e9268f`, one capture at a time, through `/dev/drive-rig` (the real `LessonPlayShell`) with the ADR-017 rig. Frames are under `.audit-frames/rig-w3c/<lesson>/`. It was stopped for a machine restart after 7 of its 10 rows. `sc-roundabout-entry:fe081cf1` was mid-capture and `sc-ed-poligon-chain:317d2b4a` / `:dceba965` were not started; all three go into the next rig wave.
+
+**Closed — the verifier could not refute (2):**
+- `sc-mv-uturn-ban:e98407b1`. Both geometries that had lost the praise are praised on both lenses: a lawful turn stopped where instruction 4 says, with the arc reaching y ≥ 277 (PC L3, phone L3, PC L1), and a diagonal creep handed to the side street inside the 45° band (PC L3, phone L3). All five drives pass with 0 points and the praise. The wrong drive's debrief names the U-turn across the solid axis and В23, and it gets no praise for the lawful turn it also made.
+- `sc-follow-tailgater:4b342eee`. A mark blown after easing inside the approach is billed at the crossing against the glass number + 10 %: billed at 51.95, 46.05 and 41.45 km/h, not billed at 37.31 km/h. The refused objective and its toast now come with the bill.
+
+**Partial (4):**
+- `sc-turn-left-oncoming:d079e687`. The judge proposed CLOSED on all five clauses; the verifier refuted the closure and the row is posted PARTIAL on one standard. The capture's rig was never armed (frame-timed input, no named start), and on the unchanged spec cell at L1 the same controller law printed «зави при 27.8 с — над нормата» on PC and «зави при 3.5 с — под нормата от 4 секунди» on the phone (3.6 с on the repeat). The verifier did not dispute that both lenses pass with 0 points, or that «завоят не беше започнат» is gone from the phone (0 of 5 drives). Owed: a step-keyed re-drive with one named start on both lenses.
+- `sc-ac-crosswind:a9db1738`. The judge proposed CLOSED; the verifier refuted it. Clauses 1 and 5 hold on PC L1: hands off, the car yaws toward the axis and drifts, and the keys hold the lane. Clauses 2, 3 and 4 are not closed by positive evidence. The headline wheel figure counted 338 rows of one frozen instant after the lesson ended (de-duplicated: 67 % of gust frames, mean 5.7°), and no still on the row's own surface (PC, L1) shows the wheel turned against the gust.
+- `sc-rb-busy-gap:7bbdd45e`. Clause 3b(i), the live PC/phone sheet split at ADR-011's clearing edge, is closed on live evidence: with step-keyed input and one named start the same bytes give the same codes, points and verdict on both lenses on both sides of the one-step edge, at L1 and L3. Clause 3b(ii) waits on the founder (does «or there is contact» also bill a touch one step after the car cleared the mouth). Two residues are reported, neither changing codes or points: the COLLISION stamp moves 1–2 grid points with the animation frame; and on 2 of 10 phone drives the impact took 16.63 → 16.2 km/h where PC took 16.63 → 10.42 km/h, the car coasted 24 m off the ring and the lesson never ended by itself.
+- `sc-merge-motorway-exit:22f793e2`. Every clause is answered at its filed pose: the careful drive reaches 115 km/h, is never off the carriageway, and the windscreen at the spawn is clear. The row stays open because its cause is still built further up: the exit ramp's street kit lands on the continuing motorway carriageway past the nose (13 instances; the first is a utility pole in the right travel lane at y 800). Owed: a repair so no neighbouring edge's dressing lands inside a motorway carriageway, then a frame from that lane.
+
+**Still (1):**
+- `sc-roundabout-entry:08a0b701`. One cell splits, at L4 (H 1776, the one-step-wide FAILED_TO_YIELD + COLLISION band): PC 20 points twice; the phone 20 on its first run and 10 on the unchanged repeat. The other 13 PC/phone pairs give the same codes and points on every run, and the car's x / y / speed are bit-identical between the lenses up to the contact. The judge rules out the rig: the start is named, no key edge is near the contact, and only the phone's frame boundary moved. Its reading of the cause: on the phone the COLLISION stamp falls on the first grid point of the animation frame that carries the contact, 2 to 9 steps earlier than on PC in 5 of 7 contact cells; at L4 the exam ends on that first опасна грешка, so the sentinel's on-grid FAILED_TO_YIELD two steps later is billed only when the frame happens to start on the contact step. That is ADR-014's frame-timed rapier contact. The `hzcontact` landing below moves the contact itself onto the step record, but the other body here is an NPC shell, which stays frame-posed (ADR-014, Amendment 2026-10-11). So this cell is to be re-driven at the new HEAD before any further repair is designed.
+
+**Seen by the captures, not yet filed (to triage):**
+- Phone, L4, sc-roundabout-entry: after an exam-ending fault the «РЕЗУЛТАТ» chip did not open the result on two taps in 5 of 6 drives. After the first tap the chip moves and «Скрий известието ×» appears; the second tap changes nothing; a DOM click opens it.
+- Phone, sc-rb-busy-gap: the two drives above on which the lesson never ended after the contact, and whose forced-end debrief then adds a near miss with the car that was hit.
+
+## Landed: a crash into a standing obstacle is recorded at the physics step it began and heard at that step's grid point, on every cadence tested in process — `sc-hz-brake-dont-swerve:a7d0dd29` (critical) (2026-10-11)
+
+Lane `hzcontact`, round 1, built on `2e9268f`. Its adversarial verifier SIGNED it OFF WITH CONDITIONS and found nothing that meets the refute rule. The patch is `hzcontact-result-r1.patch` (sha256 ed6d4ec7…, 15 files, +1839/−46, 0 CR bytes).
+- **Seven product files:** `components/sim/LessonScene.tsx`, `components/sim/VehicleRig.tsx`, `scene/gradeGrid.ts`, `traffic/playerTrack.ts` and `traffic/index.ts`, `vehicle/VehicleSim.ts` and `vehicle/index.ts`.
+- **Eight test files.** Five are new: the harness `rapierContactDrive.ts`, `hz-static-contact-cadence.test.ts`, `static-contact-cadence.census.test.ts`, `step-contacts.test.ts` and `chassis-contact-ear.test.ts`. Three are updated pins: `grade-grid.test.ts`, `live-grid-wiring.test.ts` and `live-grade-call.execution.test.ts`.
+- **No shown sentence was added or changed,** and the reviewed-text manifest was not re-recorded for this patch.
+- **No threshold, rule, point value or damage model was touched.** The verifier confirms that `hearChassisContact` keeps `gradedContactMinKmh`, `>=`, `COLLISION_MIN_KMH` and the thump formula verbatim.
+- **ADR-014 is amended** (Amendment 2026-10-11): the contact itself leaves the frame-timed list. The pose of an NPC shell the chassis meets does not (Owed).
+
+**The row is NOT closed by this landing.** `sc-hz-brake-dont-swerve:a7d0dd29` stays OPEN. Every number in this section is in-process. Nothing was driven in a browser. A rig re-drive on both lenses is owed (below); whether its frames close the row is for that wave's judge and verifier.
+
+**The cause.**
+- **Checked by the verifier** against the @react-three/rapier 2.2.0 dist on its own base:
+  - The library builds `new EventQueue(false)`, so the queue is not auto-drained.
+  - A frame takes K `world.step` calls and then ONE `drainCollisionEvents`.
+  - For a pair that STARTED, the handler is called only inside `world.contactPair`, once per manifold rapier still holds at the drain.
+  - Base `VehicleRig` read `linvel`, the impact speed, at that drain.
+  - `VehicleRig` is the only chassis consumer, and no collider is created outside the library, so hearing every pair matches the old registered-source filter.
+- **The builder's reading of what follows** (its base probe; the verifier re-ran the builder's test on base, below, but not these readings):
+  - The car rebounds off the block and leaves solver contact about 3 steps after it arrives. In a frame of 7 to 30 steps the started pair was drained with no manifold left. `onCollisionEnter` was never called and the crash never reached the grade.
+  - A crash that was still reported carried the speed of the drain, not of the step the contact began at, and was booked at the frame's first grid point.
+  - This lesson compiles `collisionMinKmh: 0` (`compileScenario` writes 0 for every template). The loss was the missing call, not the 10 km/h tolerance.
+- **Reported by the builder, not re-run by the verifier** (base, in process, sc-hz-brake-dont-swerve L3):
+  - At 51.4 km/h with no brake and the pedals released at the crash, the bill was lost on 3 of 8 phases of w69 phone cadence A, 5 of 8 of cadence B and 21 of 30 at 2 fps.
+  - With a late brake (31.8 km/h) it was lost on 8 of 8, 5 of 8 and 27 of 30.
+  - The phone phases that were billed in the no-brake drive were booked 9–29 steps early.
+
+**What landed.**
+- **A contact is part of the step record.** After every rapier step, `recordPhysicsStep` also calls `PlayerStepTrackRecorder.watchContacts`. VehicleRig's after-step callback is still that one call.
+  - The watch reads `VehicleSim.forEachChassisContact`, a pure read of rapier's contact graph.
+  - A pair counts as in contact when a manifold holds a solver contact. The builder states this is rapier's own STARTED criterion; its audit test compares the step record with the events rapier emitted.
+  - The start edge is diffed per step and logged as a `StepContact`: the step, the struck body's `userData`, and the relative speed after that step (the car's own forward speed when the collider has no body). One entry is logged per manifold the pair holds, as the library called the handler.
+- **The grid hears it at its own point.** `GradeGrid.stepPhysics` hands each contact of step k to the new `hooks.stepContact` at grid point k, with the student at that point. This is after `hooks.contacts` and before `runtime.sample`. The replay path is untouched.
+- **The rig's ear.** The chassis `onCollisionEnter` is removed. Its body moved into the exported `hearChassisContact`, with the same thump, classification, threshold and graded/nudge branches. It is reached through a new `contactListenerRef`, filled in a layout effect and emptied on unmount.
+- **The name comes from the grid.** LessonScene's `handleCollision` names the struck body from the `student` at the contact's grid point, no longer from the frame's `sampleRef`.
+- **The impact speed is the number read after the contact step.** No new number was introduced. That it equals base's 60 Hz value is reproduced for static obstacles (below); for NPC shells it is not measured.
+
+**What the verifier reproduced** (its own lane from the base tar, patch sha256 matched; rapier, the library's stepper model and LessonScene's own `stepPhysics` call executed; `handleCollision` is the harness's copy, see C3):
+- **Test-first.** On base product files `hz-static-contact-cadence` fails 24 and passes 4, the 60 Hz anchors. The builder's 16/4 count predates the audit and façade tests. On the tree the targeted set passes 116/116, and 162/162 with `live-grade-call.execution`.
+- **One sheet on every cadence.** Its 44 cells:
+  - the lesson at L1–L5 at 20/35/50/70 km/h with pedals released at the crash (20 cells);
+  - 4 glancing or offset strikes;
+  - a throttle-held re-strike;
+  - 3 cells at the 10 km/h street tolerance;
+  - all 16 census walls and props approached at +20° (L3, 40 km/h).
+
+  40 of the 44 billed a graded contact at 60 Hz. The four that did not: the three tolerance cells (below the tolerance, see the latent defect), and «hz L4 70 release», which judges no contact at all (impact step −1; its sheet carries SPEEDING_DANGEROUS at 5.98 s), so that cell says nothing about a crash.
+  - Each cell ran on 12 cadences: 60, 120, 144, 59.94 and 45 Hz, two seeded ±8 ms jitter runs, three seeded 4–800 ms runs, 13 fps and 0.37 s frames. That is 44 × 12 = 528 rows. Frames reached 30 steps.
+  - A 0.37 s hitch was also placed at 15 positions from −12 to +2 steps around the impact, on the 42 cells the probe gives an impact step (not «hz L4 70 release», not sc-park-wall wall#4). These 630 runs are compared the same way but are not among the 528 rows.
+  - Result: 0 differences from 60 Hz in judged contacts (step, impact km/h to 1e-9, class), COLLISION bills, the full sheet and the impact step, on the 528 rows and on the hitch runs.
+  - Example: L3 at 50 km/h is judged [852, 6.008160331, staticObject] on every cadence.
+- **No 60 Hz change for static obstacles.** Base against tree on the same 44 cells: 0 differences at 60 Hz and 0 at 120 Hz. This covers walls, props and the district's own colliders, and nothing else.
+- **No double hearing** (read from source by the verifier, not run): RuntimeDriver and the physics share the `physicsPaused` gate, and the grid clock is not reset on a respawn.
+- **Mutants:** 8, one at a time, each restored and sha256-checked, each run against six targeted files (the five above plus `live-grade-call.execution`; the census file was not among them).
+  - Killed: V3 (horizontal-only relative speed), V4 (contact log pruned too early), V5b (aliased touching sets), V6 (contacts heard only at a frame's first point).
+  - V5 (copy instead of swap) is equivalent.
+  - Survived: V1, V2 and V8, the conditions below.
+- **Regression** (the verifier's lane):
+  - scenario: 183 files, 4,384/4,384;
+  - lessons: 124 files, 2,336 passed, 165 skipped;
+  - components/sim, scene, traffic and vehicle: 202 files, 3,158 passed, 2 failed. Both failures are ENOENT on `tools/mobile`, which the lane tar lacks;
+  - tsc: 22 errors, the environment baseline, none in a touched file.
+
+**The conditions, and how each stands.**
+- **C1 (F4, V1). The ear's effect is pinned only by its first argument.** Giving the `useLayoutEffect` a deps array of `[]` passed 162/162. A stale closure would keep the first render's `onCollision` and `collisionMinKmh`. PINNED AT INTEGRATION: `chassis-contact-ear.test.ts` gains «the ear follows the render — the rig's own layout effect, executed» (4 tests). The rig's own `useLayoutEffect(…)` call is cut out of `VehicleRig.tsx` with its deps argument and run under @react-three/fiber's bundled reconciler, then re-rendered with another `onCollision` and another `collisionMinKmh`. V1 (deps `[]`) is RED on 2 tests, on assertion text («the ear kept the first render's onCollision…», «…collisionMinKmh…»); deps `[onCollision]`, `[collisionMinKmh]` and `[contactListenerRef]` each die too. Re-run red by the merge verifier. Limit: the rig's effect call is executed, not the mounted rig.
+- **C2 (F5, V2). The manifold count is not pinned.** Counting only the manifolds that hold solver contacts, instead of every manifold as the library called the handler, passed 162/162 on the six targeted files. The verifier wrote that no committed drive has a manifold without solver contacts at the start step, and judged the effect likely sheet-neutral because the reducer merges same-tick contacts. Both are its expectation, not a measurement: the census file was not in its mutant run. The integrator's probe over the lane's 87 committed 60 Hz drives (`scratch/hl-land/v2-probe.json`) found 112 start edges, 13 of them holding a manifold with no solver contact (sc-pk-driveway wall#1, sc-park-wall wall#4). PINNED AT INTEGRATION: `static-contact-cadence.census.test.ts` gains a 60 Hz audit of all 80 cells: the step record must begin exactly the contacts rapier STARTED, one per manifold the started pair holds. The harness also asserts that idle manifolds really occur, on exactly those two bodies, so the audit cannot go vacuous. V2 is RED on 9 cells, on assertion text. Re-run red by the merge verifier. One observation, not acted on: the census cell sc-park-wall wall#4 records a contact with an untagged body at step 1 at 18.3 km/h on every rung — its start pose appears to spawn the car inside another body, so that cell measures a spawn overlap, not a drive into the wall.
+- **C3 (F6, V8). No test executes the scene's own `handleCollision`.** With its static-object push removed, 162/162 passed. So did impactCut, crashCoachWithdrawal, merge-lane-end-body-in-lane and merge-lane-end-rear-strike (92/92). The harness re-implements `handleCollision`, and the pins check only its naming text. The gap predates the lane, but the cadence proof covers the chain only up to the ear. PINNED AT INTEGRATION, in two parts. (a) The harness now cuts LessonScene's own `handleCollision` function out of the source (`sceneHandleCollision()`) and its graded branch calls THAT on the drive's runtime; `hz-static-contact-cadence.test.ts` gains «LessonScene's own handleCollision, cut out of the scene and executed» (4 tests). V8 is RED on 6 tests, on assertion text. (b) The merge verifier then found the one link still unpinned: the JSX prop `onCollision={handleCollision}` on LessonScene's `<VehicleRig>`. With it set to `undefined`, 256 tests in the 12 files that mention the callback stayed green. `chassis-contact-ear.test.ts` now reads that element's attribute from the AST («LessonScene hands ITS handleCollision to the one <VehicleRig> it mounts»); the mutant is RED on assertion text («expected [ 'undefined' ] to deeply equal [ 'handleCollision' ]»), re-run by the integrator. Limit: V1 and V8 execute a statement cut out of the product source, not the mounted component — only the owed device re-drive holds the mounted chain.
+- **C4 (F3). Naming at 60 Hz, not measured.** See Owed.
+
+**LATENT DEFECT — NOT caused by this lane and NOT fixed by it (verifier F7).** The impact speed is read after the contact step's solve, and the vertical rebound dominates it.
+- A 70 km/h block crash reads 8.5 km/h (8.506969 in the verifier's probe). At the 10 km/h street tolerance it is not graded as a collision at 60 Hz, on base and tree alike. The cell is «hz L3 70 at street tolerance 10»; `anchor-base.json` and `anchor-tree.json` are byte-identical. The two slower tolerance cells read 4.67 and 4.86 km/h and are not graded either.
+- Mutant V3 shows the composition: 3.86 km/h horizontal-only against 6.01 km/h at the same step.
+- This lesson is not affected, because it compiles a tolerance of 0. The builder names where the 10 applies: lessons that keep the default `collisionMinKmh`, and the district's drive-over surface.
+- The lane kept the 60 Hz number on purpose. Reading the closing speed before the solve would change 60 Hz sheets.
+- It needs its own lane or a ruling. Nothing in this landing changes it.
+
+**Integration.** This patch and `postureslamp-result-r1.patch` share no file.
+
+**PROVEN TOGETHER ON 2e9268f** (scratch worktree `integ-hl`, workflow `land-hl`, wf_b9cb1614-28e). Both patches 3-way applied cleanly: 37 files, no shared
+file. The integrator then added the pins named above, in test files only; every product file is byte-identical to the two signed-off patches (the merge
+verifier compared the trees). One worker, one run at a time:
+- lessons 124 files, 2,336 passed, 165 skipped; lessons/scenario 185 files, 4,409 passed; components/sim 89 files, 1,562 passed (`chassis-contact-ear` is 12/12 after the last pin);
+- orchestrator 39 files, 467; rules 98 files, 1,779; traffic 38 files, 447; runtime 48 files, 875; scene 45 files, 745; vehicle 21 files, 296; world 135 files, 2,409; hud 65 files, 1,186;
+- tsc: 21 errors, the environment baseline, none in a touched file. The reviewed-text manifest is the postureslamp lane's own; nothing moved against it.
+
+The merge verifier re-ran scenario, scene and components/sim to the same counts, re-killed all six pinned mutants and one wave-G mutant per lane itself, and
+returned ACCEPT WITH FIXES: carry the docs in the landing commit, and pin the one link it found unpinned (C3 above). Gate patch `gate-hl.patch`,
+sha256 58b0acbc…, 38 files, +3,490/−88, 0 CR bytes.
+
+**Owed.**
+- **The live re-drive.** Drive sc-hz-brake-dont-swerve late-brake and no-brake through `/dev/drive-rig` on PC and on the phone lens, and expect a COLLISION bill on both lenses. rig-w3b's `hz-drive.mjs` is the starting point, but as written it arms `window.__driveRig.run(st)` with no `startAt`, which is ADR-017's wall-timed «next» start. It must first be changed to arm `run(steps, { startAt: N })` in one evaluate, with the same N on both lenses and phase=driving confirmed at N (ADR-017 L3).
+- **Two exclusions, unmeasured across cadences:** the GLB-measured parked-vehicle obstacles and the sc-merge-from-property forecourt. Neither mounts headless.
+- **Naming one step later at 60 Hz, not measured (F3).**
+  - Base `handleCollision` ran inside the library's drain and read `sampleRef.current`, the pose after step k−1. The tree names from the grid student at step k.
+  - `nameLiveContact`'s 0.9 m reach and its «two candidates → unnamed» refusal can flip on a 0.2–0.3 m shift.
+  - The builder's harness models base naming from the frame-end pose, so its census cannot see this.
+  - Static objects are never named, so the static result stands.
+  - Owed: a 60 Hz census of staged-vehicle, pedestrian and tram contacts, base against tree (for example sc-rx-tram-left, sc-follow-standstill and the rb lessons).
+- **Physical contact with any NPC shell inside a long frame** (ambient or staged: NpcColliders binds the nearest agents of either kind) is still against the shell's last frame's pose (doc 94, «NOT claimed» (3), second clause; ADR-014 Amendment 2026-10-11). Neither the builder's harness, which does not model NpcColliders' shells, nor the verifier's cells measure it.
+- **The latent post-solve impact speed:** its own lane or a ruling.
+- **Reported by the builder, not examined by the verifier:** a contact whose step falls after the session-ending point inside the same long frame is still heard as a thump. Nothing grades it.
+
+## Landed: the signal head at the officer's junction is given a dark state and the officer's caption, and the wait is explained by him, not by a red lamp — `sc-sig-controller-postures:784b2ca7` (major) (2026-10-11)
+
+Lane `postureslamp`, round 1, built on `2e9268f`. Its adversarial verifier SIGNED it OFF WITH CONDITIONS. The patch is `postureslamp-result-r1.patch` (sha256 2203f7e7…, 22 files, +636/−42, 0 CR bytes).
+- **Eight product files:** `contracts.ts`, `lessons/advisor.ts`, `lessons/engine.ts`, `lessons/scenario/templates-signals2.ts` (comment only), `runtime/signals.ts`, `world/components/WorldProps.tsx`, `world/components/signalHeadLabels.ts` and the new `world/components/signalHeadLenses.ts`.
+- **Four test files:** the new `controller-dark-lamp-head-and-voice.test.ts`, and updated `world-label.test.ts`, `signal-lens-look.test.ts` and `yield-voice-peek.test.ts`.
+- **Ten reviewed-text manifest files,** re-recorded. The string diff is additions only: 16 strings (13,238 → 13,254), fingerprint 3f1d3065… → 431215a7….
+- **`worldRuntime.ts` and `finish.ts` are untouched.** No threshold changed, and no grade moved on the verifier's replays (below).
+- **It addresses, in process, two of the three items the praiselamp landing left owed under «Draw the postures head dark»:** (a) the caption and (b) the yield voice's officer branch. Item (c), the ambient cross stream, is NOT in this landing (Owed). Praiselamp asked for the three to be settled together; they are not.
+
+**The row is NOT closed by this landing.** `sc-sig-controller-postures:784b2ca7` stays OPEN. Every number below is in-process (`buildLiveWorld` / `liveChainReplay`). No rig drive has photographed the dark head or the officer caption on PC or on the phone lens; that drive is owed, and whether its frames close the row is for that wave's judge and verifier.
+
+**The cause, on 2e9268f** (the builder's reading; the verifier reproduced its effect):
+- `runtime/signals.ts` `lampState` handled only the "dark" and "flashingAmber" modes. A "controlled" cluster fell through to the phase cycle, so the head cycled even where the lesson authors `lamps: "dark"`. The schedule already carried `lampsDark` (praiselamp), but the render never read it.
+- The only unlit-head caption was the uncontrolled junction's «ЗАГАСНАЛ СВЕТОФАР · Кръстовището е равнозначно · Пропусни идващия ОТДЯСНО · ЗДвП чл. 48». Darkening the head alone would have put that card over the officer's junction.
+- An officer's halt is published as the effective "red". That is kept, because it grades. The yield voice was never told about the officer, so it spoke the lamp's copy: «Защо чакаш: червен сигнал».
+
+**What the head is given now, on the dark-lamp lesson.**
+- `SignalLampState` gains "darkControlled". `lampState` returns it when `controllerLampsDark(cluster)` holds. The phase machine still runs underneath; the builder states nothing graded reads it, and the verifier found no grade change.
+- The lens tables hold every vehicle and pedestrian lens unlit for that state. `WorldProps` paints from two tables in `signalHeadLenses.ts`, `VEHICLE_LENSES_LIT` and `PED_LENSES_LIT`. They are keyed by every lamp state, so tsc forces a lens decision for any new state. That the paint functions follow the tables is not executed by any lane test (C1).
+- The caption is a new kind, "officer": «РЕГУЛИРОВЧИК» / «Светофарът е ЗАГАСНАЛ» / «Тук важи само неговата поза» / «ЗДвП чл. 6, т. 2».
+  - The verifier matched the law reference to `content/law/acts/zdvp.json`: чл. 6, т. 2 reads «…независимо от светлинните сигнали, пътните знаци, маркировката на пътя и правилата за движение».
+  - The controller schedule is posted at staging and never recalled, so the state is darkControlled for the whole session.
+- **The yield voice** takes a new flag, `officerLampsDark`, from `lessonOfficerLampsDark(lesson)`: a staged trafficController with `lamps === "dark"`. The flag is true on exactly sc-sig-controller-postures, at every rung (L1–L4). Only the "redLight" reason is re-routed there. The three stages are:
+  - «Защо чакаш: регулировчикът»;
+  - «Чакането Е маневрата — четеш човека»;
+  - «Изчака регулировчика».
+
+  All three carry lawRef «ЗДвП чл. 6, т. 2; чл. 7, ал. 1». The copy rephrases the lesson's instructions 1–5. The full sentences are in the lane report (`wave-g-r1.json`, lane `postureslamp`, `shownText`).
+- **No existing sentence was changed or removed.**
+
+**What the verifier reproduced.** It ran its own probe, base against patched: all 3 controller lessons × every rung × every committed trace, plus the 5 rig-w3a drives. That is 57 entries: 44 replays (39 committed traces + 5 rig drives) and 13 per-rung head counts.
+- **Head state.** sc-sig-controller-postures L1–L4 went from lit (green 202 / red 250 / yellow 24 / redYellow 8) to darkControlled on 484 of 484 lamp-state samples per rung.
+- **What stays identical on the live-lamp drills.** sc-signal-controller L1–L5 and sc-sig-controller-live L1–L4 are byte-identical in head counts and in voice lines. No other consumer of `SignalLampState` switches on the lamp state outside `WorldProps` and `signalHeadLabels` (grep).
+- **Grade.** Violations, commendations, LessonResult, rubric, debrief and staged outcomes are identical on all 44 replay entries. The praiselamp pins (`controller-dark-lamp-approach-phase`, V1/V9) and `controller-dark-lamp-praise` stay green.
+- **Voice.** Only postures entries changed (11 of the 44), and only in text.
+  - Notice times are identical (pc-L1-C: 21.77 / 30.55 / 44.08).
+  - Held redLight ticks are identical (886 / 885 / 927 / 926 / 927; shadow 870).
+  - The officer lines are heard on 5 of 5 rig drives and on shadow-correct at L1–L3. Zero postures lines contain «червен».
+  - At L4 no yield-voice line is spoken on any committed postures trace, on base or on the tree, so the voice change is not exercised at that rung.
+  - On mistake-start-on-raised-arm (L1–L3) only the named line is spoken. CONTROLLER_SIGNAL_VIOLATED mutes the verdict, so «Изчака регулировчика … без отчетено нарушение» is never said on a convicted drive.
+- **One sentence checked for truth.** «тези секунди се изваждат от ориентировъчното време» holds: the rubric reads «15 с чакане на предимство не се броят».
+- **Tests.** Targeted: 10 files, 116 passed. tsc: 22 errors, the environment baseline, none in a touched file.
+- **Mutants:** 10, one at a time, each restored with sha256 equal. 7 were killed on assertion text: V1, V2, V3, V4, V6, V7 and V8. 3 survived, the conditions below.
+- **Reported by the builder, not re-run by the verifier.** The verifier's hand-off was forced while its scenario run was still going. That run later ended with no usable result (`cat-scenario.log`: 1 file, 110 tests, 181 «Worker exited unexpectedly» errors), so the verifier has no catalogue figure at all.
+  - lessons: 124 files, 2,336 passed, 165 skipped. This ran before the builder's last, comment-only edit to `templates-signals2.ts`.
+  - scenario: 182 files, 4,361 passed.
+  - lesson-ui + runtime + world/components + the postures traces + captureFeedParity: 102 files, 1,756 passed, 1 failed. The failure is touchHintLifetime, ENOENT on `tools/`.
+  - 11 builder mutants, all killed.
+
+**The conditions, and how each stands.**
+- **C1 (F5; V5, V9). The render half is pinned only by source regex.**
+  - V5 changes `lampColorsFor` to paint darkControlled RED while keeping the `VEHICLE_LENSES_LIT[state]` text. All 59 tests passed.
+  - V9 does the same in `pedLampColors` and also passed.
+  - `signal-lens-look` checks only that the text is present. Nothing executes the paint function.
+  - Required before landing: a behavioural pin (export the two functions, or test the paint path), or a device photograph of the dark head.
+  - PINNED AT INTEGRATION: the new `controller-dark-lamp-head-paint.execution.test.ts` (7 tests) executes the components themselves, with no product edit. `WorldPropsGroup` is rendered on the hook harness; the module-private `TrafficLights` and `PedestrianSignals` elements of its tree are mounted with the props the group handed them; their `useFrame` callbacks are called with a real camera; the instance colours of the emissive mesh and the caption canvas are read. It sweeps every lamp state against the lens tables, and runs the dark-lamp lesson's real runtime at every rung for a 60 s cycle. V5 is RED on 2 tests («16 head paint(s) disagree with the lens table», «3872 frame(s) on which the head the lesson calls ЗАГАСНАЛ was painted lit or uncaptioned»); V9 is RED on 1 («4 walker-head paint(s) disagree with the lens table»). Re-run red by the merge verifier. Limits: no WebGL ran, so no pixel is held and the device photograph is still owed; the walker's head is a state sweep only, because the dark-lamp district (sx-v1) has no signalised crossing.
+- **C2 (F6; V10). The engine wiring of `officerLampsDark` is not pinned for the live-lamp drills.**
+  - V10 broadens the flag to every officer lesson. 9 files, 212 tests passed.
+  - Under it the live-lamp drills would say «Светофарът на кръстовището е ЗАГАСНАЛ» over a lit head. Their committed traces hold 860–2,237 redLight ticks.
+  - The census tests the predicate, not the wiring.
+  - Required: a live-chain pin that sc-sig-controller-live and sc-signal-controller still hear «Защо чакаш: червен сигнал».
+  - PINNED AT INTEGRATION: `controller-dark-lamp-head-and-voice.test.ts` §3b replays both live-lamp officer drills at every rung over every committed trace (27 replays) through `liveChainReplay`. No voice line may carry the dark-lamp officer copy, and on each drill at least 3 drives must really hold a red wait and hear «Защо чакаш: червен сигнал» (measured 4 and 6). V10 is RED on assertion text («24 line(s) of the dark-lamp officer copy spoken at a junction whose lamp is lit»). Re-run red by the merge verifier.
+- **C3 (F9). The verifier ran no catalogue-wide directory to completion.** Scenario ended without a result; lessons, lesson-ui, runtime and world/components were not started. Those rest on the builder's report until the integrated run below.
+- **F8, a test defect.** `world-label.test.ts` has `/чл.s*48/`, which is missing its backslashes and cannot match «чл. 48». The correct `/чл\.\s*48/` in `controller-dark-lamp-head-and-voice` §2 covers the claim. FIXED AT INTEGRATION: the regex is now `/чл\.\s*48/`.
+
+**Integration.** This patch and `hzcontact-result-r1.patch` share no file.
+
+**PROVEN TOGETHER ON 2e9268f:** with `hzcontact`, in one scratch worktree — the counts, the merge verifier's verdict and the gate patch are in the hzcontact section above. For this lane that run is also the first catalogue-wide run to finish on the patched tree (C3): lessons, lessons/scenario, components/sim, runtime, world and hud all green.
+
+**Found by the gate, not by the lane.** The first gate run stopped on one tools test that no lane can run (lanes carry no `tools/`): `tools/mobile/__tests__/driveline.test.mjs` §L reads every wait copy out of `advisor.ts` and failed on «Защо чакаш: регулировчикът», a notice of a table it did not know. The reader was taught the new table as its own shape: its two notices must read as a lawful wait on the glass (on this lesson the lamp's «Защо чакаш: червен сигнал» did that until the head went dark, so the audit harness holds at the officer's halt exactly as before), its card must be the officer's card by name, and nothing else in it may read as a wait. Three mutants of `advisor.ts` (a title the matcher cannot read; a second card sentence; a peek that reads as a wait) each fail the new test on assertion text. No product file changed.
+
+**Owed.**
+- **The ambient cross stream at the dark-lamp junction is not changed by this lane.** The builder carries it as still following the hidden lamp cycle, not the officer; this lane did not measure it. That is row `sc-sig-controller-postures:5ee4301e` (critical). Its lane, `posturescross`, was REFUTED in round 1; round 2 started on 2026-10-11. Until it lands, the new voice's «ГЪРДИ ИЛИ ГРЪБ към теб: минава напречното» and «предимството е твое» are rule statements the ambient traffic may not act out (verifier F7; the same already held for instructions 2–5).
+- **The advisor card names a red never shown there.** `CONTROLLER_WAIT_CARD_BG` («…страничен профил — минаваш, дори на червено…») is also shown on the dark-lamp lesson. It is true as a rule. A dark-lamp variant could be considered.
+- **No device photograph.** The dark head and the officer caption have not been photographed on PC or on the phone lens. Neither has the caption's legibility next to the officer's posture bubble. The rig drive that takes these frames should also record the three officer voice lines.

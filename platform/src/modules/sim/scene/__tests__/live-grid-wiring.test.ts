@@ -755,13 +755,14 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       expect(call.arguments.length).toBe(6);
       // The hooks: the cabin's channels, (round 8) the rest of the cabin's
       // looks, the delivery of the graded point, and (round 7) the sink of the
-      // near-miss stat. No `vruAheadM` (the grid measures the person in the
-      // path itself), no `contacts`, no `trafficSpeedKmh` — nothing that is
-      // handed a pose to answer with.
+      // near-miss stat — and (sc-hz-brake-dont-swerve:a7d0dd29) the ear for a
+      // contact the step record holds. No `vruAheadM` (the grid measures the
+      // person in the path itself), no `contacts`, no `trafficSpeedKmh` —
+      // nothing that is handed a pose to answer with.
       const hooks = call.arguments[5];
       expect(ts.isObjectLiteralExpression(hooks)).toBe(true);
       const props = (hooks as ts.ObjectLiteralExpression).properties;
-      expect(props.map((p) => p.name?.getText(sf))).toEqual(["student", "moreLooks", "onPoint", "nearMiss"]);
+      expect(props.map((p) => p.name?.getText(sf))).toEqual(["student", "moreLooks", "stepContact", "onPoint", "nearMiss"]);
       // EVERY LOOK THE CABIN STILL HOLDS (round 8): the hook is the cabin's own
       // `consumeGlanceSample`, called through — one look per call, null when
       // the cabin has none — and nothing else. Without it a second look
@@ -770,11 +771,21 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       expect(ts.isPropertyAssignment(moreLooks) && ts.isArrowFunction(moreLooks.initializer)).toBe(true);
       const flatMore = (moreLooks as ts.PropertyAssignment).initializer.getText(sf).replace(/\s+/g, " ");
       expect(flatMore).toBe("() => cabinRef.current?.consumeGlanceSample() ?? null");
+      // A CONTACT THE CHASSIS BEGAN (sc-hz-brake-dont-swerve:a7d0dd29): the
+      // hook hands the step record's contact and the GRID's student straight
+      // to VehicleRig's ear — it reads nothing of this frame, and it is the
+      // only way a contact reaches the grade (the chassis carries no
+      // onCollisionEnter any more: hz-static-contact-cadence.test.ts).
+      const stepContact = props[2];
+      expect(ts.isPropertyAssignment(stepContact) && ts.isArrowFunction(stepContact.initializer)).toBe(true);
+      expect((stepContact as ts.PropertyAssignment).initializer.getText(sf).replace(/\s+/g, " ")).toBe(
+        "(contact, student) => contactListenerRef.current?.(contact, student)",
+      );
       // The near-miss sink is NOT a function of this file: it is the shell's
       // handler, handed on by name. The grid measures the stat (from the car
       // at the grid point) and calls it with the finished event; a scene-side
       // function here could measure something of its own instead.
-      const nearMiss = props[3];
+      const nearMiss = props[4];
       expect(ts.isPropertyAssignment(nearMiss) && ts.isIdentifier(nearMiss.initializer)).toBe(true);
       expect((nearMiss as ts.PropertyAssignment).initializer.getText(sf)).toBe("onNearMiss");
     });
@@ -826,6 +837,7 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
         "attemptFeedRef",
         "cabinRef",
         "conditions",
+        "contactListenerRef",
         "director",
         "feedAttemptPoint",
         "gradeGrid",

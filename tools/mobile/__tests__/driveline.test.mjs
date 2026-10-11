@@ -2715,6 +2715,12 @@ describe("§L the lawful wait is read in every form advisor.ts can say it", () =
   };
   const YIELD = tableAt("const YIELD_VOICE_COPY");
   const RAIL = tableAt("const RAIL_PRIORITY_RED_COPY");
+  // The officer's halt at a junction whose lamps the lesson calls dark (2026-10-11,
+  // sc-sig-controller-postures:784b2ca7). It is a wait copy of ANOTHER SHAPE: its
+  // notices are a lawful wait on the glass, but its card is the officer's card,
+  // which claims no wait (the test below this table's says why). So it is read
+  // on its own, never folded into `entries`, whose cards must all read as waits.
+  const OFFICER = tableAt("const OFFICER_LAMPS_DARK_HALT_COPY");
   const entries = [
     ...[...YIELD.block.matchAll(/\n {2}(\w+): \{/g)].map((m) => ({
       where: `YIELD_VOICE_COPY.${m[1]}`,
@@ -2777,8 +2783,36 @@ describe("§L the lawful wait is read in every form advisor.ts can say it", () =
     assert.doesNotMatch(card, GLASS);
   });
 
+  it("the dark-lamp officer's halt is a lawful wait on the glass, and its card is the officer's — never a wait card", () => {
+    const where = "OFFICER_LAMPS_DARK_HALT_COPY";
+    // The notices: while the officer holds the student, the glass says so in the
+    // words the harness waits on — on this lesson the lamp's «Защо чакаш: червен
+    // сигнал» did that until the head went dark; a title the matcher cannot read
+    // would release every right leg into the officer's halt at STOP_MS.
+    const titles = ["namedTitleBg", "settledTitleBg"].map((field) => {
+      const t = required(OFFICER.block, field, where);
+      assert.match(t, GLASS, `${where}.${field} «${t}» is not recognised on the glass`);
+      return t;
+    });
+    // The card: the officer's own, by name — not a second sentence that could
+    // drift into reading as a wait (a leg holding on a card cannot see him turn).
+    for (const field of ["cardBg", "convictedCardBg"]) {
+      assert.ok(
+        new RegExp(`(?:^|[\\s{,])${field}:\\s*CONTROLLER_WAIT_CARD_BG\\s*,`).test(OFFICER.block),
+        `${where}.${field} is no longer the officer's card CONTROLLER_WAIT_CARD_BG — teach this reader the new shape`,
+      );
+    }
+    // Nothing else in the table reads as a wait, on either surface.
+    const lits = [...OFFICER.block.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`));
+    assert.ok(lits.length >= 6, `only ${lits.length} literals parsed out of ${where} — the parse is wrong`);
+    for (const s of lits) {
+      assert.doesNotMatch(s, CARD, `${where}: «${s}» reads as a wait card`);
+      if (!titles.includes(s)) assert.doesNotMatch(s, GLASS, `${where}: «${s}» is not one of the two notices and reads as a wait on the glass`);
+    }
+  });
+
   it("nothing else advisor.ts can put on that card reads as a wait", () => {
-    const rest = ADVISOR.replace(YIELD.block, "").replace(RAIL.block, "");
+    const rest = ADVISOR.replace(YIELD.block, "").replace(RAIL.block, "").replace(OFFICER.block, "");
     const lits = [...rest.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)]
       .map((m) => m[1])
       .filter((s) => /[А-Яа-я]/u.test(s) && s.length >= 12);

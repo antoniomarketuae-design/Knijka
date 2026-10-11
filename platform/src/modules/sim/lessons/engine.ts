@@ -95,7 +95,13 @@ import {
   type YieldFaultCode,
   type YieldFaultRecord,
 } from "./objectives";
-import { lessonYieldsToRailVehicle, shownObjectiveCapKmh, stepYieldVoice, yieldVoiceSiteAt } from "./advisor";
+import {
+  lessonOfficerLampsDark,
+  lessonYieldsToRailVehicle,
+  shownObjectiveCapKmh,
+  stepYieldVoice,
+  yieldVoiceSiteAt,
+} from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { foldLessonMistakes, lessonMistakeTargetCodes } from "./lessonMistake";
 import { examTerminationFor } from "./exam";
@@ -3594,6 +3600,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // advisor card reads, so the card and this teach channel cannot say two
       // different things about one wait. Pure copy selection; nothing graded.
       railPriority: lessonYieldsToRailVehicle(prev.lesson),
+      // sc-sig-controller-postures:784b2ca7 — the officer's junction whose lamps the
+      // lesson authors as OUT: a red-light hold there is his halt, and the voice
+      // says so instead of «червен сигнал». Lesson-level, pure copy selection;
+      // nothing graded reads it.
+      officerLampsDark: lessonOfficerLampsDark(prev.lesson),
       // sc-roundabout-entry:8be266cf — WHERE the car is, so the gap verdict can
       // wait for the ring entry it describes («…и влезе») and a conviction can be
       // tied to the site it was billed at (advisor.ts `YieldVoiceSite`). Pure

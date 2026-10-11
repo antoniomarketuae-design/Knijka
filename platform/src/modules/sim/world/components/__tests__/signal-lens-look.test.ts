@@ -30,6 +30,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { PED_LENSES_LIT, VEHICLE_LENSES_LIT } from "../signalHeadLenses";
 import {
   channels,
   hsvSaturation,
@@ -185,8 +186,17 @@ describe("the two passes a head is drawn in (source pin)", () => {
     const ped = /function pedLampColors[\s\S]*?\n}/.exec(CODE);
     expect(ped, "pedLampColors not found").not.toBeNull();
     expect(ped![0]).toContain("LAMP_DARK");
-    // The dead head is the row: every lens off, no exceptions.
-    expect(ped![0]).toMatch(/state === "dark"\)\s*return \[LAMP_DARK, LAMP_DARK\]/);
+    // The dead head is the row: every lens off, no exceptions. Since
+    // sc-sig-controller-postures:784b2ca7 the row is a TABLE both passes paint
+    // from (`signalHeadLenses.ts`, a Record tsc makes exhaustive), so a new
+    // dead state — the officer's "darkControlled" — cannot fall through to the
+    // walker's red the way an `===` chain let it.
+    expect(fn![0]).toMatch(/VEHICLE_LENSES_LIT\[state\]/);
+    expect(ped![0]).toMatch(/PED_LENSES_LIT\[state\]/);
+    for (const dead of ["dark", "darkControlled"] as const) {
+      expect(VEHICLE_LENSES_LIT[dead], dead).toEqual([false, false, false]);
+      expect(PED_LENSES_LIT[dead], dead).toEqual([false, false]);
+    }
   });
 
   it("keeps the lens numbers in one place, not typed twice", () => {

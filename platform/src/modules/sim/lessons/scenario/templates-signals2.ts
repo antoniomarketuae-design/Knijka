@@ -781,8 +781,10 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
  * makes the sentence true where it is graded: the crossing carries `lampsDark`
  * and the permission, the approach context no phase while he permits, and every
  * proceed crossing is credited (rules/engine.ts says which lines of this
- * template decide that). The head is still PAINTED live — see the flag's note in
- * contracts.ts for why that half is owed rather than done here.
+ * template decide that). Since sc-sig-controller-postures:784b2ca7 the head is
+ * PAINTED dark too ("darkControlled"), captioned with the officer's card rather
+ * than the right-hand rule's, and the yield voice names him instead of
+ * «червен сигнал» — see the flag's note in contracts.ts.
  *
  * GRADING IS 100% THE PRODUCTION PIPELINE: stopLineCrossed carries the
  * controller permission and the reducer grades it (halt → CONTROLLER_SIGNAL_

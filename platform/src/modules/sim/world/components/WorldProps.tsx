@@ -94,6 +94,7 @@ import {
   signalLabelKindFor,
   type SignalLabelKind,
 } from "./signalHeadLabels";
+import { PED_LENSES_LIT, VEHICLE_LENSES_LIT } from "./signalHeadLenses";
 import {
   LAMP_ON_HEX,
   LENS_EMISSIVE_R_M,
@@ -1254,9 +1255,10 @@ const LAMP_COLORS_SCRATCH: [THREE.Color, THREE.Color, THREE.Color] = [
   LAMP_DARK,
 ];
 function lampColorsFor(state: SignalLampState): [THREE.Color, THREE.Color, THREE.Color] {
-  const red = state === "red" || state === "redYellow";
-  const yellow = state === "yellow" || state === "redYellow" || state === "amberFlashOn";
-  const green = state === "green";
+  // One table for which lens is lit (`signalHeadLenses.ts`) — a state nobody
+  // decided the lenses of cannot reach here (tsc), and an unknown runtime value
+  // paints dead rather than a phantom lamp.
+  const [red, yellow, green] = VEHICLE_LENSES_LIT[state] ?? VEHICLE_LENSES_LIT.dark;
   LAMP_COLORS_SCRATCH[0] = red ? LAMP_ON.red : LAMP_DARK;
   LAMP_COLORS_SCRATCH[1] = yellow ? LAMP_ON.yellow : LAMP_DARK;
   LAMP_COLORS_SCRATCH[2] = green ? LAMP_ON.green : LAMP_DARK;
@@ -1614,10 +1616,11 @@ function TrafficLights({
  * unlit, which is exactly what the crossing then is: uncontrolled.
  */
 function pedLampColors(state: SignalLampState): [THREE.Color, THREE.Color] {
-  if (state === "dark") return [LAMP_DARK, LAMP_DARK];
-  // Vehicles stopped ⇒ the walker has his green.
-  const walkerGo = state === "red";
-  return walkerGo ? [LAMP_DARK, LAMP_ON.green] : [LAMP_ON.red, LAMP_DARK];
+  // `PED_LENSES_LIT` (signalHeadLenses.ts): vehicles stopped ⇒ the walker has
+  // his green; a dead head — "dark", or the officer's "darkControlled" — is
+  // dead for the walker too.
+  const [red, green] = PED_LENSES_LIT[state] ?? PED_LENSES_LIT.dark;
+  return [red ? LAMP_ON.red : LAMP_DARK, green ? LAMP_ON.green : LAMP_DARK];
 }
 
 function PedestrianSignals({

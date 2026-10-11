@@ -333,7 +333,12 @@ export class SignalController {
    *    omitted = the node's own assigned group), through the SAME offsets any
    *    pin rebase (setClusterOffset / armSignalPlan / amberDilemma) writes.
    *    "controlled" deliberately keeps the misleading live lamps (JU-18: the
-   *    officer's permission — not the lamp — grades, ЗДвП чл. 7).
+   *    officer's permission — not the lamp — grades, ЗДвП чл. 7);
+   *  - …EXCEPT where the lesson authors those lamps as OUT
+   *    (`controllerLampsDark`): "darkControlled", every lens unlit. The phase
+   *    machine still runs underneath, and nothing graded reads it; the head is
+   *    now what the lesson says it is («светофарът на кръстовището е
+   *    ЗАГАСНАЛ», sc-sig-controller-postures:784b2ca7 — it used to cycle).
    * Unknown ids fail exactly like phase(): "red" (never a phantom green).
    */
   lampState(signalNodeId: string, approachBearingDeg?: number): SignalLampState {
@@ -341,6 +346,7 @@ export class SignalController {
     if (!node) return "red";
     const mode = this.modes[node.clusterIdx];
     if (mode === "dark") return "dark";
+    if (this.controllerLampsDark(node.clusterIdx)) return "darkControlled";
     if (mode === "flashingAmber") {
       const inPeriod = this.tSec % FLASHING_AMBER_PERIOD_SEC;
       return inPeriod < FLASHING_AMBER_ON_SEC ? "amberFlashOn" : "amberFlashOff";
@@ -431,7 +437,8 @@ export class SignalController {
    * dial the staged `trafficController` kind arms at session start). A
    * schedule sets mode "controlled" and installs the permission timetable;
    * null recalls the controller and returns the cluster to "live". The lamps
-   * keep cycling (misleading-but-visible) — only stop-line adjudication and
+   * keep cycling (misleading-but-visible; unless the schedule says `lampsDark`,
+   * when they render unlit — `lampState`) — only stop-line adjudication and
    * the surfaced next-line context read the controller. Deterministic: the
    * schedule is authored data, permissions are a pure function of controller
    * time. No-op for unknown ids.

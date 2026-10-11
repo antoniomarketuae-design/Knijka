@@ -45,7 +45,7 @@ import { describe, expect, it } from "vitest";
 import type { VehicleSample } from "../../contracts";
 import type { DirectorInput, DirectorStepResult, ScenarioDirector } from "../../orchestrator";
 import type { SimTick, SimTickEvent } from "../../rules";
-import { NO_PHYSICS_STEPS, PhysicsSessionClock, PlayerStepTrackRecorder, SessionGridClock } from "../../traffic";
+import { NO_PHYSICS_STEPS, PhysicsSessionClock, PlayerStepTrackRecorder, recordPhysicsStep, SessionGridClock } from "../../traffic";
 import { FIXED_DT } from "../../vehicle/tuning";
 import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M } from "../../collision";
 import { GlanceSampleQueue } from "../cabin";
@@ -433,8 +433,11 @@ describe("PlayerStepTrackRecorder — the physics engine's steps, numbered for t
     expect(r.stateAtStep(136, out)).toBe(false);
     // There is no syncGrid, no offset and no reset to call (round 4's offset
     // lowering repeated a state and read the car a step stale).
+    // (sc-hz-brake-dont-swerve:a7d0dd29 adds the contact half of the step
+    // record — `watchContacts` after a step's `record`, `contactsAtStep` to
+    // read it — and still no reset.)
     expect(Object.getOwnPropertyNames(PlayerStepTrackRecorder.prototype).sort()).toEqual(
-      ["constructor", "record", "stateAtStep", "stepCount"].sort(),
+      ["constructor", "record", "stateAtStep", "stepCount", "holds", "watchContacts", "contactsAtStep", "droppedContacts"].sort(),
     );
   });
 });
@@ -1228,5 +1231,81 @@ describe("the looks through the LIVE entry, modelled: the cabin's own queue, rap
     expect(r.heard.length).toBe(r.grid.clock.last);
     expect(r.heard.length + r.grid.droppedLooks + r.grid.pendingLooks + r.cabinLeft + r.droppedByCabin).toBe(2400);
     expect(r.grid.droppedLooks).toBeGreaterThan(1500);
+  });
+});
+
+describe("GradeGrid.stepPhysics — a contact the chassis began is heard at ITS step's grid point (sc-hz-brake-dont-swerve:a7d0dd29)", () => {
+  /** Step n leaves the car at x = 1000 + n; the chassis touches a body after
+   *  the steps in `touchAt` (a new contact each time it re-touches). */
+  function recorderWithContacts(steps: number, touchAt: ReadonlySet<number>) {
+    const r = new PlayerStepTrackRecorder();
+    const body = {
+      translation: () => ({ x: 1000 + r.stepCount + 1, y: 0, z: 0 }),
+      rotation: () => ({ x: 0, y: 0, z: 0, w: 1 }),
+    };
+    const sim = {
+      get speedKmh() {
+        return r.stepCount + 1;
+      },
+      forEachChassisContact(f: (c: { otherHandle: number; manifolds: number; otherUserData: unknown; impactKmh: number }) => void) {
+        if (touchAt.has(r.stepCount)) f({ otherHandle: 9, manifolds: 1, otherUserData: undefined, impactKmh: r.stepCount / 10 });
+      },
+    };
+    const take = (m: number) => {
+      for (let i = 0; i < m; i++) recordPhysicsStep(r, body, sim);
+    };
+    return { r, take, steps };
+  }
+
+  for (const [label, frames] of [
+    ["60 Hz", Array.from({ length: 90 }, () => 1)],
+    ["7-step phone frames", Array.from({ length: 13 }, () => 7)],
+    ["0.5 s frames", [30, 30, 30]],
+    ["a 0.5 s first frame then 60 Hz", [30, ...Array.from({ length: 60 }, () => 1)]],
+  ] as const) {
+    it(`${label}: each contact reaches the hook once, at grid point k = its step, with the student at k — and before that point's tick is sampled`, () => {
+      const { world, rec } = fakeWorld();
+      const grid = new GradeGrid();
+      const { r, take } = recorderWithContacts(90, new Set([12, 40, 41, 77]));
+      const heard: Array<{ k: number; step: number; x: number; impactKmh: number; beforeSampleOfK: boolean }> = [];
+      let gradingK = 0;
+      const h = hooks(rec, {
+        stepContact: (c, s) => {
+          heard.push({
+            k: gradingK,
+            step: c.step,
+            x: s.position.x,
+            impactKmh: c.impactKmh,
+            // the sample of point k has not been taken yet
+            beforeSampleOfK: rec.sampleT.length === gradingK - 1,
+          });
+        },
+        onPoint: (p) => {
+          gradingK = p.k + 1;
+        },
+      });
+      gradingK = 1;
+      for (const m of frames) {
+        take(m);
+        grid.stepPhysics(r, r.stepCount * H, null, world, NO_WEATHER, h);
+      }
+      // 40 and 41 are ONE contact (it lasts); 12, 40, 77 begin.
+      expect(heard).toEqual([
+        { k: 12, step: 12, x: 1012, impactKmh: 1.2, beforeSampleOfK: true },
+        { k: 40, step: 40, x: 1040, impactKmh: 4, beforeSampleOfK: true },
+        { k: 77, step: 77, x: 1077, impactKmh: 7.7, beforeSampleOfK: true },
+      ]);
+    });
+  }
+
+  it("the replay's frame entry (no physics) hears none, and a source without contacts gives none", () => {
+    const { world, rec } = fakeWorld();
+    let calls = 0;
+    const h = hooks(rec, { stepContact: () => calls++ });
+    drive(new GradeGrid(), world, h, [1 / 60], 30);
+    const bare = new PlayerStepTrackRecorder();
+    for (let i = 0; i < 30; i++) bare.record(i, 0, 0, 0);
+    new GradeGrid().stepPhysics(bare, 0.5, null, world, NO_WEATHER, h);
+    expect(calls).toBe(0);
   });
 });

@@ -231,7 +231,7 @@ import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { AudioLessonPrompt } from "./AudioLessonPrompt";
 import { CameraRig, type CameraMode, type TopdownAidHandle } from "./CameraRig";
 import { ImpactCut, type ImpactCutHandle, type ImpactShakeHandle } from "./ImpactCut";
-import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
+import { VehicleRig, type ChassisContactListener, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
 import { GradeGrid } from "@/modules/sim/scene/gradeGrid";
@@ -2065,6 +2065,10 @@ export function ReadyScene({
    *  number IS the grid index, and the session runs on through a retry. */
   const stepTrackRef = useRef<PlayerStepTrackRecorder | null>(null);
   if (stepTrackRef.current === null) stepTrackRef.current = new PlayerStepTrackRecorder();
+  /** VehicleRig's ear for a contact the chassis BEGAN (sc-hz-brake-dont-swerve:
+   *  a7d0dd29): the rig fills it, RuntimeDriver's graded call hands it every
+   *  contact of the step record at that step's own grid point. */
+  const contactListenerRef = useRef<ChassisContactListener | null>(null);
   /** The session grid the graded chain runs on (scene/gradeGrid.ts). Owned
    *  HERE, not by RuntimeDriver, since round 8: `resetCar` below must be able
    *  to tell it that a respawn happened (the looks still waiting for a grid
@@ -2762,17 +2766,20 @@ export function ReadyScene({
   );
 
   const handleCollision = useCallback(
-    (impactKmh: number, withWhat: CollisionWithWhat) => {
-      const sample = sampleRef.current;
+    (impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) => {
       // f0023997: the crash has to be VISIBLE. Presentation only — it reads no
       // grading state and writes none, so a refused cut can never change a
       // verdict (`ImpactCut`'s header carries the measurement).
       impactCutRef.current?.impact(impactKmh);
+      // sc-hz-brake-dont-swerve:a7d0dd29 — named from `student`, the car at
+      // the grid point of the step the contact began (handed down by the
+      // graded call through VehicleRig's ear), never from this frame's drawn
+      // sample: the name decides the body's accident episode, which is graded.
       runtime.pushCollision(
         withWhat,
         nameLiveContact(
           withWhat,
-          playerObb(sample.position.x, sample.position.y, sample.headingDeg),
+          playerObb(student.position.x, student.position.y, student.headingDeg),
           liveContactBodies(
             directorContactCast(director),
             (actorId) => traffic.staged(actorId),
@@ -2915,6 +2922,7 @@ export function ReadyScene({
                 audioRef={audioRef}
                 sampleRef={sampleRef}
                 stepTrackRef={stepTrackRef}
+                contactListenerRef={contactListenerRef}
                 paused={physicsPaused}
                 spawn={spawn}
                 difficultyRef={difficultyRef}
@@ -3003,6 +3011,7 @@ export function ReadyScene({
               onWindPush={lesson.examMode === true ? undefined : setWindPushCue}
               sampleRef={sampleRef}
               stepTrackRef={stepTrackRef}
+              contactListenerRef={contactListenerRef}
               gradeGrid={gradeGrid}
               simRef={simRef}
               inputRef={inputRef}
@@ -4741,6 +4750,7 @@ function RuntimeDriver({
   onWindPush,
   sampleRef,
   stepTrackRef,
+  contactListenerRef,
   gradeGrid,
   simRef,
   inputRef,
@@ -4809,6 +4819,10 @@ function RuntimeDriver({
   /** The physics engine's step record — what drives the session grid (see
    *  the graded block below, and VehicleRig's prop of the same name). */
   stepTrackRef: React.RefObject<PlayerStepTrackRecorder | null>;
+  /** VehicleRig's ear for a contact the chassis began (sc-hz-brake-dont-swerve:
+   *  a7d0dd29): the graded call hands it each contact of the step record at
+   *  that step's own grid point, with the student there. */
+  contactListenerRef: React.RefObject<ChassisContactListener | null>;
   /** The session grid the graded chain runs on — LessonScene's, so that its
    *  `resetCar` can reset it on a respawn (round 8). */
   gradeGrid: GradeGrid;
@@ -5324,6 +5338,14 @@ function RuntimeDriver({
         // PC, half a second on a phone drawing two frames a second. The grid
         // takes them all now and hears them one per grid point.
         moreLooks: () => cabinRef.current?.consumeGlanceSample() ?? null,
+        // A CONTACT THE CHASSIS BEGAN (sc-hz-brake-dont-swerve:a7d0dd29) —
+        // from the step record, at its own step's grid point, with the
+        // student there, before this point's tick is sampled. VehicleRig's
+        // ear judges it (threshold, thump, haptics) and, graded, reports it to
+        // `handleCollision` → `runtime.pushCollision`. Until this repair it
+        // arrived through rapier's per-FRAME drain, which lost a crash that
+        // had rebounded inside a long frame and read the rest at its end.
+        stepContact: (contact, student) => contactListenerRef.current?.(contact, student),
         // THE PERSON IN THE PATH (`tick.vruAheadM`) is NOT measured here any
         // more (round 6). `leadGap` answers „is a CAR standing on top of me";
         // that channel answers it for the road user чл. 5, ал. 2 puts first,

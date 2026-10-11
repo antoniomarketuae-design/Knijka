@@ -10,6 +10,11 @@ adversarial reader against the code and the verifier's report. The corrections n
 and census tapes, not for any look near a rule's edge; observation moments differ by display as a class, not on a closed list; and the look-timing
 bound is measured from the press. They also name what is still owed. Everything else is the builder's text as written.
 
+**Superseded in part (2026-10-11).** Item (c) of the frame-timed list below — rapier's physical contacts — and the first clause of «NOT claimed» (3) no
+longer hold. Since the `hzcontact` landing a contact the chassis begins is recorded at its physics step and heard at that step's grid point (ADR-014,
+Amendment 2026-10-11). Item (c)'s last sentence, on staged actors, still stands, and so does the second clause of (3): NpcColliders moves the NPC shells
+once per render frame, so the other body of such a contact is still the frame's.
+
 ---
 ## The builder's note, as proposed: The world and the grade run on one fixed step, counted off the physics engine
 

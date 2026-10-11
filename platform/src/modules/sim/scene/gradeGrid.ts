@@ -136,6 +136,20 @@
  * grid point, never passed a frame glance, and so no census cell ran the path
  * the defect was in).
  *
+ * A PHYSICAL CONTACT IS THE GRID'S TOO (sc-hz-brake-dont-swerve:a7d0dd29).
+ * Rapier's contacts were the one graded input ADR-014 left frame-timed: the
+ * chassis' `onCollisionEnter`, called by @react-three/rapier once per frame
+ * after all of the frame's steps, and only for a pair still holding a manifold
+ * then. A car that rebounds off a wall leaves contact within ~3 steps, so on
+ * a phone's frames a 50 km/h crash into a static block was never reported
+ * (certified ИЗДЪРЖАН 0 ★★★), and one still reported was booked at the
+ * frame's first point with the frame-end speed. The step record now holds
+ * each contact the chassis BEGAN, at its step, with that step's speed
+ * (traffic/playerTrack.ts `StepContact`), and `stepPhysics` hands it to
+ * `hooks.stepContact` at that step's own grid point, before the tick is
+ * sampled — so a contact is reported once, at the same point, with the same
+ * speed, on every display, and at 60 Hz exactly as before.
+ *
  * WHAT STAYS ON THE FRAME: everything the student SEES (the speedometer, the
  * HUD gap readouts, the drawn poses — `traffic.setRenderSessionTime`) and
  * every coaching hint that grades nothing (reverse-assist, stuck-start, the
@@ -156,6 +170,7 @@ import {
   type PhysicsStepSource,
   type PhysicsStepState,
   type SessionGridSpan,
+  type StepContact,
   type TrafficSystem,
   type TrafficUpdateContext,
 } from "@/modules/sim/traffic";
@@ -230,6 +245,14 @@ export interface GradeGridHooks {
    *  after the world moved and before the tick is sampled (the replay's
    *  stand-in for rapier's NpcColliders). */
   contacts?(tSec: number, student: Readonly<VehicleSample>): void;
+  /**
+   * A contact the chassis BEGAN at physics step k (the step record's — never
+   * the frame's: sc-hz-brake-dont-swerve:a7d0dd29), heard at grid point k with
+   * the student there, after the world moved and before the tick is sampled —
+   * so whatever the judge pushes into the runtime is drained by THIS point's
+   * tick, on every display. `stepPhysics` only (the replay has no physics).
+   */
+  stepContact?(contact: StepContact, student: Readonly<VehicleSample>): void;
   /** The graded point. Return true to stop grading this frame (the session
    *  ended on it). */
   onPoint(point: GradeGridPoint): boolean | void;
@@ -414,6 +437,15 @@ export class GradeGrid {
       this.resolved.length = 0;
       this.nearMisses.step(tSec, dtSec, s, traffic, this.resolved);
       hooks.contacts?.(tSec, s);
+      // THE CONTACTS THE CHASSIS BEGAN AT THIS STEP (sc-hz-brake-dont-swerve:
+      // a7d0dd29): heard here, at their own point, with the speed of their
+      // own step — never at a frame's drain, where a crash that had rebounded
+      // inside a long frame was lost and one that had not was read at the
+      // frame's end.
+      if (steps !== null && hooks.stepContact !== undefined && steps.contactsAtStep !== undefined) {
+        const began = steps.contactsAtStep(k);
+        for (let i = 0; i < began.length; i++) hooks.stepContact(began[i], s);
+      }
       const leadGapM = traffic.leadGapMeters(s.position.x, s.position.y, s.headingDeg);
       // THE PERSON IN THE PATH, measured HERE (round 6): from the student at
       // this grid point to the staged people where the world's step k left
