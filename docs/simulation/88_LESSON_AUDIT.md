@@ -12717,3 +12717,70 @@ Lane `hztick`, two rounds, built on `8cb0707`. Round 1 was REFUTED. In round 2 t
 - **Not yet filed anywhere:** the two drives that never end, and the crawl that counts as standing. Each needs a triage candidate or a ruling.
 - **Rulings:** «с пълна спирачка»; the THEO-3 sandbox tick.
 - **Not measured:** the same rebound against staged lead vehicles on «Спри зад спрялата колона» (sc-fbc-stop) and «Спри зад колоната на разумно разстояние» (sc-fs-stopped). The builder calls it plausible; the harness does not mount NPC shells. `stopShortOf` is authored on one gate only.
+
+## Wave C verdicts — 2026-10-13
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`65be02022ab1`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 9 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 13 |
+
+**Open list: 23 → 22**, out of 1547 filed across the whole programme (1524 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3e: the two repairs of the `65be020` landing, driven on PC and the phone lens (integrator note, 2026-10-13)
+
+Workflow `rig-wave-w3e` (wf_f551c0ff-a02) ran at `65be020`, one capture at a time, through `/dev/drive-rig`; frames are under `.audit-frames/rig-w3e/<lesson>/`. **Open list 23 → 22 (3 critical, 18 major, 1 minor).**
+
+**Closed — the verifier could not refute (1):**
+- `sc-hz-brake-dont-swerve:a7d0dd29` (critical). Ten crash runs and four lawful controls on both lenses, at L1 and L3. Every crash run carries the COLLISION bill at the contact's own step (the phone's carrying frames were 5 to 8 steps long, the contact at positions 2 to 6), reads 10 наказателни точки / НЕИЗДЪРЖАН, and shows the task «Спри преди препятствието…» with a grey dash and «Не се отчете: колата удари препятствието — задачата е да спреш преди него.» — at 49.6 km/h with no brake, at 30.7 km/h under full brake, and for a 1.6 km/h touch. The lawful stop short of the block ticks both tasks and passes. Speed covered by this wave: 49.6 km/h, not the 58.9 km/h of the filed harness leg (that speed was driven at rig-w3d, billed on every run). No ending with «притисната» appeared on these runs.
+
+**Partial (2), and what each still needs:**
+- `sc-follow-tailgater:63c0c28c` (critical). **The open cell is repaired on the device:** a single full-pedal stop from 24.4–24.5 km/h with the лепка glued 4.6–4.8 m behind is now coached as the lesson's mistake on all six cells (PC and phone, L3 twice and L1): the «Грешката на урока» card, «НЕ Е ВЗЕТ», no praise. The follower's report lands 0.417 s after the pedal in every cell, and the pass is commanded on or after it; the hold was actually exercised in five of the six. The pass-before-pedal control stays unbilled and the careful drive passes, as decided. **Still open: the PUMPED brake check** (0.2 s full pedal, 0.1 s off, full pedal to a 1.97 s standstill, the лепка glued 4.79 m behind), on both lenses: not billed, not coached, ИЗДЪРЖАН ★★★ with the unscoped praise «Чисто и спокойно каране». The pass was held (commanded 1.19 s after it was due); the лепка never reported, because its two runs at the harsh line were 0.200 s and 0.283 s — each under the 0.4 s sustain — the car's own full-pedal deceleration falling under 7 m/s² below about 9 km/h. This contradicts one sentence of ADR-016's update of 2026-10-13 («a tap–release–slam with 26 grid points or fewer off the pedal is billed 1,512 of 1,512 on kinematic tapes»): the tapes did not carry the product car's deceleration at low speed. Whether a hard brake made in two bursts should count as one is a question about the rule's own definition and has been put to the founder; until then the row stays open. Independent of that answer, the praise on such a drive is a false sentence and is in triage.
+- `sc-hz-brake-dont-swerve:f0023997`. The measurement rig-w3d lacked is delivered: the product DOES apply its shake on the phone (one shake per run; every render inside the 420 ms window carries the roll the product's formula gives, within 0.04–0.08°; the first render equals PC's, 0.54° against 0.543°; roll is 0 before the contact and after the window). What the phone lens DISPLAYED is 2 to 4 renders of a one-way decaying tilt with no change of sign, because that lens rendered at 95–161 ms per frame with the video recorder on, against a roll period of 145 ms. Owed: a phone-lens run that renders faster inside the window (recorder off, the same rotation log). Recorded, not held against the row: the shake's amplitude is fed the post-solve impact figure (6.19 km/h for a 49.6 km/h strike, so 0.81° instead of the stated 2.29°) — the known latent defect, in triage; and on the phone the world stops being drawn under a second after the contact, when the «РЕЗУЛТАТ» prompt takes the glass.
+
+## Wave C verdicts — 2026-10-13
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`65be02022ab1`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 13 |
+
+**Open list: 22 → 21**, out of 1547 filed across the whole programme (1525 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3f: the crash shake on the phone lens, and the evidence standard that closed `sc-hz-brake-dont-swerve:f0023997` (integrator note, 2026-10-13)
+
+Workflow `rig-wave-w3f` (wf_1f956f6d-3e8) ran at `65be020`: five phone-lens crash runs with the video recorder off and no still inside the window; frames and the shake table are under `.audit-frames/rig-w3f/sc-hz-brake-dont-swerve/`. **Open list 22 → 21 (3 critical, 17 major, 1 minor).**
+
+- **What was measured.** Turning the recorder off bought 10–15 ms a frame. The lens still renders at 90–145 ms inside the shake's window, against a roll period of 144.6 ms: 3 or 4 renders per window, 0 or 1 change of sign on every run. The shake is applied: one shake per contact, every in-window render carrying the roll the product's formula gives, roll 0 before the contact and after the window. What the lens displays is one cockpit frame tilted 0.41–0.55° (3–4 CSS px at the screen edge), held 110–145 ms, then the chase cut.
+- **The first judgement** read the row PARTIAL and said plainly that this is the instrument's sampling limit, not a measured product fault, and that no further drive on this lens could settle it. It named the two ways out: a decision on the standard, or a real device.
+- **INTEGRATOR DECISION 2026-10-13 (the evidence standard).** On a lens that renders slower than the shake's own period, the per-render rotation log is the standard for «the shake is applied»: one shake per contact; every in-window render carrying the formula's roll at that instant; roll 0 before and after; the first in-window render equal to the PC reference's. It settles what counts as evidence. It does not say the shake is visible on a slow display.
+- **The re-judgement under that standard** proposed CLOSED, and its adversarial verifier could not refute it: it recomputed all four tests from the raw quaternions on the five runs (17 of 17 in-window renders; the first render within 0.020° of PC's) and wrote that the closure holds only because of the decision. The row is retired on that basis, and this note is where the basis is recorded.
+- **Not part of that row, in triage as their own candidates:** below about 14 frames per second the shake shows only as a brief tilt («shakeslow»); and its amplitude is fed the post-solve impact speed — 6.19 km/h for a 49.6 km/h strike, so 0.81° instead of the stated 2.29° («impactspeed»). Also recorded: the lesson ends half a second after the contact, and the «РЕЗУЛТАТ» prompt then stands on a dark field with no world drawn, so the chase view of the crash is on the phone glass for only 4–6 renders.
