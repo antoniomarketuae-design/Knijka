@@ -75,6 +75,8 @@ import {
   greenStartFaultVoidsObjective,
   oncomingGapDetail,
   parseObjectiveParams,
+  namedBodyTouched,
+  namedBodyTouchVoidsObjective,
   personContactVoidsObjective,
   personHaltVoidsObjective,
   railBarredVoidsObjective,
@@ -1071,7 +1073,8 @@ function stepActiveTaskCapLatch(
  *   «stopped-on-track» rail act; yieldClean — `FAILED_TO_YIELD` / `EMERGENCY_NOT_YIELDED` / `PEDESTRIAN_NOT_YIELDED`;
  *   solidLineClean — `CROSSED_SOLID_LINE`; stopSignRoll — `STOP_SIGN_NO_FULL_STOP`; speedClean — the two SPEEDING_*
  *   codes or `SPEED_TOO_FAST_FOR_CONDITIONS`; brakingClean — `STOPPED_WITHOUT_CAUSE` or `HARSH_BRAKING_NO_CAUSE`;
- *   greenStartClean — `HESITATION_AT_GREEN`.
+ *   greenStartClean — `HESITATION_AT_GREEN`; stopShortOf — a graded static-object contact with the car's body on the
+ *   gate's own named rectangle (`touchNamedBodies` below), which the rule engine bills «Удар в неподвижно препятствие».
  */
 const JOURNEY_REFUSAL_BG: Record<
   ReachZoneJourneyRefusal,
@@ -1090,6 +1093,7 @@ const JOURNEY_REFUSAL_BG: Record<
   brakingClean: (ctx) =>
     ctx.stoppedWithoutCauseInRun === true ? "колата спря без причина на открит път" : "колата спря рязко без причина",
   greenStartClean: () => "колата се забави да потегли на зелено",
+  stopShortOf: () => "колата удари препятствието, преди което трябваше да спре",
 };
 
 function objectiveNotice(
@@ -1653,6 +1657,55 @@ function isPersonContact(e: ScorableEvent): boolean {
     e.code === "COLLISION" &&
     (e.detail === "pedestrian" || e.detail === "cyclist")
   );
+}
+
+/**
+ * THE BODIES A GATE NAMES, TOUCHED — `LessonSessionState.touchedNamedBodies`
+ * after this tick (lane hztick round 2, sc-hz-brake-dont-swerve:a7d0dd29;
+ * `ReachZoneParams.stopShortOf` carries the drive).
+ *
+ * KEYED ON THE CONTACT ITSELF. The tick's own `collision` event is the graded
+ * contact as the product reports it — VehicleRig's graded branch, heard at the
+ * grid point of the physics step it began at (ADR-014, amendment 2026-10-11),
+ * or the recorder's obstacle channel on a tape — and `tick.position` /
+ * `tick.headingDeg` are the car at that same grid point. No speed is read:
+ * round 1 asked whether the impact had ARRESTED the car (`speed ≤ 1 км/ч` on
+ * the bill's grid point) and a strike with the wheel turned left +1.6 км/ч
+ * there, while a touch at 0.97 км/ч had never been „travelling". A touch is a
+ * touch at 0.04 км/ч and at 59.
+ *
+ * THE EVENT, NOT THE BILL, and the two differ in exactly one case: the rule
+ * engine folds a second static contact inside an open static episode into the
+ * first accident (`collisionSeparationSec`), so a car that clipped the kerb
+ * hard and reached the block a moment later is billed once — for the kerb.
+ * That drive has still touched the block. Every such event sits under a
+ * static-object bill already on the sheet (an episode is opened by one), so
+ * the row this voids never stands without its «Удар в неподвижно препятствие».
+ *
+ * ONLY `staticObject`: the named body is held scenery, and a contact with a
+ * vehicle, a walker or a cyclist is by its own category not a contact with it.
+ * ONLY THE GATE'S OWN RECTANGLE (`objectives.ts namedBodyTouched`): a static
+ * contact anywhere else — a kerb, a façade, a cone — leaves every gate alone.
+ * Every gate that names a body is asked, not just the active one: the touch
+ * may come while an earlier task is still open.
+ *
+ * Returns `prev`'s own array (or its `undefined`) when nothing was touched,
+ * so a session that never touches a named body is bit-identical to shipped.
+ */
+function touchNamedBodies(prev: LessonSessionState, tick: SimTick): readonly string[] | undefined {
+  let touched = prev.touchedNamedBodies;
+  if (!tick.events.some((e) => e.kind === "collision" && e.withWhat === "staticObject")) {
+    return touched;
+  }
+  for (const o of prev.objectives) {
+    const p = o.params;
+    if (p.kind !== "reachZone" || p.stopShortOf === undefined) continue;
+    if (touched?.includes(o.spec.id) === true) continue;
+    const pose = { x: tick.position.x, y: tick.position.y, headingDeg: tick.headingDeg };
+    if (!namedBodyTouched(p.stopShortOf, pose)) continue;
+    touched = [...(touched ?? []), o.spec.id];
+  }
+  return touched;
 }
 
 /**
@@ -2982,6 +3035,22 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     struckAPersonInRun ||
     prev.events.some(isBodyContact) ||
     scoredEvents.some(isBodyContact);
+  // …AND THE BODY A GATE NAMES, TOUCHED (`ReachZoneParams.stopShortOf`;
+  // `touchNamedBodies` carries what is read and why it is the contact and not
+  // a speed). Including THIS tick's contact, for the reason both ledger reads
+  // above take both halves, and above both readers for theirs: the objective
+  // context below (the tick is refused) and the finish gate further down (the
+  // drive must still be able to end).
+  //
+  // …EXCEPT IN A THEO-3 SANDBOX, the exemption every coached read below takes
+  // and for its reason: in `mistakeExperience` the wrong act IS the assignment
+  // («Късно спиране в препятствието» sends the student INTO the block), nothing
+  // scores, and the sheet carries no «Удар в неподвижно препятствие» for the
+  // row's reason to stand under. The ledger-fed contact terms are inert there
+  // because the ledger is empty; this one reads the contact itself, so it says
+  // so in words.
+  const touchedNamedBodies =
+    mistakeXp === undefined ? touchNamedBodies(prev, tick) : prev.touchedNamedBodies;
   // …AND THE BARRED RAIL ENTRY, on the same two halves of the same ledger, for
   // `ReachZoneParams.requireRailClear`. The entry and the finish disc are 130 m
   // apart, so the one-frame-stale case cannot arise here — both halves are read
@@ -3250,6 +3319,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         redsMetInRun: countRedsMet(evalStates),
         ...(struckAPersonInRun ? { struckAPersonInRun: true } : {}),
         ...(struckABodyInRun ? { struckABodyInRun: true } : {}),
+        ...(touchedNamedBodies?.includes(current.spec.id) === true ? { touchedNamedBody: true } : {}),
         ...(enteredRailBarredInRun ? { enteredRailBarredInRun: true } : {}),
         ...(restedInBanZoneInRun ? { restedInBanZoneInRun: true } : {}),
         ...(restedOnRailBandInRun ? { restedOnRailBandInRun: true } : {}),
@@ -3741,6 +3811,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // keeps its honest `active` status and the certificate is still
           // refused — only the trap goes.
           contactVoidsObjective(params[currentIndex], struckABodyInRun) ||
+          // The named body (`stopShortOf`) is monotone for the attempt in the
+          // same way, and its one gate — `sc-hzbds-stop` — IS the last
+          // objective of its drill, so this arm is load-bearing: without it a
+          // car that struck the block and rolled clear is left for the crash
+          // pin, which closes the drive ten seconds later on «колата остана
+          // притисната на място» — false of a car standing free
+          // (`objectives.ts namedBodyTouchVoidsObjective`). With it the stalled
+          // chain ends where the route ends, on gate 1's own sentence.
+          namedBodyTouchVoidsObjective(
+            params[currentIndex],
+            touchedNamedBodies?.includes(objectives[currentIndex].spec.id) === true,
+          ) ||
           // The barred rail entry is the case where this is not optional: BOTH
           // guarded drills put the gated disc last, so without it the student
           // who drove under the boom could reach the чл. 52 protocol only by
@@ -4355,6 +4437,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         ? { taskCapBreaches: [...(prev.taskCapBreaches ?? []), capStep.breach] }
         : {}),
       ...(posedAtSec !== undefined ? { posedAtSec } : {}),
+      // Monotone and additive: written only once a named body has been touched.
+      ...(touchedNamedBodies !== undefined ? { touchedNamedBodies } : {}),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
       ...(finishGate !== undefined ? { finishGate } : {}),
@@ -4601,9 +4685,41 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
   const struckAPerson = state.events.some(isPersonContact);
 
   const objectives: ObjectiveOutcome[] = state.objectives.map((o) => {
+    /**
+     * …AND THE THIRD CLAIM THE FOLD TAKES BACK: «СПРИ ПРЕДИ ПРЕПЯТСТВИЕТО»
+     * (`ReachZoneParams.stopShortOf` — lane hztick round 2,
+     * sc-hz-brake-dont-swerve:a7d0dd29).
+     *
+     * THE ORDER QUESTION, answered the way this fold already answers it for a
+     * person. In the loop a tick is final — `applyTick` steps only the active
+     * objective, so a task done at 0:23 is never asked again — and the two
+     * person demands above exist because that left «✓ Спри преди детето 1:40»
+     * standing over «Удар в пешеходец 1:48». A stop short of the block
+     * followed by a creep into it is the same sheet with a block in it, so it
+     * gets the same answer: the touch takes the tick back, and the row says
+     * why (`detail` below). ON THE ONE GATE THAT AUTHORS THE TERM THIS CANNOT
+     * ARISE TODAY — `sc-hzbds-stop` is the last task of its drill and the
+     * session completes on the grid point it is ticked, so nothing after the
+     * tick is driven (`hz-stop-before-contact.test.ts` pins both halves).
+     *
+     * `touchedNamedBodies` is the session's own record of the touch and is
+     * absent on every drive that never touched a named body, so every such
+     * drive folds to the result it always did.
+     */
+    const touchedNamedBody = state.touchedNamedBodies?.includes(o.spec.id) === true;
     const revoked =
       personHaltVoidsObjective(o.params, struckAPerson) ||
-      personContactVoidsObjective(o.params, struckAPerson);
+      personContactVoidsObjective(o.params, struckAPerson) ||
+      namedBodyTouchVoidsObjective(o.params, touchedNamedBody);
+    // THE ROW SAYS WHY (THEO-4) — `ObjectiveDetail`'s `haltVoided` member. It
+    // never displaces a measurement the evaluator reported (`o.detail` wins; no
+    // gate that names a body reports one today), and it is attached only where
+    // the touch is the reason the task is open.
+    const detail: ObjectiveDetail | undefined =
+      o.detail ??
+      (namedBodyTouchVoidsObjective(o.params, touchedNamedBody)
+        ? { kind: "haltVoided", reason: "touched" }
+        : undefined);
     return {
       id: o.spec.id,
       titleBg: o.spec.titleBg,
@@ -4615,7 +4731,7 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
       // three surfaces saying one thing instead of relying on two of them to
       // hide the third's leftover.
       completedAtSec: revoked ? null : o.completedAtSec,
-      ...(o.detail !== undefined ? { detail: o.detail } : {}),
+      ...(detail !== undefined ? { detail } : {}),
     };
   });
 

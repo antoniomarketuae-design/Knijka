@@ -25,9 +25,11 @@
  *    honest StagedEventOutcomes.
  */
 
+import { obbSeparationM, playerObb, SWEEP_RESOLUTION_M } from "../collision";
 import type { LessonObjective, ParkingBaySpec, StagedEventOutcome } from "../contracts";
 import { DEFAULT_RULE_CONFIG, type SimTick, type Vec2 } from "../rules";
 import type {
+  NamedBodyRect,
   ObjectiveDetail,
   ObjectiveEvalState,
   ObjectiveParams,
@@ -287,6 +289,16 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           throw new ObjectiveSpecError(objective.id, "reachZone requireNoContact must be true");
         }
         out.requireNoContact = true;
+      }
+      // THE BODY THE BANNER SAYS TO STOP BEFORE (ReachZoneParams.stopShortOf —
+      // lessons/types.ts carries the drive and why this is narrower than the
+      // contact term above). AUTHORED ONLY, like that term: a title can say
+      // «преди препятствието», but only the template knows where the body
+      // stands. A malformed rectangle throws — the author asked for the demand
+      // in so many words, and a silently dropped one is the false «✓ Спри
+      // преди препятствието» this key exists to end.
+      if (p.stopShortOf !== undefined) {
+        out.stopShortOf = parseNamedBodyRect(objective, p.stopShortOf);
       }
       // THE CEILING HELD OVER THE WHOLE STRETCH (see `ReachZoneWitnessDemands
       // .requireSpeedClean` for the two demonstration drives it closes, the
@@ -817,6 +829,26 @@ export interface ObjectiveContext {
    * shipped.
    */
   struckABodyInRun?: boolean;
+  /**
+   * HAS THE CAR TOUCHED THE BODY THIS GATE NAMES, in this attempt — the one
+   * fact `ReachZoneParams.stopShortOf` consults (lessons/types.ts carries the
+   * drive; lane hztick round 2, sc-hz-brake-dont-swerve:a7d0dd29).
+   *
+   * BUILT BY `lessons/engine.ts applyTick` FOR THE GATE BEING STEPPED: a graded
+   * static-object contact on this tick whose grid-point pose is on the gate's
+   * rectangle (`namedBodyTouched`), or the gate's id already in the session's
+   * `touchedNamedBodies`. Both halves, for the reason `struckABodyInRun`
+   * above reads both: a car that touches the block on the very tick the halt
+   * would complete must not be certified by a record one tick stale.
+   *
+   * NOT „any contact" — that is `struckABodyInRun`, one field up, and a gate
+   * that wants it authors `requireNoContact`. A contact with another body (the
+   * escort, a kerb, a façade) leaves this false.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes" — the polarity every
+   * witness fact on this context ships with.
+   */
+  touchedNamedBody?: boolean;
   /**
    * Has this drive been billed for going onto a level crossing with the arm
    * down — `RAIL_CROSSING_VIOLATION` detail `"entered-barred"`, the 10-point
@@ -3313,6 +3345,17 @@ function noContactHonoured(ctx: ObjectiveContext): boolean {
 }
 
 /**
+ * Has the car touched the body this gate says to stop BEFORE? (see
+ * `ReachZoneParams.stopShortOf` for the drive and `ObjectiveContext
+ * .touchedNamedBody` for who answers.) `true` is the only refusing value —
+ * absent is „unknown" and keeps the shipped answer, the polarity
+ * `noContactHonoured` above ships with.
+ */
+function stopShortOfHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.touchedNamedBody !== true;
+}
+
+/**
  * Was the yield the banner promised billed as a FAILURE inside this
  * objective's own window? (see `ReachZoneWitnessDemands.requireYieldClean` for
  * the drive, the census and why the window exists.)
@@ -3598,6 +3641,97 @@ export function contactVoidsObjective(
 ): boolean {
   if (!struckABodyInRun || params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireNoContact === true;
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE NAMED BODY (`ReachZoneParams.stopShortOf`),
+ * where — like the yield, the М1 and the ceiling terms — it is NOT optional:
+ * `sc-hzbds-stop`, the one gate that authors it, IS the last objective of its
+ * drill (2 of 2). Without this arm the repair that stops «✓ Спри преди
+ * препятствието» being printed under «Удар в неподвижно препятствие −10» hands
+ * back a drive that ends only on the crash pin — ten seconds motionless, closed
+ * with «колата остана притисната на място» over a car that had rolled two
+ * metres clear of the block (measured, the released-pedal crash: round 1 of
+ * lane hztick shipped exactly that and its verifier read the false sentence).
+ *
+ * ONE REFUSAL, NEVER A TRAP: the objective keeps its honest `active` status
+ * and `buildLessonResult` still reports finished-and-failed. The same
+ * predicate is the FOLD's (`buildLessonResult`): a touch after the tick takes
+ * the tick back — the answer `personHaltVoidsObjective` gives for «Спри пред
+ * човека», and for the same reason: one sheet may not certify the stop short
+ * of a body and bill the contact with it.
+ *
+ * Takes the boolean, like `contactVoidsObjective`: the fact is attempt-wide
+ * and the caller holds the record (`LessonSessionState.touchedNamedBodies`).
+ */
+export function namedBodyTouchVoidsObjective(
+  params: ObjectiveParams,
+  touchedNamedBody: boolean,
+): boolean {
+  if (!touchedNamedBody || params.kind !== "reachZone") return false;
+  return params.stopShortOf !== undefined;
+}
+
+/**
+ * IS THE CAR'S BODY, AT THIS POSE, ON THE BODY A GATE NAMES? — the geometry
+ * half of `ReachZoneParams.stopShortOf`, asked by `lessons/engine.ts` ONLY on
+ * a tick that carries a graded static-object contact, about the pose that tick
+ * carries (the grid point of the physics step the contact began at — ADR-014,
+ * amendment 2026-10-11; never a frame-end pose).
+ *
+ * IT DECIDES WHICH BODY, NEVER WHETHER. A static contact reaches the session
+ * with no name (`SimTickEvent` collision: a wall, a prop, a kerb and a façade
+ * are one anonymous category), so the one thing left to ask is whether the car
+ * was AT the named rectangle when the product reported the contact. The car's
+ * box is `collision/playerObb` — the chassis collider's own half-extents — and
+ * the separation is the collision module's exact SAT.
+ *
+ * THE REACH IS `collision/SWEEP_RESOLUTION_M` (0.15 m) AND NOT ZERO, measured:
+ * the pose a contact's grid point carries is the pose AFTER that physics step,
+ * and a chassis that struck the block is by then leaving it.
+ * `hz-stop-before-contact.test.ts` drives the product's chassis into the block
+ * straight and yawed to full lock, from a 0.04 км/ч touch to a 59 км/ч strike,
+ * and pins the band the box stands in at the contact's grid point; 0.15 m is
+ * the collision module's own stated contact resolution («exactness is bounded
+ * and stated rather than assumed»), several times that band, and a tenth of
+ * the nearest gap to anything else a car can strike beside the block (with the
+ * car's flank on the kerb its box is 1.5 m from the rectangle). It cannot
+ * invent a contact — nothing calls it without one.
+ */
+export function namedBodyTouched(
+  rect: NamedBodyRect,
+  pose: { x: number; y: number; headingDeg: number },
+): boolean {
+  return obbSeparationM(playerObb(pose.x, pose.y, pose.headingDeg), rect) <= SWEEP_RESOLUTION_M;
+}
+
+/** Parse an authored `stopShortOf` rectangle, or throw (see its parse site). */
+function parseNamedBodyRect(objective: LessonObjective, raw: unknown): NamedBodyRect {
+  const r = raw as Partial<Record<keyof NamedBodyRect, unknown>> | null;
+  const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+  if (
+    typeof r !== "object" ||
+    r === null ||
+    !fin(r.x) ||
+    !fin(r.y) ||
+    !fin(r.headingDeg) ||
+    !fin(r.halfLengthM) ||
+    !fin(r.halfWidthM) ||
+    r.halfLengthM <= 0 ||
+    r.halfWidthM <= 0
+  ) {
+    throw new ObjectiveSpecError(
+      objective.id,
+      "reachZone stopShortOf needs x, y, headingDeg and halfLengthM, halfWidthM > 0",
+    );
+  }
+  return {
+    x: r.x,
+    y: r.y,
+    headingDeg: r.headingDeg,
+    halfLengthM: r.halfLengthM,
+    halfWidthM: r.halfWidthM,
+  };
 }
 
 /**
@@ -4326,6 +4460,7 @@ export function stepObjective(
  *   speedClean      requireSpeedClean       a speed fault was reported (`speedCleanHonoured`)
  *   brakingClean    requireBrakingClean     a slam or a dead stop without cause (`brakingCleanHonoured`)
  *   greenStartClean requireGreenStartClean  a freeze at the green (`greenStartCleanHonoured`)
+ *   stopShortOf     stopShortOf             the body the banner names was touched (`stopShortOfHonoured`)
  *
  * Every one is session-monotone (or monotone inside its window): no speed the car can take from here on makes it true
  * again. `requireFullStop`'s OTHER half — the standstill itself (`fullStopHonoured` at the mark) — is NOT here: coming
@@ -4345,7 +4480,8 @@ export type ReachZoneJourneyRefusal =
   | "stopSignRoll"
   | "speedClean"
   | "brakingClean"
-  | "greenStartClean";
+  | "greenStartClean"
+  | "stopShortOf";
 
 export function reachZoneJourneyRefusal(
   params: WitnessedReachZoneParams,
@@ -4362,6 +4498,7 @@ export function reachZoneJourneyRefusal(
   if (params.requireSpeedClean === true && !speedCleanHonoured(ctx)) return "speedClean";
   if (params.requireBrakingClean === true && !brakingCleanHonoured(ctx)) return "brakingClean";
   if (params.requireGreenStartClean === true && !greenStartCleanHonoured(ctx)) return "greenStartClean";
+  if (params.stopShortOf !== undefined && !stopShortOfHonoured(ctx)) return "stopShortOf";
   return null;
 }
 
@@ -5167,6 +5304,15 @@ function stepReachZone(
   // vehicle kept rolling the remaining 48 m and collected the tick under a
   // sentence about having got past it. It no longer does.
   const contactOk = params.requireNoContact !== true || noContactHonoured(ctx);
+  // ── THE BODY THE BANNER NAMES WAS NOT TOUCHED (ReachZoneParams.stopShortOf) ─
+  // The same shape again, one body wide instead of the whole run (lane hztick
+  // round 2, sc-hz-brake-dont-swerve:a7d0dd29): a per-frame read of an
+  // attempt-monotone fact, OUTSIDE the `capMet` latch — which is the half
+  // round 1 got wrong. It made the refusal a property of the HALT (a void that
+  // a latched contract, a rebound speed or a yawed nose could each talk out
+  // of); the banner's word is «преди», and a car that has touched the block is
+  // not before it at any speed, on any heading, latched or not.
+  const shortOfOk = params.stopShortOf === undefined || stopShortOfHonoured(ctx);
   // ── THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS (requireRailClear) ─────
   // Third arm of the same shape, and see `railClearHonoured` for the per-frame
   // design this replaced and the drive that killed it. Outside the `capMet`
@@ -5382,6 +5528,7 @@ function stepReachZone(
     capMet &&
     vruOk &&
     contactOk &&
+    shortOfOk &&
     railOk &&
     yieldOk &&
     haltForVruOk &&

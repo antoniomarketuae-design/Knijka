@@ -1040,8 +1040,32 @@ export function objectiveDetailText(detail: ObjectiveDetail | undefined): string
       if (detail.movements === 0) return null;
       return `Обратен завой: ${detail.movements} ${detail.movements === 1 ? "движение" : "движения"}`;
     }
+    case "haltVoided":
+      // sc-hz-brake-dont-swerve:a7d0dd29 (lane hztick). The one row here that
+      // sits under an UNTICKED task: «Спри преди препятствието — с пълна
+      // спирачка, В своята лента» stood TICKED over «Удар в неподвижно
+      // препятствие −10», and with the tick gone it would stand bare. THEO-4:
+      // the row says why, in the sheet's own word for what happened («Удар») and
+      // the task's own («преди») — the sentence the debrief repeats.
+      return HALT_VOIDED_ROW_BG[detail.reason];
   }
 }
+
+/**
+ * Why a stop-before task is not ticked, per reason the fold can attach
+ * (`ObjectiveDetail`'s `haltVoided` member). Exported for the witnesses that
+ * hold this row and the debrief to one sentence.
+ *
+ * TRUE ON EVERY DRIVE THAT SHOWS IT: „touched" is attached only when the
+ * product reported a graded static-object contact with the car's body on the
+ * rectangle of the body the task names — the contact the sheet bills as «Удар
+ * в неподвижно препятствие». It says nothing about speed or pedals: round 1's
+ * «колата спря от удара, а не от спирачката» was false of a car that braked to
+ * 1 км/ч and then touched.
+ */
+export const HALT_VOIDED_ROW_BG: Record<Extract<ObjectiveDetail, { kind: "haltVoided" }>["reason"], string> = {
+  touched: "Не се отчете: колата удари препятствието — задачата е да спреш преди него.",
+};
 
 /**
  * Everything the map + row-linking needs, derived once from the result:

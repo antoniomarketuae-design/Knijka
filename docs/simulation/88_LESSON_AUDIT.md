@@ -12453,3 +12453,267 @@ Lane `postureslamp`, round 1, built on `2e9268f`. Its adversarial verifier SIGNE
 - **The ambient cross stream at the dark-lamp junction is not changed by this lane.** The builder carries it as still following the hidden lamp cycle, not the officer; this lane did not measure it. That is row `sc-sig-controller-postures:5ee4301e` (critical). Its lane, `posturescross`, was REFUTED in round 1; round 2 started on 2026-10-11. Until it lands, the new voice's «ГЪРДИ ИЛИ ГРЪБ към теб: минава напречното» and «предимството е твое» are rule statements the ambient traffic may not act out (verifier F7; the same already held for instructions 2–5).
 - **The advisor card names a red never shown there.** `CONTROLLER_WAIT_CARD_BG` («…страничен профил — минаваш, дори на червено…») is also shown on the dark-lamp lesson. It is true as a rule. A dark-lamp variant could be considered.
 - **No device photograph.** The dark head and the officer caption have not been photographed on PC or on the phone lens. Neither has the caption's legibility next to the officer's posture bubble. The rig drive that takes these frames should also record the three officer voice lines.
+
+## Wave C verdicts — 2026-10-12
+
+This run retired 3 row(s). Their evidence frames were driven at (unattributable: 3 of 3) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`8cb070776a54`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 3 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 13 |
+
+**Open list: 26 → 23**, out of 1547 filed across the whole programme (1521 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3d: eight rows driven at `8cb0707`, the first drives of the two landings (integrator note, 2026-10-12)
+
+Workflow `rig-wave-w3d` (wf_3ac2d733-cb0) ran at `8cb0707`, one capture at a time, through `/dev/drive-rig` with the ADR-017 rig; frames are under `.audit-frames/rig-w3d/<lesson>/`. It was the first time anything from the `hzcontact` and `postureslamp` landings was driven in a browser. **Open list 26 → 23 (4 critical, 18 major, 1 minor).**
+
+**Closed — the verifier could not refute (3):**
+- `sc-sig-controller-postures:784b2ca7`. Five careful drives (PC L1, L3, L4; phone L1, L3). The head at the officer's junction shows three dark lenses in his halt and in his proceed, and at the crossing; the per-frame record of the whole drive has no lit lens on any frame (3,182 / 1,203 / 3,373 / 1,129 / 3,595 frames), and the verifier's own pixel scan finds 0 lit pixels where the filed frames had 31 and 111. The caption over the head is the officer's, and the notices read «Защо чакаш: регулировчикът», «Чакането Е маневрата — четеш човека», «Изчака регулировчика». Not part of this row and not closed: the ambient cross traffic still follows the hidden cycle (row `5ee4301e`); the L1 advisor card «…минаваш, дори на червено…» still stands on the PC glass at a junction whose lamp is out (in triage).
+- `sc-ed-poligon-chain:317d2b4a`. With the reverse actually driven (the rig's own feasible reverse, not the authored 1.20 m one), all five tasks tick on PC L1, PC L3 and phone L1: ИЗДЪРЖАН, 0 т., three stars. The filed 0 of 5 was the filed leg's own driving; the harness legs at this commit still end with five dashes (one never reaches R, the other reverses off the path). No product change is named for this closure.
+- `sc-ed-poligon-chain:dceba965`. Good, bad and worse now get three different sheets on the phone: the careful drive 0 points, three stars, 5 of 5 and the praise; the wrong drive that does the tasks but speeds in transit 10 points, one star, 5 of 5; the harness wrong leg 53 points, one star, 0 of 5.
+
+**Partial (5), and what each still needs:**
+- `sc-hz-brake-dont-swerve:a7d0dd29` (critical). **The billing is repaired on the device:** COLLISION 10 т. at the contact's own step on 14 of 14 phone runs and 7 of 7 PC runs, with the car's pose identical between the lenses up to the contact and the contact carried in frames of up to 7 steps at any position. The judge proposed CLOSED; the verifier refused on the row's own literal clause, which is still photographed: the task «Спри преди препятствието — с пълна спирачка, в своята лента» is ticked on a run that never braked and hit the block (it «stopped» by bouncing off it), and the debrief says the route tasks are done. Owed: repair lane `hztick`, then a re-drive.
+- `sc-hz-brake-dont-swerve:f0023997`. On PC every clause is closed or retired under the 2026-09-27 ruling. On the phone the flash and the chase cut are shown; the shake could not be shown, because the capture logged the camera's position and the shake is rotation only, and its own still stalled the page across the shake window on 13 of 14 runs. Owed: a phone drive that logs the camera's rotation per render and takes no picture in the first half second. Noted: at L1 on PC the teach sheet covers the flash and the shake window entirely.
+- `sc-roundabout-entry:08a0b701`. **The points split is gone:** in the cell that split at `2e9268f` (L4, H 1776) all six runs on both lenses carry FAILED_TO_YIELD + COLLISION = 20 at the same step, and codes and points agree on every run of all seven cells. The judge proposed CLOSED; the verifier refused. Clause (b) has no careful drive behind it on either lens (none that stops at the line and enters behind the circulator). And the sheets still differ after the contact: at L1 the PC runs add static-object hits the phone runs do not have (and the two PC repeats differ from each other), one phone run never ended by itself, and at L4 H 1810 the COLLISION stamp moves with the display. That last is the NPC shell, which is still posed once per render frame (ADR-014, Amendment 2026-10-11). Owed: repair lane `npcstep`, and the careful drive on both lenses. Also seen: on all 16 phone L4 runs two taps on «РЕЗУЛТАТ» did not open the result (in triage).
+- `sc-roundabout-entry:fe081cf1`. The fault card as it first appears is whole on both lenses. Still open: on PC at L3 with the advisor on, the paragraph opened with «ЗАЩО» is cut 42.5 px mid-sentence with its law chip off the screen for the last 3 s of the card's life, and the card is gone 6.3 s after the press; the phone's opened state was not photographed. Noted: the same fault prints «Спирачният път не стигна.» on the phone and «Не се появи внезапно.» on PC. Owed: repair lane `whycut`.
+- `sc-turn-left-oncoming:d079e687`. The judge proposed CLOSED on the drives that completed; the verifier refused, because the capture's own attempts folder holds five phone drives with the same script bytes and the same named start in which the car went into reverse at rest under the held brake and never drove the lesson, while PC stayed in gear 1 and passed. The capture had set them aside and switched to a script that holds no pedal at rest. The ruled auto-reverse runs on a frame-timed clock (ADR-017 D-3). Whether a student's own pedals can reach this is not established; it is in triage as its own candidate.
+
+**What the wave says about the landing.** The `hzcontact` landing did what it was built for on both rows it reached: the phone no longer loses the crash bill, and the roundabout's points split is gone. What is left on those rows is narrower than what was filed: a task tick that should not be given, and what happens after a contact with another vehicle.
+
+## Landed: a due tailgater pass waits until the лепка's own hard brake has been reported or is over, so the pass timer no longer cuts that brake's report short — in process — `sc-follow-tailgater:63c0c28c` (critical), clause C2a (2026-10-13)
+
+Lane `tailbrake3`, five rounds, built on `2e9268f`. Round 1 ended BLOCKED: its builder showed that the cause filed for the lane was wrong, and changed no product line. Rounds 2, 3 and 4 were each REFUTED by the adversarial verifier on one finding. Round 5 was SIGNED OFF WITH CONDITIONS: the verifier found no stop-rule item met on its replays. The patch is `tailbrake3-result-r5.patch` (sha256 a2e66931…, 9 files, +3176/−39, 0 CR bytes). It is cumulative against `2e9268f`, not against the landing base, so it is applied 3-way on `8cb0707`. The verifier checked that it applies to `8cb0707` through a temporary index.
+- **One product file changes behaviour:** `orchestrator/runners.ts` (+189/−1; the verifier read it at sha256 510c7316…). In `RearTailgaterRunner`: one bit, one clock, one conjunct in the pass timer, and one import.
+- **Two product files change in comments only:** `contracts.ts` (the `pressureSec` doc) and `lessons/scenario/templates-following.ts` (the FTG_TAILGATER doc). The verifier compared both against base.
+- **Six test-side files.** Five are new: `orchestrator/__tests__/tailgater-pass-hold.test.ts`, `orchestrator/__tests__/tailgater-pass-hold-sustain.test.ts`, `lessons/scenario/__tests__/follow-tailgater-uneven-brake-check.test.ts`, `lessons/scenario/__tests__/follow-tailgater-rig-w3b-ttf25.test.ts` and its fixture `follow-tailgater-rig-w3b.fixture.json` (the rig-w3b per-grid rows of three drives: pc-L3-TTF25, pc-L1-TASF348, pc-L3-TTF323). One is updated: `follow-tailgater-brake-check-under-floor.test.ts`.
+- **No threshold was moved and no shown sentence was added or changed.** The 35 км/ч floor is untouched. `rules/engine.ts` is byte-identical to base (the verifier, sha256 d0943656…). The reviewed-text manifest was not re-recorded for this patch.
+- **No new rule bills.** The bill is the existing one: ADR-016's `followerBraked` report and the engine's floor-lift.
+- **ADR-016 gains an update paragraph** (Update 2026-10-13), and one sentence of its 2026-10-10 update is corrected.
+
+**The row is NOT closed by this landing.** `sc-follow-tailgater:63c0c28c` stays OPEN. Every number in this section is in-process: kinematic students on the 1/60 s grid, and the rig's recorded poses, replayed through the live rung chain. Nothing was driven in a browser. A rig re-drive on PC and on the phone lens is owed (below); whether its frames close the row is for that wave's judge and verifier.
+
+**What was wrong.** rig-w3b (above) left clause C2a open on attempt pc-L3-TTF25: a full-pedal brake check from 24.48 км/ч with the лепка glued 4.79 m behind escaped as «ИЗДЪРЖАН» ★★★ with «Чисто и спокойно каране».
+- **The cause filed for the lane was wrong.** ADR-016's update of 2026-10-10 wrote that the follower «DID brake hard» and that the report was missing because «a swerve-out never sends» it. Neither holds.
+- **The rig-w3b note's reading was right for its time, and is now superseded.** The note above read the drive as the F2 class («This is the class the tailbrake C1 integrator decision leaves unbilled»). The round-1 builder measured the same: 0.25 s at the harsh line is under the 0.4 s sustain, and the pinned cell F2 L5 25 y120 is the same drive to within two grid points. What the note could not see is why the brake was that short. Decision E2 (below) narrows the class, so the note's reading no longer describes the product.
+- **The measured cause.** The round-1 builder replayed the rig's own per-grid poses through the live rung chain on `2e9268f`; the verifier's corrected ADR text records that it reproduced this in round 2.
+  - The follower's account was never the gap. It reads the лепка on every glued grid point.
+  - The лепка's pass was a pure timer: `tSec − latchedAt >= pressureSec`. On TTF25 it came due 0.267 s after the pedal, while the лепка was braking at 9.2 m/s².
+  - The cruise law then accelerated the лепка at 3.5 m/s² toward a car stopping 4.8 m ahead (the bumper gap closing 4.80 → 4.45 m as it pulled out).
+  - Its hard brake had stood 0.25 s at the harsh line, under the product's 0.4 s sustain. So nothing was reported, and the 35 км/ч floor acquitted the brake check.
+  - Five of the six pinned F2 cells were the same: the лепка at about 10 m/s² when its pass began 0.13–0.25 s after the pedal.
+
+**Decision E2 (integrator, 2026-10-11).** This is a staging defect, not a new policy: no driver begins an overtake by accelerating at a car that is braking hard just ahead. A due pass now waits. The лепка's hard brake is then reported by the product's own step, and the existing rule (ADR-016) bills. F2's intent is kept: a tailgater that was already pulling out and is not braking stays unbilled.
+
+**Rounds 2, 3 and 4, each refuted on one pedal shape.** Each got the start of the wait right and ended it too early. The counts are the verifier's own tapes. Each drive was also run in a world where the timer never comes due (`pressureSec` 90, «the no-timer world»).
+- **Round 2 held only on grid points whose reading was AT the harsh line.** 762 of 5,838 sub-floor brake checks escaped through an uneven emergency stop. The first reading under 7 m/s² released the pass with the car still braking.
+- **Round 3 held through the step's open window.** 383 of 9,000 further tapes escaped. The product's step re-anchors its window while the brake continues; where the re-anchor fell on a reading under 7 m/s², the pass was commanded with the лепка still braking at 5.5–7.0 m/s².
+- **Round 4 held until the first reading under the braking line («the released pedal»).** 980 of 6,444 new tapes escaped: tap–release–slam 700 of 1,548, one emergency stop with a dip 234 of 1,296, seeded random stops with releases 46 of 3,600. A release of three grid points (0.05 s) in the middle of an emergency stop, or an ease to 1.9 m/s² for four, was enough. All 980 were «ИЗДЪРЖАН» with the unscoped praise, while the no-timer world reported each 0.57–1.10 s after the pedal and billed it.
+
+**What landed (round 5, the verifier's own measured cure).** A due pass is held from the лепка's FIRST reading at the harsh line, tracked on every glued grid point, until one of three things:
+1. the product's step REPORTS its hard brake (`followerBraked` is out; the pass begins on that grid point);
+2. the brake is OVER: its reading has stayed under `BRAKING_LINE_MPS2` (2 m/s²) for the product's own sustain, `harshBrakeSustainSec` (0.4 s). On the 1/60 s grid that is the 25th reading of an unbroken run under the line. Any reading back at the braking line starts the count again;
+3. the car is no longer his close follower (the account starts a fresh track).
+
+The hold goes through any reading under the harsh line, any re-anchor and any release shorter than the sustain.
+- **How it is built.** Two fields of the runner's own, written in `stepFollowerAccount` from what the product's step did on the same grid point:
+  - the bit `ownBrakeReachedTheLine`: set when `followTrack.lastQualAt === tSec` in an unreported episode; cleared when `followTrack.fired`, when the brake is over, and wherever the account starts afresh;
+  - the clock `ownReleasedSinceSec`: the first reading of the current unbroken run under the braking line; nulled by any braking reading.
+  - `ownHardBrakeHoldsThePass()` returns the bit; its negation is ANDed into the pass timer.
+- **The sustain is the engine's constant, not a second 0.4.** «Over» is `tSec − ownReleasedSinceSec >= OVERTAKE_HARSH_LINE.harshBrakeSustainSec × (1 − HARSH_BRAKE_TIE_TOLERANCE)`. A test moves the default sustain to 0.3 s and 0.5 s before the runner loads, and the hold moves with it.
+- **What changes on screen is timing only** (the builder): when the лепка's pass begins. During a held pass the лепка keeps its place on his bumper with its left blinker on. The builder found no caption, instruction or coach line that names a time for the pass; the verifier found none in this lesson's spec and did not re-read the other eleven templates' captions.
+- **On TTF25 itself, in process:** the attempt now reports at 29.2833 s and is coached at 29.300 s; it is not passed and carries no praise.
+
+**What the round-5 verifier reproduced** (its own lane, base + the round-5 patch byte for byte; its own probe and its own oracle, «a brake is over at 25 consecutive readings under 2 m/s², counted on the published speeds»):
+- **Round 4's 980 escapes are 0.** Billed on the round-5 tree:
+  - tap–release–slam: 524 → 1,224 of 1,296;
+  - the dip: 990 → 1,224 of 1,296;
+  - random stops with releases: 373 → 419 of 587;
+  - tap–release–slam at L1/L4: 404 → 948 of 948.
+
+  Each drive of the first three sets is identical in every measured field to the alternative the verifier had measured in round 4. The 312 that stay unbilled had the лепка never at the line before its pass.
+- **The earlier tapes stay at 0.** The 9,000 round-3 tapes: billed 4,603 of 8,182. The 5,838 round-2 tapes: billed 3,762 of 5,082. Every sheet equals round 4's; 840 of the 14,838 differ in the лепка's trajectory only.
+- **15,060 new drives aimed at this rule found no escape.** They cover releases of 20–31 grid points around the sustain, the tie, eases to 1.9 / 2.0 / 2.1 m/s², pumps, brake taps with throttle, a second hard brake after a report, and 200 seeded random stops with long releases, at L1/L3/L4 and 20–34.6 км/ч.
+  - 0 passes were commanded while the лепка, at the harsh line since its brake was last over, was unreported and under the braking line for fewer than 25 readings.
+  - Of 12,940 held passes, 5,061 began on the report and 7,879 exactly 25 grid points after the last braking reading. None began otherwise.
+  - A second hard brake after a completed report is held for again: 174 passes commanded on the second report.
+- **Never more than the no-timer world.** Across the 40,680 drives that have a no-timer run, 0 are billed beyond it, every report is its report on the same grid point, there is a pass on every drive, and 0 bills are lost against round 4. The only contacts are two drives of the swerve set in which the student steers into the passing car; the same two collide on round 4 and on base (base has eleven). The 24 brake-tap drives of condition C1 and the 864 constructed fresh-track drives (both below) are not among the 40,680.
+- **Cadence.** Tap–release–slam re-run at 20 Hz and at a mixed frame cadence: 1,548 of 1,548 identical to 60 Hz.
+- **The rig drives and the named cells.** All 26 rig drives and all 11 named cells are identical to round 4's.
+  - Billed, among others: the TTF25 attempt, pc-L3-TTF323 (report 28.35 s), and five of the six F2 cells (L1 28 y130, L3 28 y140, L4 28 y140, L5 25 y120, L5 30 y140).
+  - Billed too: the three wider cells the first tailbrake landing left decided-but-unpinned (L3 25 y125, L4 32 y155, L2 20 y170).
+  - Unbilled, among others: the pc-L1-TASF348 sidecar (pass commanded 0.083 s before the pedal in the verifier's replay; the builder reads 0.08 s and the rig-w3b note above 0.067 s; passed, praise) and F2 L4 30 y150 (pass 0.013 s after the pedal).
+- **Census.** Every template × committed demo × L1–L5, base against tree: 2,515 keys = 81 identical compile-error strings + 2,434 cells; the verifier's census file is byte-identical to base's (2,014 trajectories). The tailgater family with outcomes applied: 174 cells in 12 templates, byte-identical (243 trajectories).
+- **Red first.** 63 of the 136 direct tests fail on base and 25 on the round-4 tree, all on assertion text.
+- **Mutants:** 54, one at a time, `runners.ts` restored to 510c7316… after each, 0 timeouts. 47 killed on assertion text, among them every mutant named in rounds 2–5. 7 survive: 4 are the builder's and equivalent by argument (the verifier checked each argument against the code); 3 are the verifier's own (C2 below).
+- **Regression (the verifier's lane, on `2e9268f` + the patch, not on `8cb0707`):**
+  - direct: 8 files, 136 of 136;
+  - orchestrator / traffic / rules / traces / sim: 354 files, 5,009 tests, 0 failed;
+  - scenario: 183 files, 4,367, 0 failed;
+  - lessons: 124 files, 2,501, 0 failed, 165 skipped;
+  - lesson-ui: 43 files, 717, 1 failed. That is touchHintLifetime, ENOENT on `tools/mobile/lesson-audit.mjs`, as on base;
+  - tsc: 22 errors, the same list as round 4 and base, none in a touched file.
+- **Not re-run by the verifier:** the builder's own 13,992-drive search (0 escapes reported), its 1,568-, 2,592- and 2,835-drive sets and its 46-mutant script. The verifier ran its own tapes and its own mutant forms instead.
+
+**The conditions, and how each stands.**
+- **C1. The hold has no bound in seconds. DECIDED 2026-10-13: intended.** A student who stabs the brake once and then keeps tapping it is not passed for as long as he does. A tailgater does not pull out past a car that keeps braking. The builder's pin «NO CLOCK OF ITS OWN» stays; no bound is added.
+  - What the verifier measured: after one 0.2 s full-pedal stab, brake taps of 5 m/s² for 0.1 s every 0.35 s with the throttle in between held the pass 5, 10 and 20 s, as long as the taps lasted; light coasting taps (2.5 m/s² for 0.05 s every 0.38 s) held it 15–23 s. On 10 of the 24 drives of these two forms (24.5 and 34.6 км/ч, L3) the pass had not begun when the lesson ended.
+  - The sheets (debrief and result) equal base's on all 24: «ИЗДЪРЖАН» with the unscoped praise in the tree, in the no-timer world and on base. Nothing is reported in any world. Only the staged event's outcome is missing instead of «yielded».
+  - The lesson cannot deadlock on it: both objectives are reach-zones and do not need the pass (the builder).
+  - What does bound a hold: the pass begins 25 grid points (0.417 s) after the лепка's last reading at the braking line.
+  - Not known: whether the product's pedals produce this tap pattern.
+- **C2. Three behaviours were unpinned.** Three of the verifier's seven new mutants passed all 136 tests. None loses a bill on its tapes.
+  - **(a) «Over» is counted whether or not the timer is due yet.** Mutant X2 adds `latchedAt !== null && tSec − latchedAt >= pressureSec` to the «over» condition, so a brake that was over before the due point still holds the pass. On the verifier's tie set (L3, 24.5 км/ч) 8 of 756 drives then differ: 8 bills gained, none lost. PINNED AT INTEGRATION: `tailgater-pass-hold.test.ts`, new block «THREE THINGS THE HOLD DOES NOT READ, PINNED AT THE LANDING», row «"OVER" IS COUNTED ON EVERY GLUED GRID POINT, DUE OR NOT» (a 0.1 s tap at the harsh line 1.3 s before the timer, a full second off the brake, then a firm brake across the due point: the pass begins on the first due grid point). The mutant is RED on that row alone, 1 of 57, on assertion text («expected 4.216666666666667 to be 3»); re-killed by the merge verifier. Pinned on the scripted port only: no lesson-level sheet separates it.
+  - **(b) «Over» does not ask about the student's pedal.** Mutant X14 adds `!(input.brakePedal > 0)` to the «over» condition. The pass then begins up to 1.12 s later on 962 of 1,260 gentle stops; sheets unchanged. PINNED AT INTEGRATION: same block, row «"OVER" DOES NOT ASK WHERE HIS PEDAL IS» (the car's brake ends before the sustain while the student's pedal stays down: the pass begins on the 25th reading under the braking line, as in the pedal-up control). The mutant is RED on that row alone, 1 of 57 («expected null not to be null» — the pass never begins); re-killed by the merge verifier. Scripted port only.
+  - **(c) The student's standstill does not by itself end the hold.** Mutant X18 clears the bit when `input.speedKmh < 0.01`. No bill is lost on 3,192 drives, including slams from 10–18 км/ч; 238 trajectories differ. PINNED AT INTEGRATION: same block, row «THE HOLD DOES NOT END BECAUSE HE HAS STOPPED» (he brakes to a standstill before the timer; the car behind is at the harsh line and unreported on the first grid point he is at rest: the pass is not commanded there, it begins on the car's own report, which equals the no-timer world's). The mutant is RED on that row alone, 1 of 57 («expected 3.033333333333333 to be greater than 3.1166666666666667»); re-killed by the merge verifier. Scripted port only.
+- **C3. The engine tie — outside the lane, NOT fixed here.** `rules/engine.ts` compares the student's own sustain with a bare `>=`, where the follower's account uses the tie tolerance.
+  - Reported but unbilled on the tree: 182 of the 9,000, 77 of the 3,600 round-4 random stops, 321 of the 15,060 new drives. The no-timer world has more in each (350, 97, 395), so the hold is not the cause.
+  - What is new: the hold ends at a report whether or not the engine bills it. On 14 of 3,600 random stops (L1/L4, 31.7 км/ч, one shape) the лепка's first report is not billed, the pass begins on or after it, and the no-timer world bills the same stop on a second report 0.85 s later. All 14 are «ИЗДЪРЖАН» with the unscoped praise on the tree.
+  - Confirmed by instrument, measurement only (`rules/engine.ts` restored afterwards): with the tie tolerance on the student's ledger all 14 bill on the first report and no bill is lost.
+  - It is in triage as candidate «sustaintie».
+
+**Written down, not changed.**
+- **F2 as it now stands.** Unbilled = the pass was commanded before the лепка was ever at the harsh line, or after its brake had been released for the sustain. Two further unbilled forms are listed separately: the engine tie (C3 above) and the fresh-track end (below).
+  - **Before the line, with the slow-pedal width.** The width is the pedal's own rise. On the mouse pedal's 0.75 s rise the pedal can go down up to 0.583 s before the pass is commanded: 210 of 300 such drives are «ИЗДЪРЖАН» with the unscoped praise. On the 9,000 uneven stops 3,579 drives are this class (pedal up to 0.517 s before the command).
+  - **After a release for the sustain.** Tap, let go, slam: off the pedal for 26 grid points (0.433 s) or less is held through and billed, 1,512 of 1,512. Off for 27–31 grid points (0.45 s or more): 840 of 1,080 unbilled, «ИЗДЪРЖАН» with the unscoped praise, while the no-timer world bills all 1,080. Closest bumper gap 3.11 m, no contact. Across the 15,060 new drives 1,363 are this class.
+  - The praise on these unbilled forms is the question the first tailbrake landing left open; it is in triage as «flooredpraise».
+- **The fresh-track end.** The account's lane test reads the lane the traffic system publishes for the лепка, 8.125 m, so «no longer ahead of it in its lane» begins 4.96 m to the side of its line. On 228 of 864 constructed drives a pass begins with the car still braking at 9.3 m/s², 99 of them unbilled though the no-timer world bills — but only with the student placed 4.94 m to the side of the лепка's line and crossing that edge mid-stop. The verifier does not count it as a refutation. The builder's pin covers leaving the lane for good, not leaving and coming back.
+- **At L4.** A billed sub-floor brake check is a charged основна, 3 наказателни точки (the builder's reading of the sheet), and the lesson can still be «издържан»: 41 of the verifier's 2,989 billed L4 drives. No billed drive at any rung carries the praise.
+- **The braking line's own tie.** With an ease to exactly 2.0 m/s² (the лепка reads 1.9997–2.0), 17 of 72 cells with a 28-grid-point ease pass unbilled though the no-timer world bills. The verifier did not pursue it.
+
+**Integration.** This patch and `hztick-result-r2.patch` share no file (9 and 17 paths, none in common). The lane has no `tools/` directory, and the builder reports no string or table added to a module that a tools test reads.
+
+**PROVEN ON 8cb0707** (scratch worktree `integ-th`, workflow `land-th`, wf_3c22f020-f74), together with the other lane of this landing. Both patches applied 3-way with no conflict; they share no file (9 + 17 = 26 paths). Only `contracts.ts` needed a real merge (it moved between `2e9268f` and `8cb0707`), and its landed hunk is exactly the lane's comment. The integrator added the pins named above, in two test files; every product file is the lanes' bytes (the merge verifier compared the trees). One worker, one run at a time:
+- lessons 125 files, 2,386 passed, 165 skipped; lessons/scenario 188 files, 4,541 passed; components/sim 89 files, 1,563 passed; orchestrator 41 files, 528;
+- rules 98 files, 1,779; traffic 47 files, 561; runtime 48 files, 875; scene 45 files, 745; vehicle 21 files, 296; world 135 files, 2,409; hud 65 files, 1,186; traces 168 files, 2,146;
+- tsc: 21 errors, the environment baseline (the generated prisma client, absent in a worktree), none in a touched file. The reviewed-text manifest is the hztick lane's own (4 strings added); nothing moved against it.
+
+The merge verifier re-ran lessons, lessons/scenario, orchestrator and hud to the same counts, killed all four pinned mutants and four sibling forms of its own, re-killed two lane mutants per lane, and returned ACCEPT WITH FIXES (one quoted title, this paragraph's note on the tools gate, and a comment-only follow-up: `runners.ts` ~4511 and the header of `tailgater-pass-hold.test.ts` still word the hold's end as «or the car ahead has stopped», which the hold reads only through the лепка — owed as a comment fix). Gate patch `gate-th.patch`, sha256 c7b4dde9…, 26 files, 0 CR bytes.
+
+**The tools tests could not be measured in the landing worktree.** `node platform/scripts/tools-tests.mjs` there gives 2,005 tests and 8 failures where the gate allows 1 (the standing deck-captions freeze): the other 7 are inputs a worktree does not hold — `.audit-frames/findings` and the playwright package — and 11 more tests skip for the same reason. Every other test keeps its status against the last main-tree gate log. They are measured where it counts, by the main-tree gate that carries this commit; that gate commits only at one failure.
+
+**Owed.**
+- **The rig re-drive, PC and the phone lens:** the rig-w3b TTF25 cell, and a pass-before-pedal control (the TASF348 geometry, expected unbilled).
+- **From the first tailbrake landing's list:**
+  - Still owed: pins or a near-equivalence argument for X5 and X7.
+  - The phone lens for C2b and C4 is no longer undriven. rig-w3b (above) drove it, and its judge read C1, C2b, C3 and C4 closed on both lenses. No verifier ran on that reading, because the row was PARTIAL. This landing touches neither clause.
+  - Its «pin for the wider F2 cells» is settled differently than it was written: those three cells are now billed, and pinned as billed.
+- **Not measured:** whether the product's pedals (keyboard, touch axis, gamepad, mouse) produce a 0.05 s release, the 0.45 s tap-and-slam or the brake-tap pattern.
+- **Triage:** «sustaintie» (C3) and «flooredpraise» (the unbilled F2 forms).
+- **The integrator's call:** two clock resets (on a fresh track and in `stage()`) are redundant by the builder's argument and survive as equivalent mutants; they were kept because the brief asked for them.
+- **The TTF25 evidence frames** are still outside the audit tree (rig-w3b note above). The lane's fixture carries that drive's per-grid rows, not its frames.
+
+## Landed: «Спри преди препятствието» is no longer ticked once a graded contact with the obstacle it names has been recorded, and the task row and the debrief say why — in process — `sc-hz-brake-dont-swerve:a7d0dd29` (critical), the task-tick clause (2026-10-13)
+
+Lane `hztick`, two rounds, built on `8cb0707`. Round 1 was REFUTED. In round 2 the lane verifier's verdict was again REFUTED, on one clause of the round-2 brief. The integrator rescoped that clause (decision 2026-10-13, below), and the tick repair lands. The patch is `hztick-result-r2.patch` (sha256 319ad92d…, 17 files, +1999/−12; 0 CR bytes per the builder; cumulative against `8cb0707`). The verifier's lane hashed to the patch exactly.
+- **Eight product files:** `lessons/types.ts`, `lessons/objectives.ts`, `lessons/engine.ts`, `lessons/debrief.ts`, `lessons/wire.ts`, `lessons/scenario/templates-hazards2.ts`, `lessons/scenario/params.ts` and `hud/SessionEndScreen.tsx`.
+- **Three test-side files.** Two are new: `lessons/__tests__/stop-short-of-named-body.test.ts` and `lessons/scenario/__tests__/hz-stop-before-contact.test.ts`. The harness `rapierContactDrive.ts` gains an additive `onStep` tap.
+- **Six reviewed-text manifest files,** re-recorded against `8cb0707`: 4 strings added, 13,254 → 13,258.
+- **No bill, point value, verdict, threshold or rule-engine line changed.** The `engine.ts` in this patch is the lesson engine, `lessons/engine.ts`; `rules/engine.ts` is not touched.
+
+**The row is NOT closed by this landing.** `sc-hz-brake-dont-swerve:a7d0dd29` stays OPEN. Every number in this section is in-process: the product chassis on rapier through the lane harness, and tapes. Nothing was driven in a browser. A rig re-drive on PC and on the phone lens is owed (below); whether its frames close the row is for that wave's judge and verifier.
+
+**What was wrong.** rig-w3d (above) showed the crash BILL repaired on both lenses, and one literal clause still photographed: the task «Спри преди препятствието — с пълна спирачка, В своята лента» was ticked on a run that never braked and hit the block, and the debrief said «Задачите от маршрута са изпълнени».
+- In process on base, the cell LATE50 (the rig's cell: no brake, every pedal released at the bill): contact at step 877, 49.869 → −3.866 км/ч, COLLISION 10, and the task ticked at step 907 with the route sentence (the builder's cell; the verifier reproduced it to the step and the км/ч).
+- The verifier's sweeps on base: 34 of 90 swerve drives were billed and ticked, and 66 of 81 slow-touch settings.
+
+**Round 1, refuted.** It voided the tick only for a car «arrested» to ≤ 1 км/ч on the bill's own grid point. The verifier drove past it on the chassis:
+- **Wheel turned at impact.** 19 of 90 swerve-sweep drives were still billed and ticked. With yaw, the signed forward speed on that grid point is +1.1 to +2.8 км/ч. Example: steer 0.25 with 60% brake from y 183, 44.897 → +1.616 км/ч at the bill, ticked at step 909.
+- **A slow touch.** A touch at 0.04–0.99 км/ч was billed and ticked on 29 contiguous of 81 settings. The boundary sat exactly at 1.0 км/ч before the contact.
+- **The ending.** LATE50 ended on «…колата остана притисната на място и не може да продължи…» with the car 2.24 m clear of the block.
+
+**What landed (round 2).** The void is keyed on the CONTACT with the named obstacle itself. No speed is read anywhere in the rule. The description below is the builder's; the verifier drove its behaviour (next heading).
+- **A new authored reachZone term, `stopShortOf`:** the rectangle of the body the task's title names. It is authored on one gate, sc-hzbds-stop (`DEBRIS_BLOCK`: 4.06 / 190, half-length 1.2, half-width 0.8). A test pins it to the trace rect and to the scene wall.
+- **The contact.** `touchNamedBodies` (`lessons/engine.ts`) runs on any tick whose own events carry a graded static-object collision. For every gate that names a body, `namedBodyTouched` asks whether the car's box at that grid point is within the collision module's own resolution, `SWEEP_RESOLUTION_M` (0.15 m), of the rectangle. A hit records the gate in the new session field `touchedNamedBodies`, which never shrinks.
+- **Why 0.15 m and not zero** (the builder): over 543 block contacts on the chassis the car's box stood between −0.151 and +0.013 m of the rectangle at the contact's grid point. The reach only decides WHICH body was hit; nothing calls it without a contact event. With the car's flank on the kerb — the nearest other body — its box is 1.565 m from the rectangle.
+- **The refusal.** A gate with a recorded touch cannot be ticked. If the tick was given before the touch, the fold takes it back with its time, following the existing precedent for a person struck after «Спри преди детето». On the shipped drill that order cannot be heard: this gate is the last task and the session completes on the tick (see the crawl note below).
+- **The ending.** For a car that comes to rest inside the existing route-end zone (within 9 m of the stop mark), a touched terminal task lets the existing route-end path end the drive, on the existing «Край на маршрута» copy. A touched car that rests beyond 9 m is NOT covered: it ends on the crash pin's sentence or does not end by itself (the decision and the carried items below).
+- **Not recorded in the THEO-3 sandbox** («Направи грешката»), where hitting the block is the assignment (the builder; see the notes below).
+
+**Shown text.** Four reviewed strings are added. No existing sentence is changed.
+- The end-card row (one string): «Не се отчете: колата удари препятствието — задачата е да спреш преди него.»
+- The debrief line, composed of two strings (the prefix «Задачата «» and the tail): «Задачата «Спри преди препятствието — с пълна спирачка, В своята лента» не се отчете: колата удари препятствието — задачата е да спреш преди него. Спирай по-рано.»
+- A journey clause inside the existing «Стигна точката, но твърде бързо» card (one string): «колата удари препятствието, преди което трябваше да спре».
+- No longer shown on a drive with a recorded block touch (the builder): «Задачите от маршрута са изпълнени…». It still shows on the façade-bounce drives carried below.
+- The refusal is never bare: the row and the debrief state the reason (THEO-4).
+
+**The lane verifier's verdict, and the integrator's decision.** The verifier wrote: «The tick rule itself holds everywhere I drove it.» Its verdict was nevertheless REFUTED, on the round-2 brief's extra requirement F3 (the verifier's finding F1).
+- **What it found.** A flank scrape of the block followed by a hard stop past it still ends on the crash pin's sentence. Its drive: pass on the right at x 6.2, cut back from y 187, full brake from y 186.
+  - Contact at step 901, 39.309 → 35.464 км/ч, COLLISION 10. The touch is recorded, task 2 is not ticked, and the reason row prints.
+  - The car then stands free at (4.931, 195.581): 2.24 m clear of the block, 5.30 m from where it struck, 11.61 m from the stop mark.
+  - At step 1565 the lesson ends on «Край на упражнението след удара» with «След удара колата остана притисната на място и не може да продължи по маршрута…».
+  - 15 of 320 block-touching drives in a 576-drive pass-and-cut sweep end this way. It is the same at L1, L2, L3 and L5, and on 30 Hz and a phone frame list.
+- **All 15 are IDENTICAL ON BASE.** The sentence belongs to the catalogue-wide crash pin, not to this patch. The new ending arm covers only a car that rests within 9 m of the mark; the pin still closes a touched drive that rests beyond that but within 6 m of its crash pose.
+- **INTEGRATOR DECISION 2026-10-13** (verbatim from the integrator's running note): «that clause is RESCOPED to its own catalogue-wide lane «pinfree» (+ triage); the tick repair lands; the builder's claim «no „притисната“ card on any touched drive» is WITHDRAWN and the landing section must say so.»
+- **So, plainly:** the «притисната на място» sentence is NOT fixed here. It can still show on a car that touched the block and stands free. The builder's claim «No card containing „притисната“ is raised on any touched drive in the probe sets» is WITHDRAWN: the builder reported it for its own probe sets (not re-run by the verifier), and it is false on the verifier's.
+- **Two comments that land with the patch still describe the general case:** at the ending arm in `lessons/engine.ts` («With it the stalled chain ends where the route ends, on gate 1's own sentence») and in the doc of `namedBodyTouchVoidsObjective` (`lessons/objectives.ts`). They hold only for a car that rests within 9 m of the mark. They are comments, not shown text, and are left as landed; correcting them belongs to lane «pinfree».
+
+**What the verifier reproduced** (its own lane and its own base tree; the product chassis through `rapierContactDrive`):
+- **The cells.** LATE50, FLAT, BRAKE30, TOUCH, both wheel-turned strikes and the 0.97 км/ч touch reproduce to the step and the км/ч at L1 and L3. L2 and L5 behave the same. L4 is an exam rung and ends on the bill.
+  - LATE50 and BRAKE30: not ticked; the drive ends at steps 907 and 914 on «Край на маршрута», the steps base ended them on.
+- **The round-1 sweeps.** Swerve sweep, billed and ticked: 34 on base → 0. Slow-touch sweep: 66 → 0.
+- **Base against tree, 2,319 chassis drives in 11 sets.**
+  - 0 bill, score, verdict, star or task-1 differences.
+  - 768 ticks are gone, every one with a recorded touch. None is lost without a touch.
+  - The 1,263 drives that never touch the block are identical in every sheet, card and ending field.
+  - 1,056 touches; at the touch's grid point the car's box stood within −0.144 to +0.022 m of the rectangle.
+- **Contact-free stops keep the tick.** 0.05 to 1.0 m short, straight and yawed 14° and 25°: base equal to tree.
+- **Another body does not void it.** Striking the escort and then stopping lawfully short keeps the tick on base and tree (12 chassis drives). An escort strike followed by a block strike IS recorded as a touch.
+- **Timing.** A contact on the very step the halt would mature is refused (5 chassis drives).
+- **One sheet per display.** Five drives at 12 cadences each give identical sheets.
+- **Censuses.**
+  - Tapes: the verifier's hashes equal the builder's on base and tree. 2,429 of 2,434 are identical; the 5 are this lesson's late-brake tape at L1–L5 gaining the reason row.
+  - Halt gates: 63 gates, 298 contact cells, 147 ticked on both trees, 0 gone.
+  - Static contacts: 975 of 1,040 identical; 65 differ only by the reason detail.
+- **Gates** (the verifier's lane, on `8cb0707` + the patch):
+  - red on base: 89 failed | 71 passed of the two test files' 160;
+  - `lessons/__tests__`: 125 files green (2,382 passed, 165 skipped);
+  - `lessons/scenario/__tests__`: 186 files, 4,523 green;
+  - lesson-ui + hud + collision + pins: 113 of 114 files. The one failure is touchHintLifetime, on the missing `tools/mobile/lesson-audit.mjs`;
+  - tsc: 22 errors, the base set.
+- **Mutants:** 12 of its own, one at a time against both whole test files, each restored and sha-checked.
+  - Killed on assertion text, 10: the integrator's four in the verifier's own formulations (I1 speed again, I2 only if not latched, I3 reach 1.6 m, I3b any category, I4 ending arm removed) and V1, V2, V5, V6, V7.
+  - V4 is equivalent.
+  - V3 survives (the condition below).
+- **Not driven by the verifier:** L1 pause cards (the harness has no pause), reverse gear, and the THEO-3 sandbox (the harness mounts no block for it).
+- **Reported by the builder, not re-run by the verifier:** its 26 mutants (26 killed), and its 760-drive chassis comparison (504 ticks gone, each with a touch). The verifier's own 2,319 drives cover the same question.
+
+**The conditions, and what is carried.**
+- **The surviving mutant V3 (the verifier's finding F3): no test has a billed contact BEFORE the block touch.** V3 makes `touchNamedBodies` return early when the run already holds a COLLISION bill, so only the first collision of a run can be a touch. Both whole test files stay green, 160 of 160. The product itself is right: on the real tree an escort strike (vehicle bill at step 648) followed by a block strike (step 914) is recorded as a touch at 914, task 2 is not ticked, the reason row prints and the drive ends at 944 on «Край на маршрута»; base ticks at 944. The gap is the missing test. PINNED AT INTEGRATION: `stop-short-of-named-body.test.ts`, new block «a billed contact with ANOTHER body BEFORE the block does not hide the touch» (4 tests on the compiled rung through `applyTick`, L1 and L3: the escort is struck and billed, the car drives on into the block — the touch is recorded, the stop refused, the reason row and debrief line printed, both bills on the sheet in order; the control with a stop short keeps the tick). V3 is RED on 2 of 50, on assertion text («the block touch was lost behind the earlier bill: expected undefined to deeply equal [ 'sc-hzbds-stop' ]»); re-killed by the merge verifier. Pinned at engine level, where `touchNamedBodies` reads the run; the verifier's chassis drive of the same sequence stays its own evidence (`hztick-verify/r2/etb-tree.jsonl`).
+- **CARRIED, not fixed — the crash pin's sentence on a free car** (the rescoped clause above): lane «pinfree» and triage.
+- **CARRIED, not fixed — a strike on the roadside façade can still collect the ✓** (the verifier's F2). The car swerves right off the carriageway with half brake, hits the building, the pedals are released, and it rolls back at about −1 км/ч. The tick lands 7.0–8.7 m to the right of its lane centre, with «Задачите от маршрута са изпълнени». 17 of 360 bounce-sweep drives; 360 of 360 rows are identical on base and tree. It is another body, so it is outside the round-2 rule as scoped. Triage «bouncetick».
+- **CARRIED, not fixed — the static-collision card's base copy is false here** (the verifier's F4). On every block strike of this lesson the bill's card and the debrief print «…колата е стигнала до него, защото пътят ѝ е излязъл извън платното за движение. Излизането от платното е самото произшествие…». The car never left its lane; the obstacle stands in it. Identical on base, outside this patch's files. The new reason line sits directly above that text. Triage «staticcardcopy».
+- **CARRIED, not fixed — two drives that never end by themselves** (reported by the builder; base and tree alike). Two full-lock swerves clip the block, slide past and stand 9.85 m from the mark: outside the route-end zone and more than 6 m from the crash pose.
+- **Noted (the verifier's F5): a crawl counts as standing.** Both cases are identical on base.
+  - A car that stops 0.1 m short for 0.08 s and creeps on is ticked while moving 0.98 км/ч with its box on the block face: a pass with 0 points. The chassis contact begins one step after the session ended and is not heard. So a tick given first is kept on the shipped drill; 44 of the verifier's 153 stop-and-creep drives tick first.
+  - A car creeping at 0.70–0.95 км/ч that never stops is ticked the moment it enters the approach capsule at y 175.0, 11.78 m short of the block.
+- **Noted: «с пълна спирачка» is still not measured.** The tick has no brake channel (the builder). Whether the words stay an instruction or get measured needs a ruling.
+- **Noted (the verifier's F6): the sandbox exemption stands on the builder's engine-level test only.** The verifier could not drive it. Whether the stop task should tick after the assigned crash in «Направи грешката» is not decided.
+
+**Tools.** The lane has no `tools/` directory, so no tools test ran in it. The patch adds what tools tests may read: the tables `HALT_VOIDED_ROW_BG` (`SessionEndScreen.tsx`) and `HALT_VOIDED_DEBRIEF_BG` (`debrief.ts`), each with one key, "touched"; the key `stopShortOf` in `JOURNEY_REFUSAL_BG` (`lessons/engine.ts`, not exported); and the 4 reviewed strings. The builder names two readers to check: `tools/audit/inprocess-drive.mjs` (the 5 late-brake tape cells now carry `objectives[].detail`) and `tools/mobile/lesson-audit.mjs` (a voided row's text now carries the reason line). The tools result on the integrated tree is part of PROVEN ON 8cb0707.
+
+**Integration.** This patch and `tailbrake3-result-r5.patch` share no file (17 and 9 paths, none in common).
+
+**PROVEN ON 8cb0707:** with `tailbrake3`, in one scratch worktree — the counts, the merge verifier's verdict, the gate patch and the note on the tools tests are in the tailbrake3 section above.
+
+**Owed.**
+- **The rig re-drive, PC and the phone lens:** LATE50 and BRAKE30 with the task list photographed, and a clean stop short of the block as the control (expected: ticked).
+- **Lane «pinfree»** for the crash pin's sentence, catalogue-wide (it is also a triage candidate).
+- **Triage, filed:** «bouncetick» and «staticcardcopy».
+- **Not yet filed anywhere:** the two drives that never end, and the crawl that counts as standing. Each needs a triage candidate or a ruling.
+- **Rulings:** «с пълна спирачка»; the THEO-3 sandbox tick.
+- **Not measured:** the same rebound against staged lead vehicles on «Спри зад спрялата колона» (sc-fbc-stop) and «Спри зад колоната на разумно разстояние» (sc-fs-stopped). The builder calls it plausible; the harness does not mount NPC shells. `stopShortOf` is authored on one gate only.

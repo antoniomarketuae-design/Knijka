@@ -233,6 +233,21 @@ const MAX_COMMENDATION_LINES = 3;
 const LESSON_ACT_PRAISE_TITLES: ReadonlySet<string> = new Set([COMMENDATIONS.UTURN_PAST_SOLID_AXIS.titleBg]);
 /** Unfinished route tasks quoted by name before the count takes over. */
 const MAX_UNFINISHED_NAMED = 2;
+/**
+ * Why a stop-before task is not ticked — the tail of «Задачата «…» …», per
+ * reason the fold can attach (`ObjectiveDetail`'s `haltVoided` member). The
+ * first sentence is the end card's row (`hud/SessionEndScreen
+ * HALT_VOIDED_ROW_BG`); the second is the corrective.
+ *
+ * «СПИРАЙ ПО-РАНО», AND NOTHING ABOUT HOW HARD. `SimTick` carries no brake
+ * channel, so the product cannot know the pedal was not already on the floor:
+ * round 1 printed «…и по-твърдо» over a drive that held the whole pedal from
+ * 30 км/ч to the block. Earlier is true of every drive that touched it.
+ */
+export const HALT_VOIDED_DEBRIEF_BG: Record<"touched", string> = {
+  touched:
+    "не се отчете: колата удари препятствието — задачата е да спреш преди него. Спирай по-рано.",
+};
 /** Teach-moment rows listed by name in the „Учебни моменти" section before the count takes over. */
 const MAX_COACHED_NAMED = 2;
 
@@ -877,6 +892,39 @@ export function buildDebrief(
         ? "Задачите от маршрута са изпълнени — този урок не пада заради маршрута, а заради грешката, която учи (по-горе)."
         : "Задачите от маршрута са изпълнени — този урок не пада заради маршрута, а заради изпитния лист по-горе.",
     );
+  }
+
+  // -- a stop-before task the car touched the body of ------------------------
+  /**
+   * WHY THE OPEN TASK IS OPEN, WHEN THE SESSION KNOWS — lane hztick,
+   * sc-hz-brake-dont-swerve:a7d0dd29.
+   *
+   * MEASURED · rig-w3d · `sc-hz-brake-dont-swerve` · L3 · no brake, 49.6 км/ч
+   * into the block (PC and phone, 8cb0707): the route sheet carried «✓ Спри
+   * преди препятствието — с пълна спирачка, В своята лента 0:23» and this file
+   * printed, two lines under «Настъпи сблъсък», «Задачите от маршрута са
+   * изпълнени — този урок не пада заради маршрута». The car had «stopped» by
+   * bouncing off the thing the task says to stop before.
+   *
+   * The tick is no longer given (`ReachZoneParams.stopShortOf`), so that drive
+   * now takes the unfinished branch above — which NAMES the open task and
+   * stops there. Left like that it would read as a route the student simply
+   * did not finish, on a drive where he was standing on the mark. THEO-4: the
+   * row's own reason is said, once per such task, in the sentence the end card
+   * prints under the row.
+   *
+   * READ OFF THE RESULT, NEVER RE-DERIVED: `ObjectiveOutcome.detail` is written
+   * by `buildLessonResult` from the session's own record of the touch and
+   * validated across the wire, so the client's instant text and the server's
+   * stored one — the one the student reads — are the same sentence. A drive
+   * with no such row is byte-identical to what shipped. It prints on an
+   * aborted drive too: the reason is a fact about the task, not about how the
+   * drive ended.
+   */
+  for (const o of result.objectives) {
+    if (!o.done && o.detail?.kind === "haltVoided") {
+      lines.push(`Задачата «${o.titleBg}» ${HALT_VOIDED_DEBRIEF_BG[o.detail.reason]}`);
+    }
   }
 
   // -- improvement vs the driver's own best ----------------------------------

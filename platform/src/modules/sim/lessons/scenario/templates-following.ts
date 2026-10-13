@@ -1745,7 +1745,12 @@ const FTG_LEAD: BrakingLeadCarSpec = {
  * when this car reports it had to brake hard for him, `followerBraked`,
  * sc-follow-tailgater:63c0c28c), guilty speeding
  * grades SPEEDING_OVER_LIMIT, and the taught ease-off shows up as the growing
- * front gap. After ~12 s of pressure it laneShift-passes on the left.
+ * front gap. After ~12 s of pressure it laneShift-passes on the left — never
+ * in the middle of its own hard brake: a pass that comes due after the car
+ * has been at the harsh line behind him waits until the product's harsh step
+ * has reported that brake, or the brake is over (its reading under the
+ * braking line for the product's own sustain)
+ * (`RearTailgaterRunner.ownHardBrakeHoldsThePass`, 63c0c28c C2a).
  */
 const FTG_TAILGATER: RearTailgaterSpec = {
   id: "sc-ftg-tail",

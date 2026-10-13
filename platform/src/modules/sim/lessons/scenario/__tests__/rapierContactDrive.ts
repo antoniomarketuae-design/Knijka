@@ -88,7 +88,7 @@ import { createHeadlessChassis, IDLE_INPUT, VehicleSim, type VehicleInput } from
 import { READY_DRIVELINE } from "../../../vehicle/driveline";
 import * as T from "../../../vehicle/tuning";
 import { WorldColliders, type WorldColliderSet } from "../../../world";
-import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
+import { applyTick, buildLessonResult, createLessonSession, type LessonStepResult } from "../../engine";
 import type { LessonResult, LessonSessionState } from "../../types";
 import { buildLiveWorld } from "./liveChainReplay";
 
@@ -450,6 +450,13 @@ export interface ContactDriveOptions {
    * with every contact the step record began, in order.
    */
   auditStartedEvents?: boolean;
+  /**
+   * A tap on the lesson engine, once per grid point the session heard: the
+   * tick it was handed and what `applyTick` returned for it (the session after
+   * it, the HUD events it raised). Read-only — lane hztick's witnesses read the
+   * coach's cards and the car's speed at the grid point a card was raised on.
+   */
+  onStep?: (tick: SimTick, step: LessonStepResult) => void;
 }
 
 /** One contact the rig JUDGED (thumped): how it reached the judge, when, how
@@ -643,7 +650,9 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
     // The comparison closes at ONE grid point on every cadence: a frame may
     // carry the drive past `maxSteps`, and the session must not hear those.
     if (Math.round(tick.t / H) > opts.maxSteps) return;
-    session = applyTick(session, tick).state;
+    const step = applyTick(session, tick);
+    session = step.state;
+    opts.onStep?.(tick, step);
     if (!live()) endedAtPoint = Math.round(tick.t / H);
   };
   const noop = () => {};

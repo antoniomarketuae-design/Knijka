@@ -21,6 +21,28 @@
  * (`rules/harshBrakeEpisode.ts`, ≥ 7 m/s² held 0.4 s, mean over the line).
  * The 35 км/ч floor stands for every other brake.
  *
+ * ROUNDS 2–4 (lane tailbrake3, integrator decisions 2026-10-11/12) — THE PASS DOES NOT
+ * BEGIN IN THE MIDDLE OF THE ЛЕПКА'S OWN HARD BRAKE. Its pass was a pure timer
+ * (`pressureSec` after the latch). When the timer came due a fraction of a
+ * second after his pedal, the car — glued behind him and braking at about
+ * 10 m/s² — was handed to its cruise law, accelerated toward him at 3.5 m/s²
+ * and never held the harsh line for the 0.4 s sustain: no report, and the
+ * floor acquitted the brake check (the rig's TTF25 drive, «ИЗДЪРЖАН» ★★★). The
+ * pass now waits while the car is still in a hard brake it has not been
+ * reported for: from its first reading at the harsh line until the product's
+ * own harsh step reports that brake, or the brake is over (its reading has
+ * stayed under 2 m/s² for the product's own 0.4 s sustain) — a later reading
+ * under the harsh line does not end it, nor does that step's re-anchor, nor
+ * one reading under the braking line
+ * (`RearTailgaterRunner.ownHardBrakeHoldsThePass`; the uneven emergency stops
+ * that distinguish this from «while its reading is at the line» (round 2),
+ * from «while the step's window is open» (round 3) and from «until its first
+ * reading under the braking line» (round 4) are pinned in
+ * follow-tailgater-uneven-brake-check.test.ts). What stays unbilled is what
+ * integrator decision F2 was written for: a pedal when the car is ALREADY
+ * PULLING OUT, or has not braked hard at all when its pass comes due. The last
+ * `describe` names the six F2 cells and what each does now.
+ *
  * THE CHAIN IS THE PRODUCT'S: `liveChainReplay` (the stack LessonScene builds
  * for a live lesson, graded on the fixed 1/60 s session grid, ADR-014) over
  * the committed ln-v1, at every rung, the drive written as an open-loop tape
@@ -75,9 +97,20 @@ interface Drive {
   /** The front lead (FTG_LEAD): its lowest speed from 2 s before his pedal to 3 s after it, m/s — the span in
    *  which the engine's far-lead ledger could read a lead deceleration as a cause for his brake. */
   leadMinAroundPedalMps: number | null;
-  /** The лепка began its pass (left its lane centre) this long after the pedal, s; null = not within 3 s. */
+  /** The лепка began its pass (the first grid point it is off its lane line — the published
+   *  `lateralOffsetM`) this long after the pedal, s; null = not within 3 s of it (a pass that had
+   *  begun BEFORE the pedal reads 0 — and `glued` false). */
   passAfterPedalSec: number | null;
+  /** When the product's own account reported the лепка's hard brake (`followerBraked`), s. */
+  reportsAt: number[];
+  /** The лепка's deceleration over its last grid step still glued behind him, m/s² (null: never glued after the pedal). */
+  lastGluedDecelMps2: number | null;
 }
+
+/** The oracle's reading window is warm at his pedal: the лепка's speed is stepped from this long before it, s
+ *  (the product's own account has read it since it glued; a track begun cold AT the pedal reads its first
+ *  frames over a shorter span and can call the same brake a grid step late). */
+const ORACLE_LEAD_SEC = 1;
 
 function drive(level: ScenarioLevel, tape: TailgaterTapeOptions): Drive {
   const tr = tailgaterTape(tape);
@@ -90,11 +123,16 @@ function drive(level: ScenarioLevel, tape: TailgaterTapeOptions): Drive {
   let stillGlued = true;
   let leadMinAroundPedalMps: number | null = null;
   let passAfterPedalSec: number | null = null;
+  let seenPedal = false;
+  let prevTail: { t: number; v: number } | null = null;
+  let lastGluedDecelMps2: number | null = null;
+  const reportsAt: number[] = [];
   const out = liveChainReplay({
     lesson,
     districtRaw: LN,
     trace: tr,
     afterApply: ({ t, tick, traffic }) => {
+      for (const e of tick.events) if (e.kind === "followerBraked") reportsAt.push(t);
       const lead = traffic.staged(LEAD_ID);
       if (
         lead &&
@@ -110,20 +148,29 @@ function drive(level: ScenarioLevel, tape: TailgaterTapeOptions): Drive {
         passAfterPedalSec === null &&
         t >= tr.brakeOnsetSec - 1e-9 &&
         t <= tr.brakeOnsetSec + 3 &&
-        Math.abs(a.x - LANE_X) > 0.05
+        Math.abs(a.lateralOffsetM ?? 0) > 1e-6
       )
         passAfterPedalSec = t - tr.brakeOnsetSec;
-      if (!a || tr.brakeOnsetSec === null || t < tr.brakeOnsetSec - 1e-9)
+      if (
+        !a ||
+        tr.brakeOnsetSec === null ||
+        t < tr.brakeOnsetSec - ORACLE_LEAD_SEC
+      )
         return;
+      const decel =
+        prevTail === null ? 0 : (prevTail.v - a.speedMps) / (t - prevTail.t);
+      prevTail = { t, v: a.speedMps };
+      const atPedal = t >= tr.brakeOnsetSec - 1e-9;
       const gap = tick.position.y - a.y;
       const inLane =
         Math.abs(a.x - LANE_X) < 0.05 && gap > 0 && gap <= GLUED_GAP_M;
-      if (ref === null) {
-        ref = a.speedMps;
+      if (ref === null) ref = a.speedMps;
+      if (atPedal && !seenPedal) {
+        seenPedal = true;
         glued = inLane;
         gapAtOnsetM = gap;
       }
-      if (!inLane) stillGlued = false;
+      if (atPedal && !inLane) stillGlued = false;
       if (!stillGlued || followerHard !== null || t > tr.brakeOnsetSec + 3)
         return;
       const v = stepHarshBrakeTrack(
@@ -132,6 +179,8 @@ function drive(level: ScenarioLevel, tape: TailgaterTapeOptions): Drive {
         ref - a.speedMps,
         DEFAULT_RULE_CONFIG,
       );
+      if (!atPedal) return;
+      lastGluedDecelMps2 = decel;
       if (v !== null)
         followerHard = {
           t,
@@ -160,6 +209,8 @@ function drive(level: ScenarioLevel, tape: TailgaterTapeOptions): Drive {
     harsh,
     leadMinAroundPedalMps,
     passAfterPedalSec,
+    reportsAt,
+    lastGluedDecelMps2,
   };
 }
 
@@ -307,7 +358,7 @@ describe("sc-follow-tailgater · a brake check from the speed the lesson asks fo
   );
 
   it(
-    "where the лепка did NOT have to brake hard (its pass was already under way), the same pedal under the floor is not billed — the conviction rests on what the other car had to do",
+    "where the лепка did NOT have to brake hard, its pass was ALREADY UNDER WAY at his pedal — it had left his lane line — and the same pedal under the floor is not billed; every drive that found it glued behind him is billed (round 3)",
     () => {
       const unforced = cells.filter(
         (x) => !(x.d.glued && x.d.followerHard !== null),
@@ -315,7 +366,43 @@ describe("sc-follow-tailgater · a brake check from the speed the lesson asks fo
       // The pass begins inside the stretch on some rungs (the runner's seeded pressureSec).
       expect(unforced.length).toBeGreaterThan(0);
       for (const c of unforced) {
-        expect(c.d.harsh, `L${c.level} ${c.hold} y${c.by}`).toEqual([]);
+        const label = `L${c.level} ${c.hold} y${c.by}`;
+        // «Already pulling out»: off his lane line on the grid point of the pedal — never «glued, but its
+        // brake was cut short», which is what three of these cells were on base (below).
+        expect(c.d.glued, label).toBe(false);
+        expect(c.d.reportsAt, label).toEqual([]);
+        expect(c.d.harsh, label).toEqual([]);
+      }
+      // …and the product's own account agrees with the oracle on every cell of the grid.
+      for (const c of cells)
+        expect(
+          c.d.reportsAt.length > 0,
+          `L${c.level} ${c.hold} y${c.by}`,
+        ).toBe(c.d.glued && c.d.followerHard !== null);
+      // ROUND 3. On base 2e9268f three more cells of this grid were acquitted, and none of them was
+      // «already pulling out»: the лепка was glued behind him at the pedal and braking at 10 m/s² when
+      // its pass TIMER came due 0.13 / 0.27 / 0.33 s later, which handed it to the cruise law short of
+      // the 0.4 s sustain («ИЗДЪРЖАН» with «Чисто и спокойно каране» on all three). Its pass now
+      // waits for its own hard brake, so it holds the line for the sustain, reports, and the brake
+      // check is the lesson's own mistake.
+      for (const [level, hold, by] of [
+        [1, 32.3, 175],
+        [1, 34.9, 175],
+        [2, 32.3, 185],
+      ] as const) {
+        const c = cells.find(
+          (x) => x.level === level && x.hold === hold && x.by === by,
+        )!;
+        const label = `L${level} ${hold} y${by}`;
+        expect(c.d.glued, label).toBe(true);
+        expect(c.d.passAfterPedalSec!, label).toBeGreaterThanOrEqual(
+          DEFAULT_RULE_CONFIG.harshBrakeSustainSec,
+        );
+        expect(c.d.followerHard, label).not.toBeNull();
+        expect(c.d.reportsAt, label).toHaveLength(1);
+        expect(c.d.harsh.map((h) => h.charged), label).toEqual([false]);
+        expect(c.d.out.result.passed, label).toBe(false);
+        expect(c.d.out.commendationCodes, label).not.toContain("CLEAN_DRIVING");
       }
     },
     TIMEOUT,
@@ -477,44 +564,212 @@ describe("sc-follow-tailgater · round 2: a brake check from 20–25 км/ч, an
 });
 
 /**
- * INTEGRATOR DECISION (round 2, binding — the verifier's F2): a brake check
- * while the лепка's own pass is ALREADY under way — it is pulling out, not
- * braking — stays unbilled. The conviction rests on what the other car
- * actually had to do (the tailbrake principle the founder was told on
- * 2026-10-08). These are the verifier's cells: glued in his lane at the pedal,
- * its pass commanded inside the next half-second, and its own speed never
- * through the harsh gates while still behind him.
+ * THE SIX F2 CELLS, BY NAME (integrator decision E2 of 2026-10-11, which
+ * re-reads the 2026-10-09 decision F2 on what was measured; the rule as
+ * restated on 2026-10-12).
+ *
+ * WHAT F2 SAID (round 2, 2026-10-09): a brake check while the лепка's own pass
+ * is ALREADY under way — «it is pulling out, not braking» — stays unbilled; the
+ * conviction rests on what the other car actually had to do. Six cells were
+ * pinned as that class: glued in his lane at the pedal, the pass inside the
+ * next half-second, the car's speed never through the harsh gates behind him.
+ *
+ * WHAT WAS MEASURED (lane tailbrake3, 2e9268f). In five of the six the лепка
+ * was NOT pulling out: it was braking at about 10 m/s² for him when its pass
+ * TIMER (`pressureSec` after the latch — a pure timer) came due 0.13–0.25 s
+ * after his pedal. The timer handed it to the cruise law mid-brake; it
+ * accelerated at 3.5 m/s² toward a car stopping 4.3–5.1 m ahead, and its hard
+ * brake — 0.12–0.22 s at the harsh line — was cut short of the 0.4 s sustain.
+ * «Never through the harsh gates» was the timer's doing, not the car's. The
+ * rig's TTF25 drive (24.5 км/ч, «ИЗДЪРЖАН» ★★★) is the same drive as the cell
+ * L5 25 км/ч y120 to within two grid steps.
+ *
+ * THE RULE NOW. A due pass waits from the car's first reading at the harsh
+ * line until the product's own harsh step reports that brake, or the brake is
+ * over (its reading under the braking line for the sustain). So (these six
+ * are steady full pedals: the car's reading stays at the line from its first
+ * such grid point to the report, and the numbers below are the same under the
+ * narrower rules rounds 2, 3 and 4 built):
+ *
+ *   cell            base 2e9268f                      now
+ *   L1 28 y130      pass +0.136 s, 0.117 s at line    pass +0.42 s, reported → coached (the lesson's mistake)
+ *   L3 28 y140      pass +0.134 s, 0.117 s            pass +0.42 s, reported → coached
+ *   L4 28 y140      pass +0.217 s, 0.200 s            pass +0.42 s, reported → CHARGED (the rung that charges)
+ *   L5 25 y120      pass +0.249 s, 0.217 s            pass +0.43 s, reported → coached
+ *   L5 30 y140      pass +0.163 s, 0.133 s            pass +0.43 s, reported → coached
+ *   L4 30 y150      pass +0.030 s, not braking hard   UNCHANGED — pass +0.030 s, no report, unbilled
+ *
+ * L4 30 км/ч y150 is what F2 protects, and it stays: the timer came due two
+ * grid points after his pedal, before the matchPlayer law had braked the car
+ * hard at all (its last reading behind him 2.4 m/s²). It pulls out on time and
+ * its later speed is its pass's, not his. (The other F2 form — a pass that
+ * began BEFORE the pedal — is the rig's tasks-first drive, pinned in
+ * follow-tailgater-rig-w3b-ttf25.test.ts, and the fourteen such cells of the
+ * first grid above.)
  */
-describe("sc-follow-tailgater · round 2: a brake check as the лепка is already pulling out stays unbilled", () => {
-  const F2: Array<[ScenarioLevel, number, number]> = [
-    [1, 28, 130],
-    [3, 28, 140],
-    [4, 28, 140],
-    [4, 30, 150],
-    [5, 25, 120],
-    [5, 30, 140],
+describe("sc-follow-tailgater · the six F2 cells — the pass does not begin in the middle of the лепка's own hard brake", () => {
+  const SUSTAIN = DEFAULT_RULE_CONFIG.harshBrakeSustainSec;
+  const HARSH = DEFAULT_RULE_CONFIG.harshBrakeDecelMps2;
+  const F2: Array<{
+    level: ScenarioLevel;
+    hold: number;
+    by: number;
+    /** When its pass began after his pedal on base 2e9268f, s (measured there; stated, not re-run). */
+    basePassSec: number;
+    now: "billed" | "unbilled";
+  }> = [
+    { level: 1, hold: 28, by: 130, basePassSec: 0.136, now: "billed" },
+    { level: 3, hold: 28, by: 140, basePassSec: 0.134, now: "billed" },
+    { level: 4, hold: 28, by: 140, basePassSec: 0.217, now: "billed" },
+    { level: 4, hold: 30, by: 150, basePassSec: 0.03, now: "unbilled" },
+    { level: 5, hold: 25, by: 120, basePassSec: 0.249, now: "billed" },
+    { level: 5, hold: 30, by: 140, basePassSec: 0.163, now: "billed" },
   ];
+  const cells = F2.map((c) => ({
+    ...c,
+    label: `L${c.level} ${c.hold} км/ч y${c.by}`,
+    d: drive(c.level, {
+      cruiseKmh: c.hold,
+      holdKmh: c.hold,
+      easeFromY: 2000,
+      brakeAtY: c.by,
+      act: "slam",
+    }),
+  }));
+  const over = new Map(
+    [1, 3, 4, 5].map((level) => [
+      level,
+      drive(level as ScenarioLevel, {
+        holdKmh: 45.9,
+        easeFromY: 400,
+        brakeAtY: 186,
+        act: "slam",
+      }),
+    ]),
+  );
+
   it(
-    "its pass begins within 0.5 s of the pedal, it never has to brake hard behind him, and nothing is billed",
+    "the antecedent is F2's on all six: a full pedal under the 35 км/ч floor with the лепка glued in his lane, and its pass due within a quarter-second",
     () => {
-      for (const [level, hold, by] of F2) {
+      for (const c of cells) {
+        expect(c.d.onsetKmh!, c.label).toBeLessThan(
+          DEFAULT_RULE_CONFIG.harshBrakeMinSpeedKmh,
+        );
+        expect(c.d.glued, c.label).toBe(true);
+        expect(c.basePassSec, c.label).toBeLessThan(0.25);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "L1 28 y130, L3 28 y140, L4 28 y140, L5 25 y120, L5 30 y140 — braking hard when the timer came due: the pass waits out the sustain, the лепка reports its hard brake, and the brake check is the lesson's own mistake in its rung's over-the-floor form",
+    () => {
+      const billed = cells.filter((c) => c.now === "billed");
+      expect(billed.map((c) => c.label)).toEqual([
+        "L1 28 км/ч y130",
+        "L3 28 км/ч y140",
+        "L4 28 км/ч y140",
+        "L5 25 км/ч y120",
+        "L5 30 км/ч y140",
+      ]);
+      for (const c of billed) {
+        // The pass: no longer 0.13–0.25 s after the pedal, but after the sustain — and not long after.
+        expect(c.d.passAfterPedalSec, c.label).not.toBeNull();
+        expect(c.d.passAfterPedalSec!, c.label).toBeGreaterThan(
+          c.basePassSec + 0.15,
+        );
+        expect(c.d.passAfterPedalSec!, c.label).toBeGreaterThanOrEqual(SUSTAIN);
+        expect(c.d.passAfterPedalSec!, c.label).toBeLessThan(SUSTAIN + 0.05);
+        // What the car had to do, by the oracle and by the product's own account — once, before its pass.
+        expect(c.d.followerHard, c.label).not.toBeNull();
+        expect(c.d.followerHard!.meanDecelMps2, c.label).toBeGreaterThan(HARSH);
+        expect(c.d.followerHard!.shedMps, c.label).toBeGreaterThanOrEqual(
+          HARSH * SUSTAIN,
+        );
+        expect(c.d.reportsAt, c.label).toHaveLength(1);
+        expect(c.d.reportsAt[0]!, c.label).toBeLessThanOrEqual(
+          c.d.onsetSec! + c.d.passAfterPedalSec!,
+        );
+        // The bill: one, at the stop, in the form the over-the-floor brake check gets on that rung
+        // (coached and named as the lesson's mistake on L1/L3/L5, charged on L4 — Ruling A / 16).
+        expect(c.d.harsh, c.label).toHaveLength(1);
+        expect(c.d.harsh[0].t, c.label).toBeGreaterThan(c.d.onsetSec!);
+        expect(c.d.harsh[0].t, c.label).toBeLessThan(c.d.onsetSec! + 2);
+        expect(c.d.harsh[0].charged, c.label).toBe(c.level === 4);
+        expect(lessonMistakeForm(c.d), c.label).toEqual(
+          lessonMistakeForm(over.get(c.level)!),
+        );
+        expect(c.d.out.result.passed, c.label).toBe(false);
+        // THEO-4: named and explained by the catalogue's own copy; never called clean.
+        expect(c.d.out.debrief, c.label).toContain("Рязко спиране без причина");
+        expect(c.d.out.commendationCodes, c.label).not.toContain("CLEAN_DRIVING");
+        for (const rest of c.d.out.debrief.split(CLEAN).slice(1))
+          expect(
+            rest.startsWith(" — но само на отделни отсечки"),
+            c.label,
+          ).toBe(true);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "the WIDER C1 cells ADR-016 decided but never pinned (L3 25 y125, L4 32 y155, L2 20 y170 — the pass 0.40–0.41 s after the pedal, the лепка one grid step short of the sustain when the timer cut it): each is now billed",
+    () => {
+      // Base 2e9268f, measured: L3 25 y125 pass +0.412 s, 0.383 s at the line, 3.78 m/s shed behind him;
+      // L4 32 y155 pass +0.403 s, 0.383 s, 3.75 m/s; L2 20 y170 (the drive eased from y 100 to its
+      // hold) pass +0.406 s, 0.383 s, 3.69 m/s — ADR-016's own three numbers. A car that has braked at
+      // 10 m/s² for 0.38 s and shed over half its speed was «not forced» only because the timer took it
+      // one grid step before the product's line; L2 20 y170 was «ИЗДЪРЖАН» with the unscoped «Чисто и
+      // спокойно каране».
+      const WIDE: Array<[ScenarioLevel, number, number, TailgaterTapeOptions]> = [
+        [3, 25, 125, { cruiseKmh: 25, holdKmh: 25, easeFromY: 2000, brakeAtY: 125, act: "slam" }],
+        [4, 32, 155, { cruiseKmh: 32, holdKmh: 32, easeFromY: 2000, brakeAtY: 155, act: "slam" }],
+        [2, 20, 170, { holdKmh: 20, easeFromY: 100, brakeAtY: 170, act: "slam" }],
+      ];
+      for (const [level, hold, by, tape] of WIDE) {
         const label = `L${level} ${hold} км/ч y${by}`;
-        const d = drive(level, {
-          cruiseKmh: hold,
-          holdKmh: hold,
-          easeFromY: 2000,
-          brakeAtY: by,
-          act: "slam",
-        });
+        const d = drive(level, tape);
         expect(d.onsetKmh!, label).toBeLessThan(
           DEFAULT_RULE_CONFIG.harshBrakeMinSpeedKmh,
         );
         expect(d.glued, label).toBe(true);
-        expect(d.passAfterPedalSec, label).not.toBeNull();
-        expect(d.passAfterPedalSec!, label).toBeLessThan(0.5);
-        expect(d.followerHard, label).toBeNull();
-        expect(d.harsh, label).toEqual([]);
+        expect(d.passAfterPedalSec!, label).toBeGreaterThanOrEqual(SUSTAIN);
+        expect(d.passAfterPedalSec!, label).toBeLessThan(SUSTAIN + 0.05);
+        expect(d.followerHard, label).not.toBeNull();
+        expect(d.followerHard!.shedMps, label).toBeGreaterThanOrEqual(
+          HARSH * SUSTAIN,
+        );
+        expect(d.reportsAt, label).toHaveLength(1);
+        expect(d.harsh, label).toHaveLength(1);
+        expect(d.harsh[0].charged, label).toBe(level === 4);
+        expect(d.out.result.passed, label).toBe(false);
+        expect(d.out.commendationCodes, label).not.toContain("CLEAN_DRIVING");
+        expect(d.out.debrief, label).toContain("Рязко спиране без причина");
       }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "L4 30 км/ч y150 — what F2 protects: its pass came due two grid points after his pedal, before it had braked hard at all; it pulls out on time, is never reported, and nothing is billed",
+    () => {
+      const c = cells.find((x) => x.now === "unbilled")!;
+      expect(c.label).toBe("L4 30 км/ч y150");
+      // On time: where base began it (the timer), to the grid point.
+      expect(c.d.passAfterPedalSec!, c.label).toBeGreaterThan(0);
+      expect(c.d.passAfterPedalSec!, c.label).toBeLessThan(3 / 60);
+      expect(Math.abs(c.d.passAfterPedalSec! - c.basePassSec), c.label).toBeLessThan(
+        0.5 / 60,
+      );
+      // Not braking hard on its last grid point behind him: nothing of its own to wait for.
+      expect(c.d.lastGluedDecelMps2, c.label).not.toBeNull();
+      expect(c.d.lastGluedDecelMps2!, c.label).toBeLessThan(HARSH);
+      expect(c.d.followerHard, c.label).toBeNull();
+      expect(c.d.reportsAt, c.label).toEqual([]);
+      expect(c.d.harsh, c.label).toEqual([]);
+      expect(c.d.out.result.lessonMistakes ?? [], c.label).toEqual([]);
     },
     TIMEOUT,
   );

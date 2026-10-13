@@ -182,6 +182,53 @@ export interface ReachZoneParams {
    */
   requireNoContact?: true;
   /**
+   * «СПРИ ПРЕДИ ПРЕПЯТСТВИЕТО» NAMES A BODY, AND THIS IS THAT BODY — lane
+   * hztick round 2, sc-hz-brake-dont-swerve:a7d0dd29.
+   *
+   * WHAT WAS BROKEN, measured on the product's chassis and photographed by
+   * rig-w3d on PC and phone (8cb0707): a car that drove into the fallen-load
+   * block at 49.6 км/ч with the brake never touched was thrown back off it,
+   * read under the gate's 6 км/ч cap on the contact's own grid point, «stood»
+   * for the rule engine while it rolled back, and 30 steps later the sheet
+   * printed «✓ Спри преди препятствието — с пълна спирачка, В своята лента»
+   * under «Удар в неподвижно препятствие −10», and the debrief «Задачите от
+   * маршрута са изпълнени». Round 1 of this lane asked whether the impact had
+   * ARRESTED the car and read that off one grid point's speed; a strike with
+   * the wheel turned (44.9 → +1.6 км/ч) and a touch at 0.97 км/ч both kept the
+   * tick. The question was wrong: the banner says BEFORE.
+   *
+   * WHAT IT MEANS. The rectangle of the one body the banner tells the student
+   * to stop short of, in district metres — the trace harness's `ObstacleRect2D`
+   * and the footprint `scene/scenarioSceneryProps` mounts the collider from,
+   * COPIED BY VALUE (the L7 law; `hz-stop-before-contact.test.ts` re-asserts
+   * both pins). From the grid point of a graded static-object contact at which
+   * the car's body is on that rectangle (`objectives.ts namedBodyTouched`),
+   * this task cannot be ticked, and a tick already given is taken back at the
+   * fold, for the rest of the attempt — at any speed, at any yaw, whether or
+   * not the halt contract had latched. A touch is not a stop short of the
+   * thing touched.
+   *
+   * NARROWER THAN `requireNoContact`, AND THAT IS THE POINT. The contact term
+   * above reads the whole run's ledger — any body, anywhere. This one reads
+   * only contacts ON THE NAMED BODY: the escort in the other lane, a kerb, a
+   * façade or a cone elsewhere on the route leave it alone, so a student who
+   * clipped something else and then stops lawfully short of the block keeps
+   * the tick that stop earned (the rule engine bills the other contact on its
+   * own row).
+   *
+   * AUTHORED ONLY, like the contact and the rail terms: a banner can say
+   * «преди препятствието», but only the template knows where the body stands,
+   * and a rectangle derived from a title would be a guess. ONE gate carries it
+   * at HEAD — `sc-hzbds-stop`.
+   *
+   * A session-monotone fact read OUTSIDE the `capMet` latch, like every
+   * journey demand (`objectives.ts ReachZoneJourneyRefusal`): it needs no
+   * eval-state memory, and a gate without the key is bit-identical to shipped.
+   * Not recorded in a THEO-3 sandbox (`mistakeExperience`), where striking the
+   * block is the assignment and nothing is billed (`lessons/engine.ts`).
+   */
+  stopShortOf?: NamedBodyRect;
+  /**
    * THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS — sc-rx-guarded:deb92207,
    * wave 2, and the second term this file's own templates routed here.
    *
@@ -1592,7 +1639,44 @@ export type ObjectiveDetail =
       movements: number;
       /** Current |heading − target| folded to the 180° axis, deg; null before entering. */
       headingToTargetDeg: number | null;
+    }
+  | {
+      /**
+       * WHY A STOP-BEFORE TASK IS NOT TICKED — the first member of this union
+       * that reports a REFUSAL rather than a measurement (lane hztick,
+       * sc-hz-brake-dont-swerve:a7d0dd29).
+       *
+       * „touched" = the car made a graded contact with the body the task says
+       * to stop BEFORE (`ReachZoneParams.stopShortOf`). Without this member
+       * the refusal reaches no sheet: the end card would print «– Спри преди
+       * препятствието…» with nothing under it, and the debrief would name the
+       * open task and give no reason (THEO-4: never a bare withheld tick).
+       *
+       * WRITTEN ONLY BY THE FOLD (`lessons/engine.ts buildLessonResult`), off
+       * the session's own record of the touch (`LessonSessionState
+       * .touchedNamedBodies`), and only on a task that is NOT done. Read by the
+       * end card (`hud/SessionEndScreen objectiveDetailText`) and the debrief
+       * (`lessons/debrief.ts`), on the client's result and on the server's
+       * (`wire.ts` validates it). It grades nothing: `done` is decided before
+       * this is attached.
+       */
+      kind: "haltVoided";
+      reason: "touched";
     };
+
+/**
+ * The footprint of a body a task names, district metres — `ReachZoneParams
+ * .stopShortOf`. The fields are `collision/obb.ts Obb2D`'s, restated here so
+ * the content contract does not import a geometry module (heading 0 = +y, the
+ * district convention; `halfLengthM` runs along the heading).
+ */
+export interface NamedBodyRect {
+  x: number;
+  y: number;
+  headingDeg: number;
+  halfLengthM: number;
+  halfWidthM: number;
+}
 
 export interface ObjectiveProgress {
   spec: LessonObjective;
@@ -2116,6 +2200,24 @@ export interface LessonSessionState {
    * answer.
    */
   yieldVoice?: YieldVoiceState;
+  /**
+   * sc-hz-brake-dont-swerve:a7d0dd29 (additive, lane hztick round 2) — the ids
+   * of the objectives whose NAMED BODY the car has touched in this attempt
+   * (`ReachZoneParams.stopShortOf`): a graded static-object contact at whose
+   * own grid point the car's body was on that body's rectangle
+   * (`objectives.ts namedBodyTouched`).
+   *
+   * SESSION-MONOTONE — an id is appended once and never removed: a touch is
+   * not un-made by reversing off the block, so the task it voids stays void
+   * for the rest of the attempt and the fold takes back a tick given before
+   * the touch. It is state, unlike `struckABodyInRun` (re-read from the ledger
+   * on every tick), because the ledger keeps what was billed and not where the
+   * car's body was when it happened.
+   *
+   * Absent until the first such touch, and absent for ever on a lesson that
+   * authors no `stopShortOf` — every other session is bit-identical to shipped.
+   */
+  touchedNamedBodies?: readonly string[];
   /**
    * FR-B5-JAM (additive) — the CRASH PIN (finish.ts CRASH_PIN_STUCK_S).
    *

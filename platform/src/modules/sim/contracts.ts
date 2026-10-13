@@ -1886,7 +1886,14 @@ export interface RearTailgaterSpec extends StagedEventBase {
    *  ~9 m of centers ≈ 5 m of bumpers — the лепка. */
   followBehindM: number;
   maxMatchSpeedMps: number;
-  /** Glued pressure duration from the latch to the pass command, s (± jitter). */
+  /** Glued pressure duration from the latch to the pass command, s (± jitter).
+   *  The pass begins on the first grid point after it on which the car is not
+   *  still in a hard brake of its own that has not been reported: a due pass
+   *  waits from the car's first reading at the harsh line until the product's
+   *  harsh step reports that brake, or the brake is over — its reading has
+   *  stayed under the braking line for the product's own sustain
+   *  (`RearTailgaterRunner.ownHardBrakeHoldsThePass`; behind a car that keeps
+   *  braking the wait can last seconds). */
   pressureSec: number;
   /** laneShift used for the pass, m (negative = the lane to the LEFT). */
   passShiftM: number;

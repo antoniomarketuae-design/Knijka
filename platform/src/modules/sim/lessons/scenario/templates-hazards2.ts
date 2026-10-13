@@ -497,6 +497,20 @@ const DEBRIS_REVEAL_Y = 160;
 const DEBRIS_Y = 190;
 /** The shadow's rest mark: 6 m short of the debris, wheel dead straight. */
 const DEBRIS_STOP_MARK_Y = 184;
+/**
+ * The fallen-load block's footprint — `traces/scHzBrakeDontSwerve.ts
+ * hzBrakeDontSwerveObstacles()`'s one rect and the `wall` `scene/
+ * scenarioSceneryProps` mounts the live collider from (thicknessM 1.6 ×
+ * lengthM 2.4), COPIED BY VALUE (the L7 law);
+ * `__tests__/hz-stop-before-contact.test.ts` re-asserts it against both.
+ */
+const DEBRIS_BLOCK = {
+  x: DEBRIS_LANE_PLAYER_X,
+  y: DEBRIS_Y,
+  headingDeg: 0,
+  halfLengthM: 1.2,
+  halfWidthM: 0.8,
+} as const;
 
 /**
  * The ESCORT (the reason the wheel is not an option). A `cutInLeadCar` actor
@@ -740,7 +754,28 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
       // 4 m radius is half a lane pitch, so a car that swerved into lane 1
       // (x = −4.06) can never satisfy it. Stopping is not enough; stopping
       // WHERE YOU WERE is the graded claim.
-      params: { kind: "reachZone", x: DEBRIS_LANE_PLAYER_X, y: DEBRIS_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
+      //
+      // …AND STOPPING BEFORE IT IS THE BANNER'S OWN WORD (`stopShortOf` — lane
+      // hztick round 2, sc-hz-brake-dont-swerve:a7d0dd29). The disc says where
+      // the car came to rest and nothing about HOW: the product's chassis is
+      // thrown back off the block, so a 49.6 км/ч strike with the brake never
+      // touched read under the 6 км/ч cap on the contact's own grid point and
+      // collected «✓ Спри преди препятствието» half a second later, under «Удар
+      // в неподвижно препятствие −10» (rig-w3d, PC and phone). The rectangle is
+      // the block itself — `DEBRIS_BLOCK`, the trace harness's rect and the
+      // scene's collider, by value — and a graded contact with it closes this
+      // task for the rest of the attempt, at any speed and any yaw
+      // (`lessons/types.ts ReachZoneParams.stopShortOf`). The escort in the
+      // other lane is NOT this body: striking it is the other demo's lesson and
+      // the rule engine's bill, and it leaves this gate alone.
+      params: {
+        kind: "reachZone",
+        x: DEBRIS_LANE_PLAYER_X,
+        y: DEBRIS_STOP_MARK_Y,
+        radiusM: 4,
+        maxSpeedKmh: 6,
+        stopShortOf: DEBRIS_BLOCK,
+      },
     },
     // NO third „заобиколи и продължи" gate, deliberately. The drill's claim
     // ENDS at the stop (the brief's own shadow plan: „full straight-line stop

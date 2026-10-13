@@ -41,6 +41,7 @@ import type { ContactCastMember } from "./contact";
 import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, playerOverLaneReachM } from "../collision";
 import {
   DEFAULT_RULE_CONFIG,
+  HARSH_BRAKE_TIE_TOLERANCE,
   newHarshBrakeTrack,
   stepHarshBrakeTrack,
   type HarshBrakeLine,
@@ -4444,6 +4445,81 @@ export class CutInLeadCarRunner implements EventRunner {
 //     already beside him: that cut-in is still a contact and is still billed
 //     by the physics shell, and whether it should be is a founder ruling,
 //     not a runner decision.
+//
+//     THE PASS DOES NOT BEGIN IN THE MIDDLE OF THE CAR'S OWN HARD BRAKE
+//     (sc-follow-tailgater:63c0c28c C2a, integrator decision E2 of 2026-10-11,
+//     the rule as restated 2026-10-12, round 5).
+//     The pass was a pure timer — `pressureSec` after the latch, whatever the
+//     car was doing. Measured on the rig's TTF25 drive (24.5 км/ч, full pedal,
+//     the car glued 4.8 m behind): the timer came due 0.267 s after his pedal,
+//     while the car was braking at 9.2 m/s² for him; the cruise law then took
+//     over and ACCELERATED it at 3.5 m/s² toward a car stopping 4.5 m ahead
+//     (bumper gap 4.80 → 4.45 m), and its hard brake — 0.25 s at the harsh
+//     line, under the product's 0.4 s sustain — was cut short before
+//     `stepFollowerAccount` could report it. No driver starts an overtake by
+//     accelerating at a car that is braking hard just ahead of him. So a pass
+//     that comes due is HELD WHILE THE CAR'S HARD BRAKE IS NOT OVER YET AND
+//     HAS NOT BEEN REPORTED (`ownHardBrakeHoldsThePass`): from the FIRST grid
+//     point its reading is at the harsh line, until
+//       · the product's own harsh step REPORTS that brake (`followerBraked` is
+//         out — the pass begins on that grid point), or
+//       · the brake is OVER — its reading has stayed under `BRAKING_LINE_MPS2`
+//         for the product's own sustain (`harshBrakeSustainSec`), the pedal
+//         released for good and not for a dip, or
+//       · the car stops being his close follower.
+//     No new number: the harsh line, the sustain and the braking line are
+//     `stepHarshBrakeTrack` on `OVERTAKE_HARSH_LINE`, in the follower's
+//     account that already runs; the sustain that says a brake is harsh is the
+//     sustain that says it is over.
+//       Three narrower forms were built first and refuted on tapes, each tied
+//     to a bookkeeping state of the harsh step instead of to the fact it
+//     stands for — THE CAR'S HARD BRAKE IS NOT OVER YET:
+//       · round 2 held the pass only on grid points whose reading was AT the
+//         line. An UNEVEN emergency stop — 9.3 m/s² dipping to 5–6.5 for
+//         0.05–0.10 s, 8 ± 1.5 m/s² at 5 Hz, a one- or two-grid-point release
+//         — let the pass go on the first reading under 7 m/s², the car still
+//         braking, and the cruise law accelerated it exactly as on TTF25
+//         (762 of 5,838 sub-floor brake checks on its verifier's tapes);
+//       · round 3 held it through the step's OPEN WINDOW (`lastQualAt`). But
+//         the step RE-ANCHORS that window once it has been open for the
+//         sustain with a mean not over the line (harshBrakeEpisode.ts, «Open,
+//         or re-anchor on this frame's own reading») — while the brake goes
+//         on — and reports the same brake from the next window. A re-anchor
+//         on a reading under 7 m/s² let the pass go mid-brake, the car still
+//         braking at 5.5–7.0 m/s² (383 of 9,000 on its verifier's tapes: a
+//         firm lead-in then full pedal with a dip, a slow pedal rise into a
+//         wobble, 9 of 100 seeded random uneven stops);
+//       · round 4 held it until the step's RE-ARM — the first reading under
+//         the braking line. One such reading is not a released pedal: a
+//         release of three grid points (0.05 s) in the middle of an emergency
+//         stop, or an ease to 1.9 m/s² for four, gives the car one or two of
+//         them, and the pass began on that dip or on the next due grid point,
+//         the car back at 6–9 m/s² one to three grid points later (980 of
+//         6,444 on its verifier's tapes: tap–release–slam 700 of 1,548, one
+//         stop with a dip 234 of 1,296, 46 of 3,600 seeded random stops with
+//         releases).
+//     The step's track cannot carry the hold through any of these: at a
+//     re-anchor it clears `lastQualAt` and `qualifiedSec` with the pedal still
+//     down, on one reading under the braking line it re-arms everything, and
+//     it keeps no other record that this brake was ever at the line. So the
+//     hold keeps one bit and one clock of its own (`ownBrakeReachedTheLine`,
+//     `ownReleasedSinceSec`), written only from what that step did on the same
+//     grid point.
+//       THE HOLD CAN LAST SECONDS, AND THAT IS THE RULE (integrator decision
+//     of 2026-10-12): after its own hard brake the car does not pull out while
+//     the car ahead is still slowing; it pulls out once that brake has been
+//     over for the sustain, or the car ahead has stopped. Behind a student who
+//     touches the line and then brakes gently to a standstill it waits the
+//     whole stop out; nothing is billed or shown differently there. What bounds
+//     it and what was measured: `ownHardBrakeHoldsThePass`.
+//       A pass that comes due while the car has NOT been at the harsh line —
+//     he brakes after it has begun, or in the few frames before the
+//     matchPlayer law has answered him at the line — or after its brake has
+//     been over for the sustain, begins on time, exactly as before (integrator
+//     decision F2 of 2026-10-09: «already pulling out, not braking» stays
+//     unbilled). Until its pass is commanded the car is under the very law it
+//     would be under if the timer never came due, so a held pass can report
+//     nothing that world does not report.
 // ---------------------------------------------------------------------------
 
 /** The tailgater's driveline caps — authored constants (not spec surface):
@@ -4514,6 +4590,22 @@ export class RearTailgaterRunner implements EventRunner {
   private followTrack: HarshBrakeTrack = newHarshBrakeTrack();
   /** The speed the account is measured from (the first glued frame), m/s. */
   private followRefMps: number | null = null;
+  /**
+   * THE PASS HOLD'S OWN STATE, ONE BIT AND ONE CLOCK (`ownHardBrakeHoldsThePass`).
+   * The bit: the car has been at the harsh line in a brake that is NOT OVER
+   * YET and has not been reported. Set on a glued grid point whose reading is
+   * at the line in an episode the step has not reported; cleared when the step
+   * reports, when the brake is over, and wherever the follower's account
+   * starts afresh. Why the step's own track cannot carry it: the method's doc.
+   */
+  private ownBrakeReachedTheLine = false;
+  /**
+   * The clock: the session time of the first reading of the CURRENT unbroken
+   * run of readings under `BRAKING_LINE_MPS2`, s; `null` while the car is
+   * braking. The brake is over — the pedal released for good — when that run
+   * has lasted the product's own sustain (`harshBrakeSustainSec`).
+   */
+  private ownReleasedSinceSec: number | null = null;
 
   constructor(readonly spec: RearTailgaterSpec) {}
 
@@ -4569,6 +4661,8 @@ export class RearTailgaterRunner implements EventRunner {
     this.indicatorOffAtSec = null;
     this.followTrack = newHarshBrakeTrack();
     this.followRefMps = null;
+    this.ownBrakeReachedTheLine = false;
+    this.ownReleasedSinceSec = null;
   }
 
   /**
@@ -4614,10 +4708,32 @@ export class RearTailgaterRunner implements EventRunner {
     if (!glued) {
       this.followTrack = newHarshBrakeTrack();
       this.followRefMps = null;
+      this.ownBrakeReachedTheLine = false;
+      this.ownReleasedSinceSec = null;
       return;
     }
     if (this.followRefMps === null) this.followRefMps = actor.speedMps;
     const hard = stepHarshBrakeTrack(this.followTrack, input.tSec, this.followRefMps - actor.speedMps, OVERTAKE_HARSH_LINE);
+    // The pass hold's own state, kept on EVERY glued grid point, due or not (`ownHardBrakeHoldsThePass`).
+    // The step leaves `anchorT` null only on a reading under its braking line, and stamps `lastQualAt` with
+    // this grid point only when this reading is at the harsh line.
+    if (this.followTrack.anchorT === null) {
+      // Under the braking line. One such reading is a dip, not the end of the brake: the brake is OVER when
+      // the readings have stayed under the line for the product's own sustain, counted from the first of them.
+      if (this.ownReleasedSinceSec === null) this.ownReleasedSinceSec = input.tSec;
+      if (
+        input.tSec - this.ownReleasedSinceSec >=
+        OVERTAKE_HARSH_LINE.harshBrakeSustainSec * (1 - HARSH_BRAKE_TIE_TOLERANCE)
+      ) {
+        this.ownBrakeReachedTheLine = false;
+      }
+    } else {
+      // Braking: any run of readings under the line that was shorter than the sustain is forgotten.
+      this.ownReleasedSinceSec = null;
+      // Reported (on this grid point, or earlier in the episode the step still has open): nothing left to hold for.
+      if (this.followTrack.fired) this.ownBrakeReachedTheLine = false;
+      else if (this.followTrack.lastQualAt === input.tSec) this.ownBrakeReachedTheLine = true;
+    }
     if (hard === null || actor.stateId === undefined) return;
     out.push({
       kind: "followerBraked",
@@ -4629,6 +4745,74 @@ export class RearTailgaterRunner implements EventRunner {
       speedMps: actor.speedMps + hard.shedMps,
       gapM: behindM - vehicleHalfLengthM(this.spec.actor.profile) - PLAYER_HALF_LENGTH_M,
     });
+  }
+
+  /**
+   * IS A PASS THAT HAS COME DUE HELD ON THIS GRID POINT? — only while the
+   * car's own HARD BRAKE IS NOT OVER YET AND HAS NOT BEEN REPORTED (the class
+   * block, „THE PASS DOES NOT BEGIN IN THE MIDDLE OF THE CAR'S OWN HARD BRAKE").
+   *
+   * Read off the hold's own state as `stepFollowerAccount` left it on THIS
+   * grid point (it runs first in `step`), so the two can never disagree about
+   * what the car is doing. The bit `ownBrakeReachedTheLine` is up from the
+   * first glued grid point whose reading is at the harsh line
+   * (`OVERTAKE_HARSH_LINE`, 7 m/s² over the 0.04 s reading window) in an
+   * episode the product's step has not reported, kept on every glued grid
+   * point, due or not, so a pass that comes due later in the same brake is
+   * held too.
+   *
+   * WHAT ENDS THE HOLD — three things, and only these:
+   *   1. THE REPORT — the product's step finds the brake harsh
+   *      (`followTrack.fired`; `followerBraked` is out on that grid point and
+   *      the pass begins on it). `fired` stays up until the step re-arms, so a
+   *      reported brake holds nothing however long it goes on; a NEW hard
+   *      brake after a release is a new episode and is held for again.
+   *   2. THE BRAKE IS OVER — the car's reading has stayed under
+   *      `BRAKING_LINE_MPS2` (2 m/s²) for the product's own sustain
+   *      (`harshBrakeSustainSec`, 0.4 s): `ownReleasedSinceSec` is the first
+   *      reading of the current unbroken run under the line, any reading back
+   *      at the line forgets the run, and «for the sustain» is the product's
+   *      `>=` with its tie tolerance (`harshBrakeEpisode.ts heldFor`) — on the
+   *      1/60 s grid the 25th reading of the run. A car that has stopped reads
+   *      0, so no hold outlives a standstill by more than the sustain.
+   *   3. NO LONGER HIS CLOSE FOLLOWER — he is not ahead of it in its lane (or
+   *      the view publishes no lane): `stepFollowerAccount` starts a fresh
+   *      track and clears the bit and the clock, and nothing is held.
+   * NOT a single reading under the braking line (round 4's end): the step
+   * re-arms there, but a 0.05 s release or a four-grid-point ease in the
+   * middle of an emergency stop reads so once or twice and the car is braking
+   * at 6–9 m/s² again within three grid points. NOT the step's RE-ANCHOR
+   * (round 3's): it closes a WINDOW while the brake goes on. NOT the first
+   * reading under the harsh line (round 2's). That is why the state is the
+   * runner's own: the track forgets, at each of those, that this brake was at
+   * the line.
+   *
+   * WHEN A PASS BEGINS. The hold has no clock but the brake's own:
+   *   · it cannot outlive the car's LAST reading at the braking line by more
+   *     than the sustain — on the grid the pass is commanded 25 grid points
+   *     (0.417 s) after it at the latest;
+   *   · while it lasts the car must read 2 m/s² or more at least once in
+   *     every sustain. Each such reading is 0.1 m/s shed across its 0.05 s
+   *     reading span, so a car that only slows sheds at least 0.1 m/s every
+   *     0.45 s and no hold outlasts 4.5 s for each m/s of its speed at its
+   *     first reading at the line, plus the sustain. That is the kinematic
+   *     limit (one-grid-point brake taps); a steady brake at 2.1 m/s² to a
+   *     standstill is speed ÷ 2.1 plus the sustain;
+   *   · a car ahead that keeps coming back to the brake inside every sustain
+   *     AND picks its speed up in between is waited behind for as long as it
+   *     does that — as in the world where the timer never comes due — and is
+   *     passed 0.417 s after its last brake.
+   * These are pinned, with what was measured on tapes, in
+   * `orchestrator/__tests__/tailgater-pass-hold.test.ts` (its header).
+   *
+   * The hold is the student's doing only through the car: his pedal is not
+   * read here, and a pedal the car has not (yet) answered at the harsh line
+   * holds nothing. While it lasts the car stays under the matchPlayer law —
+   * the law it is under when the timer never comes due — so the hold itself
+   * can add no report.
+   */
+  private ownHardBrakeHoldsThePass(): boolean {
+    return this.ownBrakeReachedTheLine;
   }
 
   /**
@@ -4742,7 +4926,11 @@ export class RearTailgaterRunner implements EventRunner {
         // The pass is running: re-read the road every frame (passShiftM 0 can
         // meet the student in its lane at any point of it).
         this.applyPassLaw(traffic, actor, input, false);
-      } else if (input.tSec - this.latchedAt >= this.pressureSec) {
+      } else if (
+        input.tSec - this.latchedAt >= this.pressureSec &&
+        // Due — but not while the car is still in the hard brake it has not yet been reported for (the class block).
+        !this.ownHardBrakeHoldsThePass()
+      ) {
         this.applyPassLaw(traffic, actor, input, true);
         traffic.stagedCommand(s.id, {
           type: "laneShift",

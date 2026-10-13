@@ -256,6 +256,24 @@ export function serializeObjectiveParams(
       // that forgave them would teach the opposite of the lesson it belongs to.
       if (p.requireNoContact === true) params.requireNoContact = true;
       if (p.requireRailClear === true) params.requireRailClear = true;
+      // …AND THE NAMED BODY (`stopShortOf` — lane hztick round 2,
+      // sc-hz-brake-dont-swerve:a7d0dd29), on this whitelist for the reason the
+      // block above measured on the rail term: a key that is not named HERE
+      // never reaches the session the student plays. NOT LADDERED, like its two
+      // neighbours and for their reason — the aid ladder forgives precision,
+      // and «did the car touch the thing it was told to stop before» has the
+      // same answer at L1 as at L5; nor is the rectangle widened or shrunk with
+      // the disc, because it is where the body stands and not a tolerance.
+      // Copied field by field so a rung never shares the template's object.
+      if (p.stopShortOf !== undefined) {
+        params.stopShortOf = {
+          x: p.stopShortOf.x,
+          y: p.stopShortOf.y,
+          headingDeg: p.stopShortOf.headingDeg,
+          halfLengthM: p.stopShortOf.halfLengthM,
+          halfWidthM: p.stopShortOf.halfWidthM,
+        };
+      }
       // …AND THE THIRD AUTHORED WITNESS TERM, on this whitelist for exactly the
       // reason the block above measured on `requireRailClear`: parsed, read and
       // gated at template level, a key that is not named HERE never reaches the

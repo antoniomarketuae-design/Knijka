@@ -581,6 +581,18 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
         headingToTargetDeg,
       };
     }
+    case "haltVoided": {
+      // sc-hz-brake-dont-swerve:a7d0dd29 (lane hztick) — why a stop-before task
+      // is not ticked. The debrief the student reads is the SERVER's, so the
+      // row's reason has to cross the wire or the server names an open task and
+      // says nothing more. A closed vocabulary, rebuilt clean: one reason
+      // today, and anything else is not our payload and drops like every
+      // malformed detail. It selects a sentence the server composes itself
+      // (ADR-002) and never reaches `done` — that is `w.done`, reconciled
+      // below.
+      if (d.reason !== "touched") return null;
+      return { kind: "haltVoided", reason: "touched" };
+    }
     default:
       return null;
   }
