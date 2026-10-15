@@ -12784,3 +12784,165 @@ Workflow `rig-wave-w3f` (wf_1f956f6d-3e8) ran at `65be020`: five phone-lens cras
 - **INTEGRATOR DECISION 2026-10-13 (the evidence standard).** On a lens that renders slower than the shake's own period, the per-render rotation log is the standard for «the shake is applied»: one shake per contact; every in-window render carrying the formula's roll at that instant; roll 0 before and after; the first in-window render equal to the PC reference's. It settles what counts as evidence. It does not say the shake is visible on a slow display.
 - **The re-judgement under that standard** proposed CLOSED, and its adversarial verifier could not refute it: it recomputed all four tests from the raw quaternions on the five runs (17 of 17 in-window renders; the first render within 0.020° of PC's) and wrote that the closure holds only because of the decision. The row is retired on that basis, and this note is where the basis is recorded.
 - **Not part of that row, in triage as their own candidates:** below about 14 frames per second the shake shows only as a brief tilt («shakeslow»); and its amplitude is fed the post-solve impact speed — 6.19 km/h for a 49.6 km/h strike, so 0.81° instead of the stated 2.29° («impactspeed»). Also recorded: the lesson ends half a second after the contact, and the «РЕЗУЛТАТ» prompt then stands on a dark field with no world drawn, so the chase view of the crash is on the phone glass for only 4–6 renders.
+
+## Landed: an explanation opened with «ЗАЩО» on PC owns the notify column, scrolls inside its card with the title and law chip pinned where the column cannot hold it, is not taken away by the end screen, and no graded fault or teach card waiting behind it is lost unpainted — `sc-roundabout-entry:fe081cf1` (major), the opened-explanation clause (2026-10-14)
+
+Lane `whycut`, three rounds, built on `8cb0707`. Rounds 1 and 2 were each REFUTED by the adversarial verifier. Round 3 was SIGNED OFF WITH CONDITIONS: the verifier found no stop-rule item met. The patch is `whycut-result-r3.patch` (sha256 e2beb1d9…, 334,758 bytes, 27 files, +5263/−155, 0 CR bytes). It is cumulative against `8cb0707`, not against the landing base, so it is applied 3-way on `8155302`. Five of its paths changed between `8cb0707` and `8155302` (the tailbrake3 and hztick landings, commit `65be020`): `lessons/engine.ts`, `lessons/types.ts` and three reviewed-text manifest files (`manifest.json`, `strings.f.txt`, `units.source.txt`). The round-3 verifier's lane matched the patch exactly (27 of 27 files against the builder's `r3/final-src.sha256`).
+- **Product files:** `hud/HudToasts.tsx` (the card ledger, the reader, the read box, the paint report), `hud/hudPreferences.ts` (`visibleToasts` with a reading card, `waitingToasts`, `shouldShowDebrief` / `shouldShowEndBar` / `endBarVerdictHidden`, `SESSION_END_HELD_LINE_BG`), `hud/ObjectiveBanner.tsx` (a `oneLine` prop), `hud/index.ts` (exports), `lesson-ui/LessonPlayShell.tsx` (the wiring), and the one-liner: `lessons/types.ts` (`TeachMoment.peekBg?`) and `lessons/engine.ts` (sets it at the two `notePause` sites from the `peekBg` the toast already carries).
+- **Test-side files.** New: `hud/__tests__/toast-why-room.test.ts`, `hud/__tests__/toast-wait-never-dropped.test.ts`, `lessons/__tests__/teach-moment-one-liner.test.ts`, and in `lesson-ui/__tests__/` `whycut-verify-probe.test.ts` (the round-1 verifier's probe, kept and extended), `toastReadFold.test.ts`, `endWaitsForReading.test.ts`, `toastReadCensus.test.ts` and the fixture `openedCardHeights.fixture.ts`. Updated pins: `hud-preferences`, `hud-toast-fit`, `hud-toast-moment`, `toastColumnFold`, `teachPeekSummary`.
+- **Seven reviewed-text manifest files** (`manifest.json`, `strings.5/.9/.a/.c/.f.txt`, `units.source.txt`), re-recorded in round 2 against `8cb0707` (13,254 → 13,257 strings, the builder).
+- **No rule, bill, point value, verdict, threshold, graded clock or trace changed.** `CRASH_PIN_STUCK_S` (10 s), the session end, the finalizer and the tick are untouched. Nothing graded reads the reader: the round-2 verifier established this by reading the code and through its killed mutants R3 and R10.
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:fe081cf1` stays OPEN. Every repair claim in this section rests on executed tests and on a real-browser copy of the notify column (the real components, Chromium and WebKit, static files, no server). Figures marked as the builder's were not re-measured by a verifier. Nothing has been seen on a device or through the product shell. A rig re-drive is owed (below); whether its frames close the row is for that wave's judge and verifier.
+
+**What was wrong.** rig-w3d (above) closed the card as it first appears and left the opened state open. On PC at L3 with the advisor on, the paragraph opened with «ЗАЩО» was cut 42.5 px mid-sentence, with its law chip off the screen, for the last 3 s of the card's life. The card was gone at contact +8.017 s, 5.8 s after the press at +2.233 s (rig-w3d's text says 6.3 s; its own stamps give 5.8). The phone's opened state was not photographed. The same fault printed «Спирачният път не стигна.» on the phone teach card and «Не се появи внезапно.» on PC.
+- **The causes** (the round-1 builder, at `8cb0707`):
+  - The opened card is the summary form plus `whyOpen`, and the resize observer that re-asks the fit exists only for the paragraph form. So nothing re-asked when the column shrank under it: the banner grew 48.7 → 76.2 px and the 98.3 px advisor card mounted above the pill.
+  - The card's one 8,000 ms timer was armed at the push, and the press never touched it. 8,000 ms is 120 characters at the product's own 15 characters a second.
+  - The phone teach card's one-liner was keyed on the code only, so it reached a pooled line.
+
+**Round 1, refuted.** It held the column for the opened card (the advisor card waits), re-armed the card's life at the press and unified the one-liner. At the rig's bare 1440×900 stage the 295.5 px card was whole. The verifier ran the real reader against a stand-in column sized by the product's own column geometry and found three ways the card was still lost, plus a false tooltip:
+- **Cut on the product's own stage.** On the real /simulator stage (1165×650 at a 1440×900 window) the card was cut 114.7 px, with the law chip 110.7 px out, after the hold. Even with only the one-line banner standing, that stage has 267.3 px for a 295.5 px card. At an immersive 1366×768 viewport it was cut 69.5 px; at 1440×800, 45.2 px (both stages derived, not measured).
+- **Displaced by a newer fault.** At the rig stage, the SC2 re-strike's card on top cut the opened one 93.7 px, with the law chip 89.7 px out.
+- **Taken away by the end screen.** The end screen replaced the stage at contact +10.084 s, so the paragraph was on the glass 7.85 s of the 21.53 s its own reading time gives it.
+- **A tooltip made false.** In quiet mode an opened card plus a newer fault painted two cards under «По-тихи известия: едно по едно…».
+
+**The integrator's layout decisions W1–W6.** They sit inside the 2026-10-08 delegation and change no rule, grade, points or graded clock. They are kept small because the founder's redesign is pending on its own track.
+- **W1.** The opened explanation owns the notify column: the advisor card and the teach card wait, the banner under a route hold falls to one line, and a newer fault waits behind a «+N» badge.
+- **W2.** Where even the bare column cannot hold it, the BODY scrolls inside the card with the title and the law chip pinned, and the fold row «↓ обяснението продължава — покажи» pages it.
+- **W3.** The end overlay waits for an opened explanation, bounded by its reading time; result, points and end step are byte-identical.
+- **W4.** Quiet mode paints one card.
+- **W5.** A graded fault or teach card waiting behind an opened card is exempt from the queue cap and restarts its life only when painted; praise keeps its own clock.
+- **W6.** The banner's one-line ellipsis under a route hold is accepted.
+
+**Round 2, refuted on one point.** W1–W4 were built. W1, W2 and W4 held in the verifier's real-browser rig, and W3 held by its reading of the code and its killed mutants R3 and R10. But a graded fault waiting behind the opened card could be dropped:
+- The cap (`MAX_QUEUED` 4) exempted only the card being read, and every other card's clock was stopped.
+- So four further cards of any kind during a reading (four «Браво», or four faults) removed the waiting fault from the queue without it ever being painted, with the badge reading «+4».
+- The same arrivals with nothing open painted it on arrival.
+
+W5 was written for this.
+
+**What landed (round 3 = round 2 + W5).** The description is the builder's; the verifiers drove its behaviour (next heading).
+- **The opened card owns the column (W1, W4).**
+  - While «ЗАЩО» is open, `visibleToasts` paints that card alone, in quiet mode and out of it.
+  - The judged cards waiting behind it (graded faults and «Научи» cards; not praise or info) are counted on it by the «+N» badge (aria «още N известие/известия»).
+  - What stands above it gives way in two measured steps, only as far as the card is still short, latched while the student reads. First the advisor card waits. Then a banner under a route hold goes to one line; the sentence stays whole in the DOM.
+  - A banner with no hold lead (its sentence is the task and its speed cap) is never cut. Under a hold, the task behind the lead is off the glass for the reading (W6, C4).
+- **The body scrolls inside the card (W2).** While read, the card is a flex column whose body box `[data-hud-toast-read]` is the one shrinkable child; the header, the title and the law chip are pinned. The shell's existing fold row announces the hidden part, and «покажи» pages the box. The press re-arms the card's life to max(old expiry, now + characters ÷ 15 s): on the rig cell's 323-character card, a press at contact +2,233 ms keeps it to +23,767 ms.
+- **The end overlay waits (W3).**
+  - On the roomy layout only, `shouldShowDebrief` is false while a card is read, and the end bar stands in meanwhile.
+  - While the self-assessment gate holds the verdict, the bar prints only «Сесията завърши — първо се самооцени» and «Виж разбора»: no verdict word, no points.
+  - «Виж разбора» still opens the screen at once.
+  - The wait ends when the card is closed or leaves the queue, at the latest when its reading time runs out.
+  - In the rig cell the graded end stays at +10,084 ms and the debrief opens at about +23,767 ms.
+- **No judged card waiting behind an opened explanation is lost unpainted (W5).**
+  - «Judged» is the existing predicate `hudToastCarriesWhy`: a graded fault or a «Научи» teach card. Only these wait with their clock stopped. Praise and info keep their own clocks and may leave unread.
+  - The cap never evicts the card being read or a judged card still waiting with its clock stopped. Praise, info, and any judged card already painted are capped as at base (C2).
+  - A stopped card restarts ONLY when the column reports that it painted it: `HudToasts` reports its painted ids through `onPainted`, and the shell passes the queue's `painted`. So a waiting card's life starts only on the glass, never below the column's capacity. It gets all of that life unless newer cards arrive after its first paint (C2, residual e).
+  - Waiting cards come back in the column's own order, newest on top.
+  - With nothing open nothing changes: no card is stopped, and the cap (`MAX_QUEUED` 4: the four newest kept, older ones dropped) and the 4 s / 8 s lives are base.
+- **One one-liner on both layouts.** The phone's paused teach card now prints the act's own existing catalogue line, the one the PC card prints. For COLLISION/staticObject that is «Не се появи внезапно.» on the PC card, on the phone's L3 peek and on the phone's paused teach card; the round-1 verifier reproduced this through `applyTick`. By the builder's census, 18 of 26 catalogued acts printed a different line on the two surfaces at base, and 0 after.
+
+**Shown text.** No new sentence and no law text.
+- The held end-bar sentence «Сесията завърши — първо се самооцени» moved from a shell literal to `SESSION_END_HELD_LINE_BG`, and the roomy end bar now also shows it in its held form. The builder reported this as a spelling correction; the round-2 verifier found the base bytes identical, so it is a move, not a correction.
+- New: the badge's accessible name «още N известие/известия», in words the fold row already printed. Three end-bar texts were re-indented.
+- The phone teach card's body line changes, for 18 act-split faults, to the act's own existing catalogue line (above).
+- The «+N» number counts only waiting graded and «Научи» cards, not praise (round 3).
+- The card's age («преди N с») can read past 8 s on a card the student opened; it is still the fault's true age.
+
+**What the verifiers reproduced.**
+- **Layout, in real engines.** This is the round-2 verifier's rig, rebuilt by the round-3 verifier on the r3 tree with `onPainted` wired. It runs the real `HudToasts`, `useHudToastQueue`, `useToastReader` and `ObjectiveBanner`, and the shell's real `measureToastColumnFold` / `pageToastRead`, in a copy of the shell's notify column with the app's compiled CSS, in Chromium and WebKit.
+  - Cards: COLLISION/staticObject (323 characters), FAILED_TO_YIELD/roundabout (674) and the 1,320-character law-rail paragraph.
+  - Stages: /simulator 1165×650, immersive 1366×768, 1440×800, 1440×900 and 1920×1080.
+  - Title and law chip whole in every opened state: 0 instances of `titleWhole=false`, `lawWhole=false` or `last=false` across 5 stages × 3 cards × 2 engines.
+  - The fold row comes up whenever text continues, and «покажи» pages to the last line: COLLISION/staticObject at 1165×650 in 1 press in each engine, the law-rail paragraph in 5–6. The law chip is whole at every press, and the wheel reaches the last line.
+  - A newer fault while open: painted 1, badge +1. Quiet mode: painted 1. On close, the newer card comes back.
+  - In the round-2 rig, at 1366×768, 1440×800 and 1440×900, the row's own card was whole without scrolling.
+  - `drive.log`, `fold.log` and `drag.log` on the r3 tree are byte-identical to round 2's.
+- **Builder only, not re-measured by a verifier.**
+  - Its figures for the row's own card on the /simulator stage: window 208.3 px, 110.8 shown / 87.2 hidden, law chip pinned, and one press of the fold row reaches the end. At 1366×768 its stand-in table has the card scrolling (156 shown / 42 hidden), where the round-2 verifier's real-browser rig found it whole without scrolling; the re-drive decides.
+  - Its census: 86 opened cards × 6 stages × 2 engines, 0 cut (whole, or scrolling with the law chip pinned). The law chip stays pinned for all 86 from a 600 px stage (Chromium) or a 619 px stage (WebKit); the smallest product stage is 650.
+- **W5, in tests.** The builder's new `toast-wait-never-dropped.test.ts` is 14 failed / 4 passed with the r2 sources swapped in, and 18 of 18 on r3. The 4 that pass on r2 are the base contrast, effect order, nothing-open and clear rows. Its census prints 212,658 drives with 782,208 judged cards raised under a reading and 0 that broke the rule. On the r2 sources the builder reports 212,618 broken drives and 491,839 judged cards removed unpainted.
+- **W5, in real engines (the round-3 verifier's own cell `w5cell.mjs`).**
+  - The cell runs the real components, with `onPainted` wired as the shell wires it, real React effect order and real timers, in Chromium and WebKit, on the 1165×650 and 1440×900 stages.
+  - Nine sequences: P1 with four praise; P1 with four faults; a mixed batch of 8 in one push; quiet mode; ✕ on the opened card; arrivals in the same task as the close; two explanations in turn; 3.5 s lesson hints; the opened card's own reading time running out.
+  - 34 of 36 cells: no judged card removed unpainted, every judged card on the glass for at least its life minus 400 ms, and never two cards painted in quiet mode. The other 2 are a setup artefact: at the rig stage G1's paragraph fits, so it has no chip to open.
+  - Example (P1 with faults): F on the glass 7,996 ms, F2/F3 8,006 ms, F4/F5 8,038 ms.
+  - Praise left on its own 4 s; waiting cards came back newest on top.
+- **Red first.** Round 2's new files: 115 failed / 39 passed on the r1 sources, and 139 / 23 on base (the builder). Round 3: 14 / 4 on r2, reproduced.
+- **Mutants.**
+  - Round-3 verifier: 10 of its own, one at a time against 7 test files (224 tests), each restored and sha256-checked.
+  - 9 were killed on assertion text: the cap evicts a waiting graded card; praise raised under a reading starts stopped; the hold stops running praise; the column reports the whole queue; `painted()` arms only the bottom card; quiet mode paints two; the badge misses teach cards; the end overlay ignores the reading; a teach card does not wait.
+  - M5 survived (condition C1).
+  - Round-2 verifier: 10 of 10 killed, three of them round 1's survivors (V02, V07, V08). The builder reports V03/V03b killed too. V06 (the `sharedParent` guard in the reader) is on no kill list.
+  - The builder reports 60 killed in round 2 and 19 of 19 in round 3's final pass. 12 of the round-2 kills are on source pins only (the builder: C10, C11, C10c, D5, D6, D7, E2, E3, F1, F2, G2, G3).
+- **Regression (the round-3 verifier, once, on its lane: `8cb0707` + the patch).**
+  - hud/, lesson-ui/, lessons/__tests__ and lessons/scenario/__tests__: 439 files, 438 passed / 1 failed; 9,160 tests passed / 1 failed / 165 skipped; no timeouts.
+  - The one failure is touchHintLifetime: ENOENT on `tools/mobile/lesson-audit.mjs`, because the lane has no tools/.
+  - The run includes the reviewed-text manifest, caption-truth and keep-right-claim-census, all green.
+  - tsc: 22 errors, the base list, none in a touched file.
+
+**The conditions, and how each stands.**
+- **C1. The gate did not pin the column's repeated paint report.**
+  - The verifier's mutant M5 makes `HudToasts` report what it painted only once, on mount: the effect's deps go from `[paintedKey, onPainted]` to `[onPainted]`.
+  - It survived all 224 unit tests. The §3 row executes only the first commit, and the census models the report from `visibleToasts`, not through `HudToasts`.
+  - Only the verifier's real-browser cell killed it. In S1, F stayed on the glass for 38 s and never expired. In S2, F, F2 and F3 were never painted within 40 s.
+  - The product code is correct; the gap was the missing test.
+  - PINNED AT INTEGRATION (2026-10-14): `platform/src/modules/sim/hud/__tests__/toast-paint-report-follows.test.ts` re-renders the REAL `HudToasts` with a changed painted set through a renderer that compares effect deps as React does (Object.is per slot; the shared hookHarness does not compare deps, which is why M5 survived) and walks [3,2] → [4,3] → [1] (the opened card alone) → [4,3] → []. Under M5 it fails «a newer card reached the glass and the column's report did not follow it: expected [ [ 3, 2 ] ] to deeply equal [ [ 3, 2 ], [ 4, 3 ] ]»; a second row kills the integrator's M5b (deps removed — the column would re-report every render) with «the same painted set was reported twice». `HudToasts.tsx` restored byte for byte (sha256 checked); both rows green on the product.
+- **C2. CARRIED, not fixed** (verbatim): the cap protection of a judged card ends at its FIRST paint — after the close, a burst of four praise cards (or faults 300 ms apart) can push a just-painted fault off the glass and cap it out after ~320 ms painted (verifier S10/S11); the student saw it, the debrief lists every fault; candidate «wcafterpaint» for triage.
+  - S10: the opened card was closed at 1.5 s and four praise cards arrived at 1.8 s; F was capped out after 320 ms painted.
+  - S11: four faults arrived 300 ms apart after the close; F, G1 and G2 were capped out after 643, 637 and 645 ms painted, while G3 and G4 got about 8,000 ms.
+  - Base applies the same cap to any fault followed by four newer cards, and the cards were painted, so the stop rule («removed … without ever being painted») is not reached.
+  - W5's sentence is true only with its «waiting» scope. The builder scoped its 8 s claim to «when no card arrives after the reading».
+- **C3. Builder residuals, recorded, not changed.**
+  - (a) While praise is still alive at the close, it stands above a waiting fault for up to 4 s. The fault's clock is stopped meanwhile.
+  - (b) Newest-first order means the FIRST fault raised during a reading is painted LAST: with 5 waiting, about 16 s after the close, or about 32 s in quiet mode.
+  - (c) A judged card restarts only when painted. If the roomy column is not mounted (a mid-reading switch to the compact layout), waiting cards stay queued and stopped. They are not lost, and the debrief lists every fault.
+  - (d) After the W3 end-bar wait, a card that waited may be painted, and so spend its 8 s, under the opened debrief. The debrief lists the fault whole.
+  - (e) After the reading, a card already painted can still be pushed off the glass by a newer arrival and run out unseen. This is base behaviour with nothing open; C2 is its measured form.
+  - Also from the builder:
+    - Driveline rejection hints (kind `lesson`, 3–4 s) count as teach cards and wait.
+    - The «Защо ↑» chip scrolls with the body, so paging down takes it out of view (the ✕ stays).
+    - The advisor has no voice, so while the column has yielded its card is not on the PC glass.
+    - While a card is read, the other cards are off the glass for up to its reading time (88 s for the 1,320-character paragraph).
+    - The L1 one-snapshot cut (the law chip 23.5 px out for one frame before the swap to the summary) is not built.
+    - On small stages the un-pressed summary card can be cut when the banner and the advisor card stand (base behaviour).
+    - Below a 526 px stage the pinned rows overflow; no product stage is that short.
+- **C4. W6, the banner's one-line ellipsis.** Accepted by the integrator and documented above `bannerOneLineWhileReading`, unchanged. On a short stage the glass shows a cut sentence under a route hold for the length of a reading (Chromium: «Колата е притисната след удара — измъкни се назад,…»), and the task behind the hold's lead is off the glass for that time. The whole sentence stays in the DOM. A judge's THEO-4 reading of it on the device is owed.
+- **C5. Noted by the round-2 verifier, not a refutation.**
+  - «Drag» reaches the text only where a real scrollbar is drawn. Without a scrollbar gutter (overlay scrollbars), a press-and-drag at the box edge lands on the card, which is a button, and dismisses it (base behaviour of the card).
+  - The card body is not focusable, so the keyboard route is Tab to «покажи».
+  - In WebKit, a wheel that reaches the end of the read box chains to the shell scroller, which has 8 px of overflow in every opened state. The card shifts up 8 px and about 4 px of its header row leaves the window. Title and law chip stay whole.
+
+**Tools.**
+- The lane has no `tools/` directory, so no tools test ran in it.
+- The builder and the round-3 verifier both report that no string, table or selector a tools test reads was touched:
+  - The `TEACHING_TOAST_TTL_MS = 8000` literal and the `ttlFor` shape hold.
+  - `data-hud-toast-body=` still occurs exactly once, inside `ViolationToast`.
+  - There is still exactly one `<AdvisorCard`.
+  - `[data-hud="toasts"]` and `[data-hud-toast-why]` are unchanged.
+- The verifier replicated the driveline.test.mjs assertions on the r3 sources read-only. A grep of tools/ finds no reader of `useHudToastQueue`, `holdAllBut`, `onPainted`, `MAX_QUEUED`, `capToastQueue` or `waitingToasts`.
+- New selectors that no tools test reads yet: `data-hud-toast-read`, `data-hud-toast-waiting`.
+- What a harness can meet in a PC cell that presses «ЗАЩО»:
+  - A fault raised meanwhile reaches the DOM only after the reading, and a waiting card below the column's capacity can appear later than its raise.
+  - While a card is read, the other cards are off the DOM, and the advisor card is too once the column has yielded.
+  - At the session end, `[data-hud="end-bar"]` appears instead of the debrief. lesson-audit.mjs presses «Виж разбора», which stays on the bar.
+  - lesson-audit.mjs's fault-card beat timing assumes the card appears at the raise; it is unaffected in cells that press nothing.
+- touchHintLifetime reads `tools/mobile/lesson-audit.mjs` and is measured only by the main-tree gate. So is guidance-lane-align-span, which reads a tools/ fixture and was ENOENT in the round-2 builder's lane run.
+
+**Integration.** The lane's manifest was re-recorded against `8cb0707`, and the hztick landing has since re-recorded the same manifest from the same base. The manifest must therefore be re-recorded on the integrated tree. This is owed at integration, and its result is recorded under PROVEN ON 8155302.
+
+PROVEN ON 8155302 (integrator, 2026-10-14): the round-3 patch (e2beb1d9…) applied 3-way onto 8155302 in the scratch worktree `D:/knijka-lanes/integ-wc`; 26 of 27 files cleanly, the one conflict the derived «source» record of the reviewed-text `manifest.json` — resolved by re-recording (RECORD_REVIEWED_TEXT_MANIFEST=1: «nothing changed against the previous recording», 0 sentences moved; source surface now 487 units / 13,261 strings, both sides' additions). Every catalogue-wide directory ran to completion, one at a time: lessons 126 files / 2,394 (+165 skipped), lessons/scenario 188 / 4,541, components/sim 93 / 1,656, orchestrator 41 / 528, rules 98 / 1,779, traffic 47 / 561, runtime 48 / 875, scene 45 / 745, vehicle 21 / 296, world 135 / 2,409, hud 68 / 1,274 (the new pin collected), traces 168 / 2,146 — 0 failed; tsc 21 (the environment baseline, none in a touched file). Tools tests from the worktree: 2,005 / 1,982 pass / 8 fail = the standing deck-captions freeze + 7 environment-only (no `.audit-frames` corpus / no playwright in a worktree), the lane touches no `tools/` file and the readers of `HudToasts.tsx` / `LessonPlayShell.tsx` (driveline.test.mjs, route-fidelity) are green; the main-tree gate is the measurement of record. The adversarial merge verifier ACCEPTED. Combined patch `D:/knijka-lanes/gate-wc.patch` sha256 137ab6e8…, 28 files, 0 CR bytes.
+
+**Owed.**
+- **The rig re-drive** that decides the row:
+  - PC L3 advisor-on «ЗАЩО» on the REAL /simulator stage (`?chrome=dashboard`, about 1165×650 at a 1440×900 window): the body scrolls inside the card, the law chip stays pinned, the banner goes to one line, the advisor waits, and «покажи» pages to the end.
+  - The same cell on the immersive 1440×900 and 1366×768 stages. At 1366×768 the builder's stand-in and the round-2 verifier's rig disagree on whether the card scrolls.
+  - The SC2 re-strike with the first explanation open: one card painted with «+1»; on close, the re-strike card is shown for its whole 8 s.
+  - An explanation open while a graded fault and then four or more cards (praise, or more faults) arrive. While it is read, only the opened card is painted, with +1 (praise) or +5 (faults). After the close, the fault is painted for its whole 8 s when nothing arrives after the close (C2).
+  - The end of the rig cell with an explanation open: the end bar during the reading, then the debrief at about contact +23.8 s. The waiting re-strike is then painted under the debrief (residual d).
+  - The phone with «Защо» pressed (the paused sheet), and the phone L1 teach card reading «Не се появи внезапно.».
+  - FAILED_TO_YIELD/roundabout opened on both stages: it scrolls inside with the law chip pinned.
+- **A judge's THEO-4 reading** of the W6 banner ellipsis.
+- **Triage:** «wcafterpaint» (C2).
+- **No ADR is owed:** the layout decisions are recorded here.

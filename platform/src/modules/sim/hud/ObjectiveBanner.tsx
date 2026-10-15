@@ -373,7 +373,28 @@ export function ObjectiveBanner({
   total,
   progress,
   flash,
+  oneLine = false,
 }: {
+  /**
+   * THE BANNER'S ONE-LINE FORM — sc-roundabout-entry:fe081cf1 round 2
+   * (2026-10-13, integrator decision W1). The sentence is set on ONE line and
+   * what does not fit ends in an ellipsis; the text in the DOM is whole.
+   *
+   * THE SHELL ASKS FOR IT IN EXACTLY ONE STATE (`LessonPlayShell.
+   * bannerOneLineWhileReading`): a route hold has put its lead in front of the
+   * task («Колата е притисната след удара — измъкни се назад, за да продължиш:
+   * …», three lines where the task was one) AND the student is reading an
+   * explanation he opened that the column still cannot hold. The line that
+   * stays is then the START of that lead — the condition and the order that
+   * ends it — which is the half a pinned car can act on; the task behind it,
+   * which that car cannot, is back the moment the explanation is closed.
+   *
+   * NEVER ON A BANNER WITH NO LEAD. One line would then cut the task itself,
+   * and with it the «дръж под N км/ч» the founder ruled on 2026-09-22 must be
+   * said here — the cut unit this file's own 2026-08-18 block was written
+   * about. Absent or `false` is the banner exactly as it shipped.
+   */
+  oneLine?: boolean;
   /** Active objective title; null when all objectives are done / free drive. */
   titleBg: string | null;
   /** 1-based index of the active objective. */
@@ -467,7 +488,13 @@ export function ObjectiveBanner({
           — UNPANEL's `:is(p, h1, h2, h3, blockquote)` rule is what puts it back
           in the reading face, and as a `<span>` this sentence was set in
           JetBrains Mono at 6.8 px a character. */}
-      <p className="break-words text-[11px] font-bold leading-tight text-foreground">
+      <p
+        className={
+          oneLine
+            ? "truncate text-[11px] font-bold leading-tight text-foreground"
+            : "break-words text-[11px] font-bold leading-tight text-foreground"
+        }
+      >
         {withUnitsUnbroken(titleBg)}
       </p>
       {progress !== null ? (

@@ -321,18 +321,88 @@ export function quietSuppresses(kind: string, quiet: boolean): boolean {
 }
 
 /**
+ * THE CARD WHOSE «ЗАЩО» THE STUDENT HAS OPEN — sc-roundabout-entry:fe081cf1,
+ * the clauses rig-w3d left open (2026-10-12), round 2 (2026-10-13).
+ *
+ * `id` is the toast's own id (`HudToast.id`). `held` says the column's standing
+ * things ABOVE the stack have given way to it (the advisor's card waits) —
+ * measured by `HudToasts.useToastReader`, latched until the explanation is
+ * closed or its card leaves. Which CARDS are on the glass no longer depends on
+ * it: see `visibleToasts`.
+ */
+export interface ToastReading {
+  id: number;
+  held: boolean;
+}
+
+/** The cards quiet mode lets through, in queue order (newest first). */
+function audibleToasts<T extends { event: { kind: string } }>(
+  toasts: readonly T[],
+  quiet: boolean,
+): T[] {
+  return toasts.filter((t) => !quietSuppresses(t.event.kind, quiet));
+}
+
+/**
  * The column the roomy HUD paints: quiet-suppressed kinds removed, then
  * clipped to the capacity. Newest first — `useHudToastQueue` unshifts, and the
  * card a student is most likely to still be reading is the one that just
  * arrived.
+ *
+ * AN EXPLANATION THE STUDENT ASKED FOR OWNS THE STACK WHILE IT IS OPEN
+ * (integrator decision W1, 2026-10-13). `reading` is the card whose «Защо» is
+ * open; while it is in the column it is the ONE card painted, in quiet mode and
+ * out of it. Round 1 ADDED it beside the newest cards, and the round-1 verifier
+ * measured what that costs on the rig's own stage: a second fault's 116.5 px
+ * card arriving on top pushed the opened paragraph 124.5 px down and cut it
+ * 93.7 px, law chip 89.7 px out — and in quiet mode it painted two cards under
+ * a toggle whose tooltip says «едно по едно». So nothing arrives on top of it
+ * and nothing stands under it:
+ *   · every other card is off the glass. A card that carries a WHY — a graded
+ *     fault or a «Научи» card (`hudToastCarriesWhy`), what the student is
+ *     judged and taught by — WAITS: its clock stopped and the queue's cap
+ *     unable to touch it (`useHudToastQueue.holdAllBut`), until the column
+ *     paints it again after the opened card is closed, dismissed or out of
+ *     reading time; it is announced on the opened card by the count
+ *     `waitingToasts` returns. Praise keeps its own clock and may leave unread
+ *     (integrator decision W5, round 3 — see „NOTHING THE STUDENT IS JUDGED BY
+ *     IS LOST" in `HudToasts.tsx`);
+ *   · with nothing open (`null`, the default) the answer is the one this
+ *     function has always given.
+ * A reading id that is not in the column (expired, dismissed, praise in quiet
+ * mode) changes nothing.
  */
-export function visibleToasts<T extends { event: { kind: string } }>(
+export function visibleToasts<T extends { id?: number; event: { kind: string } }>(
   toasts: readonly T[],
   quiet: boolean,
+  reading: ToastReading | null = null,
 ): T[] {
-  return toasts
-    .filter((t) => !quietSuppresses(t.event.kind, quiet))
-    .slice(0, toastCapacity(quiet));
+  const audible = audibleToasts(toasts, quiet);
+  if (reading !== null) {
+    const opened = audible.find((t) => t.id === reading.id);
+    if (opened !== undefined) return [opened];
+  }
+  return audible.slice(0, toastCapacity(quiet));
+}
+
+/**
+ * How many cards are waiting behind the one being read — the «+N» the opened
+ * card prints (`HudToasts`; the phone card's own badge). The cards that carry
+ * a WHY (`hudToastCarriesWhy`) other than the opened one: each is in the queue
+ * with its clock stopped and comes back when the explanation is closed. Praise
+ * is not counted (round 3, W5): its clock keeps running and it may be gone by
+ * then, and «още N известия» may only count what will still be there. Zero
+ * with nothing open, and zero when the reading id is not in the column.
+ */
+export function waitingToasts<T extends { id?: number; event: { kind: string } }>(
+  toasts: readonly T[],
+  quiet: boolean,
+  reading: ToastReading | null,
+): number {
+  if (reading === null) return 0;
+  const audible = audibleToasts(toasts, quiet);
+  if (!audible.some((t) => t.id === reading.id)) return 0;
+  return audible.filter((t) => t.id !== reading.id && hudToastCarriesWhy(t.event.kind)).length;
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +431,14 @@ export interface DebriefVisibility {
    * off would silently never be asked to self-assess again.
    */
   held: boolean;
+  /**
+   * AN EXPLANATION THE STUDENT OPENED IS STILL ON THE GLASS (integrator decision
+   * W3, 2026-10-13 — `HudToasts.useToastReader`'s `reading !== null`). Roomy
+   * only: the phone's «Защо» is a paused sheet. Optional, and absent means
+   * nobody is reading, so every caller written before W3 gets the answer it
+   * always got. See `shouldShowDebrief`.
+   */
+  reading?: boolean;
 }
 
 /**
@@ -375,6 +453,21 @@ export function shouldShowDebrief(v: DebriefVisibility): boolean {
   if (!v.ended) return false;
   if (v.expanded) return true;
   if (v.compact) return false;
+  // W3 — THE END SCREEN DOES NOT TAKE AN OPENED EXPLANATION AWAY MID-READ. The
+  // full-frame debrief is opaque and covers the notify column; the rig cell
+  // (pc-L3-F-ON-WHY, frame 31) photographed it replacing the stage 7.85 s into
+  // a paragraph the product's own reading rule gives 21.5 s. So while that card
+  // is still up the popup WAITS — and `shouldShowEndBar`, its complement, puts
+  // the end bar on the glass instead: the student is told the session is over,
+  // and «Виж разбора» opens this screen at once (`expanded`, two lines up,
+  // outranks the wait). BOUNDED by the card's own life: the queue removes it
+  // when its reading time is over, `reading` goes false and the screen opens
+  // exactly as it would have. It outranks `held` on purpose — the I1 gate is
+  // still the first thing on the screen when it opens, and the bar prints no
+  // verdict while the gate holds one (`endBarVerdictHidden`).
+  // NOTHING GRADED READS THIS: the session ended, was folded and was sent when
+  // and as it always was; this decides only when an overlay is painted.
+  if (v.reading === true) return false;
   if (v.held) return true;
   return v.autoOpen && !v.skipped;
 }
@@ -415,10 +508,31 @@ export function endLineDemandsAnswer(v: {
 /**
  * Does the roomy verdict bar (the thing that replaces the popup) render?
  * Exactly the complement of `shouldShowDebrief` on a roomy, ended session —
- * so a roomy student who skipped is NEVER left with no way back to the WHY,
- * and (because `held` forces the debrief open) the bar can never summarise a
- * verdict the calibration gate is still hiding.
+ * so a roomy student who skipped is NEVER left with no way back to the WHY.
+ *
+ * Until W3 `held` always forced the debrief open, so the bar could never be up
+ * while the calibration gate was hiding a verdict. It now can — for as long as
+ * an opened explanation is being read (`reading`) — and what it may print then
+ * is `endBarVerdictHidden`'s to say.
  */
 export function shouldShowEndBar(v: DebriefVisibility): boolean {
   return v.ended && !v.compact && !shouldShowDebrief(v);
 }
+
+/**
+ * THE BAR MAY NOT LEAK WHAT THE I1 GATE IS HOLDING BACK. While «Позна ли се?»
+ * holds the result (`held`) the bar prints no verdict word and no points — the
+ * phone's end line has always obeyed the same rule («the line must not leak
+ * the score it is about to ask you to predict») and since W3 the bar can stand
+ * in the same state. Pure, so the shell's markup and the gate ask ONE question.
+ */
+export function endBarVerdictHidden(v: Pick<DebriefVisibility, "held">): boolean {
+  return v.held;
+}
+
+/**
+ * What both end surfaces say while the I1 gate holds the verdict: the phone's
+ * end line (since the gate shipped) and, since W3, the roomy end bar. One
+ * string, so the two cannot drift.
+ */
+export const SESSION_END_HELD_LINE_BG = "Сесията завърши — първо се самооцени";

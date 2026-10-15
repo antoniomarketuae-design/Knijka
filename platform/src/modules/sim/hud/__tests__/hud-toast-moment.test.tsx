@@ -348,7 +348,11 @@ describe("THE SURFACE THAT MOUNTS IT — the half this directory has got wrong b
     );
     // One queue, and it is this module's.
     expect(shell).toContain("useHudToastQueue()");
-    expect(shell).toMatch(/const\s*\{\s*toasts,\s*push,\s*dismiss,\s*clear\s*\}\s*=\s*useHudToastQueue\(\)/);
+    // (Two more levers since sc-roundabout-entry:fe081cf1, 2026-10-12 — the
+    // «Защо» press and the reader's hold. Still ONE queue, still `toasts` as-is.)
+    expect(shell).toMatch(
+      /const\s*\{\s*toasts,\s*push,\s*dismiss,\s*clear,\s*whyChanged,\s*holdAllBut,\s*painted\s*\}\s*=\s*useHudToastQueue\(\)/,
+    );
     // …handed to the column as-is. `toasts={toasts}` and not `toasts={…map(…)}`.
     const MOUNT = /<HudToasts\s+toasts=\{toasts\}/;
     expect(shell).toMatch(MOUNT);

@@ -1989,7 +1989,7 @@ function wiringFaults(hud: string, shell: string): string[] {
       faults.push("ViolationToast no longer wires the «Защо» chip to its toggle (onWhy={summarised ? toggleWhy : undefined})");
     // THE CHIP, AT THE HEAD OF THE BODY BOX (2026-09-17): the box opens, the
     // chip is its first child, and the body <p> follows it.
-    if (!/<div className="mt-1 flow-root">\s*\{\s*summarised\s*\?\s*<ToastWhyChip\b[^>]*\/>\s*:\s*null\s*\}\s*<p\b/.test(toast))
+    if (!/<div className="mt-1 flow-root"[^>]*>\s*\{\s*summarised\s*\?\s*<ToastWhyChip\b[^>]*\/>\s*:\s*null\s*\}\s*<p\b/.test(toast))
       faults.push(
         'ViolationToast no longer renders the «Защо» chip on a summarised card at the head of the body box (<div className="mt-1 flow-root">{summarised ? <ToastWhyChip …/> : null}<p …)',
       );
@@ -2485,8 +2485,8 @@ describe("THE w49 REPAIR — each one-line edit to the shrink switch or the chip
     },
     {
       name: "the body box stops containing its float",
-      from: '<div className="mt-1 flow-root">',
-      to: '<div className="mt-1">',
+      from: '<div className="mt-1 flow-root"',
+      to: '<div className="mt-1"',
       behaviour: /does not contain its float/,
       pin: /at the head of the body box/,
     },

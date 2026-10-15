@@ -14,7 +14,7 @@
  * actually fire.
  */
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   armedTelltaleWarnings,
   briefingSheetItem,
@@ -56,6 +56,8 @@ import {
   SessionEndScreen,
   SESSION_END_AUTO_DEFAULT,
   SESSION_END_AUTO_STORAGE_KEY,
+  SESSION_END_HELD_LINE_BG,
+  endBarVerdictHidden,
   shouldShowDebrief,
   shouldShowEndBar,
   SimOverlay,
@@ -65,9 +67,11 @@ import {
   telltaleWarningsKey,
   TOAST_QUIET_DEFAULT,
   TOAST_QUIET_STORAGE_KEY,
+  TOAST_READ_SELECTOR,
   TOUCH_SHEET_LOCATOR_BG,
   useHudToastQueue,
   useTapActivation,
+  useToastReader,
   visibleToasts,
   withSheetLocatorBg,
   writeStoredFlag,
@@ -1119,6 +1123,52 @@ export function objectiveTitleUnderHold(
 }
 
 /**
+ * WHEN THE BANNER TAKES ITS ONE-LINE FORM — sc-roundabout-entry:fe081cf1
+ * round 2, integrator decision W1 («the task banner falls to its one-line
+ * form»).
+ *
+ * WHAT GREW THE BANNER in the rig cell was the lead `objectiveTitleUnderHold`
+ * puts in front of the task when the crash pins the car: 48.7 px → 76.2 px at
+ * contact +5.03 s, two lines out of the window of the 295.5 px paragraph the
+ * student had opened 2.8 s earlier. `useToastReader` asks for those lines
+ * back only as its LAST step — after every other card and the advisor's card
+ * have given way and the paragraph is still short (`bannerYields`) — and the
+ * banner then sets its sentence on one line (`ObjectiveBanner`'s `oneLine`):
+ * laid out with the app's compiled CSS in Chromium (2026-10-13, the 304 px
+ * box of the rig's column) the banner goes 76.25 → 48.75 px — the sidecar's
+ * own two heights — and the line ends «…след удара — измъкни се назад,…»; the
+ * off-road lead ends «…върни се на платното, за да пр…».
+ *
+ * ONLY UNDER A HOLD, and that is the whole reason this is a function. With no
+ * lead in front of it the banner's sentence IS the task, and one line of a
+ * two-line task would cut «дръж под N км/ч» off the glass (founder ruling
+ * 2026-09-22: the cap is said in the banner). Under a hold the first line is
+ * the hold's own — the condition and the order that ends it — and the task
+ * behind it is one a pinned car cannot act on.
+ *
+ * AND THE SENTENCE ITSELF IS NOT TOUCHED. The first draft of this step
+ * withheld the lead instead (`hold → null`). That is the w49 defect put back
+ * for the length of a reading — the task standing over a car that cannot obey
+ * it — and it split the one field `followHintRouteHold.test.ts` holds the
+ * banner and the follow-hint pill to («ONE FIELD, TWO SURFACES»). The title
+ * is still `objectiveTitleUnderHold(…, snap.objectiveHold)`, whole in the DOM
+ * for every reader of it; only its box is one line tall.
+ *
+ * ACCEPTED AS BUILT — integrator decision W6, round 3 (2026-10-14). On the glass
+ * this is an ellipsis: on a short stage the hold's lead shows its first line
+ * only, «…измъкни се назад,…», for as long as the explanation is open, and the
+ * task behind it is off the glass for that time. It is taken only under a
+ * route hold, only at the reader's last step (`bannerYields`), only while a
+ * card is being read; the whole sentence stays in the DOM and is back on the
+ * glass the moment the card is closed or leaves; a banner with no hold lead —
+ * the task and its speed cap — is never cut. Not to be changed without a new
+ * decision.
+ */
+export function bannerOneLineWhileReading(hold: RouteHold | null, bannerYields: boolean): boolean {
+  return bannerYields && hold !== null;
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * THE ONE-LINE WHY THE TEACH CARD NEVER ASKED FOR
  * (sc-merge-from-property:6715b581, major, re-judged STILL on the w41 re-drive:
@@ -1174,6 +1224,37 @@ export function teachMomentPeekBg(code: string): string | null {
   if (!Object.prototype.hasOwnProperty.call(VIOLATIONS, code)) return null;
   const peek = violationPeekBg(code as ViolationCode, undefined);
   return typeof peek === "string" && peek.trim().length > 0 ? peek : null;
+}
+
+/**
+ * …AND THE ACT-SPLIT RESIDUAL IS CLOSED — sc-roundabout-entry:fe081cf1, the
+ * clauses rig-w3d left open (2026-10-12), item 3.
+ *
+ * The block above names it: «KEYED ON THE CODE AND NOT ON THE ACT … the pooled
+ * row is therefore the best this surface can reach». rig-w3d photographed what
+ * that costs. One fault, COLLISION with `detail: "staticObject"`, at 8cb0707:
+ *
+ *   phone-L1-SC2-02 (this card)   «Удар в неподвижно препятствие»
+ *                                 «Спирачният път не стигна.»      ← the POOLED row
+ *   pc-L3-F-ON-20 (the column)    «Удар в неподвижно препятствие»
+ *                                 «Не се появи внезапно.»          ← the ACT's row
+ *
+ * Same title, two reasons — and the pooled one is authored for «the contact
+ * channel could not say WHAT was struck» (`rules/catalog.ts`), which is not
+ * this drive: the car left the carriageway and met an island that had been
+ * there all along. The moment now carries the act's own line
+ * (`TeachMoment.peekBg`, set by `lessons/engine.ts` from the same
+ * `violationPeekBg(code, detail)` call that feeds the toast), so the two
+ * surfaces print one string by construction.
+ *
+ * The code-keyed lookup stays as the fallback for a moment that carries none
+ * (a fixture, a moment built before the field existed): that is the card
+ * exactly as it was, and for every code whose summary is not act-split the two
+ * are the same string anyway.
+ */
+export function teachMomentOneLinerBg(moment: { code: string; peekBg?: string }): string | null {
+  const own = moment.peekBg;
+  return typeof own === "string" && own.trim().length > 0 ? own : teachMomentPeekBg(moment.code);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2203,6 +2284,11 @@ export function advisorEchoTrim(
  * and no such ✕. Two readings on purpose, then, and this is the note that says
  * so; what must never be two readings is `advisorOn`/exam/sandbox/ended, and
  * `advisorTaskFold` is the one place those four are read.
+ *
+ * (The count has grown since: `!advisorCapIsDuplicate`, and from 2026-10-12
+ * `!toastReader.held` — the card waits while the student reads a fault's
+ * explanation it would cut. Both are slot conditions of the same kind, so the
+ * split this note describes is unchanged.)
  */
 export function foldAdvisorIntoTask(
   promptTextBg: string | null,
@@ -3110,6 +3196,40 @@ export interface ToastFold {
 
 const NO_TOAST_FOLD: ToastFold = { belowFold: 0, unseenBelowFold: 0 };
 
+/**
+ * Is more of the opened paragraph below the foot of its body box? The column's
+ * own rule for „cut" — more than `1` px past the foot, the slack
+ * `rowsBelowFold` and `HudToasts.toastCardFitsWindow` allow — and an unlaid
+ * box (0 px) is no claim.
+ */
+export function toastReadContinues(read: {
+  scrollTop: number;
+  clientHeight: number;
+  scrollHeight: number;
+}): boolean {
+  if (read.clientHeight <= 0) return false;
+  return read.scrollHeight - read.clientHeight - read.scrollTop > 1;
+}
+
+/**
+ * WHERE ONE PRESS OF „покажи" LEAVES THE OPENED CARD'S BODY BOX. The column's
+ * page (`toastPageScrollTop`: a window less the overlap, floored at 40 px so a
+ * squeezed column still advances) — except that the step is never MORE than
+ * the box itself. The floor was written for the scroller, whose window is the
+ * whole stack; this box can be as short as one line (`TOAST_READ_FLOOR_PX`),
+ * and a 40 px step over a 16.5 px window would page past a line and a half
+ * the student never saw.
+ */
+export function toastReadPageScrollTop(
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  const paged = toastPageScrollTop(scrollTop, clientHeight, scrollHeight);
+  if (clientHeight <= 0) return paged;
+  return Math.min(paged, Math.max(0, scrollTop) + clientHeight);
+}
+
 /** `HudToasts`' cards in the scroller's content coordinates, off LAYOUT reads —
  *  see „THE ENTRY ANIMATION WAS MEASURED AS A FIT". */
 export function toastCardRowsInScrollCoords(
@@ -3148,6 +3268,29 @@ export function toastScrollerHeightWithoutRow(scroller: HTMLElement, row: HTMLEl
 }
 
 /**
+ * …and the same probe for the card being read (W2, 2026-10-13): is more of its
+ * paragraph below the foot of its body box WITH `row` GONE from the column?
+ * The box grows with the card when the row's 29.5 px come back, so its cut has
+ * to be re-read there — the row is out of flow for the one read and back before
+ * this returns, and both scroll positions a grown box can clamp are restored.
+ */
+export function toastReadContinuesWithoutRow(
+  scroller: HTMLElement,
+  row: HTMLElement,
+  readBox: HTMLElement,
+): boolean {
+  const position = row.style.position;
+  const scrollTop = scroller.scrollTop;
+  const readTop = readBox.scrollTop;
+  row.style.position = "absolute";
+  const continues = toastReadContinues(readBox);
+  row.style.position = position;
+  if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  if (readBox.scrollTop !== readTop) readBox.scrollTop = readTop;
+  return continues;
+}
+
+/**
  * The toast column's fold, measured. `scroller` is `[data-hud-toast-scroller]`;
  * the cards are `[data-hud="toasts"]`'s children (`HudToasts` owns that box);
  * the fold row, when it is up, is `[data-hud-toast-more]` beside the scroller.
@@ -3157,16 +3300,50 @@ export function measureToastColumnFold(scroller: HTMLElement): ToastFold {
   if (stack === null) return NO_TOAST_FOLD;
   const rows = toastCardRowsInScrollCoords(scroller, stack);
   const scrollTop = scroller.scrollTop;
+  // …AND THE CARD BEING READ SCROLLS INSIDE ITSELF (W2, 2026-10-13). Its box
+  // never crosses this scroller's fold — `HudToasts` shrinks it to the window
+  // — so the rows above count it whole, and the cut, when there is one, is
+  // between the card's own title and its law chip. That is still „a card that
+  // cannot be read to its last line", so it is counted here, and the row goes
+  // up for it with the sentence that is true of it («обяснението продължава»:
+  // nothing is ENTIRELY under this cut).
+  const readBox = scroller.querySelector<HTMLElement>(TOAST_READ_SELECTOR);
+  const readBelowFold = readBox !== null && toastReadContinues(readBox) ? 1 : 0;
   const fold: ToastFold = {
-    belowFold: rowsBelowFold(rows, scrollTop, scroller.clientHeight),
+    belowFold: rowsBelowFold(rows, scrollTop, scroller.clientHeight) + readBelowFold,
     unseenBelowFold: rowsFullyBelowFold(rows, scrollTop, scroller.clientHeight),
   };
   if (fold.belowFold === 0) return fold;
   const row = scroller.parentElement?.querySelector<HTMLElement>(":scope > [data-hud-toast-more]") ?? null;
   if (row === null) return fold;
-  return rowsBelowFold(rows, scrollTop, toastScrollerHeightWithoutRow(scroller, row)) === 0
-    ? NO_TOAST_FOLD
-    : fold;
+  // The same question of the column without the row — both halves of it.
+  if (rowsBelowFold(rows, scrollTop, toastScrollerHeightWithoutRow(scroller, row)) > 0) return fold;
+  if (readBox !== null && toastReadContinuesWithoutRow(scroller, row, readBox)) return fold;
+  return NO_TOAST_FOLD;
+}
+
+/**
+ * Is the fold INSIDE the card being read — more of its paragraph below the foot
+ * of its own body box? It moves the FADE: onto that box, and off the scroller,
+ * whose foot is then the card's pinned law chip. Read as the column stands.
+ */
+export function measureToastReadFold(scroller: HTMLElement): boolean {
+  const readBox = scroller.querySelector<HTMLElement>(TOAST_READ_SELECTOR);
+  return readBox !== null && toastReadContinues(readBox);
+}
+
+/**
+ * ONE PRESS OF „покажи", FOR THE CARD BEING READ. While more of its paragraph
+ * is below the foot of its body box the press pages THAT box and this answers
+ * `true`; otherwise it touches nothing and answers `false`, and the caller
+ * pages the scroller as it has since 2026-08-26. (The scroller around a card
+ * being read has nothing to scroll: the card fits it by construction.)
+ */
+export function pageToastRead(scroller: HTMLElement): boolean {
+  const readBox = scroller.querySelector<HTMLElement>(TOAST_READ_SELECTOR);
+  if (readBox === null || !toastReadContinues(readBox)) return false;
+  readBox.scrollTop = toastReadPageScrollTop(readBox.scrollTop, readBox.clientHeight, readBox.scrollHeight);
+  return true;
 }
 
 /**
@@ -4710,7 +4887,7 @@ export function LessonPlayShell({
   // I2 „Твоят дубъл": did this attempt actually upload a trace? Only then does
   // the replay route have something to load.
   const [traceUploaded, setTraceUploaded] = useState(false);
-  const { toasts, push, dismiss, clear } = useHudToastQueue();
+  const { toasts, push, dismiss, clear, whyChanged, holdAllBut, painted } = useHudToastQueue();
 
   // -- S1: scenario sessions (<templateId>@L<n>) --------------------------------
   // The template (rubric + teach copy), a live ATTEMPT recorder the scene
@@ -6366,7 +6543,7 @@ export function LessonPlayShell({
               // why a surface that disagrees with the pill is a THEO-4 defect
               // rather than a cosmetic one.
               lineBg: resultHeld
-                ? "Сесията завърши — първо се самооцени"
+                ? SESSION_END_HELD_LINE_BG
                 : sessionEndLineBg(result),
               // A2 — WHAT „НЕ ПОКАЗВАЙ АВТОМАТИЧНО" TURNS OFF ON A PHONE.
               //
@@ -6448,7 +6625,7 @@ export function LessonPlayShell({
               // drive is frozen. `null` for a code with no summary authored is
               // exactly today's card — see `teachMomentPeekBg` for the frame,
               // the field's other two call sites and the act-split residual.
-              peekBg: teachMomentPeekBg(teachQueue[0].code),
+              peekBg: teachMomentOneLinerBg(teachQueue[0]),
               lawRef: teachQueue[0].lawRef ?? null,
               blocking: true,
               onAck: handleTeachAcknowledged,
@@ -6756,6 +6933,125 @@ export function LessonPlayShell({
       : overlayCandidates.filter((c) => c === null || !dismissedOverlayIds.has(c.id)),
   );
 
+  // -- THE TOAST STACK'S FOLD, AND THE READER'S HOLD ON THE COLUMN ---------------
+  //
+  // (MOVED above the debrief's visibility on 2026-10-13, unchanged but for the
+  // reader: `shouldShowDebrief` now has to know whether an explanation is still
+  // being read — integrator decision W3 — and a hook's result cannot be read
+  // above the hook.)
+  //
+  // …AND THE TOAST STACK SAYS THE SAME THING AS THE DEBRIEF'S FOLD ------------
+  //
+  // The affordance half of `notifyColumnCutPx`. Counted in CARDS rather than
+  // pixels, for the reason `BriefingCard` counts steps: a card is the unit the
+  // student is looking for, and „one more fault is down there" is a sentence,
+  // where „82 px remain" is not.
+  //
+  // The rows are read off `[data-hud="toasts"]`'s children — `HudToasts` owns
+  // that box, so this measures what is actually painted rather than a shape
+  // guessed at from here. The two helpers are the ones the briefing already
+  // uses, including `listRowsInScrollCoords`, which exists because
+  // `li.offsetTop` is measured against the nearest POSITIONED ancestor and this
+  // scroller is not one.
+  const toastScrollRef = useRef<HTMLDivElement | null>(null);
+  const [toastsBelowFold, setToastsBelowFold] = useState(0);
+  // …and how many of those the student has seen NOTHING of — the number that
+  // picks the sentence. See `rowsFullyBelowFold` for why one count cannot do
+  // both jobs on a column of faults.
+  const [toastsUnseenBelowFold, setToastsUnseenBelowFold] = useState(0);
+  // …and whether the fold is INSIDE the card being read (`measureToastReadFold`):
+  // it moves the fade from this scroller's foot — which is then that card's
+  // pinned law chip — onto the body box that actually scrolls.
+  const [toastFoldInRead, setToastFoldInRead] = useState(false);
+  // THE READING ITSELF IS `measureToastColumnFold` (module level, beside
+  // `isToastArrival`), since sc-roundabout-entry:fe081cf1 round 3: layout reads
+  // rather than transformed rects, and a fold row that no longer holds itself
+  // up. This callback only stores what it returns.
+  // …AND THE READER IS ASKED IN THE SAME BREATH (sc-roundabout-entry:fe081cf1,
+  // 2026-10-12). This callback is what the column's `ResizeObserver` runs, so
+  // it is the one place a layout change that no commit of this shell announces
+  // (a window resize) reaches `useToastReader`; the commits themselves are
+  // answered before paint by the hook's own layout effect. Through a ref,
+  // because this callback is created once and the hook's `recheck` is not.
+  const toastReaderRecheckRef = useRef<() => void>(() => undefined);
+  const measureToastFold = useCallback(() => {
+    const el = toastScrollRef.current;
+    if (el === null) return;
+    const fold = measureToastColumnFold(el);
+    setToastsBelowFold(fold.belowFold);
+    setToastsUnseenBelowFold(fold.unseenBelowFold);
+    // …and WHERE the fold is: inside the card being read, or under the stack.
+    // Asked only when the reading above says there is a fold at all, so the
+    // two can never disagree about a row that is about to leave.
+    setToastFoldInRead(fold.belowFold > 0 && measureToastReadFold(el));
+    toastReaderRecheckRef.current();
+  }, []);
+  // THE READER'S HOLD ON THIS COLUMN — `hud/HudToasts.tsx`, „THE EXPLANATION HE
+  // ASKED FOR WAS CUT BY WHAT ARRIVED AFTER IT", has the frames and the rule
+  // (round 2: integrator decisions W1–W4). What this shell owes it, each one
+  // line further down:
+  //   · `HudToasts` is told which card is being read (it then paints that card
+  //     alone and lets its body scroll inside it), and the fold row's own count
+  //     uses the same rule for which cards are on the glass;
+  //   · the advisor's card waits while the column has yielded (`held`);
+  //   · the banner under a hold sets its sentence on one line at the last step
+  //     (`bannerYields` → `bannerOneLineWhileReading`);
+  //   · the fold row reads and pages the opened card's body box
+  //     (`measureToastColumnFold`, `pageToastRead`), and the fade follows it;
+  //   · the full-frame debrief waits for it (`debriefVisibility.reading`).
+  const toastReader = useToastReader({
+    toasts,
+    scroller: toastScrollRef,
+    whyChanged,
+    holdAllBut,
+  });
+  // A layout effect, every commit: the fold is also measured in the layout
+  // phase (the effect below), and a `recheck` one render old would judge the
+  // column against the card and the yield of the render before.
+  useLayoutEffect(() => {
+    toastReaderRecheckRef.current = toastReader.recheck;
+  });
+  // THE ROW IS RE-ASKED BEFORE PAINT WHEN THE READING CHANGES. A press on
+  // «Защо» takes every other card off the stack in one commit, and the fold
+  // row standing under the column was raised for one of them; the observer
+  // below would take it down a painted frame later, and for that frame the
+  // opened card would be 29.5 px shorter than its window. Keyed on the three
+  // things the reading changes in this column and on nothing else.
+  const toastReadingId = toastReader.reading === null ? null : toastReader.reading.id;
+  useLayoutEffect(() => {
+    measureToastFold();
+  }, [measureToastFold, toastReadingId, toastReader.held, toastReader.bannerYields]);
+  // …AND THE ROW LEAVES WITH THE LAST CARD, in the same commit rather than one
+  // frame later. `toastsBelowFold` is state, and the only thing that zeroes it
+  // once `HudToasts` stops rendering is the observer effect below, re-created
+  // after that commit has PAINTED. So on the frame the last card expired, the
+  // column was empty with «↓ обяснението продължава — покажи» under it (5 of 5
+  // expiries in the round-2 rig). That is the shape pc-wrong `04-t016s.png`
+  // photographs; its timestamps cannot settle whether it IS that frame, and
+  // the repair does not depend on it. `visibleToasts` is the very rule
+  // `HudToasts` returns null on, so this count is zero exactly when there is no
+  // card to be below anything.
+  const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading).length;
+  useEffect(() => {
+    const el = toastScrollRef.current;
+    if (el === null) return;
+    if (typeof ResizeObserver === "undefined") {
+      measureToastFold();
+      return;
+    }
+    const ro = new ResizeObserver(measureToastFold);
+    ro.observe(el);
+    // THE BOX AND THE CONTENT, both — the same trap the debrief's observer
+    // names. This scroller's own height changes when the briefing yields, and
+    // its CONTENT changes when a second fault arrives; only one of those two
+    // resizes the scroller.
+    const stack = el.querySelector('[data-hud="toasts"]');
+    if (stack !== null) ro.observe(stack);
+    return () => ro.disconnect();
+    // `toasts` is in the deps because a new card mounts a new `[data-hud=…]`
+    // box: `HudToasts` returns null with nothing to show, so the element the
+    // observer needs does not exist until the first fault.
+  }, [measureToastFold, toasts, toastsQuiet, compact]);
   // -- L15: is the full-frame debrief on screen? --------------------------------
   //
   // One pure predicate, two call sites, and a complement that guarantees the
@@ -6771,6 +7067,11 @@ export function LessonPlayShell({
     skipped: endSkipped,
     autoOpen: endAutoOpen,
     held: resultHeld,
+    // W3: an explanation the student opened is still on the roomy glass. The
+    // END is already stamped — `result` is set, the session is folded and
+    // sent — and nothing above this line reads the reader; only the popup
+    // waits, and the end bar stands in for it (`shouldShowEndBar`).
+    reading: !compact && toastReader.reading !== null,
   };
   const debriefOpen = shouldShowDebrief(debriefVisibility);
   const endBarVisible = shouldShowEndBar(debriefVisibility);
@@ -6846,67 +7147,6 @@ export function LessonPlayShell({
     if (content !== null) ro.observe(content);
     return () => ro.disconnect();
   }, [debriefOpen, measureEndScroll]);
-  // -- …AND THE TOAST STACK SAYS THE SAME THING ---------------------------------
-  //
-  // The affordance half of `notifyColumnCutPx`. Counted in CARDS rather than
-  // pixels, for the reason `BriefingCard` counts steps: a card is the unit the
-  // student is looking for, and „one more fault is down there" is a sentence,
-  // where „82 px remain" is not.
-  //
-  // The rows are read off `[data-hud="toasts"]`'s children — `HudToasts` owns
-  // that box, so this measures what is actually painted rather than a shape
-  // guessed at from here. The two helpers are the ones the briefing already
-  // uses, including `listRowsInScrollCoords`, which exists because
-  // `li.offsetTop` is measured against the nearest POSITIONED ancestor and this
-  // scroller is not one.
-  const toastScrollRef = useRef<HTMLDivElement | null>(null);
-  const [toastsBelowFold, setToastsBelowFold] = useState(0);
-  // …and how many of those the student has seen NOTHING of — the number that
-  // picks the sentence. See `rowsFullyBelowFold` for why one count cannot do
-  // both jobs on a column of faults.
-  const [toastsUnseenBelowFold, setToastsUnseenBelowFold] = useState(0);
-  // THE READING ITSELF IS `measureToastColumnFold` (module level, beside
-  // `isToastArrival`), since sc-roundabout-entry:fe081cf1 round 3: layout reads
-  // rather than transformed rects, and a fold row that no longer holds itself
-  // up. This callback only stores what it returns.
-  const measureToastFold = useCallback(() => {
-    const el = toastScrollRef.current;
-    if (el === null) return;
-    const fold = measureToastColumnFold(el);
-    setToastsBelowFold(fold.belowFold);
-    setToastsUnseenBelowFold(fold.unseenBelowFold);
-  }, []);
-  // …AND THE ROW LEAVES WITH THE LAST CARD, in the same commit rather than one
-  // frame later. `toastsBelowFold` is state, and the only thing that zeroes it
-  // once `HudToasts` stops rendering is the observer effect below, re-created
-  // after that commit has PAINTED. So on the frame the last card expired, the
-  // column was empty with «↓ обяснението продължава — покажи» under it (5 of 5
-  // expiries in the round-2 rig). That is the shape pc-wrong `04-t016s.png`
-  // photographs; its timestamps cannot settle whether it IS that frame, and
-  // the repair does not depend on it. `visibleToasts` is the very rule
-  // `HudToasts` returns null on, so this count is zero exactly when there is no
-  // card to be below anything.
-  const toastsShownCount = visibleToasts(toasts, toastsQuiet).length;
-  useEffect(() => {
-    const el = toastScrollRef.current;
-    if (el === null) return;
-    if (typeof ResizeObserver === "undefined") {
-      measureToastFold();
-      return;
-    }
-    const ro = new ResizeObserver(measureToastFold);
-    ro.observe(el);
-    // THE BOX AND THE CONTENT, both — the same trap the debrief's observer
-    // names. This scroller's own height changes when the briefing yields, and
-    // its CONTENT changes when a second fault arrives; only one of those two
-    // resizes the scroller.
-    const stack = el.querySelector('[data-hud="toasts"]');
-    if (stack !== null) ro.observe(stack);
-    return () => ro.disconnect();
-    // `toasts` is in the deps because a new card mounts a new `[data-hud=…]`
-    // box: `HudToasts` returns null with nothing to show, so the element the
-    // observer needs does not exist until the first fault.
-  }, [measureToastFold, toasts, toastsQuiet, compact]);
   /* ══════════════════════════════════════════════════════════════════════════
      …AND A CONTROL, WHICH IS THE HALF THE ROOMY LEG NEVER GOT — 2026-08-26.
 
@@ -6955,6 +7195,13 @@ export function LessonPlayShell({
      STOPS THE CAR. The two legs are therefore NOT symmetric and this is the
      weaker one; that asymmetry is a property of the column, not of this row.
 
+     (SINCE 2026-10-13 THE THREE PARAGRAPHS AROUND THIS ONE ARE ABOUT A CARD
+     NOBODY OPENED. A press on «Защо» does buy the paragraph its reading time
+     — `HudToasts.tsx`, „THE PRESS BOUGHT NO TIME" — and while it is open this
+     control pages the body box of that card, which scrolls inside it between
+     its title and its law chip. The age on such a card is the age of a
+     fault whose explanation the student asked to keep on the glass.)
+
      AND THE TTL IS DELIBERATELY LEFT ALONE. Extending it on a press is the
      obvious repair and it would un-fix a different one: the card prints its own
      age (`toastAgeBg`) off the very clock that removes it, which is what makes
@@ -6972,7 +7219,11 @@ export function LessonPlayShell({
   const revealMoreToasts = useCallback(() => {
     const el = toastScrollRef.current;
     if (el === null) return;
-    el.scrollTop = toastPageScrollTop(el.scrollTop, el.clientHeight, el.scrollHeight);
+    // W2: the body box of the card being read, while more of its paragraph is
+    // below that box's own foot — `pageToastRead`. Otherwise the stack, as ever.
+    if (!pageToastRead(el)) {
+      el.scrollTop = toastPageScrollTop(el.scrollTop, el.clientHeight, el.scrollHeight);
+    }
     // `scrollTop =` fires `scroll` asynchronously but updates the property
     // synchronously, so re-measuring here is what makes the row's text (and its
     // own disappearance at the end) land in the SAME render as the movement.
@@ -8099,6 +8350,11 @@ export function LessonPlayShell({
               // …and with the task's own binding cap when it is stricter than
               // the sign (founder ruling 2026-09-22, `bannerObjectiveLineBg`).
               titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold)}
+              // …on ONE line while an opened explanation still needs the two
+              // the hold's lead added — the reader's last step, and only under
+              // a hold (`bannerOneLineWhileReading`). The sentence is whole in
+              // the DOM; a banner with no lead is never cut.
+              oneLine={bannerOneLineWhileReading(snap.objectiveHold, toastReader.bannerYields)}
               index={Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}
               total={snap.objectiveTotal}
               progress={snap.objectiveProgress}
@@ -8120,6 +8376,13 @@ export function LessonPlayShell({
           // carries the frame and the two readings where the bar is silent and
           // this card must therefore keep the glass.
           !advisorCapIsDuplicate &&
+          // …and the student is not reading an explanation this card would cut.
+          // He pressed «ЗАЩО» on a fault card; when the column cannot hold that
+          // paragraph whole beside this card, this card WAITS until he closes
+          // it or it leaves (`useToastReader` — the yield is measured, latched,
+          // and taken before paint). The banner above goes to one line only
+          // if that was not enough (`bannerOneLineWhileReading`).
+          !toastReader.held &&
           snap.advisorPrompt.textBg !== advisorDismissed ? (
             <AdvisorCard
               // The TRIMMED sentence; `keys` and everything else ride along
@@ -8386,10 +8649,15 @@ export function LessonPlayShell({
                   //
                   // `toastsShownCount > 0`: no fade over an empty box — see
                   // „THE ROW LEAVES WITH THE LAST CARD" at `measureToastFold`.
+                  //
+                  // …AND NOT WHILE THE FOLD IS INSIDE THE CARD BEING READ (W2):
+                  // the foot of this box is then that card's pinned law chip,
+                  // and the ramp belongs on the body box that scrolls
+                  // (`readMaskCss`, two props down).
                   toastsBelowFold > 0 && toastsShownCount > 0
                     ? {
-                        WebkitMaskImage: TOAST_FADE_MASK_CSS,
-                        maskImage: TOAST_FADE_MASK_CSS,
+                        WebkitMaskImage: toastFoldInRead ? undefined : TOAST_FADE_MASK_CSS,
+                        maskImage: toastFoldInRead ? undefined : TOAST_FADE_MASK_CSS,
                       }
                     : undefined
                 }
@@ -8399,6 +8667,20 @@ export function LessonPlayShell({
                   quiet={toastsQuiet}
                   onDismiss={dismiss}
                   onDismissAll={clear}
+                  // The card whose «ЗАЩО» is open, and whether the column has
+                  // yielded to it — see `toastReader`, above `toastsShownCount`.
+                  reading={toastReader.reading}
+                  onWhyChange={toastReader.onWhyChange}
+                  readMaskCss={toastsBelowFold > 0 && toastFoldInRead ? TOAST_FADE_MASK_CSS : null}
+                  // A `scroll` does not bubble: a wheel over the paragraph moves the
+                  // body box and this scroller's own `onScroll` never hears it. The
+                  // row has to leave when the last line is reached that way too.
+                  onReadScroll={measureToastFold}
+                  // What the column painted, back to the queue: a graded fault
+                  // or «Научи» card that waited behind an explanation restarts
+                  // its clock only when it is on the glass again (W5, round 3 —
+                  // `HudToasts`, „NOTHING THE STUDENT IS JUDGED BY IS LOST").
+                  onPainted={painted}
                 />
               </div>
               {/* OUTSIDE the scroller, `shrink-0`, and it exists only while
@@ -9268,40 +9550,63 @@ export function LessonPlayShell({
               className="pointer-events-auto flex flex-wrap items-center gap-3 rounded-2xl border bg-background/90 px-4 py-2.5 backdrop-blur"
               style={{
                 borderColor: `color-mix(in srgb, ${
-                  sessionEndToneIsGood(result) ? "var(--success)" : "var(--warning)"
+                  endBarVerdictHidden(debriefVisibility)
+                    ? "var(--border-strong)"
+                    : sessionEndToneIsGood(result)
+                      ? "var(--success)"
+                      : "var(--warning)"
                 } 55%, transparent)`,
               }}
               role="status"
             >
+              {/* W3 — THE BAR CAN NOW STAND WHILE THE I1 GATE HOLDS THE VERDICT
+                  (an opened explanation is still being read, so the popup
+                  waits). It then says what the phone's end line says in the
+                  same state and nothing more: no verdict word, no points, and
+                  «Виж разбора» opens the screen the gate is on. */}
               {/* ADR-009 §5.4. The label and the colour now come off ONE fold
                   (`sessionEndBarLabelBg` / `sessionEndToneIsGood`, both over
                   `sessionVerdict`), so this bar cannot print a word the result
                   screen's pill disagrees with — which it did on «Незавършен»
                   and would have on «Не е взет». */}
-              <span
-                className="text-sm font-black"
-                style={{
-                  color: sessionEndToneIsGood(result) ? "var(--success)" : "var(--warning)",
-                }}
-              >
-                {sessionEndBarLabelBg(result)}
-              </span>
-              <span className="text-xs font-bold tabular-nums text-muted">
-                {result.score} нак. точки
-              </span>
+              {endBarVerdictHidden(debriefVisibility) ? (
+                <span className="text-sm font-black text-foreground">{SESSION_END_HELD_LINE_BG}</span>
+              ) : (
+                <>
+                  <span
+                    className="text-sm font-black"
+                    style={{
+                      color: sessionEndToneIsGood(result) ? "var(--success)" : "var(--warning)",
+                    }}
+                  >
+                    {sessionEndBarLabelBg(result)}
+                  </span>
+                  <span className="text-xs font-bold tabular-nums text-muted">
+                    {result.score} нак. точки
+                  </span>
+                </>
+              )}
               <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={openDebrief}>
                 Виж разбора
               </button>
-              <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={retry}>
-                Повтори
-              </button>
-              <button
-                type="button"
-                className="btn-ghost px-3 py-1.5 text-xs"
-                onClick={onExitToSelect}
-              >
-                Всички уроци
-              </button>
+              {/* …and while the gate holds the result, the two ways OUT wait
+                  with the verdict — exactly as on the screen the gate stands
+                  on, which renders the gate and nothing else until it is
+                  answered or skipped (`SessionEndScreen`, `calibrationLocked`). */}
+              {endBarVerdictHidden(debriefVisibility) ? null : (
+                <>
+                  <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={retry}>
+                    Повтори
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost px-3 py-1.5 text-xs"
+                    onClick={onExitToSelect}
+                  >
+                    Всички уроци
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : null}

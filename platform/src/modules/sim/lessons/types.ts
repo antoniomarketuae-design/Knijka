@@ -1717,6 +1717,23 @@ export interface TeachMoment {
   /** Session time of the mistake, seconds. */
   t: number;
   /**
+   * THE ONE-LINE WHY OF THIS ACT — the catalogue's summary, selected by code
+   * AND act (`rules.violationPeekBg(code, detail)`) at the emission site, where
+   * both are in hand. It is the line the violation toast of the same fault
+   * carries (`HudEvent.peekBg`), so a fault prints one one-liner whichever
+   * surface raises it.
+   *
+   * WHY IT RIDES THE MOMENT (sc-roundabout-entry:fe081cf1, 2026-10-12). The
+   * phone's paused teach card built its body row from `code` alone, because a
+   * moment carried neither the act nor the line. For the act-split codes that
+   * reaches the POOLED row: a struck island read «Спирачният път не стигна.» on
+   * the phone and «Не се появи внезапно.» on the PC column, one fault with two
+   * reasons, the first of them not true of that drive. Absent when the
+   * catalogue authors no summary for the act — the card then prints what it
+   * printed before.
+   */
+  peekBg?: string;
+  /**
    * ADR-009: this code is one of the mistakes THIS LESSON EXISTS TO TEACH
    * (`LessonSpec.lessonMistakeTargets`), so the card must say that the lesson
    * will not be counted — not merely that the first encounter is free. Set by

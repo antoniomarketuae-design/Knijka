@@ -167,7 +167,12 @@ describe("L14 · HudToasts.tsx implements it", () => {
 
   it("the cap and the width come from the pure module, not from a literal", () => {
     expect(TOASTS).toMatch(/TOAST_CARD_WIDTH_CLASS/);
-    expect(TOASTS).toMatch(/visibleToasts\(toasts, quiet\)/);
+    // …with the card being read as the third argument, since
+    // sc-roundabout-entry:fe081cf1 (2026-10-12; round 2, 2026-10-13): an opened
+    // «Защо» is the one card painted and every other card waits. With nothing
+    // open the cap is still this module's `toastCapacity`, reached through the
+    // same function.
+    expect(TOASTS).toMatch(/visibleToasts\(toasts, quiet, reading\)/);
   });
 
   it("does NOT bind Space — that is the parking brake while the car moves", () => {

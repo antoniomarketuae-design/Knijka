@@ -391,7 +391,13 @@ function wiringFaults(src: string): string[] {
     if (!/scroller\.scrollTop = scrollTop;/.test(probe)) faults.push("a clamped scrollTop is not put back");
   }
 
-  if (!/const toastsShownCount = visibleToasts\(toasts, toastsQuiet\)\.length;/.test(src))
+  // …WITH THE CARD BEING READ, since sc-roundabout-entry:fe081cf1 (2026-10-12):
+  // `HudToasts` paints `visibleToasts(toasts, quiet, reading)` — since round 2
+  // (2026-10-13) an opened «Защо» is the ONE card on the glass and every other
+  // card waits — so „its own rule" is the three-argument call. The two-argument
+  // one would count a card that is waiting, and hold the row up under a column
+  // that shows nothing cut.
+  if (!/const toastsShownCount = visibleToasts\(toasts, toastsQuiet, toastReader\.reading\)\.length;/.test(src))
     faults.push("toastsShownCount is not HudToasts' own visibleToasts rule");
   const importAt = src.indexOf('} from "@/modules/sim/hud";');
   const importStart = src.lastIndexOf("import {", importAt);
@@ -425,7 +431,8 @@ describe("THE WIRING: the component stores the reading, and the row leaves with 
     ["heights come from the rect", "height: card.offsetHeight };\n      }\n      if (card.offsetParent === stack)", "height: card.getBoundingClientRect().height };\n      }\n      if (card.offsetParent === stack)"],
     ["the row's position is never restored", "row.style.position = position;", "void position;"],
     ["the clamp is not undone", "if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;", "void scrollTop;"],
-    ["the shown count is invented", "const toastsShownCount = visibleToasts(toasts, toastsQuiet).length;", "const toastsShownCount = toasts.length;"],
+    ["the shown count is invented", "const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading).length;", "const toastsShownCount = toasts.length;"],
+    ["the shown count forgets who is reading", "const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading).length;", "const toastsShownCount = visibleToasts(toasts, toastsQuiet).length;"],
     ["the fade forgets the last card", /toastsBelowFold > 0 && toastsShownCount > 0\n(\s*)\? \{/, "toastsBelowFold > 0\n$1? {"],
     ["the row forgets the last card", "{toastsBelowFold > 0 && toastsShownCount > 0 ? (", "{toastsBelowFold > 0 ? ("],
     ["the import goes", "  visibleToasts,\n  withSheetLocatorBg,", "  withSheetLocatorBg,"],

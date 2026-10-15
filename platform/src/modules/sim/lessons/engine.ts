@@ -2888,6 +2888,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             severity: e.severityClass,
             points: e.points,
             t: e.t,
+            // The same one-liner the toast pushed ten lines up carries — one
+            // fault, one short reason, on the pause card as on the column.
+            ...(peekBg === null ? {} : { peekBg }),
             // THIS ARM HAS ALWAYS PAUSED OVER POINTS IT HAD JUST TAKEN, and the
             // card said «Първа среща — не се брои в резултата» anyway. The flag
             // is what lets `lessonMistake.ts teachStakeSegments` say where they
@@ -2956,6 +2959,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           severity: e.severityClass,
           points: e.points,
           t: e.t,
+          // The act's own one-liner (`TeachMoment.peekBg`): the card that
+          // pauses for a first encounter says the line the billed card of the
+          // same act would.
+          ...(peekBg === null ? {} : { peekBg }),
           // ADR-009: read by `lessonMistake.ts teachChipBg / teachSublineBg /
           // teachStakeSegments`, so the card names the stake instead of
           // promising a free first encounter it is not going to be.

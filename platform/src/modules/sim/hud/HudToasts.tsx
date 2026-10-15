@@ -54,7 +54,10 @@ import { minusPointsBg } from "../rules";
 import {
   TOAST_CARD_WIDTH_CLASS,
   TOAST_MAX_VISIBLE,
+  hudToastCarriesWhy,
   visibleToasts,
+  waitingToasts,
+  type ToastReading,
 } from "./hudPreferences";
 // THE SHADE, TAKEN AND NOT RESTATED — same module, same lane. `SimOverlay`
 // owns the derivation of α 0.80 and of the feather, and its own test derives
@@ -101,6 +104,260 @@ function ttlFor(event: HudEvent): number {
   return event.kind === "violation" || event.kind === "lesson"
     ? TEACHING_TOAST_TTL_MS
     : TOAST_TTL_MS;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE PRESS BOUGHT NO TIME — sc-roundabout-entry:fe081cf1, the clauses rig-w3d
+   left open (2026-10-12), item 2.
+
+   THE FRAME, and the sidecar beside it: `.audit-frames/rig-w3d/
+   sc-roundabout-entry/fe081cf1/pc-L3-F-ON-WHY-30-why-card-gone.png`. A real
+   pointer press on «ЗАЩО» at contact +2.233 s opened the 323-character
+   paragraph of «Удар в неподвижно препятствие». The card left at +8.017 s —
+   its eight seconds from the moment it was RAISED — i.e. 5.8 s after the
+   student asked to read it. By the figure two constants up («~15 chars/s
+   reading speed at driving load») 323 characters are 21.5 s of reading: the
+   product handed over a text and took it back after a quarter of the time its
+   own rule says the text needs.
+
+   THE RULE IS THE ONE THIS FILE ALREADY SPENDS, NOT A NEW NUMBER.
+   `TEACHING_TOAST_TTL_MS` is 8 000 ms for „1–3 sentences", which at 15
+   characters a second is 120 characters. `toastReadMs` is that same division
+   for a text of any length, and `toast-why-room.test.ts` holds
+   `toastReadMs(120)` to the TTL literal so the two cannot drift.
+
+   WHAT THE PRESS DOES: the card may not leave before `now + toastReadMs(the
+   paragraph the press put on the glass)`. It never SHORTENS a life
+   (`Math.max`), so a card opened in its first instant still has at least what
+   it had. Closing the explanation gives nothing back and takes nothing away;
+   opening it again re-reads from that moment.
+
+   …AND THE AGE STAYS TRUE. The block below («THE CARD SAYS WHAT, AND FOR EIGHT
+   SECONDS IT DID NOT SAY WHEN») prints «преди N с» off the wall clock that
+   also removes the card, and `LessonPlayShell` (above `revealMoreToasts`)
+   declined to extend the TTL on its fold row for that reason: «преди 25 с» on
+   a card still up could be read as an accusation about now. On THIS path the
+   card is up because the student opened it and its age says exactly how old
+   the fault is — the sentence is true on every frame it shows on. What stops
+   being true is only the inference „«преди 8 с» means about to expire", which
+   no surface prints.
+
+   …AND THE END OF THE DRIVE NO LONGER TAKES IT AWAY (round 2, integrator
+   decision W3). A fault that pins the car ends the lesson ten seconds after
+   the standstill (`lessons/finish.ts` `CRASH_PIN_STUCK_S`, on the graded clock
+   — not this file's to hold, and not moved). In the rig cell that end came at
+   contact +10.084 s and the full-frame debrief replaced the stage 7.85 s into
+   the 21.5 s this rule gives the paragraph. The END is where it was; the
+   OVERLAY now waits for this card (`hudPreferences.shouldShowDebrief`,
+   `reading`) and opens the moment the card's life — the time derived here — is
+   over, or the student closes it, or asks for the debrief himself.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The product's reading pace at driving load — the figure `TEACHING_TOAST_TTL_MS`
+ *  was sized on (120 characters in its 8 000 ms). */
+export const TOAST_READ_CHARS_PER_SEC = 15;
+
+/** How long a text of `chars` characters takes to read at that pace, ms. An
+ *  unreadable count (non-finite, zero, negative) asks for no time at all. */
+export function toastReadMs(chars: number): number {
+  if (!Number.isFinite(chars) || chars <= 0) return 0;
+  return Math.ceil((chars / TOAST_READ_CHARS_PER_SEC) * 1000);
+}
+
+/**
+ * When a card whose «Защо» was just opened may leave: not before the paragraph
+ * can be read from this moment, and never earlier than it was already going to.
+ */
+export function toastExpiryAfterWhy(expiresAtMs: number, nowMs: number, paragraphChars: number): number {
+  return Math.max(expiresAtMs, nowMs + toastReadMs(paragraphChars));
+}
+
+/**
+ * The queue's cap, with the cards in `keep` exempt from it. `MAX_QUEUED` drops
+ * the OLDEST cards, and the one the student has open is by then usually the
+ * oldest — so the cap alone would delete the paragraph under its reader the
+ * moment enough newer cards arrived. Round 3 (W5): the judged cards waiting
+ * behind it are in `keep` as well (`createToastLives.capExempt`). Order is
+ * kept; nothing newer is dropped to make their place.
+ */
+export function capToastQueue<T extends { id: number }>(
+  toasts: readonly T[],
+  max: number,
+  keep: ReadonlySet<number>,
+): T[] {
+  return toasts.filter((t, i) => i < max || keep.has(t.id));
+}
+
+/** What a toast's own paragraph is, in characters — the text «Защо» opens. */
+function toastParagraphChars(event: HudEvent): number {
+  return event.kind === "violation" ? event.explanationBg.length : 0;
+}
+
+/** One card's life: the timer that will remove it, or — while it waits off the
+ *  glass — how much of its life is left to run when the column paints it. */
+interface ToastLife {
+  timer: number | null;
+  expiresAtMs: number;
+  pausedLeftMs: number | null;
+  paragraphChars: number;
+  /** A card the student is judged or taught by — it carries a WHY
+   *  (`hudToastCarriesWhy`): a graded fault or a «Научи» card. Only these wait
+   *  behind an opened explanation (round 3, W5). */
+  waits: boolean;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTHING THE STUDENT IS JUDGED BY IS LOST — sc-roundabout-entry:fe081cf1,
+   round 3 (2026-10-14), integrator decision W5.
+
+   WHAT ROUND 2 DID, AND WHAT IT COST. While an explanation was open every other
+   card's clock stopped (W1), praise included, and only the opened card was
+   exempt from `MAX_QUEUED`. The round-2 verifier raised a graded fault F
+   behind an opened card, then four more cards of any kind, one a second: the
+   four «Браво» kept their slots (their 4 s no longer ran), the cap dropped the
+   oldest waiting card — F — and F never reached the glass. The badge read «+4».
+   And a second way to lose it, found building this: on release EVERY waiting
+   card started its clock at once, so with more of them than the column paints
+   (`TOAST_MAX_VISIBLE` = 2, quiet 1) the ones below its capacity ran their
+   lives out where nobody could see them.
+
+   THE RULE, the smallest change that makes the sentence true:
+     · a card that carries a WHY (`hudToastCarriesWhy` — a graded fault or a
+       «Научи» card) and is off the glass behind an opened explanation keeps
+       its clock STOPPED and is EXEMPT from the cap (`capExempt`), like the
+       opened card itself. Bounded: a session raises finitely many;
+     · it stays stopped until the column PAINTS it again — `painted`, the
+       column's own report of what it rendered — so the whole of what it had
+       left is spent on the glass, never below the column's capacity. The
+       column's order decides which comes first: newest on top, as every card
+       has always been stacked, each one as the cards above it leave;
+     · praise and info keep their OWN clocks: no WHY, nothing the student is
+       judged by, and they may leave unread. They — and only they — are what
+       the cap may still evict while judged cards wait;
+     · with nothing open nothing here runs: no card is ever stopped, so the
+       queue, the cap and the clocks are the ones the product always had.
+   Nothing graded reads any of this; it decides only what is on the glass.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * THE QUEUE'S CLOCKS — one life per card, keyed by its id. A ledger and not the
+ * bare list of timer handles this used to be, because two things now have to
+ * find ONE card's timer: the «Защо» press that extends it and the hold that
+ * stops it. Plain object, no React: `useHudToastQueue` keeps one for its whole
+ * life and only ever calls it from handlers and effects.
+ *
+ * `onExpire` is called when a card's own clock runs out — after the ledger has
+ * forgotten it, so a late reader never finds a life for a card that is gone.
+ *
+ * ROUND 2 (2026-10-13, integrator decision W1). The hold used to stop the
+ * OLDER cards only, because a newer card was painted on top of the opened one.
+ * It no longer is (`hudPreferences.visibleToasts`): while an explanation is
+ * open every other card is off the glass. ROUND 3 (W5, above): of those, the
+ * cards that carry a WHY stop their clocks — `holdAllBut` — including one
+ * RAISED while the hold stands, which starts its life stopped; and each
+ * restarts only when the column paints it (`painted`).
+ */
+function createToastLives(onExpire: (id: number) => void) {
+  const lives = new Map<number, ToastLife>();
+  /** Cards whose «Защо» is open — exempt from the queue's cap (`capToastQueue`). */
+  const reading = new Set<number>();
+  /** The card the column is held for — every other judged card waits. */
+  let heldFor: number | null = null;
+
+  const arm = (id: number, life: ToastLife, ms: number) => {
+    if (life.timer !== null) window.clearTimeout(life.timer);
+    life.pausedLeftMs = null;
+    life.expiresAtMs = Date.now() + ms;
+    life.timer = window.setTimeout(() => {
+      lives.delete(id);
+      reading.delete(id);
+      onExpire(id);
+    }, ms);
+  };
+  const forget = (id: number) => {
+    const life = lives.get(id);
+    if (life !== undefined && life.timer !== null) window.clearTimeout(life.timer);
+    lives.delete(id);
+    reading.delete(id);
+  };
+
+  return {
+    reading: reading as ReadonlySet<number>,
+    /** What the queue's cap may not drop: the card being read, and every
+     *  judged card that waits with its clock stopped (W5). */
+    capExempt(): ReadonlySet<number> {
+      const keep = new Set<number>(reading);
+      for (const [id, life] of lives) if (life.waits && life.pausedLeftMs !== null) keep.add(id);
+      return keep;
+    },
+    /** A card was raised: start its clock — unless the column is held for
+     *  another card's explanation and this one carries a WHY. Then it is not on
+     *  the glass, so its life is kept whole (`pausedLeftMs`) and starts when the
+     *  column paints it. Praise starts its clock regardless (W5). */
+    add(id: number, event: HudEvent, ms: number) {
+      const waits = hudToastCarriesWhy(event.kind);
+      const life: ToastLife = { timer: null, expiresAtMs: 0, pausedLeftMs: null, paragraphChars: toastParagraphChars(event), waits };
+      lives.set(id, life);
+      if (waits && heldFor !== null && heldFor !== id) life.pausedLeftMs = ms;
+      else arm(id, life, ms);
+    },
+    forget,
+    forgetAll() {
+      for (const id of [...lives.keys()]) forget(id);
+    },
+    whyChanged(id: number, open: boolean) {
+      if (!open) {
+        reading.delete(id);
+        return;
+      }
+      const life = lives.get(id);
+      if (life === undefined) return;
+      reading.add(id);
+      if (life.pausedLeftMs !== null) {
+        // Opened while it waits: its clock is stopped, so the time is added to
+        // what it will run when the column paints it. (The column cannot
+        // deliver this press — a waiting card is not on the glass — but the
+        // ledger answers it rather than dropping the time.)
+        life.pausedLeftMs = Math.max(life.pausedLeftMs, toastReadMs(life.paragraphChars));
+        return;
+      }
+      const now = Date.now();
+      const expiresAtMs = toastExpiryAfterWhy(life.expiresAtMs, now, life.paragraphChars);
+      if (expiresAtMs > life.expiresAtMs) arm(id, life, expiresAtMs - now);
+    },
+    holdAllBut(id: number | null) {
+      if (heldFor === id) return;
+      heldFor = id;
+      // A card that is made to wait is no longer being read: it leaves the
+      // glass, and its «Защо» is closed when it comes back. Without this the
+      // cap exemption of a card opened earlier would outlive its reading.
+      if (id !== null) for (const other of [...reading]) if (other !== id) reading.delete(other);
+      const now = Date.now();
+      for (const [toastId, life] of lives) {
+        if (id !== null && toastId !== id && life.waits && life.timer !== null) {
+          window.clearTimeout(life.timer);
+          life.timer = null;
+          life.pausedLeftMs = Math.max(0, life.expiresAtMs - now);
+        }
+      }
+      // NOTHING restarts here — not on release, and not the card held for. A
+      // stopped card restarts when the column paints it (`painted`): on this
+      // commit for the cards the column now shows (the held card is the one
+      // card it shows), later for the ones below its capacity.
+    },
+    /** The column painted exactly these cards (`HudToasts`' `onPainted`). A
+     *  stopped card among them is on the glass, so it runs out what it had.
+     *  While an explanation is open the column paints that card alone
+     *  (`visibleToasts`), so no waiting card is reported before the reading
+     *  ends — and the report and the reader's release may come in either order
+     *  (React runs the column's effect, a child's, first). */
+    painted(ids: readonly number[]) {
+      for (const id of ids) {
+        const life = lives.get(id);
+        if (life !== undefined && life.pausedLeftMs !== null) arm(id, life, life.pausedLeftMs);
+      }
+    },
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -210,39 +467,72 @@ export function useHudToastQueue(): {
   /** L14: the student clicked a card away before its TTL ran out. */
   dismiss: (id: number) => void;
   clear: () => void;
+  /**
+   * The student opened (`true`) or closed (`false`) this card's «Защо». Opening
+   * gives the card the time its paragraph takes to read and exempts it from the
+   * queue's cap; see „THE PRESS BOUGHT NO TIME".
+   */
+  whyChanged: (id: number, open: boolean) => void;
+  /**
+   * The column is held for the card with this id: every other card that
+   * carries a WHY — older, newer, and any raised while the hold stands — stops
+   * its clock and is kept from the cap until the column paints it again, and
+   * then runs out what it had left. A card made to wait is not on the glass
+   * (`visibleToasts`), and a card that is not on the glass may not spend its
+   * reading time there. Praise keeps its own clock (W5).
+   */
+  holdAllBut: (id: number | null) => void;
+  /**
+   * The column painted exactly these cards — `HudToasts`' `onPainted`. A card
+   * that waited restarts its clock here and nowhere else (W5).
+   */
+  painted: (ids: readonly number[]) => void;
 } {
   const [toasts, setToasts] = useState<HudToast[]>([]);
   const nextId = useRef(1);
-  const timers = useRef<number[]>([]);
+  // ONE ledger for this queue's whole life (`createToastLives`). Held in state
+  // with a lazy initialiser — never set again — so it is made once and is not a
+  // ref read during render.
+  const [lives] = useState(() =>
+    createToastLives((id) => setToasts((prev) => prev.filter((t) => t.id !== id))),
+  );
 
-  useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach((t) => window.clearTimeout(t));
-  }, []);
+  useEffect(() => () => lives.forgetAll(), [lives]);
 
-  const push = useCallback((events: ReadonlyArray<HudEvent>, ttlMs?: number) => {
-    if (events.length === 0) return;
-    // The stamp is taken ONCE for the batch: a tick that raises two faults
-    // raised them in the same frame, and two ages a millisecond apart on one
-    // screen would be a distinction the engine cannot actually make.
-    const added = stampToasts(events, nextId.current, Date.now());
-    nextId.current += events.length;
-    setToasts((prev) => [...added.reverse(), ...prev].slice(0, MAX_QUEUED));
-    for (const toast of added) {
-      const timer = window.setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== toast.id));
-      }, ttlMs ?? ttlFor(toast.event));
-      timers.current.push(timer);
-    }
-  }, []);
+  const push = useCallback(
+    (events: ReadonlyArray<HudEvent>, ttlMs?: number) => {
+      if (events.length === 0) return;
+      // The stamp is taken ONCE for the batch: a tick that raises two faults
+      // raised them in the same frame, and two ages a millisecond apart on one
+      // screen would be a distinction the engine cannot actually make.
+      const added = stampToasts(events, nextId.current, Date.now());
+      nextId.current += events.length;
+      // The lives first: a card raised behind an opened explanation is one the
+      // cap may not drop (`capExempt`), and the updater may run at once.
+      for (const toast of added) lives.add(toast.id, toast.event, ttlMs ?? ttlFor(toast.event));
+      setToasts((prev) => capToastQueue([...added.reverse(), ...prev], MAX_QUEUED, lives.capExempt()));
+    },
+    [lives],
+  );
 
-  const dismiss = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  const dismiss = useCallback(
+    (id: number) => {
+      lives.forget(id);
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    },
+    [lives],
+  );
 
-  const clear = useCallback(() => setToasts([]), []);
+  const clear = useCallback(() => {
+    lives.forgetAll();
+    setToasts([]);
+  }, [lives]);
 
-  return { toasts, push, dismiss, clear };
+  const whyChanged = useCallback((id: number, open: boolean) => lives.whyChanged(id, open), [lives]);
+  const holdAllBut = useCallback((id: number | null) => lives.holdAllBut(id), [lives]);
+  const painted = useCallback((ids: readonly number[]) => lives.painted(ids), [lives]);
+
+  return { toasts, push, dismiss, clear, whyChanged, holdAllBut, painted };
 }
 
 // ---------------------------------------------------------------------------
@@ -419,10 +709,15 @@ function ToastShell({
   onDismiss,
   onWhy,
   cardRef,
+  read = false,
   children,
 }: {
   color: string;
   onDismiss: (() => void) | null;
+  /** This card's «Защо» is open and the column is reading it: the card is a
+   *  flex column that may shrink to the window, and its body box is the one
+   *  child that gives (W2 — see „THE EXPLANATION HE ASKED FOR WAS CUT"). */
+  read?: boolean;
   /** Present only on a card that prints a «Защо» chip — a press that lands on
    *  the chip runs this instead of the card's own activation. See „…AND ON PC
    *  THE SUMMARY BECAME THE LAST WORD" for why it is a region and not a
@@ -478,7 +773,11 @@ function ToastShell({
   //    a surface the student reads while driving and never hovers.
   const className =
     `hud-ghost hud-toast-in ${TOAST_CARD_WIDTH_CLASS} relative isolate border-l-2 py-1 pl-2.5 pr-1 text-left ` +
-    (interactive ? "group pointer-events-auto cursor-pointer" : "pointer-events-none");
+    (interactive ? "group pointer-events-auto cursor-pointer" : "pointer-events-none") +
+    // W2: only the card being read. `min-h-0` lets it shrink to the window the
+    // column has; as a flex column its fixed rows keep their height and the
+    // body box takes the whole of the squeeze.
+    (read ? " flex min-h-0 flex-col" : "");
   const style = { borderColor: color };
 
   if (!interactive) {
@@ -538,13 +837,16 @@ function ToastShell({
 function ToastFooter({
   lawRef,
   ageBg,
+  waiting = 0,
 }: {
   lawRef: string | undefined;
   ageBg: string | null;
+  /** Cards waiting behind this one while its explanation is open — «+N». */
+  waiting?: number;
 }) {
   // The «Защо» chip used to ride this row as a third item and is now beside the
   // sentence it opens — see „…AND THE CHIP MOVED UP BESIDE THE SENTENCE".
-  if (lawRef === undefined && ageBg === null) return null;
+  if (lawRef === undefined && ageBg === null && waiting <= 0) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
       {lawRef !== undefined ? (
@@ -554,6 +856,26 @@ function ToastFooter({
       ) : null}
       {ageBg !== null ? (
         <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
+      ) : null}
+      {/* THE CARDS WAITING BEHIND AN OPENED EXPLANATION, COUNTED (W1). The
+          phone card's own badge — `SimOverlay`'s «+N», class for class — so
+          one product has one mark for „more is queued behind this". HERE and
+          not in the header row, measured: «ОПАСНА ГРЕШКА» (88.7 px) and
+          «−10 изпитни т. ✕» (111.3) leave 24 px of the 224 px row, 8 of them
+          the row's own gap, and the badge is 26. On this row it stands beside
+          the law chip and the age at the row's own height (20 px against the
+          chip's 21 — the card does not grow when a fault starts to wait);
+          a citation long enough to fill the row puts it on a line of its own.
+          `ml-auto` sets it apart from the two things it is not: it is neither
+          part of the citation nor of the moment. */}
+      {waiting > 0 ? (
+        <span
+          data-hud-toast-waiting=""
+          aria-label={toastWaitingLabelBg(waiting)}
+          className="ml-auto shrink-0 rounded-full border border-border px-1.5 text-[10px] font-bold leading-[18px] text-muted"
+        >
+          +{waiting}
+        </span>
       ) : null}
     </div>
   );
@@ -1436,6 +1758,290 @@ export function toastCardPressAction(
   return card.interactive ? "dismiss" : "none";
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE EXPLANATION HE ASKED FOR WAS CUT BY WHAT ARRIVED AFTER IT —
+   sc-roundabout-entry:fe081cf1, the clauses rig-w3d left open (2026-10-12),
+   item 1; REBUILT in round 2 (2026-10-13) on the integrator's decisions W1/W2
+   after the round-1 verifier refuted the first hold.
+
+   THE FRAME, and the sidecar's own boxes (`.audit-frames/rig-w3d/
+   sc-roundabout-entry/fe081cf1/pc-L3-F-ON-WHY-28-why-plus4_3s.png`, Chromium
+   1440 × 900, advisor on, 8cb0707). The column is 260.5 → 728 (467.5 px).
+
+     press +0.3 s   banner 48.7 · pill 23.5 · scroller 344.7 → 698.5
+                    the opened card 295.5 px at 344.7 → 640.2 — WHOLE, law chip
+                    «ЗДвП чл. 20, ал. 2» at 615.2 → 636.2
+     contact +5.03  the crash pins the car: the banner grows to 76.2 px and the
+                    advisor posts its recovery card, 98.3 px, above the pill
+                    → scroller 476.5 → 698.5 (222 px, 251.5 without the fold row)
+                    → the card stands 476.5 → 772: body cut 42.5 px inside «…
+                    Излизането от платното», law chip 69.5 px below the window,
+                    for the 3.0 s the card had left.
+
+   WHY NOTHING ANSWERED. Two rules in this file follow a window down, and both
+   stop at the opened card on purpose: the arrival fit and the shrink switch
+   („THE WINDOW SHRANK UNDER A CARD THAT FITTED") only ever act on a card whose
+   choice is `"paragraph"`, and an opened card's choice is `"summary"` with
+   `whyOpen` on top — «an OPEN chip stays open … no resize can reach it». That
+   was written so that a window could not close a text under its reader. It
+   also meant the window could CUT that text and nothing would ask.
+
+   WHAT ROUND 1 BUILT, AND WHERE IT WAS REFUTED. A hold that made the advisor's
+   card and the OLDER cards wait when the opened card was measured cut. It
+   repaired the rig's bare immersive stage and nothing shorter: on the stage a
+   student actually gets (`/simulator`, 1165 × 650 at a 1440 × 900 window — cap
+   322) the column has 267.3 px for that 295.5 px card with only the one-line
+   banner standing, so the card was still cut 114.7 px with the hold taken; an
+   immersive 1366 × 768 viewport cut it 69.5 px; and on the rig stage itself a
+   second fault arriving ON TOP cut it 93.7 px. (Verifier probe V2/V3,
+   `lesson-ui/__tests__/whycut-verify-probe.test.ts` keeps its rows.)
+
+   SO, WHILE AN EXPLANATION IS OPEN IT OWNS THE COLUMN (W1):
+     · IT IS THE ONLY CARD PAINTED. `hudPreferences.visibleToasts` returns the
+       opened card alone; every other card — the «Научи» card under it, a fault
+       raised after it — waits with its clock stopped
+       (`useHudToastQueue.holdAllBut`) and takes its place the moment the
+       opened card is closed, dismissed or out of reading time. So nothing can
+       arrive on top of the paragraph and move it under its reader, in quiet
+       mode there is still one card on the glass, and the waiting cards are
+       COUNTED on the opened card: «+N», the phone card's own badge
+       (`SimOverlay`), in the footer beside the law chip.
+     · WHAT STANDS ABOVE IT GIVES WAY, IN TWO STEPS, ONLY AS FAR AS THE CARD IS
+       STILL SHORT (`toastColumnYieldNext`): first the advisor's card waits
+       (`held`), then the banner — when a route hold has grown it to three
+       lines — sets its sentence on one (`bannerYields`, `ObjectiveBanner`'s
+       `oneLine`): the start of the hold's own lead — measured in Chromium at
+       the rig's column width, «Колата е притисната след удара — измъкни се
+       назад,…», 76.25 → 48.75 px — with the sentence whole in the DOM. Measured before paint, latched while he reads, and
+       released only by him — re-asking on every layout would let the advisor's
+       card back the moment its absence made the paragraph fit, which cuts it
+       again. On the rig's stage step one is enough (the card stands
+       372.2 → 667.7 in a window to 728) and the banner keeps its recovery
+       order; a stage with room for everything gives up nothing.
+       A BANNER WITH NO HOLD LEAD IS NEVER CUT. One line of the task itself
+       would take its «дръж под N км/ч» off the glass — the figure the founder
+       ruled on 2026-09-22 must be said in the banner — so the one-line form is
+       taken only while a hold's lead stands in front of the task
+       (`LessonPlayShell.bannerOneLineWhileReading`), and the lead is not
+       withheld either: that would put the w49 defect back (the task standing
+       over a car that cannot obey it) for the length of a reading.
+
+   AND WHERE EVEN THE BARE COLUMN CANNOT HOLD IT, THE BODY SCROLLS INSIDE THE
+   CARD (W2). While it is being read the card is a flex column whose ONE
+   shrinkable child is the body box (`TOAST_READ_ATTR`): the header, the title
+   and the footer — the law chip — keep their height, so they are on the glass
+   on every frame, and the paragraph scrolls between them. No number decides
+   it: the shell's scroller is already the column's last-resort yielder, the
+   wrapper and the stack below take `min-h-0` for the reading, and flexbox
+   hands the card exactly the window the column has. Laid out with the app's
+   compiled CSS in Chromium and in WebKit (2026-10-13, the 295.5 px card):
+
+     stage                       window   card      body shown / whole
+     rig, 1440 × 900 immersive    383.3   295.5     198 / 198   (not scrolling)
+     /simulator 1165 × 650        237.8   237.8     140 / 198   law chip in
+       …with the fold row up      208.3   208.3     111 / 198   law chip in
+     immersive 1366 × 768         283.0   283.0     185 / 198   law chip in
+
+   The hidden part is ANNOUNCED AND REACHABLE: the shell's fold row («↓
+   обяснението продължава — покажи») is raised for it and pages THIS box
+   (`LessonPlayShell.measureToastColumnFold`, `pageToastRead`), the box fades
+   at its foot while more is below, a wheel over the card scrolls it (the card
+   takes pointer events; the shell's scroller never could be dragged), and its
+   thin scrollbar can be dragged. The law chip did not move by a pixel while
+   the box scrolled, in either engine.
+
+   WHAT IT COSTS, stated rather than found later:
+     · THE «ЗАЩО ↑» CHIP SCROLLS WITH THE TEXT. It floats at the head of the
+       body box, so paging down takes it out of sight; the ✕ on the card and
+       the text's own end are still there, and paging back up brings it back.
+     · A CARD THAT WAITS IS OFF THE GLASS FOR THE WHOLE READING — up to the
+       88 s `toastReadMs` gives the longest paragraph (1 320 characters). That
+       includes a graded fault raised meanwhile: it is counted («+1») and not
+       shown until the explanation is closed or its time is over.
+     · WHILE THE COLUMN HAS YIELDED, THE ADVISOR'S SENTENCE IS NOT ON THE GLASS
+       (the advisor has no voice; its card is its only channel on this leg),
+       and on a stage where that was not enough the banner under a hold shows
+       the first line of its sentence only — the hold's condition and order;
+       the task behind it, and any speed cap in it, are off the glass until
+       the explanation is closed. The student chose the explanation and gives
+       the column back at once with «Защо ↑» or the ✕.
+     · A WINDOW SHORTER THAN THE CARD'S PINNED ROWS PLUS ONE BODY LINE
+       (`TOAST_READ_FLOOR_PX`) cannot pin anything: the card then overflows the
+       shell's scroller as every long card did before, and the fold row
+       announces and pages that. For this card that is a stage under 526 px
+       (0.76·H − 172 − banner − pill − fold row < 97.5 + 16.5).
+     · It does not touch a card nobody opened. An un-pressed paragraph follows
+       its window down by the shrink switch above, as before.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The attribute on the opened card's body box while it is being read — the one
+ *  box that scrolls inside the card (W2). The shell's fold row reads and pages it. */
+export const TOAST_READ_ATTR = "data-hud-toast-read";
+export const TOAST_READ_SELECTOR = `[${TOAST_READ_ATTR}]`;
+
+/** The attribute on the «+N» badge the opened card prints for the cards waiting behind it. */
+export const TOAST_WAITING_ATTR = "data-hud-toast-waiting";
+
+/**
+ * The body box never shrinks under ONE line of its own type, px — `text-xs
+ * leading-snug` is 12 px × 1.375. A window under one line can show no sentence
+ * whole, so below it the card stops shrinking and overflows the shell's
+ * scroller instead (the pre-existing, announced fallback). Never taller than
+ * the box's own content: the «Защо» chip alone is 19 px.
+ */
+export const TOAST_READ_FLOOR_PX = 16.5;
+
+/** «още 1 известие» / «още 3 известия» — the badge's accessible name, in the
+ *  words the shell's fold row already prints for the same count. */
+export function toastWaitingLabelBg(waiting: number): string {
+  return `още ${waiting} ${waiting === 1 ? "известие" : "известия"}`;
+}
+
+/** How far the column has yielded to the opened card: 0 nothing above it gave
+ *  way · 1 the advisor's card waits · 2 a banner under a hold is also set on one line. */
+export const TOAST_YIELD_ADVISOR = 1;
+export const TOAST_YIELD_BANNER = 2;
+
+/**
+ * The yield after one look at the column. One step further each time the
+ * opened card is still short, never back while it is being read (the latch),
+ * and nothing at all the moment nobody is reading.
+ */
+export function toastColumnYieldNext(level: number, reading: boolean, short: boolean): number {
+  if (!reading) return 0;
+  return short ? Math.min(TOAST_YIELD_BANNER, level + 1) : level;
+}
+
+/**
+ * How much of the opened paragraph its body box cannot show at once, px — the
+ * read the yield is decided on. `null` is NO CLAIM (nothing is being read in
+ * this scroller, or the box has not been laid out), and no claim yields
+ * nothing.
+ *
+ * ASKED OF THE COLUMN WITHOUT THE FOLD ROW, for the reason
+ * `readToastScrollerWindow` gives: the row is the shell's statement ABOUT the
+ * cards, and a row that is only needed because it is up is not a shortage of
+ * room. Read, not added up — the row is taken out of flow for the two reads
+ * and put back, and the scroll positions the grown boxes can clamp are
+ * restored, so every box ends the call at the size it started.
+ */
+export function readOpenedToastShortPx(scroller: HTMLElement): number | null {
+  const box = scroller.querySelector(TOAST_READ_SELECTOR);
+  if (box === null) return null;
+  const read = box as HTMLElement;
+  const shortPx = () => (read.clientHeight > 0 ? Math.max(0, read.scrollHeight - read.clientHeight) : null);
+  const asItStands = shortPx();
+  if (asItStands === null || asItStands <= TOAST_FIT_SLACK_PX) return asItStands;
+  const more = scroller.parentElement?.querySelector(TOAST_MORE_SELECTOR) ?? null;
+  if (more === null) return asItStands;
+  const row = more as HTMLElement;
+  const kept = { position: row.style.position, scrollTop: scroller.scrollTop, readTop: read.scrollTop };
+  row.style.position = "absolute";
+  const withoutRow = shortPx();
+  row.style.position = kept.position;
+  if (scroller.scrollTop !== kept.scrollTop) scroller.scrollTop = kept.scrollTop;
+  if (read.scrollTop !== kept.readTop) read.scrollTop = kept.readTop;
+  return withoutRow;
+}
+
+/** What `useToastReader` hands the shell. */
+export interface ToastReader {
+  /** For `HudToasts` and `visibleToasts`: the opened card, and whether the column above it has yielded. */
+  reading: ToastReading | null;
+  /** The advisor's card waits (yield step 1 or 2). */
+  held: boolean;
+  /** A banner under a route hold sets its sentence on one line (yield step 2). */
+  bannerYields: boolean;
+  /** `HudToasts`' report of a «Защо» press. */
+  onWhyChange: (id: number, open: boolean) => void;
+  /** Ask again — for layout changes no commit announces (the shell's `ResizeObserver`). */
+  recheck: () => void;
+}
+
+/**
+ * THE READER'S HOLD ON THE COLUMN — the state machine of the block above, in
+ * one hook so it can be mounted and run by a test rather than read off the
+ * shell's source.
+ *
+ * `scroller` is the shell's `[data-hud-toast-scroller]`; `whyChanged` and
+ * `holdAllBut` are the queue's (`useHudToastQueue`).
+ */
+export function useToastReader({
+  toasts,
+  scroller,
+  whyChanged,
+  holdAllBut,
+}: {
+  toasts: ReadonlyArray<{ id: number }>;
+  scroller: { readonly current: HTMLElement | null };
+  whyChanged: (id: number, open: boolean) => void;
+  holdAllBut: (id: number | null) => void;
+}): ToastReader {
+  const [openId, setOpenId] = useState<number | null>(null);
+  // How far the column has yielded to the card `openId` names. It belongs to
+  // that card: a new press starts from nothing (`onWhyChange`), because a yield
+  // taken for one card is not a measurement of the next one the student opens.
+  const [yieldLevel, setYieldLevel] = useState(0);
+  // A card that has left takes its open explanation with it — derived, so there
+  // is no unmount report to forget.
+  const readingId = openId !== null && toasts.some((t) => t.id === openId) ? openId : null;
+  const level = readingId === null ? 0 : yieldLevel;
+
+  /** The yield the column should stand at, by one look at it as it now is. */
+  const yieldTarget = (el: HTMLElement | null): number => {
+    let short = false;
+    if (readingId !== null && level < TOAST_YIELD_BANNER && el !== null) {
+      const shortPx = readOpenedToastShortPx(el);
+      short = shortPx !== null && shortPx > TOAST_FIT_SLACK_PX;
+    }
+    return toastColumnYieldNext(level, readingId !== null, short);
+  };
+  // The shell's ref, under a ref's name: the value the layout effect below sets
+  // is read straight off it, which is the one shape of „measure, then set" this
+  // file already uses (`useToastBodyChoice`).
+  const scrollerRef = scroller;
+  const recheck = () => {
+    const next = yieldTarget(scrollerRef.current);
+    if (next !== yieldLevel) setYieldLevel(next);
+  };
+
+  // After EVERY commit, before paint: the banner growing and the advisor's card
+  // arriving are commits of the shell, and the re-render this may ask for is
+  // flushed before the browser paints either — one step per pass, so a column
+  // that needs both steps takes two passes and still paints once. With nothing
+  // open it reads no DOM, and setting the value the state already holds is not
+  // an update — which is also why this effect needs no dependency list and
+  // must not have one: the layout it answers to changes on commits none of its
+  // own inputs take part in.
+  useLayoutEffect(() => {
+    setYieldLevel(yieldTarget(scrollerRef.current));
+  });
+
+  // Every other card waits for as long as this one is being read — and only
+  // that long.
+  useEffect(() => {
+    holdAllBut(readingId);
+  }, [readingId, holdAllBut]);
+
+  const onWhyChange = useCallback(
+    (id: number, open: boolean) => {
+      whyChanged(id, open);
+      if (open) setYieldLevel(0);
+      setOpenId((current) => (open ? id : current === id ? null : current));
+    },
+    [whyChanged],
+  );
+
+  const held = level >= TOAST_YIELD_ADVISOR;
+  return {
+    reading: readingId === null ? null : { id: readingId, held },
+    held,
+    bannerYields: level >= TOAST_YIELD_BANNER,
+    onWhyChange,
+    recheck,
+  };
+}
+
 /**
  * The chip. `pointer-events-auto` because the inert column's card is
  * `pointer-events-none`; `title` because the card's own „Щракни, за да го
@@ -1455,28 +2061,97 @@ function ToastWhyChip({ open, color }: { open: boolean; color: string }) {
   );
 }
 
+/**
+ * The body box's style while the card is being read (W2) — what makes it the
+ * one box that scrolls inside the card:
+ *   · `overflowY: auto` makes it a scroll container, so its flex minimum is 0
+ *     and it — alone — takes the card's squeeze (the header, the title and the
+ *     footer are not scroll containers and cannot shrink under their content);
+ *     it still contains the chip's float, which is all `flow-root` was for;
+ *   · `minHeight` is the one-line floor (`TOAST_READ_FLOOR_PX`);
+ *   · `overscrollBehavior: contain` — a wheel that reaches the end of the
+ *     paragraph stops there instead of scrolling the page behind the stage;
+ *   · the scrollbar pair is the shell scroller's own
+ *     (`[scrollbar-color:var(--border-strong)_transparent]
+ *     [scrollbar-width:thin]`), and on THIS box it can be dragged: the card
+ *     takes pointer events, the shell's scroller never did;
+ *   · and — only while more of the paragraph is below — the fade at its foot.
+ *     The mask is the shell's (`readMaskCss` is
+ *     `LessonPlayShell.TOAST_FADE_MASK_CSS`, derived there from this card's
+ *     own type), handed in rather than restated.
+ */
+export function toastReadBoxStyle(readMaskCss: string | null): {
+  minHeight: number;
+  overflowY: "auto";
+  overscrollBehavior: "contain";
+  scrollbarWidth: "thin";
+  scrollbarColor: string;
+  WebkitMaskImage?: string;
+  maskImage?: string;
+} {
+  const box = {
+    minHeight: TOAST_READ_FLOOR_PX,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    scrollbarWidth: "thin",
+    scrollbarColor: "var(--border-strong) transparent",
+  } as const;
+  return readMaskCss === null ? box : { ...box, WebkitMaskImage: readMaskCss, maskImage: readMaskCss };
+}
+
 function ViolationToast({
   event,
   ageBg,
   onDismiss,
+  onWhyChange,
+  reading = false,
+  waiting = 0,
+  readMaskCss = null,
+  onReadScroll,
 }: {
   event: Extract<HudEvent, { kind: "violation" }>;
   ageBg: string | null;
   onDismiss: (() => void) | null;
+  /** The student opened or closed this card's «Защо» — see `useToastReader`. */
+  onWhyChange?: (open: boolean) => void;
+  /** The column is reading THIS card (`useToastReader`'s `reading.id`). */
+  reading?: boolean;
+  /** Cards waiting behind it while it is read — the «+N» in its footer. */
+  waiting?: number;
+  /** The fade for the body box's foot while more of the paragraph is below it; null when none is. */
+  readMaskCss?: string | null;
+  /** The body box scrolled (a wheel, a drag of its bar) — a `scroll` does not
+   *  bubble, so the shell's fold row hears it only through this. */
+  onReadScroll?: () => void;
 }) {
   const meta = SEVERITY_META[event.severity];
   const canSummarise = typeof event.peekBg === "string" && event.peekBg.trim().length > 0;
   const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise, violationToastBodyBg(event, false));
   const [whyOpen, setWhyOpen] = useState(false);
-  const toggleWhy = useCallback(() => setWhyOpen((open) => !open), []);
+  // The press is REPORTED as well as kept: the column has to make room for the
+  // paragraph and the queue has to give it the time to be read, and neither can
+  // see this component's state. Reported from the handler, with the value the
+  // press produced — never from inside the state updater, which React may run
+  // twice.
+  const toggleWhy = useCallback(() => {
+    const open = !whyOpen;
+    setWhyOpen(open);
+    onWhyChange?.(open);
+  }, [whyOpen, onWhyChange]);
   const summarised = choice === "summary";
   const showParagraph = !summarised || whyOpen;
+  // W2 — the read layout, and it needs BOTH: the column says this is the card
+  // it is reading, and this card's own chip is open. With no reader mounted
+  // (`app/dev/popup-rig`, a test) `reading` is never true and the card is laid
+  // out exactly as it shipped.
+  const read = reading && summarised && whyOpen;
   return (
     <ToastShell
       color={meta.color}
       onDismiss={onDismiss}
       onWhy={summarised ? toggleWhy : undefined}
       cardRef={setCard}
+      read={read}
     >
       <div className="flex items-center justify-between gap-2">
         <span
@@ -1508,8 +2183,16 @@ function ViolationToast({
           read the choice off the DOM instead of inferring it from a crop;
           `"pending"` there is the one commit before the choice, never painted.
           The chip comes FIRST in this box because it floats: see „…AND THE
-          CHIP MOVED UP BESIDE THE SENTENCE" for why a float and not a row. */}
-      <div className="mt-1 flow-root">
+          CHIP MOVED UP BESIDE THE SENTENCE" for why a float and not a row.
+
+          WHILE IT IS BEING READ THIS BOX IS THE ONE THAT SCROLLS (W2): the
+          title above it and the law chip below it keep their height (a flex
+          item that is not a scroll container cannot shrink under its content),
+          and the paragraph moves between them. `toastReadBoxStyle` is the
+          whole of it, as a style on this box and not a second class list, so
+          that the box of a card NOT being read is this element exactly as it
+          shipped — one `className`, no `style`, no attribute. */}
+      <div className="mt-1 flow-root" data-hud-toast-read={read ? "" : undefined} style={read ? toastReadBoxStyle(readMaskCss) : undefined} onScroll={read ? onReadScroll : undefined}>
         {summarised ? <ToastWhyChip open={whyOpen} color={meta.color} /> : null}
         <p
           ref={bodyRef}
@@ -1520,7 +2203,7 @@ function ViolationToast({
           {violationToastBodyBg(event, showParagraph)}
         </p>
       </div>
-      <ToastFooter lawRef={event.lawRef} ageBg={ageBg} />
+      <ToastFooter lawRef={event.lawRef} ageBg={ageBg} waiting={read ? waiting : 0} />
     </ToastShell>
   );
 }
@@ -1529,16 +2212,37 @@ function ToastCard({
   event,
   ageBg,
   onDismiss,
+  onWhyChange,
+  reading = false,
+  waiting = 0,
+  readMaskCss = null,
+  onReadScroll,
 }: {
   event: HudEvent;
   /** „сега" / „преди 8 с", or null when this card carries no moment. */
   ageBg: string | null;
   onDismiss: (() => void) | null;
+  onWhyChange?: (open: boolean) => void;
+  reading?: boolean;
+  waiting?: number;
+  readMaskCss?: string | null;
+  onReadScroll?: () => void;
 }) {
   if (event.kind === "violation") {
     // Its own component because it holds hooks (the fit measurement), and a
     // hook called in one arm of this `if` chain is outside the rules of hooks.
-    return <ViolationToast event={event} ageBg={ageBg} onDismiss={onDismiss} />;
+    return (
+      <ViolationToast
+        event={event}
+        ageBg={ageBg}
+        onDismiss={onDismiss}
+        onWhyChange={onWhyChange}
+        reading={reading}
+        waiting={waiting}
+        readMaskCss={readMaskCss}
+        onReadScroll={onReadScroll}
+      />
+    );
   }
 
   if (event.kind === "commendation") {
@@ -1594,6 +2298,11 @@ export function HudToasts({
   quiet = false,
   onDismiss,
   onDismissAll,
+  reading = null,
+  onWhyChange,
+  readMaskCss = null,
+  onReadScroll,
+  onPainted,
 }: {
   toasts: HudToast[];
   /** „По-тихи известия": one card at a time, and no praise. */
@@ -1602,8 +2311,38 @@ export function HudToasts({
   onDismiss?: (id: number) => void;
   /** Shown only while more than one card is up — one click clears the lot. */
   onDismissAll?: () => void;
+  /** The card whose «Защо» is open and whether the column is held for it
+   *  (`useToastReader`). Omitted: nothing is being read, the column as shipped. */
+  reading?: ToastReading | null;
+  /** A «Защо» press, by toast id — the shell hands it to `useToastReader`. */
+  onWhyChange?: (id: number, open: boolean) => void;
+  /** The fade for the foot of the opened card's body box, while the shell's
+   *  fold measure says more of the paragraph is below it; null otherwise. */
+  readMaskCss?: string | null;
+  /** The opened card's body box scrolled — the shell re-measures its fold row. */
+  onReadScroll?: () => void;
+  /** After every change of what is on the glass: the ids this column painted,
+   *  for the queue (`useHudToastQueue.painted`) — a card that waited behind an
+   *  explanation restarts its clock only when it is painted (round 3, W5). */
+  onPainted?: (ids: readonly number[]) => void;
 }) {
-  const shown = visibleToasts(toasts, quiet);
+  const shown = visibleToasts(toasts, quiet, reading);
+  // W5: tell the queue what is on the glass — every time it changes, and once
+  // on mount. Keyed on the ids, so a re-render that paints the same cards says
+  // nothing new.
+  const paintedKey = shown.map((t) => t.id).join(",");
+  useEffect(() => {
+    onPainted?.(paintedKey === "" ? [] : paintedKey.split(",").map(Number));
+  }, [paintedKey, onPainted]);
+  // W1/W2 — the card the column is reading, when it is the one on the glass.
+  // `visibleToasts` then returns it alone, so the stack below is a stack of
+  // one, and `readingRoom` is what lets that one card be handed the window:
+  // `min-h-0` on the two boxes between the shell's scroller and the card, for
+  // the reading and not a frame longer — with nothing open neither box may
+  // shrink, and the stack scrolls in the shell's scroller as it always has.
+  const readId = reading !== null && shown.some((t) => t.id === reading.id) ? reading.id : null;
+  const readingRoom = readId !== null;
+  const waiting = waitingToasts(toasts, quiet, reading);
 
   // ── THE AGE HAS TO MOVE, OR IT IS NOT AN AGE ─────────────────────────────
   // Hooks before the early return below, which is why `shown` is computed
@@ -1627,7 +2366,13 @@ export function HudToasts({
   return (
     // The WRAPPER stays inert so the column never eats a click meant for the
     // road behind it; only the cards themselves are `pointer-events-auto`.
-    <div className="pointer-events-none flex flex-col items-end gap-2 select-none">
+    <div
+      className={
+        readingRoom
+          ? "pointer-events-none flex min-h-0 flex-col items-end gap-2 select-none"
+          : "pointer-events-none flex flex-col items-end gap-2 select-none"
+      }
+    >
       {/* ═══════════════════════════════════════════════════════════════════
           `[data-hud="toasts"]` HOLDS CARDS AND ONLY CARDS — 2026-08-28, w8.
 
@@ -1676,7 +2421,7 @@ export function HudToasts({
       <div
         aria-live="polite"
         data-hud="toasts"
-        className="flex w-full flex-col items-end gap-2"
+        className={readingRoom ? "flex min-h-0 w-full flex-col items-end gap-2" : "flex w-full flex-col items-end gap-2"}
       >
         {shown.map((t) => (
           <ToastCard
@@ -1688,6 +2433,11 @@ export function HudToasts({
                 : null
             }
             onDismiss={onDismiss ? () => onDismiss(t.id) : null}
+            onWhyChange={onWhyChange ? (open) => onWhyChange(t.id, open) : undefined}
+            reading={t.id === readId}
+            waiting={t.id === readId ? waiting : 0}
+            readMaskCss={t.id === readId ? readMaskCss : null}
+            onReadScroll={t.id === readId ? onReadScroll : undefined}
           />
         ))}
       </div>

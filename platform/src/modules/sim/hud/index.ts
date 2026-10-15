@@ -276,12 +276,19 @@ export { ObjectiveBanner, type ObjectiveFlash } from "./ObjectiveBanner";
 // own binding speed cap when it is stricter than the posted limit.
 export { objectiveLineWithTaskCap } from "./objectiveTaskLine";
 export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
+// sc-roundabout-entry:fe081cf1 (2026-10-12, round 2 2026-10-13): an opened
+// «Защо» owns the column and buys the time its paragraph takes to read — the
+// shell mounts the hook, and its fold row reads and pages the body box the
+// card scrolls inside (`TOAST_READ_SELECTOR`).
+export { useToastReader, TOAST_READ_SELECTOR, type ToastReader } from "./HudToasts";
+export { type ToastReading } from "./hudPreferences";
 // Doc 86 L14/L15 — the DESKTOP half of the notification rework: a dismissible,
 // two-card, 240 px toast column with a „по-тихи известия" setting, and an
 // end-of-lesson debrief that Space skips and a setting can stop auto-opening.
 export {
   briefingAutoDefault,
   briefingOpensAtStart,
+  endBarVerdictHidden,
   endLineDemandsAnswer,
   hudToastCarriesWhy,
   parseStoredFlag,
@@ -301,6 +308,7 @@ export {
   ROOMY_MIN_WIDTH_PX,
   SESSION_END_AUTO_DEFAULT,
   SESSION_END_AUTO_STORAGE_KEY,
+  SESSION_END_HELD_LINE_BG,
   SESSION_END_SKIP_HINT_BG,
   TOAST_CARD_WIDTH_CLASS,
   TOAST_CARD_WIDTH_PX,
