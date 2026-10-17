@@ -873,8 +873,31 @@ export interface StagedActorPathSpec {
    *  the slow launch as a yield — hold it to the player's pace so the duty
    *  arms only once the player is at cruise, in the corridor, refusing). */
   accelMps2?: number;
-  /** Curb-side extra offset, m (cyclist proxy rides right of lane center). */
+  /** Curb-side extra offset, m (cyclist proxy rides right of lane center).
+   *  GEOMETRY ONLY for a cast member: what a staged body IS (cyclist or
+   *  vehicle) is its runner's contact cast — never the sign of this offset
+   *  (sc-roundabout-entry:08a0b701, lane npcstep; `gradedOnlyByOwnRunner`
+   *  below is the one authored opt-out from the runtime's cyclist queries). */
   extraRightOffsetM?: number;
+  /**
+   * GRADED ONLY BY ITS OWN RUNNER (lane npcstep round 4, integrator N9). The
+   * runtime's three graded queries of staged bodies — `cyclistNear` (the
+   * vulnerable-pass tracker's feed: the lateral-clearance duty),
+   * `overtakenNear` (the overtake-return duty) and `sameDirVehiclesNear` (the
+   * lane-entry tracker) — never return this actor; its event's own runner is
+   * the only thing that grades the student against it (the CyclistRightHook
+   * runner's priority situation and its contact channel; the contact bill
+   * itself is unchanged). Authored `true` on exactly the counter-flow rider
+   * of sc-vu-bikelane-turn, a rider coming from AHEAD that the
+   * vulnerable-pass tracker must not grade as a rider being passed. Until
+   * round 4 this opt-out was carried by the SIGN of `extraRightOffsetM` (a
+   * negative offset left the actor out of the A11 cyclist marker); the
+   * queries now read the cast's kind, so the opt-out is this field.
+   * Read only by the CyclistRightHook runner (it stages the actor with it);
+   * pinned over the catalogue by lessons/scenario/__tests__/
+   * npc-shell-cast-kind.test.ts. Absent = graded as its kind says.
+   */
+  gradedOnlyByOwnRunner?: true;
   /** Closed loop path (roundabout circulation). */
   loop?: boolean;
   /** Presentation palette index. */

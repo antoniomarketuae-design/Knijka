@@ -13,22 +13,25 @@
  *     agents around them within the next second or two; everything farther
  *     stays a ghost (documented, deliberate). A fixed pool means a constant
  *     rapier world size — zero allocation churn, no solver-island growth.
- *   - Shells are re-bound to the nearest agents every REASSIGN_INTERVAL_SEC
- *     (~0.5 s) via the pure traffic/proximity helpers. A shell that keeps its
- *     agent glides with setNextKinematicTranslation/Rotation (the physics
- *     engine derives its velocity, so contacts with the player chassis push
- *     realistically). A shell that CHANGES agent teleports with
+ *   - Shells are re-bound to the nearest agents every 0.5 s of the SESSION
+ *     GRID (30 grid points) via the pure traffic/proximity helpers. A shell
+ *     that keeps its agent glides with setNextKinematicTranslation/Rotation
+ *     (the physics engine derives its velocity, so contacts with the player
+ *     chassis push realistically). A shell that CHANGES agent teleports with
  *     setTranslation/setRotation instead — a teleport carries no implied
  *     velocity, so a rebind can never sweep through the player like a ram.
  *   - Dormant shells park far below the district (kinematic bodies never
  *     collide with the fixed world or each other, and the player's kill
  *     plane sits far above the parking depth).
  *   - Each shell carries a mutable `userData` tag ({ kind, npcId }) that
- *     VehicleRig's onCollisionEnter reads to classify the contact — so the
+ *     VehicleRig's contact ear reads to classify the contact — so the
  *     rule engine finally grades collision withWhat "vehicle" / "pedestrian"
- *     / "cyclist" instead of everything being a static object. Staged
- *     cyclist proxies are tagged via traffic.vehicleCollisionKind (their
- *     staged spec's curb offset — audit C3's honest v1 cyclist model).
+ *     / "cyclist" instead of everything being a static object. A shell
+ *     bound to a member of the lesson's staged cast carries the CAST's kind
+ *     (the director's record — one touch, one kind for both reporters;
+ *     scene/npcShells.ts); any other state reads the traffic system's marker
+ *     (traffic.vehicleCollisionKind — the staged spec's curb offset, audit
+ *     C3's honest v1 cyclist model).
  *
  * Near-miss detection is NOT here any more (sc-roundabout-entry:7b747c15
  * round 7). This component stepped the pure stepNearMiss detector once per
@@ -38,43 +41,67 @@
  * that point (scene/nearMissMeter.ts, run by scene/gradeGrid.ts) — over the
  * same FULL agent arrays, ghosts included.
  *
+ * THE POOL IS NOT MOVED HERE ANY MORE EITHER (sc-roundabout-entry:08a0b701,
+ * lane npcstep). This component moved it in its own `useFrame`: once per
+ * render frame, so inside a frame of several physics steps a shell leapt the
+ * whole frame's distance in one step and then stood still, and which agents
+ * held a shell was re-chosen on this component's own clock from the frame's
+ * drawn chassis — one drive met a different body on a different display
+ * (scene/npcShells.ts carries the measurements). The pool is stepped by the
+ * session grid now, once per graded grid point, from the student at that
+ * point (`NpcShellPool.step`, reached through the grid's `shells` hook and
+ * the `shellsRef` this component fills). This file MOUNTS the twelve bodies
+ * and hands the pool to the scene; it reads no frame, no pose and no clock.
+ *
  * Physics cost expectation: 12 colliders + 12 kinematic bodies added to the
  * world, at most 12 potential contact pairs (each shell vs the one dynamic
  * player chassis — kinematic-vs-fixed and kinematic-vs-kinematic pairs are
- * skipped by rapier). Per frame: <=12 kinematic pose writes + one O(agents)
- * scan per 0.5 s. Well under 0.1 ms — no measurable frame budget impact.
+ * skipped by rapier). Per physics step: <=12 kinematic pose writes + one
+ * O(agents) scan per 30 steps — what a 60 Hz display always paid per frame
+ * (scene/__tests__/npc-shells.test.ts measures it).
  *
  * Coordinates: district (x = east, y = north) -> three.js (x, -z), y-up;
  * yaw = atan2(dirX, -dirY) — the same mapping TrafficLayer renders with, so
  * shells sit exactly on the visuals.
  */
 
-import { useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CapsuleCollider,
   CuboidCollider,
   RigidBody,
   type RapierRigidBody,
 } from "@react-three/rapier";
-import type { VehicleSample } from "@/modules/sim/contracts";
+import type { TrafficSystem } from "@/modules/sim/traffic";
 import {
-  assignPool,
-  selectNearest,
-  type TrafficSystem,
-  type VehicleProfile,
-} from "@/modules/sim/traffic";
-import { actorObb, PEDESTRIAN_BODY_RADIUS_M } from "@/modules/sim/collision";
+  createNpcShellTags,
+  NPC_PED_CAPSULE_HALF_HEIGHT_M,
+  NPC_PED_CAPSULE_RADIUS_M,
+  NPC_SHELL_PARK_Y,
+  NPC_VEHICLE_SHELL_HALF_HEIGHT_M,
+  NpcShellPool,
+  npcShellHalfExtents,
+  PED_SHELL_COUNT,
+  pedShellParkX,
+  VEHICLE_SHELL_COUNT,
+  vehicleShellParkX,
+  type NpcColliderUserData,
+  type NpcShellCast,
+  type NpcShellStep,
+} from "@/modules/sim/scene/npcShells";
 
-// --- Shell-pool budget (doc 68 A11). Keep these small and fixed: every shell
-// is a rapier body for the WHOLE session; the pool IS the perf contract.
-export const VEHICLE_SHELL_COUNT = 8;
-export const PED_SHELL_COUNT = 4;
-/** Rebind shells to the nearest agents on this cadence, s. */
-const REASSIGN_INTERVAL_SEC = 0.5;
-/** Agents beyond these radii stay ghosts (unreachable within ~2 s anyway). */
-const VEHICLE_SHELL_RADIUS_M = 130;
-const PED_SHELL_RADIUS_M = 70;
+// The pool's numbers, its sizing and its tag live with the pool
+// (scene/npcShells.ts); re-exported here because this file is where VehicleRig,
+// ScenarioObstacles and the collider tests have always imported them from.
+export {
+  fitVehicleShell,
+  NpcShellPool,
+  npcShellHalfExtents,
+  PED_SHELL_COUNT,
+  readNpcColliderUserData,
+  VEHICLE_SHELL_COUNT,
+  type NpcColliderUserData,
+} from "@/modules/sim/scene/npcShells";
 
 // --- Shell geometry.
 //
@@ -115,7 +142,7 @@ const PED_SHELL_RADIUS_M = 70;
 // `collider.setHalfExtents`. The physics body and the graded body are one
 // fact, and a rig resize moves both at once.
 //
-// Cost: one `actorObb` call + one `setHalfExtents` per REBIND, not per frame.
+// Cost: one `actorObb` call + one `setHalfExtents` per REBIND, not per step.
 // A shell that keeps its agent (the common case) re-sizes nothing.
 //
 // THE FOLLOW-UP THIS ROUTED, AND WHY IT WAS NOT OPTIONAL. This block shipped
@@ -132,123 +159,38 @@ const PED_SHELL_RADIUS_M = 70;
 //
 // It has landed: `npcShellObb` and both constants are DELETED, and
 // `LessonScene.liveContactBodies` sizes its candidates with
-// `actorObb(pose, m.profile)` — literally the call below. One function, one
-// source, nothing left in between for the next resize to leave behind.
-const VEH_HALF_H = 0.7; // box spans 0..1.4 m above the tarmac
-// Height stays one number on purpose: contact here is a GROUND-PLANE fact (the
-// player's chassis box spans ~0.15–0.85 m above the tarmac at every pose), so
-// 1.4 m of shell covers it for a bicycle and for a train alike. Making it
-// profile-tall would change nothing a student can reach.
-const PED_CAPSULE_HALF_HEIGHT = 0.55;
-const PED_CAPSULE_RADIUS = PEDESTRIAN_BODY_RADIUS_M; // 0.3 — capsule spans 0..1.7 m
-const VEH_CENTER_Y = VEH_HALF_H;
-const PED_CENTER_Y = PED_CAPSULE_HALF_HEIGHT + PED_CAPSULE_RADIUS;
-/** Dormant shells rest here — far below the district AND the player's kill
- *  plane, so a parked shell can never be touched. */
-const PARK_Y = -120;
-
-/** Pose the sizing probe is taken at — only the extents are read back, so the
- *  position and heading are arbitrary and constant (allocation-free intent:
- *  one frozen literal, not a per-call object). */
-const SIZING_POSE = { x: 0, y: 0, dirX: 0, dirY: 1 } as const;
-
-/**
- * THE SHELL'S GROUND-PLANE HALF-EXTENTS FOR ONE AGENT — read off `actorObb`,
- * the very function the director's ContactSentinel grades contact with.
- *
- * Not a parallel table and deliberately not a copy of one: a second table is
- * how the 0.92 × 2.10 constants outlived the fleet in the first place. If a
- * rig is resized, `traffic/types` VEHICLE_PROFILE_*_M moves, `actorObb` moves,
- * and the rapier body moves with them on the next rebind.
- *
- * `undefined` profile = "car", exactly as every other reader of that table
- * treats an ambient agent (ambient states never publish `profile`).
- */
-export function npcShellHalfExtents(profile: VehicleProfile | undefined): {
-  halfWidthM: number;
-  halfLengthM: number;
-} {
-  const box = actorObb(SIZING_POSE, profile);
-  return { halfWidthM: box.halfWidthM, halfLengthM: box.halfLengthM };
-}
+// `actorObb(pose, m.profile)` — literally the call the pool sizes with
+// (scene/npcShells.ts). One function, one source, nothing left in between for
+// the next resize to leave behind.
 
 /** Car-sized shell — the declarative mount size. Every shell is re-fitted to
  *  its agent on its first rebind, so this is only ever the size of a shell
- *  that is parked at PARK_Y and bound to nobody. (The near-miss stat's body
- *  envelopes moved with the detector: scene/nearMissMeter.ts.) */
+ *  that is parked at NPC_SHELL_PARK_Y and bound to nobody. (The near-miss
+ *  stat's body envelopes moved with the detector: scene/nearMissMeter.ts.) */
 const CAR_SHELL = npcShellHalfExtents(undefined);
-
-/** Mutable collision tag on each shell body — VehicleRig reads it through
- *  the rapier collision payload (`other.rigidBody.userData`). The object
- *  identity is stable for the shell's lifetime; rebinds mutate it in place. */
-export interface NpcColliderUserData {
-  npcCollider: true;
-  kind: "vehicle" | "pedestrian" | "cyclist";
-  /** Bound TrafficVehicleState/TrafficPedestrianState id, or -1 dormant. */
-  npcId: number;
-}
-
-/**
- * The two methods a shell body has to have for `fitVehicleShell` — declared
- * structurally rather than as `RapierRigidBody` because `@react-three/rapier`
- * carries its OWN nested `@dimforge/rapier3d-compat`, so the two copies' class
- * types are not assignable to each other (they differ on a private field). A
- * headless harness holding the top-level rapier could therefore never call
- * this function, and a fix nobody can drive is a fix nobody can check.
- */
-interface ShellBody {
-  numColliders(): number;
-  collider(i: number): { setHalfExtents(v: { x: number; y: number; z: number }): void };
-}
-
-/**
- * Re-fit shell `body`'s cuboid to `profile` and return the half-length it now
- * carries (−1 when there is no cuboid to fit — a body mid-mount).
- *
- * `setHalfExtents` is a no-op on a non-cuboid shape by rapier's own contract,
- * and these bodies carry exactly one `<CuboidCollider>`, so the guard is the
- * mount race and nothing else. `scratch` is the caller's per-system vector —
- * the frame loop allocates nothing.
- *
- * EXPORTED FOR THE TEST TO CALL FOR REAL, not for convenience. The whole fix
- * rests on rapier honouring a live shape swap on a kinematic body: if
- * `setHalfExtents` were inert, a test that merely built its own correctly
- * sized collider would still be green while every browser kept the car box.
- * `stagedActorColliders.test.ts` drives the player into a shell created
- * car-sized and re-fitted through THIS function, so the swap is measured
- * rather than assumed.
- */
-export function fitVehicleShell(
-  body: ShellBody,
-  profile: VehicleProfile | undefined,
-  scratch: { x: number; y: number; z: number },
-): number {
-  if (body.numColliders() < 1) return -1;
-  const half = npcShellHalfExtents(profile);
-  scratch.x = half.halfWidthM;
-  scratch.y = VEH_HALF_H;
-  scratch.z = half.halfLengthM;
-  body.collider(0).setHalfExtents(scratch);
-  return half.halfLengthM;
-}
-
-/** Narrowing reader for collision handlers (unknown -> tag or null). */
-export function readNpcColliderUserData(value: unknown): NpcColliderUserData | null {
-  return value !== null &&
-    typeof value === "object" &&
-    (value as { npcCollider?: unknown }).npcCollider === true
-    ? (value as NpcColliderUserData)
-    : null;
-}
 
 export interface NpcCollidersProps {
   traffic: TrafficSystem;
-  /** Player pose channel (district space) — LessonScene's shared sample. */
-  sampleRef: React.RefObject<VehicleSample>;
-  paused: boolean;
+  /**
+   * WHERE THE SCENE REACHES THE POOL: this component points the ref at the
+   * mounted pool's step, and the session grid's `shells` hook (LessonScene's
+   * RuntimeDriver) calls it once per graded grid point with that point's
+   * student. Null while nothing is mounted — the grid then poses nothing.
+   * There is NO sample, pose or pause prop: the pool reads the grid's student
+   * and is stepped only when a grid point is graded.
+   */
+  shellsRef: React.RefObject<NpcShellStep | null>;
+  /**
+   * THE LESSON'S STAGED CAST — the director's own record of what each staged
+   * body is (`directorContactCast(director)`, a stable array per director). A
+   * shell bound to a cast member is tagged with the cast's kind, so the rapier
+   * contact and the director's sentinel report one touch as one kind
+   * (scene/npcShells.ts `NpcShellCast`). Empty with no director.
+   */
+  cast: NpcShellCast;
 }
 
-export function NpcColliders({ traffic, sampleRef, paused }: NpcCollidersProps) {
+export function NpcColliders({ traffic, shellsRef, cast }: NpcCollidersProps) {
   const vehBodies = useRef<(RapierRigidBody | null)[]>(
     Array.from({ length: VEHICLE_SHELL_COUNT }, () => null),
   );
@@ -257,167 +199,27 @@ export function NpcColliders({ traffic, sampleRef, paused }: NpcCollidersProps) 
   );
 
   // Stable userData tags — mutated on rebind, never re-created.
-  const [vehTags] = useState<NpcColliderUserData[]>(() =>
-    Array.from({ length: VEHICLE_SHELL_COUNT }, () => ({
-      npcCollider: true as const,
-      kind: "vehicle" as const,
-      npcId: -1,
-    })),
-  );
-  const [pedTags] = useState<NpcColliderUserData[]>(() =>
-    Array.from({ length: PED_SHELL_COUNT }, () => ({
-      npcCollider: true as const,
-      kind: "pedestrian" as const,
-      npcId: -1,
-    })),
+  const [vehTags] = useState<NpcColliderUserData[]>(() => createNpcShellTags(VEHICLE_SHELL_COUNT, "vehicle"));
+  const [pedTags] = useState<NpcColliderUserData[]>(() => createNpcShellTags(PED_SHELL_COUNT, "pedestrian"));
+
+  // The pool's bindings are INDICES into the traffic system's agent arrays, so
+  // a new traffic system gets a new pool (agent-array lengths are fixed after
+  // LessonScene stages the lesson's actors).
+  const pool = useMemo(
+    () => new NpcShellPool(traffic, vehTags, pedTags, cast),
+    [traffic, vehTags, pedTags, cast],
   );
 
-  // All per-frame buffers, allocated once per traffic system (agent-array
-  // lengths are fixed after LessonScene stages the lesson's actors).
-  const pools = useMemo(
-    () => ({
-      // The system the bindings below index into. They are INDICES into its
-      // agent arrays, so a new traffic system gets new pools — which is why
-      // this memo stays keyed on `traffic` now that the near-miss trackers
-      // (which used to size themselves off it here) have moved to the grid.
-      system: traffic,
-      vehAssign: new Int32Array(VEHICLE_SHELL_COUNT).fill(-1),
-      vehBound: new Int32Array(VEHICLE_SHELL_COUNT).fill(-1),
-      vehSelIdx: new Int32Array(VEHICLE_SHELL_COUNT),
-      vehSelD2: new Float64Array(VEHICLE_SHELL_COUNT),
-      pedAssign: new Int32Array(PED_SHELL_COUNT).fill(-1),
-      pedBound: new Int32Array(PED_SHELL_COUNT).fill(-1),
-      pedSelIdx: new Int32Array(PED_SHELL_COUNT),
-      pedSelD2: new Float64Array(PED_SHELL_COUNT),
-      pos: { x: 0, y: PARK_Y, z: 0 },
-      rot: { x: 0, y: 0, z: 0, w: 1 },
-      // Shell re-fitting state. `vehFitBody` is an IDENTITY witness, not a
-      // convenience: a remount hands this loop brand-new car-sized colliders
-      // while `vehBound` still says "already bound", and a truck wearing a car
-      // box is the exact defect this block exists to end. Comparing the body
-      // the fit was applied to (and the size it produced) re-fits through a
-      // remount, an HMR swap and StrictMode's double-mount alike, for two
-      // scalar compares per shell per frame and no allocation.
-      vehFitBody: new Array<RapierRigidBody | null>(VEHICLE_SHELL_COUNT).fill(null),
-      vehFitHalfL: new Float64Array(VEHICLE_SHELL_COUNT).fill(-1),
-      half: { x: 0, y: VEH_HALF_H, z: 0 },
-    }),
-    [traffic],
-  );
-
-  const reassignAtRef = useRef(0);
-
-  useFrame((_, delta) => {
-    if (paused) return;
-    const dt = Math.min(delta, 0.1);
-    const sample = sampleRef.current;
-    const px = sample.position.x;
-    const py = sample.position.y;
-
-    // --- Rebind cadence: nearest-N selection + stable pool assignment.
-    reassignAtRef.current -= dt;
-    if (reassignAtRef.current <= 0) {
-      reassignAtRef.current = REASSIGN_INTERVAL_SEC;
-      const nVeh = selectNearest(
-        traffic.vehicles,
-        px,
-        py,
-        VEHICLE_SHELL_RADIUS_M,
-        pools.vehSelIdx,
-        pools.vehSelD2,
-      );
-      assignPool(pools.vehAssign, pools.vehSelIdx, nVeh);
-      const nPed = selectNearest(
-        traffic.pedestrians,
-        px,
-        py,
-        PED_SHELL_RADIUS_M,
-        pools.pedSelIdx,
-        pools.pedSelD2,
-      );
-      assignPool(pools.pedAssign, pools.pedSelIdx, nPed);
-    }
-
-    const pos = pools.pos;
-    const rot = pools.rot;
-
-    // --- Vehicle shells follow their bound agents.
-    for (let k = 0; k < VEHICLE_SHELL_COUNT; k++) {
-      const body = vehBodies.current[k];
-      if (!body) continue;
-      const idx = pools.vehAssign[k];
-      const rebound = idx !== pools.vehBound[k];
-      if (idx < 0) {
-        if (rebound) {
-          pools.vehBound[k] = -1;
-          vehTags[k].npcId = -1;
-          pos.x = k * 12;
-          pos.y = PARK_Y;
-          pos.z = 0;
-          body.setTranslation(pos, false);
-        }
-        continue;
-      }
-      const v = traffic.vehicles[idx];
-      // THE SHELL IS THIS AGENT'S OWN BODY, not the fleet average. Re-fitted
-      // when the binding changes, when the collider itself is new (remount),
-      // or when the size it should carry has moved — never otherwise, so a
-      // shell that keeps its agent costs one float compare per frame.
-      const wantHalfL = actorObb(SIZING_POSE, v.profile).halfLengthM;
-      if (rebound || pools.vehFitBody[k] !== body || pools.vehFitHalfL[k] !== wantHalfL) {
-        const fitted = fitVehicleShell(body, v.profile, pools.half);
-        pools.vehFitBody[k] = fitted < 0 ? null : body;
-        pools.vehFitHalfL[k] = fitted;
-      }
-      const yaw = Math.atan2(v.dirX, -v.dirY);
-      pos.x = v.x;
-      pos.y = VEH_CENTER_Y;
-      pos.z = -v.y;
-      rot.y = Math.sin(yaw / 2);
-      rot.w = Math.cos(yaw / 2);
-      if (rebound) {
-        // Teleport (no implied velocity) — a rebind must never read as a ram.
-        pools.vehBound[k] = idx;
-        vehTags[k].kind = traffic.vehicleCollisionKind(v.id);
-        vehTags[k].npcId = v.id;
-        body.setTranslation(pos, true);
-        body.setRotation(rot, true);
-      } else {
-        body.setNextKinematicTranslation(pos);
-        body.setNextKinematicRotation(rot);
-      }
-    }
-
-    // --- Pedestrian shells (capsules are yaw-symmetric — translation only).
-    for (let k = 0; k < PED_SHELL_COUNT; k++) {
-      const body = pedBodies.current[k];
-      if (!body) continue;
-      const idx = pools.pedAssign[k];
-      const rebound = idx !== pools.pedBound[k];
-      if (idx < 0) {
-        if (rebound) {
-          pools.pedBound[k] = -1;
-          pedTags[k].npcId = -1;
-          pos.x = 200 + k * 12;
-          pos.y = PARK_Y;
-          pos.z = 0;
-          body.setTranslation(pos, false);
-        }
-        continue;
-      }
-      const p = traffic.pedestrians[idx];
-      pos.x = p.x;
-      pos.y = PED_CENTER_Y;
-      pos.z = -p.y;
-      if (rebound) {
-        pools.pedBound[k] = idx;
-        pedTags[k].npcId = p.id;
-        body.setTranslation(pos, true);
-      } else {
-        body.setNextKinematicTranslation(pos);
-      }
-    }
-  });
+  // Hand the scene this pool's step — and take it back on unmount, or when the
+  // pool changes, so the grid never poses bodies that are gone.
+  useLayoutEffect(() => {
+    const step: NpcShellStep = (k, student, respawned) =>
+      pool.step(k, student, vehBodies.current, pedBodies.current, respawned);
+    shellsRef.current = step;
+    return () => {
+      if (shellsRef.current === step) shellsRef.current = null;
+    };
+  }, [pool, shellsRef]);
 
   return (
     <>
@@ -429,17 +231,17 @@ export function NpcColliders({ traffic, sampleRef, paused }: NpcCollidersProps) 
           }}
           type="kinematicPosition"
           colliders={false}
-          position={[k * 12, PARK_Y, 0]}
+          position={[vehicleShellParkX(k), NPC_SHELL_PARK_Y, 0]}
           userData={tag}
         >
           {/* Mount size = the car profile. Every shell is re-fitted to its
-              own agent on the frame it binds one (see the frame loop), so
-              this is only ever the size of a shell parked at PARK_Y with no
-              agent — and it is a real size rather than a placeholder so a
-              first frame that lands before the first rebind is a car, not a
-              point. */}
+              own agent on the grid point it binds one (NpcShellPool.step), so
+              this is only ever the size of a shell parked at NPC_SHELL_PARK_Y
+              with no agent — and it is a real size rather than a placeholder
+              so a first step that lands before the first rebind is a car, not
+              a point. */}
           <CuboidCollider
-            args={[CAR_SHELL.halfWidthM, VEH_HALF_H, CAR_SHELL.halfLengthM]}
+            args={[CAR_SHELL.halfWidthM, NPC_VEHICLE_SHELL_HALF_HEIGHT_M, CAR_SHELL.halfLengthM]}
             friction={0.5}
             restitution={0.05}
           />
@@ -453,11 +255,11 @@ export function NpcColliders({ traffic, sampleRef, paused }: NpcCollidersProps) 
           }}
           type="kinematicPosition"
           colliders={false}
-          position={[200 + k * 12, PARK_Y, 0]}
+          position={[pedShellParkX(k), NPC_SHELL_PARK_Y, 0]}
           userData={tag}
         >
           <CapsuleCollider
-            args={[PED_CAPSULE_HALF_HEIGHT, PED_CAPSULE_RADIUS]}
+            args={[NPC_PED_CAPSULE_HALF_HEIGHT_M, NPC_PED_CAPSULE_RADIUS_M]}
             friction={0.6}
             restitution={0}
           />

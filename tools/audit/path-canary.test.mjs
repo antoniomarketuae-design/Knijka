@@ -39,10 +39,15 @@ const plan = loadPathRef(lesson, REPO);
  * seed does, `FIXTURE_REFUSAL` below says so by name instead of leaving the coupling silent.
  */
 const CREDIT_WITHDRAWN = { allCredited: false, reachedVerdict: true, stopFaultBooked: false };
+// RE-DERIVED 2026-10-16 (cdtools CD-3): EVERY stop G7 times, not only the gear change. The curvdepth
+// re-author gave sc-park-wall R1 a mid-reverse AUTHORED stop («Спри на половината завой», 1.15 s), and on
+// the seed the gear-change-only search picked it read «authored 0.5–4s/1.15 [NOT SERVED]» once the credit was
+// withdrawn — so «G4 fails alone» failed G7 beside it, the coupling this search exists to exclude. The route
+// end is served by the verdict card (stopServedBasis), which CREDIT_WITHDRAWN keeps.
 const servedWithoutCredit = (b) => {
   const ev = computePathEvidence({ samples: b.books.samples, trace, lesson });
-  const gc = (ev.stops ?? []).filter((x) => x.tag === "gearChange");
-  return gc.length > 0 && gc.every((x) => stopServedBasis(x, CREDIT_WITHDRAWN) !== null);
+  const timed = (ev.stops ?? []).filter((x) => x.tag !== "routeEnd");
+  return timed.some((x) => x.tag === "gearChange") && timed.some((x) => x.tag === "authored") && timed.every((x) => stopServedBasis(x, CREDIT_WITHDRAWN) !== null);
 };
 const FIXTURE_SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 let bench = null;
@@ -57,7 +62,7 @@ for (const seed of FIXTURE_SEEDS) {
   break;
 }
 if (!bench) {
-  FIXTURE_REFUSAL = `no seed of ${FIXTURE_SEEDS.join(",")} drives ${lesson} to a gear-change stop that G7 serves on TIMING alone, so G7 rides on the product's credit and «fails alone» cannot be told apart from it — the fixture, not the gates, is what must be fixed`;
+  FIXTURE_REFUSAL = `no seed of ${FIXTURE_SEEDS.join(",")} drives ${lesson} through a gear-change stop AND its mid-reverse authored stop that G7 serves on TIMING alone, so G7 rides on the product's credit and «fails alone» cannot be told apart from it — the fixture, not the gates, is what must be fixed`;
   bench = runBench({ plan, seed: FIXTURE_SEEDS[0] });
   benchSeed = FIXTURE_SEEDS[0];
 }
@@ -85,6 +90,25 @@ const benchDriveClearance = driveClearance(lesson, [
   ...ledgerFromWitness(plan, 0, 0),
   ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM),
 ]);
+
+/**
+ * HOW FAR SIDEWAYS THE R1 WITNESS MUST BE PUSHED TO TOUCH THE GARAGE WALL — re-derived 2026-10-16 (cdtools CD-3)
+ * from the committed witness, never assumed. On 9390622's wall witness 0.25 m put the chassis 0.047 m inside
+ * the wall; the curvdepth witness clears it by 1.036 m (0.786 m at a 0.25 m shift), so the fixture searches
+ * the shift in 0.05 m steps and the value it finds is pinned below.
+ */
+const shiftedR1 = (lat) => driveClearance(lesson, [
+  ...ledgerFromWitness(plan, 0, 0),
+  ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM, { lat }),
+]);
+const INTO_WALL = (() => {
+  for (let i = 1; i <= 40; i++) {
+    const lat = Math.round(i * 5) / 100;
+    const r = shiftedR1(lat);
+    if (r.verdict === "contact" && /wall/.test(String(r.body))) return { lat, r };
+  }
+  return null;
+})();
 
 const passing = () => ({
   driveClearance: benchDriveClearance,
@@ -183,7 +207,18 @@ test("G3 fails alone when the reverse samples leave the corridor", () => {
  * pose where the car actually meets that wall. G10 fails it, names the wall, and says by how
  * much. That is protection the authored face did not have before.
  */
-test("a reverse 0.25 m into the AUTHORED garage wall: G3's corridor still holds, and G10 fails it by name — the proxy that used to ride on G3 caught neither", () => {
+/* RE-DERIVED 2026-10-16 (cdtools CD-3). Through 9390622 this case shifted the reverse 0.25 m and showed BOTH
+ * halves of the hand-over on one drive: the chassis 0.047 m inside the wall while G3's 0.819 m corridor still
+ * held. On the curvdepth wall witness the wall is 1.036 m away — beyond the re-pinned 0.818 m corridor — so a
+ * reverse that reaches the wall now leaves the corridor too, and «G3 holds while the car is in the wall» has
+ * no subject on the committed witness. That half is DELETED here with this provenance (measured on 9390622:
+ * shift 0.25 m, worst −0.046609 m vs held:wall@5.03,8.6, G3 «R1 max 0.xx/corr 0.819» pass). What is asserted
+ * now: the corridor G3 reads is the re-pinned 0.818, G3 carries no in-bay clause, the shift that reaches the
+ * wall is pinned (1.05 m) and is wider than that corridor, and that pose record fails G10 alone, by name. */
+test("a reverse pushed into the AUTHORED garage wall: G10 fails it alone and by name, G3 carries no in-bay proxy, and on this witness the wall lies outside G3's corridor", () => {
+  assert.ok(INTO_WALL, "no lateral shift up to 2.0 m of the R1 witness reaches the garage wall");
+  assert.equal(INTO_WALL.lat, 1.05, `the shift that reaches the garage wall moved: ${JSON.stringify({ lat: INTO_WALL.lat, worstM: INTO_WALL.r.worstM })}`);
+  assert.equal(shiftedR1(0.25).verdict, "clear", "the 9390622 shift (0.25 m) touches the wall again — this witness is not the curvdepth one");
   const D = 0.25;
   const c = passing();
   let shifted = 0;
@@ -196,19 +231,17 @@ test("a reverse 0.25 m into the AUTHORED garage wall: G3's corridor still holds,
   assert.ok(shifted >= 2, "no reverse sample stood in the bay");
   const g3 = gate(evaluateCanary(c), "G3");
   assert.equal(g3.pass, true, `G3 is the corridor alone now and the corridor holds — got «${g3.why}»`);
-  assert.match(g3.why, /R1 max 0\.\d+\/corr 0\.819/, g3.why);
+  assert.match(g3.why, /R1 max 0\.\d+\/corr 0\.818/, g3.why);
   assert.doesNotMatch(g3.why, /in-bay/, "G3 still carries the retired in-bay proxy");
+  assert.ok(INTO_WALL.lat > 0.818, `the wall is ${INTO_WALL.lat} m away, inside G3's 0.818 m corridor — the deleted half has a subject again, restore it`);
 
-  // …and the same 0.25 m, as a POSE RECORD rather than as samples, fails G10 alone.
-  const wide = driveClearance(lesson, [
-    ...ledgerFromWitness(plan, 0, 0),
-    ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM, { lat: D }),
-  ]);
+  // …and the shift that reaches the wall, as a POSE RECORD rather than as samples, fails G10 alone.
+  const wide = INTO_WALL.r;
   assert.equal(wide.measured, true, wide.why);
-  assert.equal(wide.verdict, "contact", `0.25 m into the wall must read as a contact — got ${wide.verdict} at ${wide.worstM} m`);
+  assert.equal(wide.verdict, "contact", `${INTO_WALL.lat} m into the wall must read as a contact — got ${wide.verdict} at ${wide.worstM} m`);
   assert.match(String(wide.body), /wall/, `it must name the authored wall, got ${wide.body}`);
   assert.equal(driveClearanceGate(wide).pass, false);
-  failsOnlyG10((x) => { x.driveClearance = wide; }, "a drive 0.25 m into the garage wall");
+  failsOnlyG10((x) => { x.driveClearance = wide; }, `a drive pushed ${INTO_WALL.lat} m into the garage wall`);
 });
 
 test("a pathFollow block claiming success while the samples violate G3 still fails", () => {
@@ -333,13 +366,15 @@ test("G10 fails alone on a drive whose clearance is positive but under what it h
   // a real geometry again: walk the witness in until it is inside the required
   // margin but has not touched. Anything in that band is a drive one following
   // error away from a booked «Удар в друго превозно средство».
+  // The search domain was 0.05–0.6 m on the − side, sized to 9390622's witness. The curvdepth witness keeps
+  // 0.77 m from its nearest body, so the domain is now the penetration search's own (0.05–1.2 m, both sides,
+  // re-derived 2026-10-16); the claim — a positive clearance under the margin fails G10 alone — is unchanged.
   let unsafe = null;
-  for (let lat = 0.05; lat <= 0.6; lat += 0.005) {
-    const r = driveClearance(lesson, [
-      ...ledgerFromWitness(plan, 0, 0),
-      ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM, { lat: -lat }),
-    ]);
-    if (r.worstM > 0 && r.worstM < r.requiredM) { unsafe = r; break; }
+  for (let i = 10; i <= 240 && !unsafe; i++) {
+    for (const sign of [-1, 1]) {
+      const r = shiftedR1(sign * i * 0.005);
+      if (r.worstM > 0 && r.worstM < r.requiredM) { unsafe = r; break; }
+    }
   }
   assert.ok(unsafe, "no lateral offset produced a positive clearance under the required margin");
   assert.equal(unsafe.verdict, "unsafe", JSON.stringify(unsafe));
@@ -361,9 +396,10 @@ test("G10 fails alone on a drive whose clearance is positive but under what it h
  * sailed past `INTERP_BOUND_CAP_M` too. Now that row is a named refusal.
  */
 test("H1 a ledger row with no finite (x, z) is a named REFUSAL, never a skipped row", () => {
+  // the witness pushed into the garage wall (INTO_WALL, re-derived 2026-10-16: 1.05 m; it was 0.25 m on 9390622)
   const clean = [
     ...ledgerFromWitness(plan, 0, 0),
-    ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM, { lat: 0.25 }),
+    ...ledgerFromWitness(plan, 1, plan.segments[1].witnesses[0].startAlongM, { lat: INTO_WALL.lat }),
   ];
   const hit = driveClearance(lesson, clean);
   assert.equal(hit.verdict, "contact", `the fixture must penetrate — got ${hit.verdict} at ${hit.worstM}`);

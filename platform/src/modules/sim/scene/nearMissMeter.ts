@@ -26,8 +26,16 @@
  * point's session time (it was NpcColliders' private clock, which ran slow
  * against the session on any frame longer than 0.1 s).
  *
- * Not the rapier shells: NpcColliders still owns the kinematic collider pool
- * (physical contact) and still moves it once per frame.
+ * Not the rapier shells: NpcColliders owns the kinematic collider pool
+ * (physical contact); since sc-roundabout-entry:08a0b701 the grid poses it
+ * too, once per grid point, after this meter (scene/npcShells.ts).
+ *
+ * WHAT A VEHICLE ENCOUNTER IS CALLED (`kind`) is `vehicleCollisionKind` —
+ * since round 3 of that row the CAST's kind for a staged actor its director
+ * casts (the kind its touch is billed as, and the rear badge's noun), the A11
+ * curb-offset marker for any other state. Until then a rider of
+ * sc-vu-bikelane-turn was a «кола» in the debrief's near-miss sentence and a
+ * cyclist on the sheet.
  */
 
 import type { NearMissEvent, NearMissStats, VehicleSample } from "@/modules/sim/contracts";
@@ -41,7 +49,8 @@ import {
 } from "@/modules/sim/traffic";
 
 /** The slice of the traffic system the stat reads: the published agent
- *  arrays (grid state — never the drawn poses) and the cyclist marker. */
+ *  arrays (grid state — never the drawn poses) and what each vehicle state
+ *  is called (`vehicleCollisionKind`: the cast's kind, else the marker). */
 export type NearMissTraffic = Pick<TrafficSystem, "vehicles" | "pedestrians" | "vehicleCollisionKind">;
 
 // --- Body envelopes (metres) — the ones NpcColliders stepped the detector

@@ -37,7 +37,7 @@ import type {
   TrafficControllerSpec,
   TrainPassSpec,
 } from "../contracts";
-import type { ContactCastMember } from "./contact";
+import { contactKindOfProfile, type ContactCastMember } from "./contact";
 import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, playerOverLaneReachM } from "../collision";
 import {
   DEFAULT_RULE_CONFIG,
@@ -233,6 +233,14 @@ function outcomeOf(
  * new policy, they are the numbers each runner already used — first moved to
  * where a retirement could not reach them, now to where the runner itself
  * cannot.
+ *
+ * `withWhat` IS NOT AN ARGUMENT (sc-roundabout-entry:08a0b701, round 2). It
+ * was — defaulting to "vehicle", with the right-hook runner passing "cyclist"
+ * — and the cut-in runner, which stages sc-vu-child-cyclist's CHILD ON A
+ * BICYCLE, never passed it: a touch on the child was reported as a car crash
+ * by the sentinel and as a cyclist by the rapier shell. The kind is read off
+ * the profile the body is sized from (`contactKindOfProfile`), so a runner
+ * cannot cast a bicycle as a car or a car as a bicycle.
  */
 function vehicleCast(
   ownerId: string,
@@ -243,13 +251,12 @@ function vehicleCast(
   /** "combined" = |player| + actor speed; "player" = the player's alone —
    *  whichever the replaced branch tested. */
   closing: "combined" | "player" = "combined",
-  withWhat: "vehicle" | "cyclist" = "vehicle",
   frontalOnly = false,
 ): ContactCastMember {
   return {
     actorId,
     ownerId,
-    withWhat,
+    withWhat: contactKindOfProfile(profile),
     body: "box",
     ...(profile !== undefined ? { profile } : {}),
     minClosingKmh,
@@ -1694,7 +1701,7 @@ export class CyclistRightHookRunner implements EventRunner {
 
   constructor(readonly spec: CyclistRightHookSpec) {
     this.contactCast = [
-      vehicleCast(spec.id, spec.id, spec.actor.profile ?? "cyclist", 3, "player", "cyclist"),
+      vehicleCast(spec.id, spec.id, spec.actor.profile ?? "cyclist", 3, "player"),
     ];
   }
 
@@ -1716,6 +1723,10 @@ export class CyclistRightHookRunner implements EventRunner {
         // on purpose). Authored profiles (e.g. "childCyclist") win.
         profile: s.actor.profile ?? "cyclist",
         playerGuard: true,
+        // The authored opt-out from the runtime's graded cyclist queries
+        // (contracts.ts `gradedOnlyByOwnRunner`) — this runner grades the
+        // actor alone. Absent on every rider but the counter-flow one.
+        ...(s.actor.gradedOnlyByOwnRunner === true ? { gradedOnlyByOwnRunner: true as const } : {}),
       });
       if (!view) throw new Error(`staged event ${s.id}: cyclist path failed to stage`);
     } else {
@@ -1861,7 +1872,7 @@ export class RoundaboutEntryRunner implements EventRunner {
 
   constructor(readonly spec: RoundaboutEntrySpec) {
     this.contactCast = [
-      vehicleCast(spec.id, spec.id, spec.actor.profile, 3, "player", "vehicle", true),
+      vehicleCast(spec.id, spec.id, spec.actor.profile, 3, "player", true),
     ];
   }
 

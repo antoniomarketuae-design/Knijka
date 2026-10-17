@@ -130,7 +130,17 @@ export const REVERSE_POLICY = Object.freeze({
       classAtAuthored: TRACK, devAtAuthoredM: 0.09, policyStartTargetM: -0.25,
       band: band([-1.0, 0.25], 0.25, 2.5), witnessGrid: [-1.0, -0.5, 0],
       expect: { "-1": [TRACK, 0.22, 1], "-0.5": [TRACK, 0.14, 1], "0": [TRACK, 0.09, 0.95] },
-      why: "robust to −1.0 (0.22). The authored annotation at t = 31.88 s says «Спри РАНО … стената не оставя място»: the wall is ahead, so overshoot is not bought",
+      // ── STALE ROW (2026-10-16, cdtools / CD-1) ── The curvdepth re-author moved this
+      // demo's gear change from about (0.9, z −11.66) to (−0.2, z −12.008) and its reverse
+      // onto a 4.6 m minimum-radius swing, so every Slice 0 MEASURED field of this row
+      // (class, devAtAuthoredM, band, witnessGrid, expect, screenedBySlice0, «robust to
+      // −1.0 (0.22)») was measured on the OLD demo and is owed a Slice 0 re-measure; the
+      // Slice 0 tooling is not on disk (scratchpad/ is gitignored). Nothing here was edited
+      // to make the build pass. The ONLY correction is the derived trace-time cite: the
+      // annotation «Спри РАНО …» is at t = 35.18 s in the re-authored trace (31.88 s at
+      // 9390622). The band this row now commits is narrower than declared on the lat −
+      // side (−0.05, pulled by CD-1: build-pathrefs.mjs screenCorners `deviationPulled`).
+      why: "robust to −1.0 (0.22). The authored annotation at t = 35.18 s says «Спри РАНО … стената не оставя място»: the wall is ahead, so overshoot is not bought",
       src: SLICE0,
     }),
   },
@@ -268,14 +278,14 @@ const bay = (x, y, headingDeg, widthM, lengthM) => ({ x, y, headingDeg, widthM, 
  * grades ("last" = the final segment).
  */
 export const PRODUCT = Object.freeze({
-  "sc-park-gap-short": { park: { seg: "last", bay: bay(6.28, 0, 0, 2.5, 4.5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:580-586,760-770" } },
+  "sc-park-gap-short": { park: { seg: "last", bay: bay(6.28, 0, 0, 2.5, 4.5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:580-586,764-774" } },
   "sc-park-gap-long": { park: { seg: "last", bay: bay(6.28, 0, 0, 2.5, 6.5), centerTolM: 0.5, headingTolDeg: 10, entry: "forward", src: "templates-parking3.ts:589-595,904-915" } },
-  "sc-park-van": { park: { seg: "last", bay: bay(5.03, 0, 90, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:598-604,1050-1060" } },
-  "sc-park-45-rev": { park: { seg: "last", bay: bay(4.8, 0, 135, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:607-613,1206-1216" } },
-  "sc-park-left": { park: { seg: "last", bay: bay(-5.03, 0, 270, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:616-622,1333-1343" } },
-  "sc-park-zebra": { park: { seg: "last", bay: bay(6.28, 11.75, 0, 2.5, 5.5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:627-633,1501-1511" } },
-  "sc-park-wall": { park: { seg: "last", bay: bay(5.03, 5.4, 90, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:636-642,1659-1669" } },
-  "sc-park-judge": { park: { seg: "last", bay: bay(6.28, 7.4, 0, 2.5, 4.2), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:663-669,2082-2092" } },
+  "sc-park-van": { park: { seg: "last", bay: bay(5.03, 0, 90, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:598-604,1060-1070" } },
+  "sc-park-45-rev": { park: { seg: "last", bay: bay(4.8, 0, 135, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:607-613,1216-1226" } },
+  "sc-park-left": { park: { seg: "last", bay: bay(-5.03, 0, 270, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:616-622,1343-1353" } },
+  "sc-park-zebra": { park: { seg: "last", bay: bay(6.28, 11.75, 0, 2.5, 5.5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:627-633,1511-1521" } },
+  "sc-park-wall": { park: { seg: "last", bay: bay(5.03, 5.4, 90, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:636-642,1669-1679" } },
+  "sc-park-judge": { park: { seg: "last", bay: bay(6.28, 7.4, 0, 2.5, 4.2), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-parking3.ts:663-669,2104-2114" } },
   "sc-pk-driveway": { park: { seg: "last", bay: bay(8.0, 45.0, 90, 2.7, 5), centerTolM: 0.5, headingTolDeg: 10, entry: "reverse", src: "templates-pk.ts:276-282,347-360" } },
   "sc-ed-poligon-chain": {
     park: { seg: 1, bay: bay(143, -127, 0, 2.6, 5.0), centerTolM: 0.6, headingTolDeg: 12, entry: "reverse", src: "templates-exam.ts:1213,1293-1305" },
@@ -327,38 +337,38 @@ export const STAGED_ACTORS = Object.freeze({
  */
 export const COMMITTED = Object.freeze({
   "sc-park-wall": {
-    0: { corridorM: 0.446 },
-    1: { corridorM: 0.819, band: { alongM: [-1,0.25], latM: [-0.15,0], yawDeg: [-1.5,1.5] } },
+    0: { corridorM: 0.411 },
+    1: { corridorM: 0.818, band: { alongM: [-1,0.25], latM: [-0.05,0.15], yawDeg: [-1.5,1.5] } },
   },
   "sc-park-left": {
-    0: { corridorM: 0.431 },
-    1: { corridorM: 0.82, band: { alongM: [-0.5,1], latM: [-0.05,0.15], yawDeg: [-1.5,1.5] } },
+    0: { corridorM: 0.4 },
+    1: { corridorM: 0.849, band: { alongM: [-0.5,1], latM: [-0.25,0.25], yawDeg: [-2.5,2.5] } },
   },
   "sc-park-zebra": {
-    0: { corridorM: 0.406 },
-    1: { corridorM: 0.821, band: { alongM: [0,1.5], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
-    2: { corridorM: 0.389 },
+    0: { corridorM: 0.404 },
+    1: { corridorM: 0.779, band: { alongM: [0,1.5], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
+    2: { corridorM: 0.372 },
   },
   "sc-park-gap-short": {
-    0: { corridorM: 0.526 },
-    1: { corridorM: 0.82, band: { alongM: [0.5,2], latM: [0,0.25], yawDeg: [-2.5,0] } },
-    2: { corridorM: 0.386 },
+    0: { corridorM: 0.555 },
+    1: { corridorM: 0.688, band: { alongM: [0.5,2], latM: [0,0.25], yawDeg: [-2.5,0] } },
+    2: { corridorM: 0.414 },
   },
   "sc-park-gap-long": {
     0: { corridorM: 0.596 },
   },
   "sc-park-judge": {
-    0: { corridorM: 0.402 },
-    1: { corridorM: 0.774, band: { alongM: [-0.5,1], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
-    2: { corridorM: 0.379 },
+    0: { corridorM: 0.401 },
+    1: { corridorM: 0.729, band: { alongM: [-0.5,1], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
+    2: { corridorM: 0.392 },
   },
   "sc-park-45-rev": {
-    0: { corridorM: 0.535 },
-    1: { corridorM: 0.82, band: { alongM: [0.5,2], latM: [0,0.25], yawDeg: [-2.5,0] } },
+    0: { corridorM: 0.522 },
+    1: { corridorM: 0.702, band: { alongM: [0.5,2], latM: [0,0.25], yawDeg: [-2.5,0] } },
   },
   "sc-park-van": {
-    0: { corridorM: 0.46 },
-    1: { corridorM: 0.82, band: { alongM: [-0.5,1], latM: [-0.15,0.05], yawDeg: [-1.5,1.5] } },
+    0: { corridorM: 0.427 },
+    1: { corridorM: 0.779, band: { alongM: [-0.5,1], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
   },
   "sc-pk-driveway": {
     0: { corridorM: 0.437 },

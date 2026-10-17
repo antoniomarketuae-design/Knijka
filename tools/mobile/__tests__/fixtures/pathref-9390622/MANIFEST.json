@@ -1,0 +1,63 @@
+{
+  "schema": "knijka.pathref-fixture/1",
+  "frozenFrom": "9390622",
+  "why": "FROZEN 2026-10-16 (cdtools lane, CD-3): HEAD 9390622 pathref + shadow-correct trace pairs of the seven parking lessons the curvdepth re-author re-planned. Claims of path-follow.test.mjs / path-body-screen.test.mjs / path-evidence.test.mjs that were MEASURED on these witnesses and lost their subject on the re-planned corpus (micro square-ups, saturated reverse arcs, the old arm bands, the old point-screen over-read) are pinned HERE, loaded through loadPathRef(lesson, this dir), never re-baselined onto the new corpus. Byte-identical to git show 9390622:<path>; every file is sha256-pinned below and the tests refuse a fixture that drifted.",
+  "files": {
+    "content/traces/sc-park-45-rev/shadow-correct.trace.json": {
+      "sha256": "68b166180836d39bf6da57931d0c8c6d26d0e3ae49ddfb80a8e618df696dd49f",
+      "bytes": 154533
+    },
+    "content/traces/sc-park-gap-short/shadow-correct.trace.json": {
+      "sha256": "99ddba1f6e59d952b4c636fd4d2c4a69639f7626201b91610b23804b00b734c5",
+      "bytes": 153966
+    },
+    "content/traces/sc-park-judge/shadow-correct.trace.json": {
+      "sha256": "c09c0f7b7503f112215ad4e433bfc288139ea3e79b6fddb8b1bcba9e818f7d0b",
+      "bytes": 188949
+    },
+    "content/traces/sc-park-left/shadow-correct.trace.json": {
+      "sha256": "b2a43c95113edfd26c4e23f990d5f97d04e193768bffb7a613c0a4b153027552",
+      "bytes": 152996
+    },
+    "content/traces/sc-park-van/shadow-correct.trace.json": {
+      "sha256": "5318b84d564c81a778114e9b1047591f0423519e6b65f833aea8812da9d381f9",
+      "bytes": 152241
+    },
+    "content/traces/sc-park-wall/shadow-correct.trace.json": {
+      "sha256": "4315c3a32b5819af5a2ae1366b842582e61f3aa12ee53814366d58d3c6b48ccf",
+      "bytes": 162868
+    },
+    "content/traces/sc-park-zebra/shadow-correct.trace.json": {
+      "sha256": "2b9a75f4b4317109ea7491610224442448dbf78338b784da6d68d984840c8736",
+      "bytes": 166973
+    },
+    "tools/mobile/path-refs/sc-park-45-rev.pathref.json": {
+      "sha256": "1c53a38e0a228930e497c02a2f34259e20ac9050433702e3c8fcc65a57c24bbe",
+      "bytes": 78444
+    },
+    "tools/mobile/path-refs/sc-park-gap-short.pathref.json": {
+      "sha256": "2053846e5c9fae94a3ed208be5f54df39944663cd881c0ee70418a52e516c53a",
+      "bytes": 81918
+    },
+    "tools/mobile/path-refs/sc-park-judge.pathref.json": {
+      "sha256": "2f29896cd15f9552c012317122055a4b4bc34ffd07e4a092092ef2d286a96b77",
+      "bytes": 82862
+    },
+    "tools/mobile/path-refs/sc-park-left.pathref.json": {
+      "sha256": "2c1dd99f2ce63fd0c7cf04a4b93f0f55b51b2f74719da8347fa328c404740b76",
+      "bytes": 91117
+    },
+    "tools/mobile/path-refs/sc-park-van.pathref.json": {
+      "sha256": "815df023b02463489074d8b8a60292fe7720bfaaf55751059501a8e58b541319",
+      "bytes": 80267
+    },
+    "tools/mobile/path-refs/sc-park-wall.pathref.json": {
+      "sha256": "eced6a78cf1933fe83ca1f53751c2dcbecbe655b64b2e9c486ba030c074dfe27",
+      "bytes": 81039
+    },
+    "tools/mobile/path-refs/sc-park-zebra.pathref.json": {
+      "sha256": "777a5d04188a7bae691079e07534e8a2c292c9325418fb4bdd943171d8db5255",
+      "bytes": 85688
+    }
+  }
+}

@@ -37,11 +37,19 @@ import { GENERATOR, emitDecision, pickStop } from "../lib/path-plan/build-pathre
 import { REVERSE_LOCK_AUTHORITY } from "../lib/path-plan/policy.mjs";
 import { PATH_TUNE, createPathState, witnessBodyGate } from "../lib/path-follow.mjs";
 import { BRAKE_SCAN_SPACING_M, DRIVE_CLEARANCE_FLOOR_M, bodyClearanceGuard, driveClearance, driveClearanceGate } from "../lib/drive-clearance.mjs";
+import { HEAD_FIXTURE_LESSONS, HEAD_FIXTURE_ROOT, verifyHeadFixture } from "./fixtures/pathref-9390622.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..", "..");
 const PATHREF_DIR = resolve(REPO, "tools", "mobile", "path-refs");
 const refOf = (lesson) => JSON.parse(readFileSync(resolve(PATHREF_DIR, `${lesson}.pathref.json`), "utf8"));
+// THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16; fixtures/pathref-9390622.mjs): the §3/§6 claims measured on the
+// witnesses the curvdepth re-plan replaced are read HERE, verified byte for byte first, never re-baselined.
+verifyHeadFixture();
+const headRefOf = (lesson) => {
+  if (!HEAD_FIXTURE_LESSONS.includes(lesson)) throw new Error(`${lesson} is not in the frozen 9390622 fixture`);
+  return JSON.parse(readFileSync(resolve(HEAD_FIXTURE_ROOT, "tools", "mobile", "path-refs", `${lesson}.pathref.json`), "utf8"));
+};
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} ${a} vs ${b} (tol ${tol})`);
 
 /**
@@ -343,11 +351,26 @@ describe("§3 the sc-park-left witness the canary drove is refused", () => {
     assert.deepEqual(refused, [], "the set of lessons whose committed plan drives through a body has moved");
   });
 
-  it("a refusal is not the only output: a merely TIGHT witness caveats instead of blocking, and a pool-only penetration never blocks", () => {
-    const g = screenPathrefSegments("sc-park-45-rev", refOf("sc-park-45-rev").segments);
+  // PINNED ON THE FROZEN 9390622 PAIR (CD-3): the curvdepth re-plan's 45-rev witnesses clear every pool model,
+  // so on the corpus this lesson has no caveat to show (0). The mechanism is still exercised on the corpus by
+  // sc-park-gap-short — re-derived in the case after this one.
+  it("a refusal is not the only output (9390622 fixture): a merely TIGHT witness caveats instead of blocking, and a pool-only penetration never blocks", () => {
+    const g = screenPathrefSegments("sc-park-45-rev", headRefOf("sc-park-45-rev").segments);
     assert.equal(g.problems.length, 0, "45-rev's mounted models are all clear of its witnesses");
     assert.ok(g.caveats.length >= 1, "…but its seg-0 approach is inside the warn band and its pool-worst penetrates");
     assert.ok(g.caveats.some((c) => /kargo_v/.test(c) && /deterministic/.test(c)), `a pool-only penetration must be caveated and explained: ${JSON.stringify(g.caveats)}`);
+  });
+
+  // RE-DERIVED on the curvdepth corpus (2026-10-16, cdtools probe bs-probe.mjs): sc-park-gap-short's committed
+  // witnesses block nothing and carry 6 caveats, 5 of them a pool-only kargo_v penetration explained as the
+  // deterministic draw; sc-park-45-rev carries none. Counts pinned exactly (9390622: gap-short 4 / 3, 45-rev 1).
+  it("a refusal is not the only output on the live corpus: sc-park-gap-short caveats 6 times (5 pool-only kargo_v) and blocks nothing; sc-park-45-rev is clean", () => {
+    const g = screenPathrefSegments("sc-park-gap-short", refOf("sc-park-gap-short").segments);
+    assert.equal(g.problems.length, 0, JSON.stringify(g.problems));
+    assert.equal(g.caveats.length, 6, JSON.stringify(g.caveats));
+    assert.equal(g.caveats.filter((c) => /kargo_v/.test(c) && /deterministic/.test(c)).length, 5, JSON.stringify(g.caveats));
+    const r = screenPathrefSegments("sc-park-45-rev", refOf("sc-park-45-rev").segments);
+    assert.deepEqual([r.problems.length, r.caveats.length], [0, 0], JSON.stringify(r.caveats));
   });
 
   it("the mounted model is a fact about the lesson, not a coin flip: the same bay gives the same model every time", () => {
@@ -644,13 +667,17 @@ describe("§5b the reverse wheel the car has, and the tie between equally clear 
  * unchanged at 0.0227 m. The claim got STRONGER, the assumption it refutes did
  * not move, and the number is re-pinned rather than relaxed to a range.
  */
+/* RE-PINNED 2026-10-16 (cdtools CD-3). The curvdepth re-plan moved every witness of these six lessons, and the
+ * worst over-read on the CORPUS is now 0.000987 m (sc-park-left F0 — no reverse straddles a corner any more). The
+ * 0.0318 m claim is kept on the frozen 9390622 pairs it was measured on (the first case), never relaxed to fit;
+ * the corpus figure is pinned exactly in the second, so a re-plan that brings a corner straddle back reads red. */
 describe("§6 the swept screen", () => {
-  it("the point screen OVER-READS a committed witness by up to 0.0318 m — 3.2x the term the floor assumed", () => {
+  it("the point screen OVER-READS a committed witness by up to 0.0318 m — 3.2x the term the floor assumed (9390622 fixture)", () => {
     let worstOverRead = { m: 0 };
     for (const lesson of ["sc-park-gap-short", "sc-park-left", "sc-park-wall", "sc-park-zebra", "sc-park-van", "sc-park-judge"]) {
       const m = mountedBodies(lesson);
       if (!m.count) continue;
-      for (const seg of refOf(lesson).segments) {
+      for (const seg of headRefOf(lesson).segments) {
         for (const w of seg.witnesses) {
           if (!w.rows?.length) continue;
           const r = worstMountedClearance(w.rows, m);
@@ -666,6 +693,26 @@ describe("§6 the swept screen", () => {
     // and it is CORNER-TO-CORNER geometry, not a constant: the face-to-face
     // lessons really are at the assumed order of magnitude, which is why no single
     // number could have covered both
+    const faceToFace = worstMountedClearance(headRefOf("sc-park-left").segments[1].witnesses[0].rows, mountedBodies("sc-park-left"));
+    assert.ok(faceToFace.pointSamplingM < 0.001, `sc-park-left over-read ${faceToFace.pointSamplingM}`);
+  });
+
+  it("on the live corpus the worst point-screen over-read is 0.000987 m (sc-park-left F0) — re-pinned exactly, and the face-to-face case still under 1 mm", () => {
+    let worstOverRead = { m: 0 };
+    for (const lesson of ["sc-park-gap-short", "sc-park-left", "sc-park-wall", "sc-park-zebra", "sc-park-van", "sc-park-judge"]) {
+      const m = mountedBodies(lesson);
+      if (!m.count) continue;
+      for (const seg of refOf(lesson).segments) {
+        for (const w of seg.witnesses) {
+          if (!w.rows?.length) continue;
+          const r = worstMountedClearance(w.rows, m);
+          assert.ok(r.pointWorst >= r.worst - 1e-9, `${lesson} seg${seg.k} w${w.startAlongM}: point ${r.pointWorst} < swept ${r.worst}`);
+          if (r.pointSamplingM > worstOverRead.m) worstOverRead = { m: r.pointSamplingM, lesson, seg: seg.k, w: w.startAlongM };
+        }
+      }
+    }
+    near(worstOverRead.m, 0.000987, 5e-7, `the corpus's worst over-read moved: ${JSON.stringify(worstOverRead)}`);
+    assert.deepEqual([worstOverRead.lesson, worstOverRead.seg, worstOverRead.w], ["sc-park-left", 0, 0], JSON.stringify(worstOverRead));
     const faceToFace = worstMountedClearance(refOf("sc-park-left").segments[1].witnesses[0].rows, mountedBodies("sc-park-left"));
     assert.ok(faceToFace.pointSamplingM < 0.001, `sc-park-left over-read ${faceToFace.pointSamplingM}`);
   });
@@ -698,9 +745,12 @@ describe("§6 the swept screen", () => {
     );
   });
 
-  it("refinement converges: the same answer from every scan spacing, while the raw scan does not", () => {
+  // PINNED ON THE FROZEN 9390622 PAIR (CD-3): on the curvdepth corpus no reverse witness's raw scans disagree
+  // by more than 4.6e-5 m (sc-park-left R1 −0.5; gap-short's +1 by 6e-6), so the defect refinement exists for
+  // has no subject there; on 9390622's gap-short +1 it does.
+  it("refinement converges (9390622 fixture): the same answer from every scan spacing, while the raw scan does not", () => {
     const boxes = mountedBodies("sc-park-gap-short").bodies.map((b) => b.box);
-    const poses = refOf("sc-park-gap-short").segments[1].witnesses.find((w) => w.startAlongM === 1).rows.map(poseOfRow);
+    const poses = headRefOf("sc-park-gap-short").segments[1].witnesses.find((w) => w.startAlongM === 1).rows.map(poseOfRow);
     const at = (sp) => sweptSeparation(poses, boxes, { spacingM: sp });
     const refined = [0.05, 0.01, 0.0025, 0.0005].map((sp) => at(sp).worst);
     for (const v of refined) near(v, refined[0], 1e-6, "refined values must agree across spacings");

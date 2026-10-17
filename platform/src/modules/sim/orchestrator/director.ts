@@ -576,5 +576,16 @@ export function createScenarioDirector(
 ): ScenarioDirector {
   const director = new ScenarioDirectorImpl(events, traffic, opts);
   castByDirector.set(director, director.contactCast);
+  // ONE FACT, ONE SOURCE (sc-roundabout-entry:08a0b701 round 3): what each
+  // cast vehicle IS reaches the traffic system from the cast itself, so every
+  // reader that names the body — the shell's tag, the rear badge, the
+  // near-miss stat — says what its runner bills.
+  if (traffic.setStagedContactKind) {
+    for (const m of director.contactCast) {
+      if (m.body === "box" && (m.withWhat === "vehicle" || m.withWhat === "cyclist")) {
+        traffic.setStagedContactKind(m.actorId, m.withWhat);
+      }
+    }
+  }
   return director;
 }

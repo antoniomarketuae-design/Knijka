@@ -132,6 +132,31 @@ describe("demo curvature census — every committed demo against the product car
     expect(census.offenders.filter((r) => r.lesson === "sc-park-bay-exit-rev")).toEqual([]);
   });
 
+  it("PINNED: every demo of the nine parking-depth lessons re-authored on the car's own circle (catalogue-demo-curvature:dae908c7, family curvdepth)", () => {
+    // traces/scParkDepth.ts — its nine curvature-programme drills, three demos
+    // each. (sc-park-gap-long is the tenth drill of that file and was never an
+    // offender; it is measured like everything else and pinned by the census.)
+    const FAMILY = [
+      "sc-park-gap-short",
+      "sc-park-van",
+      "sc-park-45-rev",
+      "sc-park-left",
+      "sc-park-zebra",
+      "sc-park-wall",
+      "sc-park-night",
+      "sc-park-double",
+      "sc-park-judge",
+    ];
+    for (const lesson of FAMILY) {
+      const rows = all.filter((r) => r.lesson === lesson);
+      expect(rows, lesson).toHaveLength(3);
+      for (const r of rows) {
+        expect(r.worstRadiusM, `${lesson} ${r.demo}`).toBeGreaterThanOrEqual(KINEMATIC_CENTRE_RADIUS_M);
+      }
+    }
+    expect(census.offenders.filter((r) => FAMILY.includes(r.lesson))).toEqual([]);
+  });
+
   it("REPORTED: the offenders are exactly the committed census (a change here must be looked at)", () => {
     if (WRITE) writeFileSync(CENSUS_FILE, JSON.stringify(census, null, 2) + "\n");
     const pinned = JSON.parse(readFileSync(CENSUS_FILE, "utf-8")) as Census;

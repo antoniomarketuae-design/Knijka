@@ -104,6 +104,10 @@ export const PATH_TUNE = Object.freeze({
   // (20/20), lateral box margin 0.082 m, lengthwise 0.375 m; no other lesson loses a pass, a clearance or a
   // corridor (the SQD case pins gap-short's heading on seeds 7–10).
   terminal: Object.freeze({ on: true, startM: 2.0, fullM: 1.0, dMinM: 0.5 }),
+  // THE FINAL FORWARD PULL-IN's run-out anticipation (CD-2, 2026-10-16; isFinalPullIn). `on: false` is the
+  // follower as it stood at the curvdepth landing — kept only so the CD-2 tests can measure what it buys and
+  // prove every other lesson is driven pose for pose as before.
+  pullIn: Object.freeze({ on: true }),
   pedals: Object.freeze({
     landS: 0.1, aMaxMps2: 3, pressMarginKmh: 0.5,
     wOnBelowKmh: 0.8, trimOverKmh: 2.0, trimReleaseKmh: 0.5,
@@ -2313,6 +2317,43 @@ function steerCommand(state, u, obs, v) {
   return m.k;
 }
 
+/**
+ * THE FINAL FORWARD PULL-IN (CD-2, 2026-10-16), pure: the plan's LAST segment, forward, NOT a
+ * micro square-up, entered from the rest its preceding REVERSE left.
+ *
+ * WHY IT IS NAMED. The curvdepth re-author (scParkDepth.ts) replaced the 0.42–0.76 m micro
+ * square-ups of sc-park-gap-short, -judge and -zebra with real forward pull-ins of 1.52 / 1.94 /
+ * 2.48 m, and their reverses now end OUTSIDE the product box by design (gap-short lon −1.207,
+ * judge −1.937): the park is credited only after this pull-in. Measured on the bench (seeds 7–10,
+ * cdtools probe gs-1.txt / f2-trace): the follower drives it from rest, W ramps past the crawl
+ * ceiling, the D stop trigger latches its COAST branch at 2.0–2.7 km/h (under PRESS_MIN 2.58, so
+ * S cannot be pressed), and the lifted pedal keeps DRIVING the car up to 3.2 km/h before the coast
+ * begins — the car came to rest 0.87–1.04 m past the end on gap-short and judge (0/4 credited each),
+ * 1.47 m on zebra seed 8, and gap-short seed 8 drove into lotgs-bay-4 (body-clearance, F2).
+ * `stopTrigger`'s coast branch books the release at constant speed; that is the exact defect the
+ * micro creep's `creepLiftRunOutM` anticipation was built for on 2026-09-21, and this applies it,
+ * unchanged, to the one segment shape that now has the micro's physics without being a micro.
+ *
+ * SCOPE, AND WHY IT IS THE COAST BRANCH ONLY (forwardStep). Above PRESS_MIN the trigger brakes and
+ * its brake model stands. sc-park-bay-exit-rev F1 is a forward after a reverse too, but it carries
+ * an authored (walker) stop, so it is not one run to the route end and is excluded by shape: measured
+ * with it included, seed 8's last 2.9 m after the walker stop came to rest 1.07 m SHORT (the pedal
+ * bound from the segment's first W over-reads a re-pressed pedal) where it rested 0.07 m short
+ * before. sc-ed-poligon-chain F6 qualifies but is never reached on the bench (F4 gear-change-missed,
+ * T9.c todo), so its invariance there is vacuous and is said so. Every lesson ending in a reverse,
+ * and every segment before the last, never reaches it (path-follow.test.mjs CD-2 invariance).
+ */
+export function isFinalPullIn(plan, segIndex) {
+  const segs = plan?.segments;
+  if (!Array.isArray(segs) || segIndex !== segs.length - 1 || segIndex < 1) return false;
+  const seg = segs[segIndex];
+  // ONE RUN, FROM THE REVERSE'S REST TO THE ROUTE END: a segment that carries any other stop is
+  // not a pull-in (sc-park-bay-exit-rev F1 waits for its walker 2.9 m before its route end, and is
+  // driven as before).
+  return seg?.gear === 1 && seg.micro !== true && segs[segIndex - 1]?.gear === -1
+    && Array.isArray(seg.stops) && seg.stops.length > 0 && seg.stops.every((st) => st.tag === "routeEnd");
+}
+
 function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys, { releaseLatch }) {
   const tune = state.tune ?? PATH_TUNE;
   const seg = segOf(state);
@@ -2409,18 +2450,27 @@ function forwardStep(state, obs, cmd, row, pose, psi, v, vAbs, stepM, now, keys,
   // bound from above can only lift early.
   const aCoastNow = state.aCoastMeas ?? tune.pedals.aCoastMps2;
   let anticipateM = 0;
-  if (creep && (seg.micro === true || state.creepYaw) && Number.isFinite(toStopM) && !state.latch.brake && !state.latch.coast) {
-    const pedal = Number.isFinite(state.creepWAt) ? clamp((now - state.creepWAt) / 1000 / CREEP_THROTTLE.attackS, 0, 1) : 0;
+  // THE FINAL FORWARD PULL-IN (CD-2, 2026-10-16): the same run-out, on the coast branch only.
+  // …and only toward the route end: an authored stop earlier on such a segment is driven as before
+  const pullIn = !creep && (tune.pullIn ?? PATH_TUNE.pullIn).on === true && stop?.tag === "routeEnd" && isFinalPullIn(state.plan, state.segIndex);
+  if (((creep && (seg.micro === true || state.creepYaw)) || pullIn) && Number.isFinite(toStopM) && !state.latch.brake && !state.latch.coast) {
+    const wAt = pullIn ? state.pullInWAt : state.creepWAt;
+    const pedal = Number.isFinite(wAt) ? clamp((now - wAt) / 1000 / CREEP_THROTTLE.attackS, 0, 1) : 0;
     const runOut = creepLiftRunOutM({ vKmh: vAbs, pedal, aCoast: aCoastNow, landS: tune.runner.pollMs / 1000, aMax: tune.pedals.aMaxMps2 });
     const trig = stopTrigger({ gear: 1, vAbs, vGate: Math.min(vAbs, Number.isFinite(obs.dialKmh) && obs.dialKmh >= 0 ? obs.dialKmh : vAbs), aBrake: state.aBrakeMeas, aCoast: aCoastNow, landS: tune.pedals.landS, pressMin: pressMinFor(tune.pedals) }, tune.pedals);
-    anticipateM = Math.max(0, runOut - trig.distM);
-    row.runOut = r3(runOut);
+    // On the pull-in the run-out is the stop only where the brake cannot be pressed (the coast
+    // branch); on the brake branch the trigger's own brake model stands, exactly as before.
+    if (!pullIn || trig.branch === "coast") {
+      anticipateM = Math.max(0, runOut - trig.distM);
+      row.runOut = r3(runOut);
+    }
   }
   const g = pedalGrammar(state.latch, {
     gear: 1, vAbs, dialKmh: obs.dialKmh, vT, toStopM, aBrake: state.aBrakeMeas,
     aCoast: aCoastNow, keys, release: releaseLatch, anticipateM,
   }, tune.pedals);
   if (creep && (seg.micro === true || state.creepYaw) && g.W && !Number.isFinite(state.creepWAt)) state.creepWAt = now;
+  if (pullIn && g.W && !Number.isFinite(state.pullInWAt)) state.pullInWAt = now;
   if (g.latch.brake !== state.latch.brake || g.latch.coast !== state.latch.coast) {
     if ((g.latch.brake || g.latch.coast) && bk) {
       bk.branch = g.trigger?.branch ?? null;
@@ -3074,6 +3124,7 @@ function forwardSettleStep(state, obs, cmd, row, pose, psi, vAbs, now, keys) {
   state = enterForward(state, pose, psi);
   if (state.mode === "refused") return refusedStep(state, obs, cmd, row, vAbs, keys, now);
   state.mode = "follow";
+  state.pullInWAt = null;
   return out(release(state), { ...cmd, steer: 0, W: false, S: false, why: `F${seg.k} acquired` }, { ...row, why: "forward-acquired" });
 }
 

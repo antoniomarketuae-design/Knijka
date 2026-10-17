@@ -441,7 +441,16 @@ describe("G · R1 AS A CLASS — the objective's own speed toasts print numbers 
     });
     return out;
   }
-  it("the 9 committed legs that read «… не повече от 10 км/ч, а стигна дотук с 10 км/ч» (and the same at 8 and at 6) now state a speed the printed numbers bear out", () => {
+  // THE NINTH LEG LEFT THE CLASS (catalogue-demo-curvature:dae908c7, 2026-10-11).
+  // sc-park-double L1 mistake-wide-run-up was one of these: its old demo drove
+  // on THROUGH four parked cars of the opposite row and into the setup disc at
+  // the cap's own whole number. Re-authored on the car's circle, the demo stops
+  // on the first car it touches (y = −7.2), 13 m short of the gate, so it reads
+  // no objective toast at all — pinned below, so that a ninth leg coming back
+  // is looked at rather than assumed.
+  const DOUBLE_WIDE_RUN_UP: Recorder = ((d: unknown, name: never, extra: { onTick: (t: SimTick) => void }) =>
+    recordScParkDepthDrive(d, "sc-park-double" as never, name, extra)) as Recorder;
+  it("the 8 committed legs that read «… не повече от 10 км/ч, а стигна дотук с 10 км/ч» (and the same at 8) now state a speed the printed numbers bear out", () => {
     const legs: Array<[typeof SC_PARK_45, ScenarioLevel, Recorder, string]> = [
       [SC_PARK_45, 3, recordScPark45Drive as unknown as Recorder, "shadow-correct"],
       [SC_PARK_45, 5, recordScPark45Drive as unknown as Recorder, "shadow-correct"],
@@ -451,8 +460,8 @@ describe("G · R1 AS A CLASS — the objective's own speed toasts print numbers 
       [SC_PARK_PERP_FORWARD, 2, recordScParkPerpForwardDrive as unknown as Recorder, "mistake-early-turn"],
       [SC_PARK_PERP_FORWARD, 3, recordScParkPerpForwardDrive as unknown as Recorder, "mistake-early-turn"],
       [SC_PARK_PERP_FORWARD, 5, recordScParkPerpForwardDrive as unknown as Recorder, "mistake-early-turn"],
-      [SC_PARK_DOUBLE, 1, ((d: unknown, name: never, extra: { onTick: (t: SimTick) => void }) => recordScParkDepthDrive(d, "sc-park-double" as never, name, extra)) as Recorder, "mistake-wide-run-up"],
     ];
+    expect(objectiveToasts(SC_PARK_DOUBLE, 1, DOUBLE_WIDE_RUN_UP, "mistake-wide-run-up")).toEqual([]);
     const opened: string[] = [];
     for (const [spec, lv, rec, name] of legs) {
       const toasts = objectiveToasts(spec, lv, rec, name).filter((x) => x.includes("не повече от"));

@@ -165,7 +165,11 @@ describe("the static-contact census — one drive, one sheet, on every display",
       }
       expect(contacts, "the drives struck nothing — the census proves nothing").toBeGreaterThan(all.length / 2);
       expect(wrong.slice(0, 12)).toEqual([]);
-    });
+      // An explicit budget, as the other cadence censuses carry: each level drives every body on every cadence and phase, ~37–60 s on an
+      // idle box. Under load it ran 61–117 s and the 60 s default timed it out with no assertion failing (whycut r3 lane; gate «nscdt»,
+      // 2026-10-16). The assertions are unchanged. Measured 2026-10-17, the file alone on an otherwise idle box: 239 s of tests at 9390622,
+      // 462 s with the npcstep landing — its drive harness now executes the scene's real frame region and step-loop grade on every step.
+    }, 600_000);
   }
 
   it("60 Hz, every cell: the step record began exactly the contacts @react-three/rapier handed the old onCollisionEnter — one per manifold the started pair HOLDS, in solver contact or not", () => {

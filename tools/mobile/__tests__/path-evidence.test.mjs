@@ -15,6 +15,7 @@ import { describe, it } from "node:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HEAD_FIXTURE_LESSONS, HEAD_FIXTURE_ROOT, verifyHeadFixture } from "./fixtures/pathref-9390622.mjs";
 import { routeDeviation } from "../lib/guidance.mjs";
 import { segmentPoints } from "../lib/path-plan/geom.mjs";
 import { corridorFor, ARM_ROLL_ALLOW_M } from "../lib/path-plan/policy.mjs";
@@ -37,6 +38,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..", "..");
 const SRC = resolve(REPO, "tools", "mobile", "lib", "path-evidence.mjs");
 const traceOf = (l) => JSON.parse(readFileSync(resolve(REPO, "content", "traces", l, "shadow-correct.trace.json"), "utf8"));
+// THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16; fixtures/pathref-9390622.mjs), verified byte for byte first
+verifyHeadFixture();
+const headTraceOf = (l) => {
+  if (!HEAD_FIXTURE_LESSONS.includes(l)) throw new Error(`${l} is not in the frozen 9390622 fixture`);
+  return JSON.parse(readFileSync(resolve(HEAD_FIXTURE_ROOT, "content", "traces", l, "shadow-correct.trace.json"), "utf8"));
+};
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ""} ${a} vs ${b} (tol ${tol})`);
 
 /** Outer-tick samples along a trace's segments: every `every`-th authored point, shifted `lat` m. */
@@ -268,9 +275,14 @@ describe("§12.2 path-evidence", () => {
     // the real samples: an arrival the drive never reached is null and blocks the release
     const dw = arrivalLagFromSamples(samplesAlong(traceOf("sc-pk-driveway")), traceOf("sc-pk-driveway"), "sc-pk-driveway");
     assert.equal(attributeMistakes(code, [], traceWithChannels, { ...cleanIndep, arrivals: dw }).release.released, false);
-    // overshootFromSamples carries micro through, so the exemption is reachable from real evidence
+    // overshootFromSamples carries micro through, so the exemption is reachable from real evidence — on the
+    // frozen 9390622 zebra trace (CD-3): the curvdepth re-author turned its 0.42 m square-up into a 2.48 m
+    // forward pull-in, and no corpus trace has a micro segment any more (the census below, re-derived)
     const zb = "sc-park-zebra";
-    assert.ok(overshootFromSamples(samplesAlong(traceOf(zb)), traceOf(zb), zb).some((s) => s.micro === true));
+    assert.ok(overshootFromSamples(samplesAlong(headTraceOf(zb)), headTraceOf(zb), zb).some((s) => s.micro === true));
+    const corpusMicro = readdirSync(resolve(REPO, "tools", "mobile", "path-refs")).map((x) => x.replace(".pathref.json", ""))
+      .filter((l) => overshootFromSamples(samplesAlong(traceOf(l)), traceOf(l), l).some((sp) => sp.micro === true));
+    assert.deepEqual(corpusMicro, [], `a corpus trace carries a micro segment again (${corpusMicro.join(", ")}) — read the exemption from it`);
   });
 
   it("attributeMistakes release is computable and ONE-WAY (2,000 random cases)", () => {

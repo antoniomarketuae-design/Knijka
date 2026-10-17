@@ -729,7 +729,7 @@ export const SC_PARK_GAP_SHORT: ScenarioSpec = {
     // 61 ch
     { n: 1, textBg: "Спри успоредно на предната кола, задна броня срещу задната ѝ." },
     // 53 ch — the lateral offset is an instruction, not scenery: it is what
-    // makes the 45° swing fit a 7.3 m gap, so it keeps a step of its own.
+    // makes the swing fit a 7.3 m gap, so it keeps a step of its own.
     { n: 2, textBg: "Дръж около половин метър странично разстояние до нея." },
     // 70 ch
     { n: 3, textBg: "Спри наистина — под 6 км/ч, практически в покой: оттук се мери всичко." },
@@ -741,10 +741,14 @@ export const SC_PARK_GAP_SHORT: ScenarioSpec = {
     { n: 6, textBg: "Включи на задна — огледала, после през рамо — и волана ДОКРАЙ надясно." },
     // 43 ch
     { n: 7, textBg: "Помни: в късо място половин волан не стига." },
-    // 79 ch
-    { n: 8, textBg: "Върни назад до около 45°, после докрай наляво — щом бронята ти подмине нейната." },
-    // 76 ch
-    { n: 9, textBg: "Влез до дъното, подкарай леко напред за центъра и спри успоредно на бордюра." },
+    // 79 ch — «около 40°» (curvdepth round 2): the product car, from half a
+    // metre out, comes round 39° at reference point 2 in this slot; «45°» was
+    // the angle of a car that turns tighter than this one can.
+    { n: 8, textBg: "Върни назад до около 40°, после докрай наляво — щом бронята ти подмине нейната." },
+    // 80 ch — ONE correction, as teach.examinerBg's standard says: the pull
+    // forward is 1.5 m with the wheel right, not „леко", and it straightens the
+    // car rather than centring it (it stops 0.3 m ahead of the middle).
+    { n: 9, textBg: "Влез до дъното, после напред с волан надясно, докато застанеш успоредно, и спри." },
     // 61 ch
     { n: 10, textBg: "Включи късите светлини ПРЕДИ маневрата, ако е тъмно или вали." },
   ],
@@ -1010,7 +1014,7 @@ export const SC_PARK_VAN: ScenarioSpec = {
     // this file). It read „Дръж около метър и половина странично от реда." — a
     // state with no WHEN — then became a step-2 act, and a step-2 act on this
     // drill is an act the phone does not always paint. The recorded correct
-    // drive leaves the curb lane at y = −18 (traces/scParkDepth `easeTo`),
+    // drive leaves the curb lane at y = −18 (traces/scParkDepth `aisleTo`),
     // BEFORE the bay row starts at y = −6.30, because the swing room for a 90°
     // reverse is bought from the middle of the aisle and nowhere else.
     // Measured on lot-van-v1 with the production collision geometry: the drawn
@@ -1022,8 +1026,14 @@ export const SC_PARK_VAN: ScenarioSpec = {
     // 86 ch it left 68, and the halt below needs 78. The act that prevents the
     // collision cannot be bought by pushing the halt off the glass.
     { n: 1, textBg: "Излез в средата на алеята преди реда — той стои в твоята лента." },
-    // 64 ch — the metre-and-a-half from the old step 2, with the reason it has.
-    { n: 2, textBg: "Дръж метър и половина от него — оттам се вижда и оттам се влиза." },
+    // 58 ch — the lateral offset from the old step 2, with the reason it has.
+    // TWO METRES, not a metre and a half (catalogue-demo-curvature:dae908c7,
+    // 2026-10-11): the product car's 90° swing carries its centre 5.5 m
+    // sideways on its 4.6 m circle, so from 1.5 m off the row the tail reaches
+    // the neighbours before the car is straight — the old number was true of a
+    // 4 m arc no car here can drive. The recorded correct drive stands 2.08 m
+    // off the van's nose (traces/scParkDepth VN_SETUP_X).
+    { n: 2, textBg: "Дръж два метра от него — оттам се вижда и оттам се влиза." },
     // Step 2 was 162 characters: the halt, its trigger and the lateral offset.
     // The offset is an instruction of its own and now reads as one — the halt
     // keeps its wording, it is only no longer the first thing asked for.
@@ -1910,12 +1920,24 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
     // body reaches out to x = 2.78 against a spawn x of 4.06 —
     // an overlap of 2.13 m before the west row is even considered. The
     // position is the whole drill; it leads.
-    // 72 ch (under 76 — see the fold note on sc-park-van step 1)
-    { n: 1, textBg: "Излез точно по средата на алеята преди реда — и двата реда са в лентите." },
-    // 56 ch
-    { n: 2, textBg: "Подмини гнездото и спри — под 6 км/ч — точно по средата." },
-    // 39 ch
-    { n: 3, textBg: "Помни: една педя вляво вече е чужд ред." },
+    // THE CORRIDOR AS BUILT (curvdepth round 2, D2 — measured, not assumed).
+    // The bay mouths are painted at x = ±2.53 about the centre line x = 0;
+    // beside the setup the west row's nearest body is the kolos SUV, nose at
+    // x = −2.44 (its GLB collider, 0.34 m longer than the gate's rect). The
+    // car's side (half-width 0.85 m) reaches it when the car's centre is
+    // 1.59 m left of the middle — so «една педя вляво вече е чужд ред», the old
+    // step 3, was not true: a span left of the middle leaves 1.3 m of air.
+    // And the product car's swing (4.5 m circle) cannot start ON the middle
+    // with a quarter-metre kept from the right-hand neighbour (0.15–0.22 m
+    // measured), so the demo stands a span LEFT of it. The three steps now
+    // say both: the middle, a span left at most, and where «чуждият ред»
+    // actually begins.
+    // 66 ch (under 76 — see the fold note on sc-park-van step 1)
+    { n: 1, textBg: "Излез по средата на алеята преди реда — и двата реда са в лентите." },
+    // 75 ch
+    { n: 2, textBg: "Подмини гнездото и спри — под 6 км/ч — по средата или до педя вляво от нея." },
+    // 68 ch
+    { n: 3, textBg: "Помни: около метър и половина вляво от средата вече си в чуждия ред." },
     // 77 ch
     { n: 4, textBg: "Знай: между двата пълни реда остават под шест метра — нито сантиметър повече." },
     // 80 ch
@@ -2113,8 +2135,16 @@ export const SC_PARK_JUDGE: ScenarioSpec = {
     {
       traceRef: { path: "content/traces/sc-park-judge/mistake-try-short.trace.json" },
       titleBg: "„Ще се сместя“ — маневра в място, което не е място",
+      // ONE CONTACT, NOT TWO (catalogue-demo-curvature:dae908c7, 2026-10-11). The
+      // card read «завоят закачи колата отпред, а задницата стигна до колата
+      // отзад». The first half was true of the old demo's 4 m arc and of no car:
+      // reversing in, the nose swings AWAY from the car in front and only comes
+      // back toward its corner once the car has travelled its own length — by
+      // which point, in a 4.3 m slot, the tail has already met the car behind.
+      // The re-recorded demo (traces/scParkDepth gjMistakeTryShort) touches the
+      // rear car alone, at 35° to the kerb, and the card says what it shows.
       whatWentWrongBg:
-        "Изходната позиция беше вярна, наблюдението — също. Мястото не беше: завоят закачи колата отпред, а задницата стигна до колата отзад. Между двете брони има четири метра и трийсет, а колата е четири и четиридесет — никаква техника не запълва тази разлика.",
+        "Изходната позиция беше вярна, наблюдението — също. Мястото не беше: задницата стигна до колата отзад, докато предницата още стърчеше в платното. Между двете брони има четири метра и трийсет, а колата е четири и четиридесет — никаква техника не запълва тази разлика.",
       codeRefs: ["COLLISION"],
     },
     {

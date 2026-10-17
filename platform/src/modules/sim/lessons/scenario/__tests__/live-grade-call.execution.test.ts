@@ -67,6 +67,18 @@
  *     grader heard. And the scene's `resetCar` is cut out and executed: a
  *     look or a near-miss window pending at key R is not heard after it.
  *
+ * LANE npcstep (sc-roundabout-entry:08a0b701). The call now lives in the
+ * component-level `gradeTakenSteps` and has a second caller: the function
+ * RuntimeDriver puts in `stepLoopGradeRef` (a layout effect; VehicleRig's
+ * before-step callback calls it first — round 2; round 1 handed it to
+ * `useBeforePhysicsStep`), which grades the step rapier has just taken before
+ * the next one of the same frame. Every drive in this file
+ * runs BOTH, cut out of the scene together (sceneGradeCut.ts): the before-step
+ * callback before each recorded step, the frame's statements after the
+ * stepper. What the drives hold is unchanged — every step graded once, in
+ * order, from the car after it; every look heard once, in order, from the
+ * first point not graded when its frame began.
+ *
  * NOT CLAIMED: §1 runs the scene's call expression, not React. That the call
  * is reached once per frame after rapier's stepper is the wiring model's
  * (scene/__tests__/live-grid-wiring.test.ts), read from source and not driven
@@ -78,7 +90,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { sessionClockAdvance } from "../../../../../components/sim/lesson-ui/sessionClock";
 import { actorObb } from "../../../collision";
 import type { LessonSpec, NearMissEvent, NearMissStats, VehicleSample } from "../../../contracts";
 import { directorContactCast } from "../../../orchestrator/director";
@@ -95,7 +106,6 @@ import {
   createNearMissTracker,
   DEFAULT_NEAR_MISS_CONFIG,
   NO_PHYSICS_STEPS,
-  PhysicsSessionClock,
   PlayerStepTrackRecorder,
   stepNearMiss,
 } from "../../../traffic";
@@ -104,6 +114,7 @@ import { compileScenario } from "../compile";
 import { SCENARIO_TEMPLATES } from "../templates";
 import type { ScenarioLevel } from "../types";
 import { buildLiveWorld, liveChainReplay } from "./liveChainReplay";
+import { sceneFrameScope, sceneGradeCut, type SceneGradeBound, type SceneGradeName } from "./sceneGradeCut";
 import { loadDistrict } from "./witnessLiveRung";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -209,44 +220,42 @@ const SCENE_NAMES = [
  *  missing name. */
 const EXTRA_NAMES = ["vruAheadMeters", "directorContactCast"] as const;
 
-type SceneCall = (...args: unknown[]) => unknown;
+/** The scene's graded statements bound to one drive's scope: `frame()` (the
+ *  frame's `const steps = …` and call) and `beforeStep` (RuntimeDriver's
+ *  before-step callback; null on a scene that registers none). */
+type SceneCall = (ordered: unknown[], cabinNow?: (out: VehicleSample) => void) => SceneGradeBound;
 
-/** Cut the call out of the scene as a tree, and compile it. */
+/** Cut the scene's graded statements out of the scene as trees, and compile
+ *  them (sceneGradeCut.ts — the one cutter every executing harness shares). */
 function sceneGradeCall(): { text: string; stepsDecl: string; run: SceneCall } {
-  const source = readFileSync(path.join(SRC, "components/sim/LessonScene.tsx"), "utf-8").replace(/\r\n/g, "\n");
-  const sf = ts.createSourceFile("LessonScene.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const calls: ts.CallExpression[] = [];
-  const visit = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && n.expression.getText(sf) === "gradeGrid.stepPhysics") calls.push(n);
-    ts.forEachChild(n, visit);
-  };
-  visit(sf);
-  if (calls.length !== 1) throw new Error(`expected one gradeGrid.stepPhysics call in LessonScene, found ${calls.length}`);
-  const text = calls[0].getText(sf);
-  // The statement that makes `steps`, in the same function body as the call
-  // (RuntimeDriver's frame callback), and everything else that body does to
-  // `steps` before the call: none may exist but the declaration and reads.
-  let body: ts.Block | null = null;
-  for (let p: ts.Node | undefined = calls[0].parent; p; p = p.parent) {
-    if (ts.isBlock(p) && (ts.isArrowFunction(p.parent) || ts.isFunctionExpression(p.parent))) {
-      body = p;
-      break;
-    }
-  }
-  if (!body) throw new Error("the stepPhysics call is not inside a function body");
-  const decls = body.statements.filter(
-    (st): st is ts.VariableStatement =>
-      ts.isVariableStatement(st) && st.declarationList.declarations.some((d) => d.name.getText(sf) === "steps"),
-  );
-  if (decls.length !== 1) throw new Error(`expected one \`steps\` declaration beside the call, found ${decls.length}`);
-  const stepsDecl = decls[0].getText(sf);
-  const js = ts.transpileModule(`${stepsDecl}\nreturn (${text});`, {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
-  }).outputText;
+  const cut = sceneGradeCut();
+  const names = [...SCENE_NAMES, "NO_PHYSICS_STEPS", ...EXTRA_NAMES] as const;
   return {
-    text,
-    stepsDecl,
-    run: new Function(...SCENE_NAMES, "NO_PHYSICS_STEPS", ...EXTRA_NAMES, `"use strict";\n${js}`) as SceneCall,
+    text: cut.callText,
+    stepsDecl: cut.stepsDecl,
+    run: (ordered, cabinNow) => {
+      const scope: Record<string, unknown> = {};
+      names.forEach((n, i) => {
+        scope[n] = ordered[i];
+      });
+      // What the scene's statements read since lane npcstep: the frame's
+      // sample and the attempt recorder off their refs; NpcColliders' pool
+      // (none is mounted in these drives); the pause; and the cabin refresh
+      // the before-step callback makes before it grades a point inside the
+      // frame. These drives have no rig, so «the cabin as it stands when the
+      // step has been taken» is the drive's own: `cabinNow` (default: the
+      // sample is left as the last frame built it).
+      scope.sampleRef = { current: scope.sample };
+      scope.attemptRecorderRef = { current: scope.recorder };
+      scope.npcShellsRef = { current: null };
+      scope.paused = false;
+      scope.updateCabinChannels = (out: VehicleSample) => cabinNow?.(out);
+      // Round 3: the frame's WHOLE grading region runs — the session clock
+      // line, the reverse assist and both stuck watches included — so the
+      // scene's own clock is handed in, and the frame is handed R3F's delta.
+      Object.assign(scope, sceneFrameScope());
+      return cut.bind(scope as Record<SceneGradeName, unknown>);
+    },
   };
 }
 
@@ -331,7 +340,6 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
   const cast = directorContactCast(director);
   const gradeGrid = new GradeGrid();
   const steps = new PlayerStepTrackRecorder();
-  const sessionClock = new PhysicsSessionClock();
   const tRef = { current: 0 };
   const sample: VehicleSample = createGradeGridSample();
   sample.seatbeltOn = true;
@@ -415,7 +423,7 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
     traffic,
     director,
     conditions: NO_WEATHER,
-    inputRef: { current: { rawBrake: 0 } },
+    inputRef: { current: { rawBrake: 0, consumeBlockedDriveAttempt: () => false } },
     hazardActiveRef: { current: false },
     telltaleLitRef: { current: false },
     onTelltale: noop,
@@ -433,6 +441,7 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
     contactListenerRef: { current: null },
   };
   const ordered = [...SCENE_NAMES.map((n) => args[n]), NO_PHYSICS_STEPS, vruAheadMeters, directorContactCast];
+  const scene = run(ordered);
   const dur = c.trace.meta.durationSec;
   let accumulator = 0;
   let frames = 0;
@@ -445,6 +454,11 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
     // car after each step.
     accumulator += Math.min(Math.max(delta, 0), 0.5);
     while (accumulator >= H) {
+      // RuntimeDriver's before-step callback: the step before this one is
+      // graded now if the frame's own call has not graded it.
+      const gradedBefore = gradeGrid.clock.last;
+      scene.beforeStep?.();
+      gradedByCall += gradeGrid.clock.last - gradedBefore;
       const n = steps.stepCount + 1;
       sampleAt(c.trace, Math.min(n * H, dur), p);
       steps.record(p.x, p.y, p.speedKmh, p.headingDeg);
@@ -461,9 +475,9 @@ function driveSceneCall(c: Cell, deltas: readonly number[], run: SceneCall) {
     sample.speedKmh = p.speedKmh + 17;
     sample.indicator = p.indicator;
     sample.gear = p.gear;
-    // RuntimeDriver: the clock line, then the call.
-    tRef.current = sessionClock.frame(sessionClockAdvance(delta), steps.stepCount);
-    gradedByCall += run(...ordered) as number;
+    // RuntimeDriver: its frame's whole grading region — the clock line, the
+    // assist and the two watches, then the call (sceneGradeCut.ts).
+    gradedByCall += scene.frame(delta);
     // NpcColliders until round 7: once per frame, after RuntimeDriver, from
     // the frame's sample, dt capped at 0.1 s.
     nearFromFrame.step(steps.stepCount, Math.min(delta, 0.1), sample.position.x, sample.position.y, sample.headingDeg, sample.speedKmh);
@@ -493,6 +507,12 @@ describe("§1 the scene's own graded call, EXECUTED: the grader hears the car af
 
   it("the call was found, compiles, and names nothing this file does not hand it", () => {
     expect(scene.text.startsWith("gradeGrid.stepPhysics(")).toBe(true);
+    // The repair's shape: the expression in `gradeTakenSteps`, called by the
+    // frame and by the step loop — both cut out and run by every drive here.
+    const cut = sceneGradeCut();
+    expect(cut.shape).toBe("function");
+    expect(cut.frameCallText).toBe("gradeTakenSteps(steps, tRef.current, sample.mirrorGlance)");
+    expect(cut.beforeStepText).not.toBeNull();
     // The step source is the recorder itself, or — with none handed in — a
     // source that never steps (nothing is graded): the scene's own statement.
     expect(scene.stepsDecl.replace(/\s+/g, " ")).toBe("const steps = stepTrackRef.current ?? NO_PHYSICS_STEPS;");
@@ -772,7 +792,9 @@ describe("§4 the near-miss stat («мина на косъм») is measured by t
   const scene = sceneGradeCall();
 
   it("the scene hands the grid the shell's handler by name and steps no detector of its own (NpcColliders does not either)", () => {
-    expect(scene.text).toMatch(/nearMiss: onNearMiss,\s*\}\s*,?\s*\)$/);
+    // The handler by name, as a hook of its own (the one hook after it is the
+    // shell pool's — lane npcstep; live-grid-wiring §3 pins the hook list).
+    expect(scene.text).toMatch(/\n\s*nearMiss: onNearMiss,\n/);
     const strip = (rel: string) =>
       readFileSync(path.join(SRC, rel), "utf-8")
         .replace(/\r\n/g, "\n")
@@ -968,7 +990,7 @@ interface LookRun {
   heard: Array<{ k: number; look: LookKind }>;
   pressed: number;
   /** For each press burst: the first grid point not yet graded when the frame
-   *  that sampled it ran. */
+   *  that sampled it BEGAN. */
   firstUngraded: number[];
   steps: number;
   frames: number;
@@ -1023,7 +1045,6 @@ function driveLooks(
     const watchPoint = opts.watch ? opts.watch(world) : null;
     const gradeGrid = new GradeGrid();
     const steps = new PlayerStepTrackRecorder();
-    const sessionClock = new PhysicsSessionClock();
     const cabin = new CabinControls({}, "ready", "off");
     const recorder = createTraceRecorder({ scenarioId: c.lesson.id, kind: "attempt" });
     const tRef = { current: 0 };
@@ -1053,7 +1074,8 @@ function driveLooks(
       traffic,
       director,
       conditions: NO_WEATHER,
-      inputRef: { current: { rawBrake: 0.9, rawThrottle: 0 } },
+      // (`read`: the before-step callback reads the pad for the cabin refresh.)
+      inputRef: { current: { rawBrake: 0.9, rawThrottle: 0, consumeBlockedDriveAttempt: () => false, read: () => ({ throttle: 0, brake: 0.9, steer: 0, handbrake: false }) } },
       hazardActiveRef: { current: false },
       telltaleLitRef: { current: false },
       onTelltale: noop,
@@ -1070,6 +1092,17 @@ function driveLooks(
       contactListenerRef: { current: null },
     };
     const ordered = [...SCENE_NAMES.map((n) => args[n]), NO_PHYSICS_STEPS, vruAheadMeters, directorContactCast];
+    // «The cabin as it stands when the step has been taken», for a drive whose
+    // lever and stalk come off a tape: the tape's, at the step just taken (the
+    // product reads its real cabin there — scene/vehicleSample.ts
+    // `updateCabinChannels`). Never the look: the grid takes the real cabin's
+    // looks itself.
+    const cabinNow = (out: VehicleSample) => {
+      sampleAt(c.trace, Math.min(steps.stepCount * H, c.trace.meta.durationSec), p);
+      out.indicator = p.indicator;
+      out.gear = p.gear;
+    };
+    const scene = run(ordered, cabinNow);
     const resetCar = opts.resetCar ? opts.resetCar(args.simRef, directorRef, args.cabinRef, gradeGrid) : null;
     let respawn: LookRun["respawn"] = null;
     const dur = Math.min(c.trace.meta.durationSec, opts.seconds ?? Infinity);
@@ -1102,8 +1135,13 @@ function driveLooks(
         respawn.cabinAfter = cabin.consumeGlanceSample();
       }
       frames++;
+      // The first grid point not graded when this frame begins (every step of
+      // the frames before it has been graded by then).
+      const firstUngradedAtFrameStart = gradeGrid.clock.last + 1;
       accumulator += Math.min(Math.max(delta, 0), 0.5);
       while (accumulator >= H) {
+        // RuntimeDriver's before-step callback (the scene's own).
+        scene.beforeStep?.();
         const n = steps.stepCount + 1;
         sampleAt(c.trace, Math.min(n * H, c.trace.meta.durationSec), p);
         steps.record(p.x, p.y, p.speedKmh, p.headingDeg);
@@ -1121,10 +1159,9 @@ function driveLooks(
       sample.indicator = p.indicator;
       sample.gear = p.gear;
       sample.mirrorGlance = cabin.consumeGlanceSample();
-      if (burst && burst.length > 0) firstUngraded.push(gradeGrid.clock.last + 1);
-      // RuntimeDriver: the clock line, then the call.
-      tRef.current = sessionClock.frame(sessionClockAdvance(delta), steps.stepCount);
-      run(...ordered);
+      if (burst && burst.length > 0) firstUngraded.push(firstUngradedAtFrameStart);
+      // RuntimeDriver: its frame's whole grading region (sceneGradeCut.ts).
+      scene.frame(delta);
     }
     return {
       heard,
@@ -1181,6 +1218,29 @@ describe("§5 ROUND 8 — the scene's own call, EXECUTED with a real cabin: ever
       expect(wrong, `${name}: two-key presses not heard as left@k, right@k+1 at the first ungraded point`).toBe(0);
     });
   }
+
+  it("LANE npcstep — a look a ONE-step frame took is not heard again by the step loop of the long frame after it: on a 60 Hz display with a 0.1 s hitch every fourth frame every look is heard exactly once, in order", () => {
+    // Three 60 Hz frames, then one of six steps. A two-key press before the
+    // frame just ahead of the hitch: that frame's builder takes «left» (so the
+    // frame's sample still carries it when the hitch frame's step loop grades),
+    // the frame's call takes «right» through `moreLooks`. The step loop is
+    // handed NO frame look (`gradeTakenSteps(taken, null, null)`) — were it
+    // handed the sample's, «left» would be heard a second time.
+    const deltas = [1 / 60, 1 / 60, 1 / 60, 0.1];
+    const r = driveLooks(c, deltas, scene.run, (f) => (f % 4 === 2 ? ["left", "right"] : null), { seconds: 12 });
+    expect(r.pressed).toBeGreaterThanOrEqual(100);
+    expect(r.heard.length + r.pendingAtEnd).toBe(r.pressed);
+    expect(r.pendingAtEnd).toBeLessThanOrEqual(1);
+    const wrong: string[] = [];
+    for (let i = 0; i + 1 < r.heard.length; i += 2) {
+      const a = r.heard[i];
+      const b = r.heard[i + 1];
+      if (a.look !== "left" || b.look !== "right" || b.k !== a.k + 1 || a.k !== r.firstUngraded[i / 2]) {
+        wrong.push(`burst ${i / 2}: ${a.look}@${a.k}, ${b.look}@${b.k} — first ungraded point ${r.firstUngraded[i / 2]}`);
+      }
+    }
+    expect(wrong.slice(0, 4)).toEqual([]);
+  });
 
   it("four keys inside one frame: heard over four consecutive grid points on a 0.5 s frame as at 60 Hz (the cabin is drained by the frame, not one look per frame)", () => {
     for (const [name, deltas] of [LOOK_CADENCES[0], LOOK_CADENCES[1], LOOK_CADENCES[6], LOOK_CADENCES[5]]) {

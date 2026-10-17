@@ -59,11 +59,22 @@
  * sample's pedal columns are the command the pad handed the physics step that
  * produced that grid point.
  *
- * D-3, STATED, NOT FIXED: script KEY edges (indicators, looks, gear, holds)
- * stay frame-timed. They are still dispatched from `onTick`, inside the grade
- * loop, at the point whose decision changed the step, and the grade reads the
- * cabin through the frame's sample and the look FIFO (ADR-014). The
- * cadence-invariance claim covers PEDALS AND STEER ONLY.
+ * D-3, AS IT STANDS SINCE 2026-10-13 (ADR-014 amendment / ADR-017 update of
+ * that date — sc-roundabout-entry:08a0b701, lane npcstep; no line of this
+ * file's code changed): script KEY edges (indicators, looks, gear, holds) are
+ * dispatched from `onTick`, at the grid point whose decision changed the
+ * step — and `onTick` for point k now runs BEFORE physics step k + 1 reads
+ * its input on every display (the scene grades a multi-step frame's points
+ * inside its step loop; VehicleRig's before-step calls that grade first). So
+ * an edge is dispatched with exactly k steps taken, on every cadence, as it
+ * always was at one step per frame; through 8cb0707 it landed after the
+ * frame's steps (up to 29 steps late at 2 fps). The same holds for a «drive»
+ * start (no late decisions on any cadence) and for the freeze at the lesson's
+ * end (ADR-017 L1). What a key DOES after it is dispatched is still the
+ * product's: the cabin's clocks run on the render delta and the keyboard's
+ * pedal ramps on wall time, so the invariance CLAIM stays pedals and steer,
+ * for scripts whose held keys do not touch physics.
+ * devrig/__tests__/rig-step-keyed.census.test.ts measures both orders.
  *
  * The step reference is a DEV-ONLY read handle (`RigStepSource`) that
  * LessonScene publishes on `window.__rigStepSource` inside a
@@ -529,9 +540,13 @@ class SyntheticPad {
 // Edge-driven (one keydown per step, one keyup on handover) rather than
 // repeated per frame — a hold that depends on the frame rate is not a hold.
 //
-// ADR-017 D-3: these edges stay FRAME-TIMED. They are dispatched from
-// `onTick`, i.e. inside the grade loop, at the grid point whose decision
-// changed the script step — never from inside a physics step's read.
+// ADR-017 D-3: these edges are dispatched from `onTick`, i.e. inside the
+// grade loop, at the grid point whose decision changed the script step —
+// never from inside the PAD's read. Since 2026-10-13 the grade of point k
+// itself runs inside rapier's before-step callback when the frame owes a
+// further step (before that step's input is read), so on a multi-step frame
+// this dispatch happens there: ADR-017's rejected alternative 6 by
+// construction, at a fixed place in the step loop.
 
 function fireKey(type: "keydown" | "keyup", code: string): void {
   window.dispatchEvent(

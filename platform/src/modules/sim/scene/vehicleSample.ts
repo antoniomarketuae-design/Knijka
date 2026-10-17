@@ -62,6 +62,64 @@ function contractGear(cabin: CabinControls, sim: VehicleSim): number {
 }
 
 /**
+ * THE CABIN'S NINE CHANNELS, AS THE CABIN STANDS NOW — written into `out`
+ * and nothing else of it: not the pose, heading or speed, and NOT the look
+ * (`mirrorGlance` is a one-shot the frame's builder below takes out of the
+ * cabin's queue; this function leaves the queue alone).
+ *
+ * One mapping, two callers (sc-roundabout-entry:08a0b701, lane npcstep):
+ *
+ *  · `updateVehicleSample` below — the frame's sample, once per render frame;
+ *  · LessonScene's RuntimeDriver, INSIDE the physics step loop of a frame that
+ *    owes several steps — before it grades the step rapier has just taken (so
+ *    the next step meets the world that step left), it refreshes these
+ *    channels of the frame's sample. The grade of that point then reads the
+ *    stalk, the lever, the belt and the pedal as they stand when the point's
+ *    step has been taken: every press made before the frame began is in (the
+ *    frame-start rule of ADR-017 D-1 — a press acts from the frame's first
+ *    step), the cosmetic gear is the one of the point's own step, and what
+ *    this frame's cabin clocks will change (`cabin.update`, the driveline's
+ *    stall timer — VehicleRig runs them after the physics) is not in yet: it
+ *    reaches the frame's last point, with the frame's sample.
+ *
+ * Nobody reads the frame's sample between the two: inside the step loop only
+ * step callbacks run, and VehicleRig rebuilds the whole sample right after it.
+ */
+export function updateCabinChannels(
+  out: VehicleSample,
+  sim: VehicleSim,
+  cabin: CabinControls,
+  input: VehicleInput | null,
+): void {
+  out.indicator = cabin.indicator;
+  out.headlights = cabin.headlights;
+  out.seatbeltOn = cabin.seatbeltOn;
+  // A1: the stateful parking brake is the real handbrake signal — the rule
+  // engine's HANDBRAKE_LEFT_ON detector now grades truth, not a held Space
+  // key. The momentary gamepad handbrake still counts while held.
+  out.handbrakeOn = cabin.driveline.parkingBrakeOn || (input?.handbrake ?? false);
+  out.gear = contractGear(cabin, sim);
+  // B1a (doc 72 VP-04): the driveline's latched stall flag — the rule engine
+  // grades its rising edge as the официална второстепенна „загасване".
+  out.stalled = cabin.driveline.stalled;
+  // FOG unlock (doc 72 AC-03): the driveline's fog-lamp state (V key /
+  // cockpit hotspot) — graded only when the lesson's world is in fog.
+  out.fogLightsOn = cabin.driveline.fogLightsOn;
+  // THE ACCELERATOR THE GRADER COULD NOT SEE (sc-vp-handbrake:1f2f7463). The
+  // FUNCTIONAL value — this is the gated, reverse-remapped input the physics
+  // is actually being given, so a pedal zeroed by the pre-drive lock reads 0
+  // here too and the standstill handbrake arm cannot fire during the
+  // procedure. `rules/types.ts SimTick.throttlePedal` carries the reason.
+  out.throttlePedal = input?.throttle ?? 0;
+  // …AND WHETHER THE ENGINE IS EVEN RUNNING. The pedal alone cannot say what is
+  // holding the car: on a COLD hand-over (`vehicleStart: "cold"`, this drill's
+  // L4) the lever is up AND the engine is off, and `engine/stuckStart.ts`
+  // answers «запали двигателя», not «свали ръчната». The standstill handbrake
+  // arm reads this so it can only ever bill the blocker the cockpit named.
+  out.engineOn = cabin.driveline.engineOn;
+}
+
+/**
  * Write the current frame into `out` (zero allocation).
  *
  * District-space mapping (matches DistrictWorld, which places district (x,y)
@@ -89,31 +147,6 @@ export function updateVehicleSample(
   out.headingDeg =
     (Math.atan2(scratchFwd.x, -scratchFwd.z) * (180 / Math.PI) + 360) % 360;
   out.speedKmh = sim.speedKmh;
-  out.indicator = cabin.indicator;
-  out.headlights = cabin.headlights;
-  out.seatbeltOn = cabin.seatbeltOn;
-  // A1: the stateful parking brake is the real handbrake signal — the rule
-  // engine's HANDBRAKE_LEFT_ON detector now grades truth, not a held Space
-  // key. The momentary gamepad handbrake still counts while held.
-  out.handbrakeOn = cabin.driveline.parkingBrakeOn || (input?.handbrake ?? false);
-  out.gear = contractGear(cabin, sim);
+  updateCabinChannels(out, sim, cabin, input);
   out.mirrorGlance = cabin.consumeGlanceSample();
-  // B1a (doc 72 VP-04): the driveline's latched stall flag — the rule engine
-  // grades its rising edge as the официална второстепенна „загасване".
-  out.stalled = cabin.driveline.stalled;
-  // FOG unlock (doc 72 AC-03): the driveline's fog-lamp state (V key /
-  // cockpit hotspot) — graded only when the lesson's world is in fog.
-  out.fogLightsOn = cabin.driveline.fogLightsOn;
-  // THE ACCELERATOR THE GRADER COULD NOT SEE (sc-vp-handbrake:1f2f7463). The
-  // FUNCTIONAL value — this is the gated, reverse-remapped input the physics
-  // is actually being given, so a pedal zeroed by the pre-drive lock reads 0
-  // here too and the standstill handbrake arm cannot fire during the
-  // procedure. `rules/types.ts SimTick.throttlePedal` carries the reason.
-  out.throttlePedal = input?.throttle ?? 0;
-  // …AND WHETHER THE ENGINE IS EVEN RUNNING. The pedal alone cannot say what is
-  // holding the car: on a COLD hand-over (`vehicleStart: "cold"`, this drill's
-  // L4) the lever is up AND the engine is off, and `engine/stuckStart.ts`
-  // answers «запали двигателя», not «свали ръчната». The standstill handbrake
-  // arm reads this so it can only ever bill the blocker the cockpit named.
-  out.engineOn = cabin.driveline.engineOn;
 }

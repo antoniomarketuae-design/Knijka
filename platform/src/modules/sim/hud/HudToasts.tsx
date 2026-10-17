@@ -58,6 +58,7 @@ import {
   visibleToasts,
   waitingToasts,
   type ToastReading,
+  type ToastStanding,
 } from "./hudPreferences";
 // THE SHADE, TAKEN AND NOT RESTATED — same module, same lane. `SimOverlay`
 // owns the derivation of α 0.80 and of the feather, and its own test derives
@@ -855,7 +856,7 @@ function ToastFooter({
         </span>
       ) : null}
       {ageBg !== null ? (
-        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
+        <span data-hud-toast-age="" className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
       ) : null}
       {/* THE CARDS WAITING BEHIND AN OPENED EXPLANATION, COUNTED (W1). The
           phone card's own badge — `SimOverlay`'s «+N», class for class — so
@@ -1333,7 +1334,11 @@ function measureToastBodyChoice(
    a fold row that was raised for an OLDER card below it, keeps its paragraph
    under the row's fade (rule 3 gives the row back, so to this rule it is
    whole). That is HEAD's behaviour for that card, not a new one, and the row
-   over it is true — the older card really is cut.
+   over it is true — the older card really is cut. (Lane `cardstay` round 3,
+   X2: the column's reader now reads exactly that card as cut —
+   `readStandingToastCut`, „…UNLESS THE ROW STAYS UP FOR ANOTHER CARD" — and
+   asks it for its summary before paint, `toastCardShrinksItself`; this
+   switch's own rule is unchanged.)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -1562,6 +1567,16 @@ function measureToastSummaryCardPx(card: HTMLElement, scroller: HTMLElement, sum
 }
 
 /**
+ * The column's request (lane `cardstay` round 2): a paragraph that can summarise
+ * takes its summary when the column asks; nothing else moves — a pending body is
+ * its arrival measurement's, a summary stays a summary, and with nothing asked
+ * the card is as shipped.
+ */
+export function toastBodyChoiceOnAsk(choice: ToastBodyChoice, canSummarise: boolean, asked: boolean): ToastBodyChoice {
+  return asked && canSummarise && choice === "paragraph" ? "summary" : choice;
+}
+
+/**
  * The measurement. A card with a summary starts `"pending"` and leaves it in
  * its arrival commit's layout effect, before paint. That effect keys on
  * `choice` alone, so neither the age tick's once-a-second re-render nor the
@@ -1572,6 +1587,8 @@ function measureToastSummaryCardPx(card: HTMLElement, scroller: HTMLElement, sum
 function useToastBodyChoice(
   canSummarise: boolean,
   summaryBg: string,
+  /** The column asks for the summary NOW (`useToastReader.summarise`, lane `cardstay` round 2). */
+  summariseNow = false,
 ): {
   setCard: (el: HTMLElement | null) => void;
   bodyRef: { current: HTMLParagraphElement | null };
@@ -1596,6 +1613,25 @@ function useToastBodyChoice(
   // disconnects, which is the second lock on the one-way rule: nothing is
   // listening that could put the paragraph back. No scroller (the popup rig)
   // or no `ResizeObserver` is no claim, i.e. the arrival choice as shipped.
+  // …AND THE SAME SWITCH, TAKEN BEFORE PAINT WHEN THE COLUMN ASKS (lane
+  // `cardstay` round 2). The observer below answers a window that closed in on
+  // the paragraph — but it is delivered after layout, and the summary it sets
+  // is rendered a frame later: measured in the product's own letterboxed and
+  // bare stages, a paragraph the crash pin's banner cut was painted cut on one
+  // frame (title or law chip off the glass) before its summary came. The
+  // column's reader sees the same cut in the shell's own commit, before paint,
+  // and asks for exactly what the observer would decide
+  // (`toastCardShrinksItself`: a top-of-stack paragraph whose summary would be
+  // whole). The card RENDERS its summary in the very commit that carries the
+  // ask (the choice it returns is derived, below), so the shell's own fold
+  // measure in that commit already sees the summary — and this layout effect
+  // keeps it, so the summary stays when the ask is withdrawn. (Taken only in the
+  // effect, WebKit painted one frame of the summary under the fold row the cut
+  // paragraph had raised: measured, 3 of 86 cards on the 1000 × 548 stage.)
+  useLayoutEffect(() => {
+    const asked = toastBodyChoiceOnAsk(choice, canSummarise, summariseNow);
+    if (asked !== choice) setChoice(asked);
+  }, [summariseNow, canSummarise, choice]);
   const watchesWindow = canSummarise && choice === "paragraph";
   useEffect(() => {
     if (!watchesWindow) return;
@@ -1625,7 +1661,7 @@ function useToastBodyChoice(
     observer.observe(card);
     return () => observer.disconnect();
   }, [watchesWindow, summaryBg]);
-  return { setCard, bodyRef, choice };
+  return { setCard, bodyRef, choice: toastBodyChoiceOnAsk(choice, canSummarise, summariseNow) };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1944,13 +1980,326 @@ export function readOpenedToastShortPx(scroller: HTMLElement): number | null {
   return withoutRow;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE GRADED CARD NOBODY PRESSED WAS PUSHED OFF THE GLASS — sc-roundabout-
+   entry:fe081cf1, rig-w3g CONTROL-NOPRESS-SIM at 9390622 (integrator decision
+   W7, 2026-10-15).
+
+   THE FRAME. PC L3, advisor on, a 1165 × 650 shell, nothing pressed. The
+   «Удар в неподвижно препятствие» card, 116.5 px in its summary form, stood
+   whole for 4.8 s in a 131.9 px window. Then the car was pinned: the banner
+   grew 48.7 → 76.2 px with the hold's lead and the advisor posted its 98.3 px
+   card above the pill IN THE SAME COMMIT. The column is capped (245.6 px
+   there) and the toast scroller is its last-resort yielder, so the scroller
+   paid for both: its window fell to 29.6 px, the card stayed at the window's
+   top and its title, one-liner and law chip went under the foot — cut 86.9 to
+   116.4 px on 90 snapshots until it left at +7.91 s.
+
+   WHY NOTHING ANSWERED. The only thing that could make the advisor wait was
+   the reader above, and it acts only while an explanation is OPEN (W1): with
+   nothing open its level is 0 by construction. The card's own shrink switch
+   had nothing left to give — the card was already its summary.
+
+   SO, W7: A GRADED FAULT OR «НАУЧИ» CARD ON THE GLASS IS NEVER PUSHED OUT OF
+   THE WINDOW BY A LATER CARD THE STUDENT IS NOT JUDGED BY. With nothing open,
+   after every commit of the shell and before paint (and on the shell's resize
+   observer), the reader asks whether a judged card on the glass is cut below
+   the window — asked, like every fold read in this column, with the fold row
+   out of flow. If one is, the column STANDS for it (`standing`), one step per
+   look and only while that card is still cut:
+     1 · W7 — the advisor's card and praise wait: the same waiting W1 uses (the
+         advisor's gate is `held`; praise keeps its own clock and is not
+         painted, `visibleToasts`). On the frame's own stage that gives the
+         card 133.9 px for its 116.5: whole for its whole life, and the
+         advisor's card is painted the moment it leaves.
+     2 · W8 (integrator, 2026-10-15) — a banner under a route hold sets its
+         sentence on one line, W6's form exactly (`bannerYields` →
+         `LessonPlayShell.bannerOneLineWhileReading`, which never cuts a banner
+         with no hold lead). The pin grows the banner 48.7 → 76.2 px; on the
+         1165 × 650 stage that alone cut 18 catalogued summaries (137.5–181.5
+         px) that had been whole before it, advisor or no advisor.
+     3 · W9 (integrator, 2026-10-15) — the card's age stamp («сега» / «преди
+         N с») is not painted, and ONLY when it stands on a footer row of its
+         own (`toastAgeHasOwnRow`): the one row of a summary the student is not
+         judged by. It is 21 px (the footer's 6 px gap and its 15 px line), and
+         it wraps exactly under the long law chips (36 / 51 px: «ППЗДвП
+         светлинни сигнали…», «ЗДвП чл. 6, т. 1; …»), i.e. on the tallest
+         summaries. Measured on the product's letterboxed stage at a 1366 × 768
+         laptop (viewport 1366 × 657, stage 918 × 516.4, bare window 134.4):
+         «Преминаване на червен сигнал» 147.25 → 126.25, «Пресичане на
+         непрекъсната осева линия» 152.5 → 131.5 — whole: title, one-liner and
+         law chip.
+   A PARAGRAPH IS ASKED, NOT STOOD FOR. A top-of-stack paragraph whose own
+   summary would be whole is the card's own switch's to mend; the reader asks
+   it for that summary before paint (`summarise`, `toastCardShrinksItself`)
+   and takes no step for it, so neither the banner nor the advisor's card pays
+   for a cut the card can mend itself, and no cut frame is painted while it
+   does. A body still `pending` (its first commit) is not looked at.
+   LATCHED until that card leaves the glass. Re-asking with the advisor gone
+   (or the banner whole again) would find the card whole and give it back —
+   which cuts it again: that is an oscillation, and the frame already had one
+   (in the shell). A judged card ABOVE the one stood for that is cut takes the
+   stand over: a newer fault's body is laid out one commit after it arrives,
+   so the first look can see only the older card it pushes down.
+
+   TWO JUDGED CARDS (lane `cardstay` round 3, integrator decision X2). A newer
+   fault on top of an older one is a card the student is judged by, so W7 does
+   not hold it back, and the older card it pushes under the window is
+   announced by the fold row. Two things follow, both measured on the round-3
+   census (the 20 tallest top cards × 5 older cards, two and three faults, the
+   product's stages, Chromium and WebKit):
+     · the newer card's cut under THAT row is a cut (`readStandingToastCut`,
+       „…UNLESS THE ROW STAYS UP FOR ANOTHER CARD"): the row stays whatever the
+       newer card does, so it is asked for its summary before paint or stood
+       for. Round 2 read the cut away, stood for the older card, kept the
+       banner on one line, and the newer card's paragraph (full screen
+       1280 × 720, «Преминаване на червен сигнал», 213.3 px in 185.4) stayed
+       cut for its whole life — where base had at least given it its summary
+       when the crash pin's banner grew;
+     · the column stands for the TOP judged card, and for an older card only
+       where a later card the student is not judged by pushed it out (it was
+       last seen whole under the same judged cards — `free`). An older card a
+       newer judged card put under the window is announced by the fold row and
+       nothing more: no waiting advisor, no one-line banner, no dropped stamp.
+       Standing for it folded the banner in 83–98 of 98 census pairs on every
+       stage and, holding the advisor back, cost 18 of 3900 rows the older card
+       base had brought back whole (its advisor squeezed the top paragraph into
+       its summary).
+
+   WHAT IS STILL NOT DONE, AND WHY (measured, lane `cardstay`, rounds 1–3).
+     · W2's read layout for a SUMMARY (title and law chip pinned, the body box
+       scrolling). A summary's body is the one-liner, 16.5–33 px, and while
+       that box is short the shell raises the fold row (23.5 px + the 6 px
+       gap): pinning helps only where the body gives back ≥ 46 px, and no
+       catalogued summary has such a body. Built and measured in round 1, it
+       cut the card further (35.2 px past the window at cap 220).
+     · THE FLOOR. With all three steps, every catalogued summary fits a
+       column whose stage (`[data-sim-stage]`'s padding box) is at least
+       548 px tall — measured in Chromium, all 86 cards, a two-line task
+       banner; at 547 «Изпреварване в зона със забрана» (160.5 px once
+       trimmed) is cut. Below it the card keeps the column's fallback: the
+       fold row announces it and «покажи» pages it. Two product stages are
+       below it: the letterboxed /simulator at 1366 × 657 (514) and at
+       1280 × 601 (420). A minimum supported screen is the founder's question.
+     · TWO JUDGED CARDS ON A SMALL STAGE. The fold row raised for the older
+       card is 29.5 px the newer one does not get: where the newer card's
+       summary (stamp dropped) is taller than the window less that row, its
+       law chip stays under the row (the 1165 × 650 rig stage: «Изпреварване
+       в зона със забрана» 160.5 and «Спиране в забранена зона» 141.3 against
+       131.9). The two-card floor, measured (Chromium and WebKit, the 20
+       tallest top cards × 5 older cards), is 582 px of stage against 548.
+     · «НАУЧИ» CARDS have no summary on PC: measured floors (bare stage
+       1000 wide) 516 / 646 / 650 / 673 / 716 px for the five verbatim cards,
+       716 for all; below it the fold row announces the card and «покажи»
+       pages it to its end.
+   No rule, grade, points, verdict, graded clock or sentence is changed by any
+   of this — only which of the cards and rows already composed is on the
+   glass when.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Standing step 1 (W7): the advisor's card and praise wait for the graded card. */
+export const TOAST_STAND_YIELD = 1;
+/** Standing step 2 (W8): a banner under a route hold also sets its sentence on one line. */
+export const TOAST_STAND_BANNER = 2;
+/** Standing step 3 (W9): the card's age stamp, when it stands on a footer row of its own, is not painted. */
+export const TOAST_STAND_TRIM = 3;
+
+/** The attribute on a card's age stamp («сега» / «преди N с»). */
+export const TOAST_AGE_ATTR = "data-hud-toast-age";
+
+/**
+ * Whether this card's age stamp stands on a footer row of its own — the only
+ * case in which not painting it gives the card a row back (W9). Layout px, the
+ * stamp against the footer item before it (the law chip): both are in the one
+ * `flex-wrap` footer, so a stamp whose top is below the chip's top has been
+ * wrapped onto the next row. A card with no stamp, or a stamp with nothing
+ * before it, has no such row: `false`.
+ */
+export function toastAgeHasOwnRow(card: HTMLElement): boolean {
+  const age = card.querySelector(`[${TOAST_AGE_ATTR}]`) as HTMLElement | null;
+  const before = (age?.previousElementSibling ?? null) as HTMLElement | null;
+  if (age === null || before === null) return false;
+  return age.offsetTop >= before.offsetTop + before.offsetHeight;
+}
+
+/**
+ * Which judged card on the glass is cut below the column's window — its index
+ * among `[data-hud="toasts"]`'s children (`judged[i]` says whether child `i`
+ * carries a WHY), or `null` when none is, or when nothing can be read: no
+ * stack, a stack that does not hold exactly the cards named, or a card whose
+ * offset parent is not the scroller's (the same no-claim `readToastWindow`
+ * makes). Layout px, never a rect — a card in its `hud-toast-in` entry is
+ * scaled. A cut is the card's foot more than `TOAST_FIT_SLACK_PX` past the
+ * window's foot; a card the student paged past the window's TOP is not one.
+ * The window is read WITHOUT the fold row (out of flow for the one read, put
+ * back, both scroll positions restored), and only once the card is cut with
+ * the row as it stands — a whole card costs three layout reads.
+ * …UNLESS THE ROW STAYS UP FOR ANOTHER CARD (lane `cardstay` round 3, X2). The
+ * read without the row is the right question only while the row is up for the
+ * cut it reports: take the row away and that cut is gone. When, with the row
+ * out of flow, some card of the stack is STILL below the window — an older
+ * fault the newer one pushed down — the shell's fold measure keeps the row up
+ * whatever this card does (`measureToastColumnFold` asks exactly that), so the
+ * window this card really gets is the one with the row in it, and a judged
+ * card cut there is cut. Measured (verifier, round 2, full-screen 1280 × 720):
+ * «Преминаване на червен сигнал» on top of «Удар в неподвижно препятствие», its
+ * 213.3 px paragraph whole in the 214.9 px window without the row and cut,
+ * law chip out, in the 185.4 px it really had — for its whole life.
+ */
+export function readStandingToastCut(scroller: HTMLElement, judged: readonly boolean[]): number | null {
+  if (!judged.includes(true)) return null;
+  const stack = scroller.querySelector('[data-hud="toasts"]');
+  if (stack === null) return null;
+  const cards = Array.from((stack as HTMLElement).children) as HTMLElement[];
+  if (cards.length !== judged.length) return null;
+  const scrollTop = scroller.scrollTop;
+  const cutAt = (windowPx: number): number | null => {
+    for (let i = 0; i < cards.length; i += 1) {
+      if (!judged[i]) continue;
+      const card = cards[i]!;
+      if (card.offsetParent === null || card.offsetParent !== scroller.offsetParent) return null;
+      const cardPx = card.offsetHeight;
+      if (!(cardPx > 0)) continue;
+      const topPx = card.offsetTop - scroller.offsetTop - scroller.clientTop - scrollTop;
+      if (topPx + cardPx > windowPx + TOAST_FIT_SLACK_PX) return i;
+    }
+    return null;
+  };
+  const asItStands = cutAt(scroller.clientHeight);
+  if (asItStands === null) return null;
+  const more = scroller.parentElement?.querySelector(TOAST_MORE_SELECTOR) ?? null;
+  if (more === null) return asItStands;
+  const row = more as HTMLElement;
+  const position = row.style.position;
+  row.style.position = "absolute";
+  const withoutRowPx = scroller.clientHeight;
+  row.style.position = position;
+  if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  return toastCardsCutBelow(cards, scroller, scrollTop, withoutRowPx) ? asItStands : cutAt(withoutRowPx);
+}
+
+/**
+ * Whether any card of `cards` has its foot more than
+ * `TOAST_FIT_SLACK_PX` below a window of `windowPx` — the shell's own question
+ * for keeping the fold row up (`rowsBelowFold` against the window without the
+ * row), asked off the same layout px as `readStandingToastCut`. A card of no
+ * height, or one whose offset parent is not the scroller's, makes no claim.
+ */
+function toastCardsCutBelow(
+  cards: readonly HTMLElement[],
+  scroller: HTMLElement,
+  scrollTop: number,
+  windowPx: number,
+): boolean {
+  return cards.some((card) => {
+    if (card.offsetParent === null || card.offsetParent !== scroller.offsetParent) return false;
+    const cardPx = card.offsetHeight;
+    if (!(cardPx > 0)) return false;
+    return card.offsetTop - scroller.offsetTop - scroller.clientTop - scrollTop + cardPx > windowPx + TOAST_FIT_SLACK_PX;
+  });
+}
+
+/**
+ * Whether this card answers its own cut — so the column takes no step for it
+ * (lane `cardstay` round 2). Two cases, both the card's own machinery:
+ *   · its body is still `pending` — its first commit, before
+ *     `useToastBodyChoice` has chosen paragraph or summary, laid out with the
+ *     body at 0 px: not the card the student will see;
+ *   · it shows its PARAGRAPH, it has a summary (`peekBg`), it is the top card of
+ *     the stack, and the summary would be whole in the window as it stands —
+ *     exactly the cut the card's own shrink switch mends
+ *     (`toastSummaryMendsCut`; at the top of the stack its „not pushed" rule
+ *     holds by construction). Judged, like the switch, in the window without
+ *     the fold row — also where the row stays up for an older card below it
+ *     (round 3, X2): a summary that is still cut under that row is then stood
+ *     for, and the stand's own steps (the banner's one line, the stamp row)
+ *     are taken for the shorter card. The reader asks that card for its
+ *     summary NOW (`useToastReader.summarise` → `toastBodyChoiceOnAsk`, a layout effect), so
+ *     the switch is taken before paint instead of a frame after it.
+ * MEASURED, both ways the column could have answered such a paragraph without
+ * this: standing for it set the banner on one line before the switch could run
+ * (the product's letterboxed stage at 1440 × 900: 11 of the 86 catalogued cards
+ * folded a banner base never let cut any card); leaving it to the switch alone
+ * painted it cut for one frame (bare 1000 × 548 stage: 4 cards, title or law
+ * chip off the glass on that frame).
+ * Anything else — a summary, a card with nothing shorter to show, a card pushed
+ * down the stack, a read that cannot be made — is `false`: the column stands
+ * for it.
+ */
+export function toastCardShrinksItself(card: HTMLElement, scroller: HTMLElement, peekBg: string | undefined): boolean {
+  const body = card.querySelector(`[${TOAST_BODY_ATTR}]`) as HTMLElement | null;
+  if (body === null) return false;
+  const choice = body.getAttribute(TOAST_BODY_ATTR);
+  if (choice === "pending") return true;
+  if (choice !== "paragraph" || typeof peekBg !== "string" || peekBg.trim().length === 0) return false;
+  const read = readToastWindow(card, scroller);
+  if (!(read.contentTopPx <= TOAST_FIT_SLACK_PX)) return false;
+  const summary = readToastSummaryFit(card, body, scroller, peekBg);
+  // A summary no shorter than the card mends nothing: since round 3 (X2) this is
+  // asked of a card cut only under an older card's fold row, which the card's
+  // own switch never asks about (its rule 1 reads that card whole).
+  if (!(summary.cardPx < read.cardPx)) return false;
+  return toastCardInWindow(read.contentTopPx - read.scrollTopPx, summary.cardPx, summary.windowPx) === "whole";
+}
+
+/** The reader's latch on a judged card (W7–W9; `above`: round 3, see `useToastReader`). */
+interface Stand {
+  id: number;
+  level: number;
+  above: string | null;
+}
+
+/** The ids of the judged cards above index `i` of `shown`, as one key. */
+function toastJudgedAbove(shown: ReadonlyArray<{ id: number; event: { kind: string } }>, i: number): string {
+  return shown
+    .slice(0, Math.max(0, i))
+    .filter((t) => hudToastCarriesWhy(t.event.kind))
+    .map((t) => t.id)
+    .join(",");
+}
+
+/**
+ * Records, for each judged card WHOLE in the window as it stands, the judged
+ * cards above it (`toastJudgedAbove`) — only while none of the cards down to it
+ * is still `pending` (a newer card's first commit lays its body out at 0 px, so
+ * a card under it looks whole one commit too long). Ids no longer on the glass
+ * are dropped. Layout px, the same reads as `readStandingToastCut`.
+ */
+function recordWholeToasts(
+  scroller: HTMLElement,
+  shown: ReadonlyArray<{ id: number; event: { kind: string } }>,
+  wholeUnder: Map<number, string>,
+): void {
+  for (const id of [...wholeUnder.keys()]) if (!shown.some((t) => t.id === id)) wholeUnder.delete(id);
+  const stack = scroller.querySelector('[data-hud="toasts"]');
+  if (stack === null) return;
+  const cards = Array.from((stack as HTMLElement).children) as HTMLElement[];
+  if (cards.length !== shown.length) return;
+  const windowPx = scroller.clientHeight;
+  for (let i = 0; i < cards.length; i += 1) {
+    const card = cards[i]!;
+    if (card.querySelector(`[${TOAST_BODY_ATTR}="pending"]`) !== null) return;
+    if (!hudToastCarriesWhy(shown[i]!.event.kind)) continue;
+    if (card.offsetParent === null || card.offsetParent !== scroller.offsetParent) continue;
+    const cardPx = card.offsetHeight;
+    const topPx = card.offsetTop - scroller.offsetTop - scroller.clientTop - scroller.scrollTop;
+    if (cardPx > 0 && topPx >= -TOAST_FIT_SLACK_PX && topPx + cardPx <= windowPx + TOAST_FIT_SLACK_PX) {
+      wholeUnder.set(shown[i]!.id, toastJudgedAbove(shown, i));
+    }
+  }
+}
+
 /** What `useToastReader` hands the shell. */
 export interface ToastReader {
   /** For `HudToasts` and `visibleToasts`: the opened card, and whether the column above it has yielded. */
   reading: ToastReading | null;
-  /** The advisor's card waits (yield step 1 or 2). */
+  /** For `HudToasts` and `visibleToasts`: the graded card nobody opened that the column stands for (W7). */
+  standing: ToastStanding | null;
+  /** For `HudToasts`: the paragraph that answers its own cut — asked to take its summary before paint. */
+  summarise: number | null;
+  /** The advisor's card waits (yield step 1 or 2, or a standing graded card — W7). */
   held: boolean;
-  /** A banner under a route hold sets its sentence on one line (yield step 2). */
+  /** A banner under a route hold sets its sentence on one line (yield step 2, or standing step 2 — W8). */
   bannerYields: boolean;
   /** `HudToasts`' report of a «Защо» press. */
   onWhyChange: (id: number, open: boolean) => void;
@@ -1971,11 +2320,14 @@ export function useToastReader({
   scroller,
   whyChanged,
   holdAllBut,
+  quiet = false,
 }: {
-  toasts: ReadonlyArray<{ id: number }>;
+  toasts: ReadonlyArray<{ id: number; event?: { kind: string; peekBg?: string } }>;
   scroller: { readonly current: HTMLElement | null };
   whyChanged: (id: number, open: boolean) => void;
   holdAllBut: (id: number | null) => void;
+  /** „По-тихи известия" — which cards are on the glass, for the standing read (W7). */
+  quiet?: boolean;
 }): ToastReader {
   const [openId, setOpenId] = useState<number | null>(null);
   // How far the column has yielded to the card `openId` names. It belongs to
@@ -1986,6 +2338,118 @@ export function useToastReader({
   // is no unmount report to forget.
   const readingId = openId !== null && toasts.some((t) => t.id === openId) ? openId : null;
   const level = readingId === null ? 0 : yieldLevel;
+
+  // W7 — THE GRADED CARD THE COLUMN STANDS FOR (block above `readStandingToastCut`).
+  // The latch is state; whether it still stands is derived, like `readingId`:
+  // only while nothing is being read and only while that card is on the glass.
+  // A card with no `event` (a test double) is never judged. `level` is how far
+  // the column has stood for it — `TOAST_STAND_YIELD`, then `TOAST_STAND_BANNER`
+  // (W8), then `TOAST_STAND_TRIM` (W9) — one step per look, only while the card
+  // is still cut, never back.
+  // `above` (round 3): the judged cards above it when it was found cut, if it had
+  // been seen whole under exactly those — the cut came from a card the student is
+  // not judged by (W7's case); `null` when a newer judged card is what put it
+  // under the window. See „…AND THE COLUMN STANDS ONLY FOR…" below.
+  const [stand, setStand] = useState<Stand | null>(null);
+  // Each judged card's last sighting WHOLE: the judged cards above it then, all
+  // laid out (none pending). Written by `look`, read only by `look`.
+  const wholeUnder = useRef(new Map<number, string>());
+  // The paragraph the column asks for its summary before paint (`look` below) —
+  // derived like `standing`: only while nothing is read and that card is on the glass.
+  const [summariseAsked, setSummariseAsked] = useState<number | null>(null);
+  // …AND A CARD THAT ARRIVES WITH ITS BODY STILL PENDING IS LOOKED AT AGAIN, in
+  // the same flush (cardstay round 2). Its first commit lays the body out at
+  // 0 px and the card chooses paragraph or summary in its OWN layout effect — a
+  // re-render of the card alone, which runs no look of this hook; the next look
+  // came from the shell's observer, a painted frame later. Measured in WebKit on
+  // the 1366 × 657 letterboxed stage: a fault raised under the crash pin's
+  // banner was painted cut for one frame (window 107.2 for its 130.5) before
+  // the stand. The re-render asked here is flushed with the card's own, before
+  // paint; it is asked at most twice in a row, so a body that never leaves
+  // `pending` cannot loop.
+  const [, setRelook] = useState(0);
+  const relooks = useRef(0);
+  const cards = toasts.map((t) => ({ id: t.id, event: { kind: t.event?.kind ?? "" }, peekBg: t.event?.peekBg }));
+  const asked: ToastStanding | null = readingId === null && stand !== null ? { id: stand.id } : null;
+  const glass = asked === null ? [] : visibleToasts(cards, quiet, null, asked);
+  const onGlass = asked !== null && glass.some((t) => t.id === asked.id);
+  // …AND THE COLUMN STANDS ONLY FOR A CARD A LATER UNJUDGED CARD PUSHED (lane
+  // `cardstay` round 3). An older card under a newer judged card is under the
+  // window because of THAT card — one the student is judged by, not W7's case —
+  // and is announced by the fold row; standing for it gives him nothing he can
+  // read and costs what base gave. Measured on the round-3 two-fault census (20
+  // tall top cards × 5 older ones, the product's stages, against base): round
+  // 3's first build stood for such cards, folded the banner under the crash pin
+  // in 83–98 of 98 pairs on every stage, and — holding the advisor's card back
+  // for them — kept the newer paragraph from the summary base's advisor had
+  // squeezed it into, which in 18 of 3900 rows had brought the older card back
+  // whole. So the column stands for the TOP judged card, and for an older card
+  // only while the judged cards above it are the ones it was last seen whole
+  // under (the crash pin's banner or the advisor's card pushed it out).
+  const onTop = onGlass && glass.find((t) => hudToastCarriesWhy(t.event.kind))?.id === asked!.id;
+  const aboveNow = onGlass ? toastJudgedAbove(glass, glass.findIndex((t) => t.id === asked!.id)) : "";
+  const free = onTop || (stand !== null && stand.above !== null && stand.above === aboveNow);
+  const standing: ToastStanding | null =
+    asked === null || !onGlass || !free ? null : stand!.level >= TOAST_STAND_TRIM ? { id: asked.id, trimAge: true } : asked;
+  const shown = visibleToasts(cards, quiet, null, standing);
+  /**
+   * One look at the column. `stand` is the latch after it: while its card is on
+   * the glass, one step further if that card is still cut (W8, W9), never back;
+   * otherwise the first judged card on the glass that is cut, or nothing.
+   * `summarise` is the paragraph that answers its own cut
+   * (`toastCardShrinksItself`), asked to take its summary now, before paint —
+   * the column takes no step for it.
+   */
+  const look = (el: HTMLElement | null): { stand: Stand | null; summarise: number | null } => {
+    const none = { stand: null, summarise: null };
+    if (readingId !== null || el === null) return none;
+    const cardAt = (i: number) => el.querySelector('[data-hud="toasts"]')?.children[i] as HTMLElement | undefined;
+    recordWholeToasts(el, shown, wholeUnder.current);
+    /** The stand for card `i`: `above` set only where it was last seen whole under the judged cards above it now. */
+    const standFor = (i: number, lvl: number): Stand => {
+      const key = toastJudgedAbove(shown, i);
+      return { id: shown[i]!.id, level: lvl, above: wholeUnder.current.get(shown[i]!.id) === key ? key : null };
+    };
+    const shrinks = (i: number): boolean => {
+      const card = cardAt(i);
+      return card !== undefined && toastCardShrinksItself(card, el, shown[i]?.peekBg);
+    };
+    /** A paragraph is asked for its summary; a body still `pending` is asked nothing — its own first layout effect chooses. */
+    const ask = (i: number): number | null =>
+      cardAt(i)?.querySelector(`[${TOAST_BODY_ATTR}]`)?.getAttribute(TOAST_BODY_ATTR) === "paragraph" ? shown[i]!.id : null;
+    if (standing !== null && stand !== null) {
+      // A judged card ABOVE the one stood for, cut — a newer fault whose summary
+      // was laid out after the stand was taken: the stand moves up to it (the
+      // card below it is under the window whatever is done for it). The steps
+      // already taken stay taken; the trim is a fact about one card's footer,
+      // so it is re-asked for the new one.
+      const at = shown.findIndex((t) => t.id === standing.id);
+      const above = at > 0 ? readStandingToastCut(el, shown.map((t, i) => i < at && hudToastCarriesWhy(t.event.kind))) : null;
+      if (above !== null) {
+        if (shrinks(above)) return { stand, summarise: ask(above) };
+        return { stand: standFor(above, Math.min(stand.level, TOAST_STAND_BANNER)), summarise: null };
+      }
+      if (stand.level >= TOAST_STAND_TRIM) return { stand, summarise: null };
+      const still = readStandingToastCut(el, shown.map((t) => t.id === standing.id));
+      if (still === null) return { stand, summarise: null };
+      if (shrinks(still)) return { stand, summarise: ask(still) };
+      if (stand.level < TOAST_STAND_BANNER) return { stand: { ...stand, level: stand.level + 1 }, summarise: null };
+      // W9: the last step only where it gives a row back — a stamp on a row of its own.
+      const card = cardAt(still);
+      return { stand: card !== undefined && toastAgeHasOwnRow(card) ? { ...stand, level: TOAST_STAND_TRIM } : stand, summarise: null };
+    }
+    const cut = readStandingToastCut(el, shown.map((t) => hudToastCarriesWhy(t.event.kind)));
+    if (cut === null) return none;
+    // A card that answers its own cut is not stood for: a paragraph is asked for
+    // its summary (and stood for only if that is still cut, on the next look); a
+    // body still pending is left to its own first layout effect.
+    if (shrinks(cut)) return { stand: null, summarise: ask(cut) };
+    const fresh = standFor(cut, TOAST_STAND_YIELD);
+    const top = shown.findIndex((t) => hudToastCarriesWhy(t.event.kind));
+    return { stand: cut === top || fresh.above !== null ? fresh : null, summarise: null };
+  };
+  const sameStand = (a: Stand | null, b: Stand | null) =>
+    a === b || (a !== null && b !== null && a.id === b.id && a.level === b.level && a.above === b.above);
 
   /** The yield the column should stand at, by one look at it as it now is. */
   const yieldTarget = (el: HTMLElement | null): number => {
@@ -2003,6 +2467,9 @@ export function useToastReader({
   const recheck = () => {
     const next = yieldTarget(scrollerRef.current);
     if (next !== yieldLevel) setYieldLevel(next);
+    const seen = look(scrollerRef.current);
+    if (!sameStand(seen.stand, stand)) setStand(seen.stand);
+    if (seen.summarise !== summariseAsked) setSummariseAsked(seen.summarise);
   };
 
   // After EVERY commit, before paint: the banner growing and the advisor's card
@@ -2015,6 +2482,18 @@ export function useToastReader({
   // own inputs take part in.
   useLayoutEffect(() => {
     setYieldLevel(yieldTarget(scrollerRef.current));
+    // …and the standing card (W7), the same way: the advisor's card arriving and
+    // the banner growing are this shell's commits, so the yield is taken before
+    // the frame that would have cut the card is painted.
+    const seen = look(scrollerRef.current);
+    if (!sameStand(seen.stand, stand)) setStand(seen.stand);
+    if (seen.summarise !== summariseAsked) setSummariseAsked(seen.summarise);
+    const pending = readingId === null && scrollerRef.current?.querySelector(`[${TOAST_BODY_ATTR}="pending"]`) != null;
+    if (!pending) relooks.current = 0;
+    else if (relooks.current < 2) {
+      relooks.current += 1;
+      setRelook((n) => n + 1);
+    }
   });
 
   // Every other card waits for as long as this one is being read — and only
@@ -2032,11 +2511,15 @@ export function useToastReader({
     [whyChanged],
   );
 
-  const held = level >= TOAST_YIELD_ADVISOR;
+  const held = level >= TOAST_YIELD_ADVISOR || standing !== null;
   return {
     reading: readingId === null ? null : { id: readingId, held },
+    standing,
+    summarise: readingId === null && summariseAsked !== null && shown.some((t) => t.id === summariseAsked) ? summariseAsked : null,
     held,
-    bannerYields: level >= TOAST_YIELD_BANNER,
+    // W8: the stand's second step is the reading's second step — a banner under
+    // a route hold sets its sentence on one line while the card still stands.
+    bannerYields: level >= TOAST_YIELD_BANNER || (standing !== null && stand !== null && stand.level >= TOAST_STAND_BANNER),
     onWhyChange,
     recheck,
   };
@@ -2108,6 +2591,7 @@ function ViolationToast({
   waiting = 0,
   readMaskCss = null,
   onReadScroll,
+  summariseNow = false,
 }: {
   event: Extract<HudEvent, { kind: "violation" }>;
   ageBg: string | null;
@@ -2123,10 +2607,12 @@ function ViolationToast({
   /** The body box scrolled (a wheel, a drag of its bar) — a `scroll` does not
    *  bubble, so the shell's fold row hears it only through this. */
   onReadScroll?: () => void;
+  /** The column asks this paragraph for its summary before paint (`useToastReader.summarise`). */
+  summariseNow?: boolean;
 }) {
   const meta = SEVERITY_META[event.severity];
   const canSummarise = typeof event.peekBg === "string" && event.peekBg.trim().length > 0;
-  const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise, violationToastBodyBg(event, false));
+  const { setCard, bodyRef, choice } = useToastBodyChoice(canSummarise, violationToastBodyBg(event, false), summariseNow);
   const [whyOpen, setWhyOpen] = useState(false);
   // The press is REPORTED as well as kept: the column has to make room for the
   // paragraph and the queue has to give it the time to be read, and neither can
@@ -2217,6 +2703,7 @@ function ToastCard({
   waiting = 0,
   readMaskCss = null,
   onReadScroll,
+  summariseNow = false,
 }: {
   event: HudEvent;
   /** „сега" / „преди 8 с", or null when this card carries no moment. */
@@ -2227,6 +2714,7 @@ function ToastCard({
   waiting?: number;
   readMaskCss?: string | null;
   onReadScroll?: () => void;
+  summariseNow?: boolean;
 }) {
   if (event.kind === "violation") {
     // Its own component because it holds hooks (the fit measurement), and a
@@ -2241,6 +2729,7 @@ function ToastCard({
         waiting={waiting}
         readMaskCss={readMaskCss}
         onReadScroll={onReadScroll}
+        summariseNow={summariseNow}
       />
     );
   }
@@ -2299,6 +2788,8 @@ export function HudToasts({
   onDismiss,
   onDismissAll,
   reading = null,
+  standing = null,
+  summarise = null,
   onWhyChange,
   readMaskCss = null,
   onReadScroll,
@@ -2314,6 +2805,11 @@ export function HudToasts({
   /** The card whose «Защо» is open and whether the column is held for it
    *  (`useToastReader`). Omitted: nothing is being read, the column as shipped. */
   reading?: ToastReading | null;
+  /** The graded card nobody opened that the column stands for (`useToastReader`, W7):
+   *  praise waits while it does. Omitted: the column as shipped. */
+  standing?: ToastStanding | null;
+  /** The paragraph the column asks to take its summary before paint (`useToastReader`). Omitted: none. */
+  summarise?: number | null;
   /** A «Защо» press, by toast id — the shell hands it to `useToastReader`. */
   onWhyChange?: (id: number, open: boolean) => void;
   /** The fade for the foot of the opened card's body box, while the shell's
@@ -2326,7 +2822,7 @@ export function HudToasts({
    *  explanation restarts its clock only when it is painted (round 3, W5). */
   onPainted?: (ids: readonly number[]) => void;
 }) {
-  const shown = visibleToasts(toasts, quiet, reading);
+  const shown = visibleToasts(toasts, quiet, reading, standing);
   // W5: tell the queue what is on the glass — every time it changes, and once
   // on mount. Keyed on the ids, so a re-render that paints the same cards says
   // nothing new.
@@ -2428,7 +2924,7 @@ export function HudToasts({
             key={t.id}
             event={t.event}
             ageBg={
-              t.raisedAtMs !== undefined && toastCarriesAge(t.event.kind)
+              t.raisedAtMs !== undefined && toastCarriesAge(t.event.kind) && !(standing?.trimAge === true && standing.id === t.id)
                 ? toastAgeBg(t.raisedAtMs, nowMs)
                 : null
             }
@@ -2438,6 +2934,7 @@ export function HudToasts({
             waiting={t.id === readId ? waiting : 0}
             readMaskCss={t.id === readId ? readMaskCss : null}
             onReadScroll={t.id === readId ? onReadScroll : undefined}
+            summariseNow={t.id === summarise}
           />
         ))}
       </div>

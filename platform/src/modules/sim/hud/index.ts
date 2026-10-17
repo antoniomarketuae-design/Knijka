@@ -281,7 +281,7 @@ export { HudToasts, useHudToastQueue, type HudToast } from "./HudToasts";
 // shell mounts the hook, and its fold row reads and pages the body box the
 // card scrolls inside (`TOAST_READ_SELECTOR`).
 export { useToastReader, TOAST_READ_SELECTOR, type ToastReader } from "./HudToasts";
-export { type ToastReading } from "./hudPreferences";
+export { type ToastReading, type ToastStanding } from "./hudPreferences";
 // Doc 86 L14/L15 — the DESKTOP half of the notification rework: a dismissible,
 // two-card, 240 px toast column with a „по-тихи известия" setting, and an
 // end-of-lesson debrief that Space skips and a setting can stop auto-opening.

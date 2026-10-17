@@ -12946,3 +12946,823 @@ PROVEN ON 8155302 (integrator, 2026-10-14): the round-3 patch (e2beb1d9…) appl
 - **A judge's THEO-4 reading** of the W6 banner ellipsis.
 - **Triage:** «wcafterpaint» (C2).
 - **No ADR is owed:** the layout decisions are recorded here.
+
+## rig-w3g: the re-drive the whycut landing owed — `sc-roundabout-entry:fe081cf1` stays PARTIAL; the opened explanation is closed, a card nobody presses is now pushed off the PC glass (integrator note, 2026-10-15)
+
+Workflow `rig-wave-w3g` (wf_c515a3a5-62e) ran at `9390622` (health attested `93906222`), one capture and one judge; the judge proposed no closure, so no verifier ran. 13 cells were kept: WHY-SIM ×2, WHY-IMM, WHY-1366, CONTROL-NOPRESS-SIM, WHY-END-SIM, WHY-SC2-SIM, WHY-BURST-SIM, WHY-ROUNDABOUT on S-SIM and S-IMM, PHONE-WHY ×2 (L1) and PHONE-L3. Frames and sidecars are under `.audit-frames/rig-w3g/sc-roundabout-entry/fe081cf1/`; the journal is `handoff-2026-10-08/reports/rig-w3g-journal.jsonl`. **Open list 21 → 21 (3 critical, 17 major, 1 minor).**
+
+- **The stages.** The rule asked for the product's own `/simulator?chrome=dashboard` stage. At 1440×900 the bare `/simulator?chrome=dashboard` is the lesson picker and has no `[data-sim-shell]`. The lesson page (`/simulator?scenario=sc-roundabout-entry&level=3&chrome=dashboard`) has a shell 1168×773.5 at (264, 8) with `data-sim-play=letterbox`. The rig used the rule's fallback, a 1165×650 shell (S-SIM), plus the immersive 1440×900 (S-IMM) and 1366×768 (S-1366). That S-SIM reproduces the column of the letterboxed product stage is not measured; the follow-up lane measures it.
+- **Closed by the judge on these frames:**
+  - The phone card as it first appears: whole at L3 and at L1.
+  - The PC explanation opened with «ЗАЩО» (W2 as built):
+    - on S-SIM it shows 34 of 198 px under «↓ обяснението продължава — покажи», and four presses page it to its last line;
+    - on S-1366, one press reaches the end;
+    - on S-IMM it is whole;
+    - on every snapshot the title and the law chip stay inside the window;
+    - the card now lives about 21.5 s after the press (rig-w3d: gone 5.8 s after it), and the end bar waits for the reading.
+  - The phone's opened sheet at L1: whole, with the law chip, and no scroll.
+  - The FAILED_TO_YIELD card opened on PC: it pages the same way.
+- **New, STILL — the card nobody presses (CONTROL-NOPRESS-SIM).** The 116 px summary card «Не се появи внезапно.» is whole for its first 4.8 s. At +4.87 s the recovery banner and the advisor card arrive. The notify window then falls to 30 px, flickering to 0.1 px as the fold row toggles, and the graded card is pushed wholly below it until it leaves at +7.91 s: cut by 86.9–116.4 px, with its body and its law chip off the glass (90 snapshots). W1 holds the advisor card back only while an explanation is OPEN, so no decision covers this. The debrief carries the full paragraph. S-IMM and S-1366 had no un-pressed control, so the size of this at those stages is unmeasured.
+- **Unjudged:**
+  - the phone's no-pause L3 peek opened with «ЗАЩО» (the filed frame's form);
+  - any phone FAILED_TO_YIELD card (no phone cell drew the bill).
+- **Recorded, not held against the row:**
+  - The W6 one-line banner: «Колата е притисната след удара — измъкни се наза…».
+  - In BURST and END, the waiting cards are painted after the close only under the debrief. No «wcafterpaint» cap-out was seen.
+- **Next (integrator):**
+  - A follow-up lane on `9390622`. A graded fault card on the glass is never pushed out of the column's window by a later card the student is not judged by: the advisor card waits, and the recovery banner's growth does not cut it. The lane measures the column on the product's letterboxed `/simulator` stage itself.
+  - Then a re-drive with un-pressed controls on every stage and the two unjudged phone forms.
+
+## Landed: the road users' shells are posed from the grid before every physics step, so a touch with another road user is billed at the same step, of the same kind and at the same impact on every cadence tested in process, and a staged rider has one kind on every reader — in process — `sc-roundabout-entry:08a0b701` (major) (2026-10-16)
+
+Lane `npcstep`, six rounds, built on `8cb0707`. Rounds 1–5 were each REFUTED by the adversarial verifier. Round 6 was SIGNED OFF WITH CONDITIONS: the verifier found no product-behaviour defect on the drives it ran and no surviving mutant of a named class. Its two conditions on new classes (V6-1, V6-2) are pinned at integration, below.
+- **The patch.** It is `npcstep-result-r6.patch` (sha256 e38d7702…, 572,778 bytes, 33 files, +8845/−705), cumulative against `8cb0707`. It lands as its rebase on `9390622`, `npcstep-result-r6-on-9390622.patch` (sha256 56d4ed13…, 572,939 bytes), together with two test-side files changed at integration (`sceneGradeCut.ts` and `scene-frame-grade.execution`, C1–C2 below) and the docs.
+  - The two patches differ only in `lessons/scenario/__tests__/rapierContactDrive.ts`, which is the union with `65be020`'s `onStep`. The round-6 verifier confirmed this. It also confirmed that the rebased patch applies with `--cached --check` to `9390622`.
+  - By the builder, `9390622` changes none of the files round 6 touched.
+  - The patch has 16 CR bytes, all in `orchestrator/director.ts`, which is CRLF in base. Every other touched file is LF.
+- **Product files (17):**
+  - `components/sim/LessonScene.tsx`, `NpcColliders.tsx` and `VehicleRig.tsx`;
+  - `scene/gradeGrid.ts`, `scene/npcShells.ts` (new), `scene/nearMissMeter.ts` and `scene/vehicleSample.ts`;
+  - `traffic/system.ts` and `traffic/types.ts`;
+  - `orchestrator/contact.ts`, `director.ts`, `runners.ts` and `types.ts`;
+  - `contracts.ts`;
+  - `lessons/scenario/templates-vru2.ts` (the opt-out field and comments; no rider moves);
+  - `devrig/rig.ts` and `hud/RearProximityCue.tsx` (comments only).
+- **Test-side files (16).**
+  - New: `sceneGradeCut.ts` (the cut), `scene-frame-grade.execution`, `step-loop-grade`, `npc-colliders-mount`, `npc-shells`, `npc-contact-cadence` and its census, `npc-shell-cast-kind`, `npc-shell-respawn`, the harness `npcContactDrive.ts`, and `grade-grid-clock-readonly`.
+  - Updated: `live-grid-wiring`, `live-grade-call.execution`, `rapierContactDrive.ts`, `rig-step-keyed.census` and `traffic/cyclist-near`.
+  - Extended at integration (tests only): `sceneGradeCut.ts` and `scene-frame-grade.execution` (§5c, and §3's O2).
+- **No rule, threshold, point value, copy table or sentence was touched.** The reviewed-text manifest was not re-recorded. What a student can see change is listed under «What changes at 60 Hz».
+- **ADR-014 is amended and ADR-017 is updated** (both dated 2026-10-13, the date the code cites).
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:08a0b701` stays OPEN.
+- Every number in this section was measured in process. Nothing was driven in a browser by the builder, by any verifier or by the integrator.
+- A rig re-drive of the kept cells on PC and on the phone lens is owed (below). Whether its frames close the row is for that wave's judge and verifier.
+- The Product Map count is unchanged (21 open).
+
+**What was wrong.** rig-w3d (above, 2026-10-12, at `8cb0707`) found the points split gone, but the sheets still differed after a contact.
+- At L1 the PC runs added static-object hits that the phone runs did not have, and the two PC repeats differed from each other.
+- At L4 H1810 the COLLISION stamp moved with the display.
+
+rig-w3d named the cause of the H1810 stamp: the NPC shell, still posed once per render frame (ADR-014, Amendment 2026-10-11).
+- **How it happened** (the builder, at `8cb0707`). NpcColliders moved rapier's kinematic shells once per rendered frame. In a frame of n steps a shell jumped the frame's whole distance in the first step and stood still for the other n−1. Rapier took the shell's velocity from that one jump.
+- **The builder's census** covered 56 committed demos that end in a road-user contact: 200 cells × {30 Hz, 13 fps, 0.37 s frames, w69 phone deltas}, each compared with its own 60 Hz drive.
+  - 543 of 800 rows differed, in 136 cells.
+  - The largest first-contact shift was 41 steps.
+  - One touch was judged at 1.82 km/h on one cadence and at 86.06 km/h on another.
+  - 36 rows in 21 cells added a static-object bill.
+  - A standing shell agreed on every cadence, which puts the cause in the shell's move.
+- **The round-1 verifier, with its own drivers on base:** 1,555 of 1,600 carry-on rows differed from 60 Hz, counting rows that differ only in which agents hold the shells. Beyond the shell bindings, 108–142 of 200 cells differed on each multi-step cadence (15 at 120 Hz). The largest first-contact shift was 137 steps.
+
+**The five refuted rounds.** Each failed on something the next round had to answer.
+- **Round 1.** The cadence repair held: 2,944 non-60 Hz rows, 0 differences. But one touch on a staged rider was billed twice, as two kinds: the director's sentinel said «cyclist» and the ear said «vehicle». 15 of 784 cast members had a shell tag that disagreed with the cast, in sc-vu-bikelane-turn and sc-vu-child-cyclist. This was pre-existing at 60 Hz on base.
+- **Round 2.** A frame callback that skipped a multi-step frame's last point at the frame end (G5b) passed 183 of 183 targeted tests and 595 of 596 wide ones. The harness cut only the call expression, so the scene's frame callback around it was never executed.
+- **Round 3.** A clock skip at the frame site, placed before `const steps` (R1b), passed the 75-file wide set. Also, the three graded traffic queries still took a staged body's kind from the A11 curb-offset marker. Routing them through the cast moved 0 of 2,434 digests, so the builder's reason for keeping the marker did not hold.
+- **Round 4.** A `return` inside the pre-drive branch on frames longer than 20 ms (F1) passed the 87-file wide set, and four more such placements passed the targeted set. These were branches the harness compiled but never executed.
+- **Round 5.** Three placements with no `return` and no `throw` went uncaught:
+  - reassigning the pause guard's input (P1) and re-declaring the step loop's input (P3) passed the targeted set and the 87-file wide set;
+  - replacing the grid's grading method (P7) passed the targeted set (278 of 278).
+
+  The hazard lights, one key press, were enough to trigger each.
+
+**The integrator's decisions N1–N17**, inside the 2026-10-08 delegation:
+- **N1.** One kind per touch: the cast's kind.
+- **N2.** Grading inside the step loop is ratified with conditions.
+- **N4–N7.** The frame call is executed, the last two readers move to the cast kind, and every 60 Hz change is listed.
+- **N8–N10.** The grid's clock is read-only, the graded queries use the cast kind, and the counter-flow rider's opt-out becomes an authored field.
+- **N11–N13.** The cut refuses every early exit from the frame callback except `if (paused) return;`, and every product-reachable branch is executed.
+- **N14–N16.**
+  - N14: the cut refuses writes to the names the exits and the two pinned declarations read, and to the members of the grid, the step record and the step-loop ref. `const taken` is pinned, and the grid's methods cannot be replaced.
+  - N15: the exception limit is stated truly.
+  - N16: the product's inputs are executed.
+- **N17** bounds the stop rule. A refutation needs product behaviour on a drive the product's inputs can produce, a surviving mutant of a named sabotage class, or a builder claim that does not reproduce. A new class of sabotage is a condition.
+
+None of these is a founder ruling.
+
+**What landed.** The description is the builder's; the next heading says what the verifiers drove.
+- **The shells are posed by the grid.**
+  - At every graded point, after `onPoint` and the near-miss handler, `GradeGrid` calls `hooks.shells(k, student, respawned)`.
+  - `scene/npcShells.ts` then gives each bound shell its agent's pose at k as the next kinematic pose, so step k+1 moves it there at the agent's own one-step velocity.
+  - Which agents hold the 8 + 4 shells is chosen from the grid's student: at the first point, at every 30th point, and, after a respawn, at the point the respawn is handed to and at the point after it.
+  - NpcColliders mounts the bodies and fills the scene's shells ref. It has no frame hook.
+- **A multi-step frame is graded between its steps.**
+  - VehicleRig's before-step callback first calls `stepLoopGradeRef?.current?.();`.
+  - If the step just taken has not been graded and the driver is not paused, the scene refreshes the cabin's channels (when it has a sim and a cabin) and grades that point, with no frame end and no look, before the next step's input is read. Grading that point is what poses the shells for the next step.
+  - The frame's own call grades its last point, with the session clock and the frame's look.
+  - At one step per frame the sequence is what shipped.
+- **One kind per touch (N1).**
+  - A staged road user's contact kind, its rear-badge kind and its near-miss kind all come from the director's cast (`vehicleCollisionKind`). So do the three graded queries (`cyclistNear`, `overtakenNear`, `sameDirVehiclesNear`).
+  - The counter-flow rider's opt-out is the authored field `gradedOnlyByOwnRunner` (`templates-vru2.ts`, `sc-vbl-rider-cf`). It is no longer carried by the sign of its offset.
+- **The grid is sealed.** Its clock is a frozen read-only view. Its prototype is frozen, the instance cannot be extended, and its clock fields cannot be written.
+- **The test cut.**
+  - `sceneGradeCut.ts` executes the scene's whole frame callback and its step-loop grade.
+  - From the syntax tree it refuses:
+    - every early exit before the graded call except the exact `if (paused) return;`;
+    - every write to a guarded name;
+    - every assignment, `delete`, computed read, method call or alias of a guarded object.
+  - It pins `const steps` and `const taken` by their exact syntax.
+- **The stated limit (`EXCEPTION_LIMIT`).**
+  - Any exception raised while the frame callback runs before its graded call abandons the rest of that frame (R3F 9.6.1 has no try/catch there).
+  - The next frame's step loop grades the lost point once and in order, with no frame end and no look.
+
+**What the verifiers reproduced.**
+- **The round-6 verifier,** on its own lane (`8cb0707` + the patch, sha matched):
+  - **Product-input fuzz.** The scene's own frame callback and step-loop grade, cut with the refusal on, ran on a real GradeGrid and a real CabinControls.
+    - Scale: 500 seeded drives, 60,198 frames of 0–30 steps (3 % of them 0.5–3.5 s), 3,013 paused frames and 400,231 steps.
+    - Inputs: cold and ready cabins, locked and live drives, all 19 keys pressed and held through the cabin's own handlers, its public controls, pedals, blocked presses, a disowned pedal and tier switches.
+    - The branch events it counted: pre-drive 1,592, blocked 2,792, rejections 1,351, tier switches 223, reverse-stuck 168, stuck-start 546, assist shifts 35, recorded 6,243.
+    - Result: 0 violations. Every point was graded once and in order, and every stepping frame reached its call once. Every frame end was the previous one plus the clamped delta. The shells were posed from every point before the next step, and every look handed out in a live frame was heard in order.
+  - **Its cadence census.** 520 cells, 2,944 non-60 Hz rows: 0 differences from 60 Hz. Sorted, every part's rows are byte-identical to rounds 3–5: carry 051dfd7e, brake 5ae2d29f, the row's own lesson f2cf0f55, release e3677a51, bikelane variants f0bcf971.
+  - **No touch is doubled.** Across all 3,464 rows, no two road-user COLLISION rows fall within 0.2 s. This was measured in round 2; the rows are identical since.
+  - **Replay catalogue.** 2,434 cells, 0 digest differences against the round-5 tree, and the collision file is byte-identical.
+  - **Mutants.** 12 files, 319 tests, each mutant restored and sha-checked.
+    - Killed on the refusals' text: P1 (27 failed), P2 (28), P3 (27), P5 and P6, R1, F1–F6, P7 (28), R1b (28), R1c (29), SL1 (28) and G5b (28).
+    - Killed on executed assertions: P4 (13), R3 (19), G1 (4) and G2 (31).
+    - Seven variants of its own were also killed.
+    - V1 and NS1b survived (conditions below).
+  - **The seal's cost.** Interleaved in one process (60,000 points × 9 repetitions, three runs): round 5 876 / 641 / 527 ns, sealed 899 / 619 / 519 ns per point. No measurable difference.
+  - **Regression.**
+    - scene, devrig, collision, traffic, orchestrator, vehicle, hud and components/sim: 320 files, 5,050 of 5,052; the 2 failures are tools/ ENOENT.
+    - lessons/__tests__ and lessons/scenario/__tests__ (caption-truth, keep-right-claim-census and the reviewed-text manifest among them): 314 files, 6,952 passed, 166 skipped, 0 failed.
+    - tsc: 22 errors, the environment baseline.
+- **Earlier verifiers.**
+  - The replay catalogue's 4 base-against-tree differences (sc-vu-bikelane-turn mistake-cut-path L1, L2, L3, L5, `nearMisses[1].kind` only) were reproduced in round 3.
+  - The R3F 9.6.1 loop shape behind the exception limit was checked in round 5 (`dist/events-b389eeca.esm.js`: the next frame is requested first, the subscribers run in a plain `for`, no try/catch).
+  - Round 4 found no staged vehicle state outside a cast that carries the marker (808 rungs, 104 such states).
+  - The cost of the three graded queries:
+    - +0.15–0.25 µs per point in round 4's form (round-4 verifier);
+    - after round 5, within noise to about +0.2 µs (round-5 verifier: tree 0.65 / 0.89 µs, base 0.67 / 0.69 µs);
+    - the builder puts the residual at about +0.1 µs and shows it does not come from the predicate.
+- **Builder only, not re-run by a verifier.**
+  - Its own census: 200 cells × 4 cadences, 0 of 800 rows differ.
+  - A respawn at point 607 on 4 cadences: the shell speed stays 7.2 m/s, against 3,444 m/s with the respawn ignored.
+  - 113 mutants, all killed; 31 of them die on a refusal alone.
+  - The int-r6 run on `9390622` + the rebased patch: 324 files, 5,533 passed, 1 skipped, 2 failed (both tools/ ENOENT).
+
+**What changes at 60 Hz, base against tree** (the whole list for rounds 1–6).
+- **The rebind phase.** It changed no judged contact, bill or sheet in the 496 + 200 census cells. It can change which agents hold a shell when more than 8 vehicles or 4 walkers are in range, or when one enters range within a rebind interval of a contact.
+- **The rider rows.** 8 of 160 change, all in sc-vu-bikelane-turn mistake-cut-path:
+  - L1 and L5 carry-on lose the duplicate COLLISION «vehicle» row at 19.300 s; score and verdict are unchanged.
+  - The rear badge reads «Велосипедист отзад» where it read «Кола отзад» (L1, L2, L3, L5 brake; L2, L3, L5 carry-on).
+  - The near-miss record names the rider «cyclist» where it said «vehicle» (live L2, L3, L5 carry-on; in the replay catalogue L1, L2, L3, L5). The debrief's sentence names the closest near miss, the pedestrian, so the shown sentence does not change.
+- **The round-2 verifier's 24 variant cells** (not committed demos): 22 badge relabels, 8 near-miss relabels, and 9 sheets, with score and verdict equal in all 9.
+  - 7 of the 9 lose the exact duplicate.
+  - At L1/look0.3 an ear-only touch is relabelled «vehicle» → «cyclist», as N1 intends.
+  - At L1/look0.5, a separate «vehicle» touch 0.28 s after the sentinel's last report of the same rider is now the continuation of that cyclist contact.
+- **The with-flow rider** is now fed to the vulnerable-pass tracker and dropped from the overtake-return and lane-entry queries. On what was measured, no sheet moves with it.
+
+**The conditions, and how each stands.**
+- **C1 (V6-1). The caller of the step-loop grade was outside the cut.**
+  - The verifier's V1 wraps VehicleRig's `stepLoopGradeRef?.current?.();` in `if (!(hazards && rawBrake > 0.3))`. It passed the targeted set (319/319) and the 87-file wide set (1,953 passed; only the 2 tools/ ENOENTs failed).
+  - By the verifier's reading, not executed for V1, it has the effect of a step loop that grades nothing (scene-frame-grade.execution §3's case «a step loop that grades nothing»). That would restore this row's defect on multi-step frames with the hazard lights on and the brake pressed.
+  - Why nothing caught it: live-grid-wiring §3 only counts one rig statement naming the ref, and step-loop-grade §3 runs the rig callback with no cabin.
+  - Evidence: `scratch/npcstep-verify/r6mut/V1.log` and `V1-wide.log`.
+  - **PINNED AT INTEGRATION** (tests only).
+    - What the pin checks: `sceneGradeCut.ts` `rigStepLoopCallRefusals` reads VehicleRig's syntax tree. It requires exactly one `useBeforePhysicsStep`, handed a block-bodied function whose FIRST statement is the expression statement `stepLoopGradeRef?.current?.();` (`RIG_STEP_LOOP_CALL`). It also requires that `stepLoopGradeRef` is named nowhere else in the rig but the prop's declaration and the destructured parameter.
+    - How it fails: `sceneGradeCut()` throws when the rig fails the check, so every harness that cuts the scene fails, at collection or at its first call of the cut, on the refusal's text.
+    - What §5c refuses: V1, an expression spelling, the call moved below the `sim` guard (the round-2 verifier's M5), the call removed, and the ref emptied later in the callback.
+    - The verifier's V1 text, applied alone: 27 failed of 160 tests, 2 files refused at collection. Kill text: «the rig does not run the scene's step-loop grade first and unconditionally before every physics step (V6-1): VehicleRig line 669: the before-step callback's first statement is not `stepLoopGradeRef?.current?.();`, unconditional (V6-1) …». Restored, sha c188759a (`scratch/ns-land/mut/V1.log`).
+- **C2 (V6-2). The graded call's other inputs were not guarded.**
+  - The verifier's NS1b empties `npcShellsRef` around the frame's graded call on long frames with the hazards on and a brake, written as an expression, and restores it after the call. The cut accepted it, and it passed the targeted set (319/319).
+  - Under the verifier's fuzz with the refusal on, 173 of 200 drives took a step with the shells posed from an earlier point (`r6out/fuzz-NS1b.log`).
+  - Its `if` spelling (NS1) died only on the branch census.
+  - The condition was to guard every ref that `gradeTakenSteps` and its hooks close over, with the list derived from the code.
+  - **PINNED AT INTEGRATION** (tests only) as N14 f.
+    - The derived refs: `gradedRefsOf` derives from the syntax of `gradeTakenSteps` (its hooks included) and of the step-loop grade every ref they read as `X.current` and do not declare. Today there are 11, a superset of the verifier's six: attemptFeedRef, attemptRecorderRef, cabinRef, contactListenerRef, hazardActiveRef, inputRef, npcShellsRef, sampleRef, simRef, telltaleCautionLitRef and telltaleLitRef.
+    - Guarded in the frame callback (whole) and the step-loop grade: each ref is a guarded name; no member of it is written, deleted or read computed; and it never escapes into an alias.
+    - Guarded in the rest of RuntimeDriver, outside the graded function: no member of one is written.
+    - Not refused: a method called on a ref's value, and a write to the value read off a ref (N17).
+    - What §5c refuses: NS1b, NS1, `Object.defineProperty(npcShellsRef, …)`, an alias, a computed write, the step loop emptying the contact ear, a `delete` of the cabin, and a render-body write.
+    - The verifier's NS1b text, applied alone: 27 failed of 160, 2 files refused at collection. Kill text: «… frame callback line 5550: writes a member of `npcShellsRef`, a ref the grading reads (N14f) …». Restored, sha 9ab18086 (`scratch/ns-land/mut/NS1b.log`).
+- **C3 (V6-6, tools). The tools test's frame-order model.**
+  - `tools/mobile/__tests__/path-follow.test.mjs` `frameOrderRead` (about :894–942) pins VehicleRig's two input reads and the mount order. It does not describe the step-loop grade's extra `inputRef.current?.read()`, which `updateCabinChannels` makes before VehicleRig's own read on every step but a frame's first.
+  - The lane has no tools/, so no tools test ran in it.
+  - **MEASURED AT INTEGRATION, not taught.** In the worktree, `node --test` gives 97 tests: 93 pass, 0 fail, 4 todo. The model was not changed, and no mutant was needed, since the file is green.
+  - The merge verifier's tools run had path-follow green too (T14 and T6.7 pass).
+  - Why it stays green, by the integrator's reading of the code (the merge verifier's reading of `input.ts` agrees); no run isolated the extra read:
+    - its pins are ordered anchors in VehicleRig and LessonScene, all still present and in order (the new read is in LessonScene's step-loop grade);
+    - `input.ts` integrates each read over the wall time since the previous one with a ramp saturating at 0 and 1, so the added read, which falls between VehicleRig's reads of two consecutive substeps and far below `MAX_RAMP_DT_S` (0.5 s), composes;
+    - the ReverseAssist is still handed VehicleRig's render-rate read.
+
+    The model's description (one read per substep) stays incomplete.
+- **C4 (N17). What the cut still does not follow, caught only where an executed drive sees it:**
+  - an alias of the value read off a guarded ref (Q4: `const rec = stepTrackRef.current; rec.record(…)`), killed by execution;
+  - a write to the session clock (Q2: `tRef.current -= delta`), killed by execution;
+  - a write to the frame's sample through its local alias (`const sample = sampleRef.current`). Q1 as the builder wrote it, `sampleRef.current.mirrorGlance = null`, is now refused by N14 f (§3's O2 asserts it);
+  - a write inside a procedure the callback calls, which syntax cannot refuse;
+  - a write to a ref the grading reads made outside RuntimeDriver: ReadyScene, which declares `npcShellsRef` and `contactListenerRef` (LessonScene.tsx:2079, :2073) and hands them down as props, or NpcColliders, which fills the shells ref. N14 f guards RuntimeDriver only. The merge verifier's mutant X1 adds a ReadyScene effect that nulls `npcShellsRef.current` behind a global flag the product never sets; it passed the fast set, 335/335 (`mut/X1.log` in the merge verifier's session scratchpad, a temporary directory). Not product-reachable: a new sabotage class, an N17 condition with no code change.
+- **C5. The exception limit is stated, not fixed.**
+  - An exception before the graded call loses that frame's end, its look and its draw. It shows only in the console (Next's overlay in development).
+  - The product registers no window `error` listener (pinned).
+  - It is executed in scene-frame-grade.execution §7.
+  - Whether any product code path raises one there is not measured beyond the in-process drives above.
+
+**PROVEN ON 9390622** (the integrator, worktree `D:/knijka-lanes/integ-ns`; log `scratch/ns-land/PROGRESS.md`; vitest `--maxWorkers=1`, one run at a time).
+- **The patch.** The rebased patch (sha 56d4ed13 matched) applied cleanly: 33 files, no 3-way merge, no conflict.
+- **The landing.** The staged result is `D:/knijka-lanes/gate-ns.patch`: sha256 ec00797b…529b, 645,770 bytes, 34 files (the 33, with `sceneGradeCut.ts` and `scene-frame-grade.execution` extended, plus `docs/architecture/07`). Its 16 CR bytes are all in `orchestrator/director.ts`, which is CRLF at `9390622`. Its `docs/architecture/07` hunk is an earlier wording of the ADR text. The wording that lands was corrected after the merge verifier's check, so the landing differs from this patch in docs only (the ADR text and this section) and will not hash to ec00797b.
+- **The pins.** The integration pins (C1, C2) are tests only. The fast set (the 12 lane files) passed 335 of 335. V1 and NS1b died as quoted above.
+- **path-follow.test.mjs:** 97 tests, 93 pass, 0 fail, 4 todo (C3).
+- **Directories:**
+  - lessons/__tests__: 126 files, 2,394 passed, 165 skipped;
+  - lessons/scenario/__tests__: 193 files, 4,764 passed, 1 skipped (caption-truth, keep-right-claim-census and the reviewed-text manifest green; nothing re-recorded);
+  - components/sim: 95 files, 1,674 passed;
+  - modules/sim: orchestrator 528, rules 1,779, traffic 562, runtime 875, scene 787, vehicle 296, world 2,409, hud 1,274, traces 2,146 and devrig 103, each with 0 failed.
+
+  Not in this run: modules/sim collision, engine, environment, cockpit, procedures, scenarios and modules/sim/__tests__ (the merge verifier ran the last, below).
+- **tsc:** 21 errors, the environment baseline, none in a touched file.
+- **tools/ gate** (`platform/scripts/tools-tests.mjs`): 2,005 tests, 1,982 pass, 8 fail.
+  - What the 8 are: the standing deck-captions freeze, and 7 environment failures of the worktree (no `.audit-frames`, no playwright) in build-redrive §9, count-agreement, finding-reader and lane-evidence.
+  - A re-run with the main repo as cwd turned build-redrive, finding-reader and lane-evidence green. count-agreement stays red: apply-reroute.mjs resolves its corpus from its own path, and the worktree has no reroute.jsonl.
+  - The patch touches no tools/ file. count-agreement still needs a run on the main tree, where the corpus exists, before the merge.
+- **The merge verifier** (ACCEPT_WITH_FIXES; the worktree left as it found it, by sha):
+  - The staged diff is byte-identical to `gate-ns.patch`.
+  - The rebased patch alone, applied to `9390622`, gives a tree that differs from the integrated one in exactly three files: `docs/architecture/07`, `sceneGradeCut.ts` and `scene-frame-grade.execution`. Every product file equals the lane's, byte for byte.
+  - On the fast set, V1 and NS1b died as quoted above, each restored by sha. The lane verifier's P4 died on executed drives (13 failed).
+  - Directories: lessons/scenario/__tests__ 193 files, 4,764 passed, 1 skipped; components/sim 95 files, 1,674 passed; orchestrator, scene, traffic, hud, devrig and modules/sim/__tests__ together 210 files, 3,258 passed.
+  - The tools/ gate gave the same 8 failures; path-follow passed in that run. tsc: 21 errors, the baseline.
+  - Its two documentation fixes, I-1 (where a refused cut fails: at collection or at the first call of the cut) and I-2 (writes from outside RuntimeDriver, C4), are applied in this section and in the ADR text that lands.
+
+**Owed.**
+- **The rig re-drive that decides the row.**
+  - The 08a0b701 kept cells, L4 H1810, L1 H1711 and L1 H1707, through `/dev/drive-rig` on PC and on the phone lens, with one named start (`run(steps, { startAt: N })`, the same N on both lenses, phase=driving at N).
+  - Expected: the same contact step, kind and bills on both lenses, and no static-object hit on one lens only.
+  - Also the careful drive rig-w3d's verifier found missing: stop at the line and enter behind the circulator, on both lenses.
+  - The same drives are the first browser evidence that the layout effect fills the step-loop ref before the first step, and that rig key edges dispatched from inside a physics callback behave as in process (ADR-017 L4).
+- **Comparability.** Rig evidence captured before this landing is comparable step for step on PC one-step frames only. It is not comparable on the phone lens or on PC two-step frames.
+- **Triage «vru2offset».** The with-flow rider `sc-vbl-rider-wf` is authored with `extraRightOffsetM` −2.6 (its comment intended +2.6), so it rides at y ≈ −1.46, not the south curb line −6.66. This is a content question and was not changed.
+- **Founder question, unchanged.** Should an ear-only touch with no sentinel box overlap bill (the H1810 class)? This landing makes the answer the same on every display, not right.
+- **Still frame-timed** (ADR-014, Amendment 2026-10-13): the cabin clocks and the stall timer on the render delta (A13, still owed), and with them how many looks a held mirror yields.
+
+## Landed: in a real-browser copy of the PC notify column, on stages at or above the measured floors, a graded fault or «Научи» card nobody presses is no longer pushed below the window by the crash pin's banner or the advisor card, and the window no longer flickers — `sc-roundabout-entry:fe081cf1` (major), the un-pressed-card clause (2026-10-16)
+
+Lane `cardstay`, three rounds, built on `9390622`.
+- Rounds 1 and 2 were each REFUTED by the adversarial verifier.
+- Round 3 was SIGNED OFF WITH CONDITIONS.
+- The lane patch is `cardstay-result-r3.patch`: sha256 4dc902da…, 162,168 bytes, 10 files, +2351/−28, 0 CR bytes. All 10 files are LF in base.
+- It is cumulative against `9390622`, the landing base. The round-3 verifier applied it to a lane reset to `9390622`; `git diff base` equalled the patch byte for byte, ignoring index lines.
+- Between round 2 and round 3 only `HudToasts.tsx` and `toast-standing-card.test.ts` changed.
+- What lands is that patch plus the integrator's R8 pin (condition 1): a 41-line §6 row in `toast-standing-card.test.ts`.
+  - Staged diff: 10 files, +2392/−28, sha256 e7bfa98c…, 165,210 bytes, 0 CR bytes.
+  - The product files are byte-identical to the lane patch's.
+
+**Product files:**
+- `hud/HudToasts.tsx`: the stand in `useToastReader` and the stamp trim. The stand covers `readStandingToastCut`, `toastCardsCutBelow`, `toastCardShrinksItself`, `toastJudgedAbove`, `recordWholeToasts`, the `Stand {id, level, above}` latch with `sameStand`, and the `summarise` ask.
+- `hud/hudPreferences.ts`: `ToastStanding {id, trimAge?}` and `visibleToasts(…, standing)`. While a card on the glass stands, it paints only judged cards, up to the column's capacity.
+- `hud/index.ts`: exports `ToastStanding`.
+- `lesson-ui/LessonPlayShell.tsx`:
+  - the squeezed-window read in `measureToastColumnFold`;
+  - the W8 note above `bannerOneLineWhileReading`;
+  - the wiring: `quiet`, `standing`, `summarise`, and the fold effect's deps.
+
+**Test-side files.**
+- New: `hud/__tests__/toast-standing-card.test.ts` (92 tests from the lane, 93 with the integrator's §6 row) and `lesson-ui/__tests__/toastFoldSqueezed.test.ts`.
+- Updated: `toastColumnFold`, `hud-preferences`, `hud-toast-fit` and `toast-why-room`.
+
+**No rule, grade, points, verdict, graded clock, threshold, trace or sentence changed** (the builder).
+- The verifier's suites back this: shown-text guards plus `sc-roundabout-entry` traces 157/157, and the reviewed-text manifest green with no re-record.
+- On the landing tree the manifest is 49/49 with no re-record.
+- ADR-014 is untouched (the builder).
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:fe081cf1` stays OPEN and PARTIAL, as rig-w3g left it.
+- Every repair claim here rests on executed tests and on real-browser copies of the notify column, file:// only, in Chromium and WebKit: the real components in a class-for-class copy of the product's `/simulator` page.
+- Figures marked as the builder's were not re-measured by a verifier.
+- Nothing has been seen on a device or through the product shell.
+- Below the measured floors the card is still cut (condition 5).
+- A rig re-drive is owed (below). Whether its frames close the row is for that wave's judge and verifier.
+- The Product Map count is unchanged (21 open).
+
+**What was wrong.** rig-w3g (above), CONTROL-NOPRESS-SIM.
+- The 116 px summary card «Не се появи внезапно.» was whole for its first 4.8 s.
+- At +4.87 s the crash pin's recovery banner and the advisor card arrived. The notify window fell to 30 px, flickering to 0.1 px.
+- The graded card was pushed wholly below the window until it left at +7.91 s: cut by 86.9–116.4 px, body and law chip off the glass (90 snapshots).
+
+The causes, from the round-1 builder at `9390622`:
+- **The advisor card had no reason to wait.** Its mount is gated only on `!toastReader.held`, and `held` was set only while an explanation was OPEN (W1). On S-SIM the column is capped at 245.6 px. The banner's +27.5 px and the advisor's 98.3 px card arrive in one commit, and both come out of the scroller: 245.6 − 76.2 − 98.3 − 23.5 − 18 = 29.6 px of window.
+- **The flicker.** With the fold row up, the 0.1 px window has `clientHeight` 0. `rowsBelowFold` reads 0 as «not laid out», so the row took itself down. The window came back to 29.6, the card was cut again and the row went back up, every 1–2 frames.
+- **The product's own stage reproduces it** (measured in the rig copy, not on a device). rig-w3g could not say whether S-SIM stands for the letterboxed product stage. On base, the round-1 verifier's rig:
+  - letterboxed 1440×900 stage (padding box 1166×655): card cut on 189/189 frames, window falling 109.8 → 80.3 px; the round-1 builder found the row stable there (no flicker);
+  - S-SIM: cut on 187/187 frames, window flipping 29.6 ↔ 0.1 on all 187.
+
+**Round 1, refuted.**
+- It built W7's stand: the advisor card and praise wait while a judged card nobody opened is cut, and the window no longer oscillates.
+- The verifier reproduced the filed cell as repaired: 0 cut frames on five stages in Chromium and WebKit.
+- It refuted on the banner. On S-SIM, 18 catalogued summaries were whole before the pin. When the pin's banner grew 48.7 → 76.3 px they lost their law chip for the rest of their life: window 104.4 px with the row up, cut 33.1–57.9 px, with the advisor waiting or off.
+- It also found a non-equivalent survivor, VM10 (the stand read with every card counted as judged). With praise on top, VM10 left COLLISION/staticObject cut 158.9 px at stage heights 565 and 568.
+
+**Round 2, refuted.**
+- It built W8 (the banner's one-line form under a hold while a card stands) and W9 (the stamp trim).
+- It measured the product's stages in a class-for-class copy of `/simulator`. The builder validated the copy at 1440×900: shell (264, 8, 1168, 773.5), the box rig-w3g measured.
+- That put the top bar at 76.5 px, not the 104.5 px round 1 had derived. The round-1 verifier's derived 1366×768 figures (stage 866×486.5) are superseded by the measured 916×514.
+- The round-2 verifier re-derived the stage boxes from `playArea.ts` and matched the builder's table. It reproduced:
+  - the floor (H548: 0 cut; H547 cuts OVERTAKING_IN_BAN_ZONE);
+  - the cell at 0 cut on 9 stages.
+- It refuted on a tools gate. A literal `'[data-hud-toast-body="pending"]'` in `useToastReader` turned `tools/mobile/__tests__/driveline.test.mjs` §M red (164/165; base 165/165).
+- It raised three further conditions:
+  - At FS-1280×720 (COLLISION/staticObject, then RED_LIGHT_CROSSED) the builder's claim that the newer card stays whole did not reproduce. The newer 213.3 px paragraph kept its law chip out for its whole life. Base had fitted its 147.3 px summary after the pin, so this was a narrow regression against base.
+  - Two mutants survived and were not equivalent, both test gaps. VB ignored the queue cap while a card stands (3 judged cards painted, «още 2 известия»). VC dropped the slack in the stand read.
+  - No floor was given for the teach cards.
+
+**The integrator's layout decisions.** They sit inside the 2026-10-08 delegation and change no rule, grade, points or graded clock. The labels are this landing's, dated 2026-10-15. The «W8» in LessonPlayShell's compact-STANDBY comments is an unrelated older decision.
+- **W7.** A graded fault or teach card on the glass is never pushed out of the column's window by a later card the student is not judged by.
+  - The column STANDS for it (`useToastReader`'s stand).
+  - The advisor card waits through the existing gate, and praise is kept off the glass.
+  - The fold row no longer oscillates: `measureToastColumnFold` asks the column without the row when a 0-height window would remove it.
+- **W8.** While the column stands for a judged card, the objective banner under a route hold falls to its one-line form, exactly as during a reading (W6 extended). A banner with no hold lead (the task and its speed cap) is never cut.
+- **W9.** A judged summary whose stamp stands on its own footer row may drop the stamp («преди N с») while it stands, only where that gives a row back.
+- **X1.** The reader builds its selectors through `TOAST_BODY_ATTR`, so `data-hud-toast-body=` stays once, inside `ViolationToast`.
+- **X2.** The column stands only for the TOP judged card, or for an older card an unjudged change pushed out. A summary still cut under an older card's fold row is asked for before paint. No case may be worse than base.
+
+**What landed (round 3).** The description is the builder's; what the verifiers drove is under the next heading.
+- **The stand.** With nothing open, after every shell commit and before paint, the reader asks whether a judged card on the glass is cut below the window. «Judged» is `hudToastCarriesWhy`: a graded fault or a «Научи» card.
+- If one is cut, the column takes up to three steps, one per look, only while that card is still cut. The stand is latched until the card leaves (its 8 s or ✕):
+  - Step 1 (W7): the advisor card waits and praise is kept off the glass.
+  - Step 2 (W8): under a route hold, the banner goes to one line, with the whole sentence still in the DOM.
+  - Step 3 (W9): if the card's stamp stands on its own footer row, that card is painted without the stamp.
+  - Opening «ЗАЩО» ends the stand, and W1/W2 own the column.
+- **The flicker.** A scroller whose cards have height is laid out. When the row squeezes it to 0, the row is decided on the column without it.
+- **A card that mends itself is not stood for.**
+  - A top-of-stack paragraph whose summary would be whole is asked for that summary before paint (`ToastReader.summarise`).
+  - A body still `pending` is left to its own first layout effect: at most two extra passes in one flush, so it cannot loop.
+  - A summary that is not shorter than the card is not asked for.
+- **Two judged cards (X2).**
+  - The cut is read with the fold row in place when some card of the stack would still be below the window without it (`toastCardsCutBelow`).
+  - The column stands for the top judged card. It stands for an older card only if the judged cards above it are unchanged since it was last seen whole (`free`, from `recordWholeToasts`).
+  - An older card that a newer JUDGED card pushed down holds nothing back: no waiting advisor, no one-line banner, no dropped stamp. It is announced by the fold row (condition 3).
+- **X1.** Every selector the reader builds goes through `TOAST_BODY_ATTR`. Outside comments, the attribute now appears once, in `ViolationToast`'s JSX.
+
+**Shown text.** No sentence added or changed, and no manifest re-record. What the glass does differently, all with existing text:
+- While a judged card stands, the advisor card is painted only after it leaves. Praise raised meanwhile stays off the glass on its own clock (W5) and may leave unread.
+- Under a route hold the banner shows its one-line form.
+- At step 3 a stood card's «сега» / «преди N с» stamp is not painted.
+- A top-of-stack paragraph takes its summary, with the «ЗАЩО» chip, before paint instead of a frame later.
+- A newer judged card cut only under an older card's fold row takes its summary or the stand's steps.
+- In the squeezed-window state the fold row holds one of its existing sentences instead of flipping.
+
+**What the verifiers reproduced.**
+- **The filed cell (CONTROL-NOPRESS),** round-3 verifier, its own rig (bundle `rig-r3.js` built from its lane, output `rig/v3-A.json`):
+  - Chromium: 0 cut frames on 8 stages (S-SIM, LB-1440×900, LB-1440×789, LB-1536×730, LB-1920×969, FS-1366×768, FS-1280×720, H548), window steady at 116.5 px.
+  - The advisor waits and is painted after the card leaves. It stays painted on LB-1920 and FS-1366, where card and advisor both fit.
+  - WebKit: 0 cut.
+  - On base the same cell is cut on every frame (round-1 verifier: S-SIM 187/187, letterboxed 1440×900 189/189, S-1280 188/188).
+- **Single cards, all 86 catalogued fault cards** (banner only, banner + advisor, pin-first), round-3 verifier:
+  - 0 judged parts out and 0 oscillation on S-SIM, LB-1440×900, LB-1440×789, LB-1536×730, LB-1920×969, FS-1366×768, FS-1280×720 and H548.
+  - WebKit banner + advisor: 0 on LB-1440×900, LB-1536 and FS-1280.
+  - On base (round-1 verifier), banner + advisor cut 85 on S-SIM (86 oscillating) and 79 on the letterboxed 1440×900 stage.
+  - The round-2 verifier measured the floor at H548 (0 cut), with H547 cutting OVERTAKING_IN_BAN_ZONE (160.5 px).
+  - Below the floor, the round-2 verifier reproduced the builder's two below-floor stages:
+    - the letterboxed 1366×657 stage (514 px) leaves the same 3 summaries cut on arrival (ILLEGAL_STOP_IN_BAN_ZONE plain and /sign, OVERTAKING_IN_BAN_ZONE);
+    - 1280×601 (420 px) leaves all 86.
+  - The builder reports round 3 identical to round 2 row for row on all 12 stages.
+- **Two judged cards (X2),** round-3 verifier, its own pair set (`rig/vdrive3.mjs`):
+  - 12 tall top cards × 5 older cards (one of them the 288.5 px teach card) = 60 pairs.
+  - Modes: banner, banner + advisor, pin first, and ✕ on the newer card.
+  - Stages: 7 product stages in Chromium (LB-1440×900, LB-1440×789, LB-1536×730, LB-1920×969, FS-1366×768, FS-1280×720, FS-1536×864).
+  - The top judged card's title, one-liner or law chip is off the glass on 0 frames. Oscillation 0, advisor flicker 0.
+  - The round-2 FS-1280 COLLISION + RED_LIGHT case is clean.
+  - Against base, 1,680 matched rows:
+    - top card: worse 0, better 1,034;
+    - older card: worse 0, better 67;
+    - after the ✕: worse 0, better 256.
+  - WebKit (LB-1440×900, LB-1536×730, FS-1280×720): top card out 0, except 4 one-frame arrival transients. They came with the teach card as the older card, while other jobs loaded the CPU. A clean rerun gave 0 of 72, and base has those cards cut on every frame.
+  - After the ✕ only the 288.5 px teach card is out. It is cut on arrival there, below its floor.
+- **The floors, re-measured by the round-3 verifier:**
+  - Two judged cards (its Chromium pair set): at H581, 5 pairs have the top card out (OVERTAKING_IN_BAN_ZONE as top); at H582, 0.
+  - One judged card: H548 gives 0.
+  - «Научи» teach cards: 516 / 646 / 650 / 673 / 716 px, exactly the builder's.
+  - On the stages it ran, teach cards are cut on arrival exactly per the builder's per-stage list, and none whole on arrival is later cut by the pin or the advisor.
+- **«ЗАЩО», praise and the hold cycle (W1/W2) are unchanged.** Praise on top of a fault, a hold that ends and comes back, and a three-fault burst are clean.
+- **Red first.**
+  - `toast-standing-card.test.ts` with round 2's `HudToasts.tsx` swapped in: 12/92 red, as the builder claims.
+  - The builder reports 71/92 red on base, all on assertion text.
+- **Mutants.**
+  - Round-3 verifier: 10 of its own, one at a time, against 11 files / 431 tests, each restored and sha256-checked.
+    - 7 killed on assertion text: R1 (X2 read off), R2, R3 (the not-shorter guard removed), R4, R5, R6 and R9.
+    - R7 and R10 survived (condition 2). R8 survived (condition 1).
+  - It re-ran round 2's survivors VB and VC on r3. Both were killed on assertion text: «the queue's cap was dropped while a card stands — a third card painted» and «a card inside the rounding slack was read as cut».
+  - The builder reports 52 of its own: 49 killed, and 3 survivors it judges equivalent. N3 and N24 differ only on the render before the layout-effect re-render; P4 is unreachable behind the not-shorter guard.
+- **Regression** (round-3 verifier, on its lane: `9390622` + the patch):
+  - the 11-file toast set: 431/431;
+  - hud/ + lesson-ui/: 2,508/2,509; the one failure is touchHintLifetime, ENOENT on `tools/`, because the lane has no tools/;
+  - shown-text guards and roundabout traces: 157/157;
+  - tsc: 22 errors, the baseline, none in a touched file.
+  - The builder ran a wider set once: 447 files, 9,456 passed / 1 failed (the same ENOENT) / 165 skipped.
+- **Builder only, not re-measured by a verifier:**
+  - the single-card census on FS-1920/1536/1440;
+  - the two-card census on FS-1920, FS-1440 and S-SIM, and WebKit two-card beyond LB-1440×900, LB-1536 and FS-1280;
+  - its 3,900-row base comparison (top card worse 0 / better 2,170; older card worse 0 / better 191);
+  - the two-card banner-fold counts (condition 4);
+  - its live-resize run: 1-frame cuts at stage heights 548–615, identical to round 2, where base is cut on all 12 frames.
+
+**The conditions, and how each stands.**
+
+**1. Mutant R8 survived the lane's tests: `sameStand` ignores `above`.**
+- It survived all 431 of the verifier's tests. The verifier called it not equivalent in principle.
+- The difference needs a card held at the first stand step, then seen whole under a newer judged card, then cut by an unjudged change. The numbers allow that only after the window grows by about 100 px between sightings, for example a «Цял екран» toggle.
+- In that case the mutant would leave the older card cut where the patch stands for it. The verifier did not demonstrate this in the rig and called it a test gap only.
+- PINNED AT INTEGRATION.
+  - Where: the integrator added a §6 row to `toast-standing-card.test.ts`: «an older card stood for at step 1 as the top card, then cut by the advisor's card under the judged card it was last seen whole under, is stood for again».
+  - The mutant: the verifier's exact R8 edit was not on disk, so the integrator re-derived it from its name: `sameStand` drops `&& a.above === b.above` (HudToasts.tsx:2452).
+  - Result: the file went to 1 failed | 92 passed, on assertion text: «the older card, last seen whole under exactly the judged card above it now and cut by the advisor's card, was not stood for — the latch kept a stale `above`: expected null to be 1».
+  - Restored with a sha256 check (a14b285e…); the file is 93/93 green.
+  - Caveat: the row drives the hook's input contract. The newer card leaves the list and is listed again, and the stage grows 100 px. The integrator found no product sequence, with the newest-first queue, where R8 diverges: there, the sighting under a newer card clears the stand in both versions. So this pins the hook's contract, not a frame seen in the product.
+
+**2. R7 and R10 are equivalent while `TOAST_MAX_VISIBLE = 2`** (`hudPreferences.ts`).
+- R7 makes the judged-above key count unjudged cards. R10 makes the move-up forget the sighting.
+- Under a stand only two judged cards are visible. So a moved-up card is always the top card, and praise can only sit above the top judged card.
+- If the column is ever allowed a third card, both become live and need test rows.
+
+**3. CARRIED: how a waiting older card is announced (verifier F3).**
+- The builder wrote that the older judged cards waiting behind the fold row are «all announced by «↓ още 1 известие — покажи»». That does not reproduce.
+- Of 1,544 final frames on which the older card is out, the row reads:
+  - «↓ обяснението продължава — покажи» on 1,341;
+  - «↓ още 1 известие — покажи» on 203.
+- This is the shell's unchanged base rule (`rowsFullyBelowFold`, LessonPlayShell.tsx:1955 on the landing tree): «още N» is said only for a card with no pixel above the fold. When even the older card's 16 px header strip is in view and its title is out, the row says the explanation continues.
+- No sentence changed. The older card is announced, never lost.
+
+**4. CARRIED: the banner's one-line form under a hold during a stand (W8),** for the triage candidate «wcbannercap» (the task and its speed cap off the glass under a hold).
+- **Single cards.** The builder's round-2 counts, reproduced by the round-2 verifier and reported by the builder as identical in round 3:
+  - S-SIM: 19;
+  - LB-1536×730: 1 (OVERTAKING_IN_BAN_ZONE);
+  - LB-1366×657: 75;
+  - LB-1280×601: 86;
+  - none on LB-1440×900, LB-1440×789, LB-1920×969 or any fullscreen stage.
+- **Duration** (the builder): a card raised before the pin at +4.87 s folds the banner for 3.07–3.14 s. A card raised under the pin folds it for 7.95–7.99 s, its whole life. The whole sentence is back on the next frame after the card leaves.
+- **Two judged cards.** The builder only, round 3, Chromium. Folds for banner / banner + advisor / pin-first / trio, out of 98 / 98 / 98 / 96 runs:
+  - LB-1440×900: 17/3/0/3;
+  - LB-1440×789: 13/5/4/4;
+  - LB-1536: 53/53/53/51;
+  - LB-1920: 13/13/0/13;
+  - FS-1920: 10/10/0/10;
+  - FS-1536: 2/2/0/2;
+  - FS-1440: 0;
+  - FS-1366: 10/8/0/8;
+  - FS-1280: 15/14/14/13;
+  - S-SIM: 93/93/93/91.
+  - The builder reports every one as a stand for the top card, or for an older card the pin pushed out.
+
+**5. Founder question 8: the minimum supported screen.** The measured floors of stage height, BLOCKED below them as pre-authorised:
+- one judged card: 548 px (round-2 and round-3 verifiers);
+- two judged cards: 582 px (the round-3 verifier in Chromium; the builder in both engines);
+- «Научи» teach cards: 716 px (516 / 646 / 650 / 673 / 716; builder and round-3 verifier).
+
+Teach cards have no PC summary form. Cut on arrival, by product stage (the builder):
+- LB-1440×900: 2/5;
+- LB-1440×789: 3/5;
+- LB-1536: 4/5;
+- FS-1366: 2/5;
+- FS-1280: 4/5;
+- LB-1366×657: 5/5;
+- LB-1280×601: 5/5, with the title cut too.
+
+The round-3 verifier matched the stages it ran. The round-2 verifier matched LB-1366×657 and LB-1280×601. The builder reports that the fold row always pages a cut teach card to its end, where the title is usually above the window.
+
+Below the floors at real viewports:
+- the letterboxed 1366×657 (a 1366×768 laptop, stage 514) leaves 3 summaries cut;
+- 1280×601 (stage 420) leaves all 86.
+
+The builder derives that 582 needs a viewport at least 725 px tall with the two-row top bar. «Цял екран» puts a 1366×768 screen at 668, and every measured screen above the one- and two-card floors. A summary form for teach cards on PC would be a design decision.
+
+**6. Builder residuals, recorded, not changed.**
+- (a) While a card stands, the advisor's recovery sentence is off the PC glass. The stand is latched until the card leaves (≤ 8 s), including when the card later fits. The advisor has no voice.
+- (b) A live stage resize while a card stands can paint 1 cut frame (above). Base is cut on every frame.
+- (c) WebKit was measured with fallback fonts, because file:// fonts are refused. WebKit S-SIM «ЗАЩО» on CROSSED_SOLID_LINE shows 30 out frames, identical to round 2 and base.
+- (d) When the stand on an older card ends, the advisor can mount and unmount inside one pre-paint flush. This is not painted.
+- A code comment at LessonPlayShell.tsx:7037 still says «The banner is not touched (W6 is the reading's)». Under W8 the stand does fold the banner (the round-2 verifier's F6; round 3 did not touch the shell). It is a comment, not shown text. The note above `bannerOneLineWhileReading` states W8 correctly.
+
+**Tools.**
+- The round-3 verifier ran the real tools tests in a `git archive` mirror of the r3 tree, with `tools/` copied read-only and byte-identical to the main tree:
+  - driveline: 165/165 (base 165/165; round 2 was 164/165);
+  - wrong-leg-profiles 221/221, route-fidelity 45/45, reclosure 28/28, comment-blind 11/11 and path-leakage 9/9, all as on base;
+  - canary-pills: 33 pass, as on base.
+- count-agreement fails in a mirror on base and patch alike, because the mirror has no `.audit-frames` (the r3 builder and the round-2 verifier).
+- No tools/ file reads any name this lane added:
+  - `readStandingToastCut`, `ToastStanding`, `useToastReader`, `visibleToasts(`, `data-hud-toast-more` (the round-1 verifier's grep);
+  - `toastCardsCutBelow`, `toastJudgedAbove`, `recordWholeToasts`, `TOAST_STAND_*`, `toastAgeHasOwnRow`, `toastCardShrinksItself`, `data-hud-toast-age` (the builder; re-grepped on the main tree's tools/ at landing).
+- New selector: `data-hud-toast-age` on the stamp span.
+- What a harness can meet in a PC cell that presses nothing:
+  - while a judged card stands, the advisor card is not in the DOM, and it is painted after the card leaves;
+  - praise raised meanwhile is held off the glass;
+  - under a hold the banner's sentence is whole in the DOM but painted on one line.
+- touchHintLifetime reads `tools/mobile/lesson-audit.mjs`. It is green on the landing worktree, which has tools/ (components/sim below).
+
+**PROVEN ON 9390622** (the integrator, worktree `integ-cs` = `9390622` + the lane patch + the §6 R8 row; vitest --maxWorkers=1, one run at a time):
+- lessons/__tests__: 126 files, 2,394 passed / 165 skipped;
+- lessons/scenario/__tests__: 188 files, 4,541/4,541;
+- components/sim: 94 files, 1,663/1,663 (touchHintLifetime included);
+- orchestrator: 41 files, 528/528;
+- rules: 98 files, 1,779/1,779;
+- traffic: 47 files, 561/561;
+- runtime: 48 files, 875/875;
+- scene: 45 files, 745/745;
+- vehicle: 21 files, 296/296;
+- world: 135 files, 2,409/2,409;
+- hud/__tests__: 69 files, 1,367/1,367;
+- traces: 168 files, 2,146/2,146.
+
+Also on the landing tree:
+- The reviewed-text manifest is 49/49 with no re-record.
+- tsc --noEmit --incremental false: 21 errors, all in the environment baseline files (api/health, lib/db, the */store.ts files, lesson/progress, traces/attemptStore), none in a touched file.
+- Tools, `node platform/scripts/tools-tests.mjs` as wave-cycle gate 4 runs it: 2,005 tests, 1,982 pass, 8 fail, 11 skipped, 4 todo.
+  - 1 red is the standing deck-captions freeze.
+  - 7 are the worktree's environment: count-agreement, finding-reader, build-redrive §9 (a)(b)(d)(e), lane-evidence. These have no `.audit-frames` corpus and no clips playwright package.
+  - None reads a touched file. Re-run with the environment present, they are green, and the main tree's byte-identical count-agreement is 14/14.
+  - driveline, route-fidelity, wrong-leg-profiles and reclosure are green.
+- The landing set: `D:/knijka-lanes/gate-cs.patch`, sha256 e7bfa98c806f511d28c369d73ea8d3542410b7f9890409a51d09d39d53d37436, 10 files, 0 CR bytes; the merge verifier ACCEPTED it (the product files equal the lane patch byte for byte; the only addition is the §6 R8 row). It lands together with the npcstep landing (above) in one gate; the two touch no common file.
+
+**Owed.**
+- **The rig re-drive** that decides the row:
+  - CONTROL-NOPRESS on the product's letterboxed `/simulator` stage at 1440×900, and on S-SIM, S-IMM and S-1366. Real desktop Chrome stays letterboxed; headless goes immersive after about 3 s. The card must stay whole while the advisor card waits, and the window must not flicker.
+  - A two-fault burst on the letterboxed 1440×900 and fullscreen 1280×720 stages: a newer paragraph over an older fault, then the crash pin. The top card's title, one-liner and law chip must stay on the glass.
+  - The phone's L3 peek opened with «ЗАЩО», and a phone FAILED_TO_YIELD card. Both were unjudged at rig-w3g; the PC column is not mounted on the compact layout.
+- **Founder question 8** (condition 5).
+- **Triage:** «wcbannercap» (condition 4).
+- **No ADR is owed.** The layout decisions are recorded here. No ADR sentence is contradicted: `docs/architecture/07` has no sentence on the PC notify column, the advisor card's gate or the banner's fold.
+
+## Landed: the nine parking drills' demos turn no tighter than a 4.6 m circle (4.5 m in sc-park-double), wider than the product car's reversing circle; every contact demo hits the live body it names, and the two-move parks, the zebra park and the double briefing say what the demo does. Measured in process only. `catalogue-demo-curvature:dae908c7` (critical), family curvdepth (2026-10-16)
+
+Lane `curvdepth`, two rounds, built on `2e9268f`.
+- **Round 1 was REFUTED,** on two counts:
+  - R1: on the live chain with the live scene's collider boxes, three mistake demos made no contact at any rung: double correct-backwards (+0.314 m short of the pino), gap-short shallow-angle (+0.011 m) and left mirrored-habit (+0.010 m).
+  - R2: the sc-park-double briefing («точно по средата», «една педя вляво вече е чужд ред») contradicted the new correct demo.
+- **Round 2 was SIGNED OFF WITH CONDITIONS.**
+- **The lane patch.** `curvdepth-result-r2.patch`: sha256 04a44d18…058b, 17,709,840 bytes, 85 files (3 added, 82 modified), 0 CR bytes, cumulative against `2e9268f`. The verifier applied it to its lane reset to base. The sha matched and it applied clean; at the end, `git diff base --binary` hashed to the patch's sha.
+- **What lands is the integrator's landing set,** `D:/knijka-lanes/gate-cd.patch`: sha256 bc5841b5…aff7, 18,737,426 bytes, 93 files (3 A, 90 M), 0 CR bytes. It is the lane patch applied 3-way on `9390622`, plus the first landing attempt's integration work (log `scratch/cd-land/PROGRESS.md`):
+  - **The manifest.** The only conflict was the reviewed-text manifest's `manifest.json`, re-recorded on the merged tree. RECORD gave 49/49. Caption strings went 1,871 → 1,880 and source strings 13,261 → 13,270. The only units that moved are the nine drills, `templates-parking3.ts` and `scParkDepth.ts`.
+  - **The N4 pin** (condition F5 below).
+  - **Six pathrefs re-planned** with `build-pathrefs.mjs`, one lesson at a time. Each exited 0 with problems [] and emitBlocked []: 45-rev, gap-short, judge, left, van and zebra (`scratch/cd-land/bp-sc-park-*.log`).
+  - **The wall's re-plan exited 1.** Its pathref was restored to HEAD's; the cdtools landing below re-plans it. bay-exit-rev, gap-long, driveway and poligon are byte-identical.
+  - **The re-pin.** `repin-committed.mjs --write` re-pinned COMMITTED from 11 pathrefs (6 moved). A second print had nothing to re-pin.
+  - **`policy.mjs`.** The PRODUCT source cites were moved for the shifted template lines (+4 gap-short; +10 van, 45-rev, left, zebra, wall; +22 judge), with the cited content checked identical. No Slice 0 field was touched.
+  - **The lists.** sc-park-judge and sc-park-45-rev came off NOT_REPLANNED. judge, 45-rev and gap-short came off PLANNED_BEFORE_THE_CAP.
+- **Why the first attempt stopped.** It stopped at its step 6. The wall's re-plan had exited 1, and the pc-path instrument's tools tests were red on the re-planned corpus. The cdtools landing (next section) resolves that and lands on top of this set.
+- **No file of this set is in `gate-ns.patch` or `gate-cs.patch`.**
+
+**Product files:**
+- `traces/scParkDepth.ts`;
+- `traces/drivablePath.ts` (new);
+- `lessons/scenario/templates-parking3.ts`. The verifier found text and comment changes only: no geometry, zone, actor, rule or threshold.
+- the 27 × 2 committed traces of the nine drills (content/ and public/).
+
+**Test-side files:**
+- `traces/__tests__/sc-park-depth-drivable.test.ts` (new, with the integrator's N4 row) and `parkDepthProduct.ts` (new);
+- the demo-curvature census (.json and test);
+- `scene/guidance-route-recovery.test.ts`;
+- `rearStaticBodies` and `rearStaticBodiesSeam`, `traffic/rear-static-gap`, `task-cap-round14` and `keep-right-claim-census.json`;
+- the reviewed-text manifest.
+
+**Tools:** the six pathrefs, `policy.mjs` and `path-plan.test.mjs`.
+
+**The row is NOT closed by this landing.** `catalogue-demo-curvature:dae908c7` stays OPEN.
+- Every number below was measured in process. There was no browser, no rig and no rapier VehicleSim path-following.
+- A rig re-drive must show the drills on the device. Even then the row stays open for its other families.
+- The census still has 82 offenders outside this family. By the builder that is 27 lessons' correct demos and 55 mistake demos.
+- The Product Map count is unchanged (21 open).
+
+**What was wrong.** The 2026-10-06 census (above) measured all 503 committed demos against the car's limit (3.955 m over a 1 m window). It found 36 lessons whose CORRECT demo, and 72 mistake demos, turn tighter than the car can. 17 of the 36 are reversing parking demos. This family is the nine drills of `traces/scParkDepth.ts`.
+
+On base, by the builder (`scratch/r2-census-compare.txt`):
+- van, left and double's correct demos drew COLLISION;
+- all nine drew «Стигна точката, но твърде бързо»;
+- double wide-run-up hit 4 bodies, and double correct-backwards hit 4 wrong ones.
+
+**What landed.** The description is the builder's; what the verifier reproduced is under the next heading.
+- All 27 demos (9 correct, 18 mistake) are integrated from ramped curvature programmes on a 4.6 m circle (4.5 m in sc-park-double). The pin requires at least 1.05 × the physics car's reversing radius, measured on VehicleSim.
+- **D1.** `untilContact` cuts every contact against the per-axis smaller of the gate rect and the live GLB collider (`PARK_DEPTH_LIVE_HALF`, pinned equal to the GLB table).
+- **D2.** sc-park-double's briefing is rewritten to be true of the corridor as built. The demo stands 0.25 m left of the middle.
+- **D3.** sc-park-gap-short and sc-park-night park in two moves: the reverse, then one forward correction. The gap is NOT lengthened.
+- **D4.** The zebra hidden-pedestrian car really parks inside the five metres. The post-hit pause is 0.6 s.
+- **D5.** The blind crossing is hit past the aisle's centre line.
+- **D6.** Every mistake demo keeps ≥ 0.25 m (on the envelope) from the bodies it is not about.
+- **D7.** The taught properties are pinned: the looks are taken at rest, the indicator goes on to the bay's side before the first reverse, and the reverse stays under REAR_CUE_MOVING_KMH (5 km/h).
+- **D8.** The 45-rev guidance budget is 1.
+
+**What the verifier reproduced** (lane `D:/knijka-lanes/curvdepth-verify`, tag `patched-r2` = `2e9268f` + the lane patch, not `9390622`; log `scratch/curvdepth-verify/PROGRESS.md`):
+- **Curvature, its own probe.** It used per-leg heading windows of 0.5, 1 and 2 m and a Menger circle. The tightest radius is 4.592–4.600 m, and 4.494–4.500 m in sc-park-double. That is 16.1 % (13.6 %) over the census limit, and 10.1 % (7.8 %) over the physics car's ≈ 4.17 m reversing radius.
+- **Continuity.** The heading step is ≤ 1.60° per sample, there is no pivot at rest, and the car rests ≥ 0.95 s at every gear change.
+- **Correct demos.**
+  - Envelope clearance is 0.330–0.705 m.
+  - The verifier's feedback tracker, held to the physics car's lock and steer rate, keeps ≥ 0.278 m on gap-short and ≥ 0.33 m elsewhere.
+  - On the live chain all nine complete both tasks at L1–L5: 0 т., passed, no bill, no teach card and no coach card, identically at 60 Hz, 30 Hz and the phone cadence.
+  - Stars are ★3, except gap-short ★2.
+- **D1.** All 13 contact demos commit COLLISION on exactly their named body at L1–L5, on each box set taken alone (live GLB, gate rect, envelope). They rest 0.121–0.274 m into the live collider. The verifier re-read the GLB extents from `public/sim/vehicles-v2`; they match `PARK_DEPTH_LIVE_HALF`.
+- **D6.** Every mistake demo keeps ≥ 0.311 m on the envelope from every non-target body. All 18 give the same sheet at all three cadences, each committing only its own codeRefs.
+- **D3.**
+  - gap-short reverses 7.42 m, then makes one 1.51 m forward pull and rests at (6.04, 0.31). That leaves 1.31 m to the front car and ≥ 1.94 m to the rear. The setup gap is 0.52 m.
+  - night makes one 1.66 m pull and rests 0.04 m from the centre, ★3.
+- **D4.** The zebra car rests parallel at (6.28, −5.40), with its body at y −7.42…−3.38, inside the five metres (y −8 to −3).
+- **D5.** The hit comes with the centre at x = −0.587 and heading −33.5°, both front corners west of the centre line.
+- **The census JSON** goes 108 → 82 offenders: 26 removed, all in the family, none added, 503 measured.
+- **Traces.** Only the 27 × 2 files of the nine drills changed, and the public copies equal content/.
+- **The pins.** The 130-test drivable pin plus the census gave 134/134 (`r2-run1-core.txt`), and the three pin files gave 222/222 in every mutant run. On the landing tree the drivable pin has 139 tests, because N4 adds 9.
+- **Mutants** (one at a time, restored by git and sha256):
+  - killed: M2, M4, M8, M9, M7c (0.233 m), M7e (−0.062 m), N1, N2 and N3;
+  - literal M7 and M7b are equivalent on the new geometry (measured 0.328 / 0.311 m);
+  - N4 survived (F5).
+- **Regression** (on the lane tree):
+  - lessons/scenario: 181 files, 4,349/4,349.
+  - traces + lessons/__tests__ + lesson-ui: 336 files, 5,329 passed, 165 skipped. The 1 failure is touchHintLifetime ENOENT on tools/ (the lane has no tools/).
+  - components/sim/__tests__ + guidance-route-recovery + traffic: 54 files, 722/722.
+  - tsc: 22 errors, that lane's baseline.
+- **Builder only, not re-run by a verifier:**
+  - the builder's mutants D1, D1c, D2, D3, D4, D5b and D7b (the verifier ran its own M2, M4, M7–M9 and N1–N4);
+  - the base-against-tree cadence count (13 cadence-dependent cells → 5, all the accepted KNOWN_LOOK_TIMED_MOMENTS entry);
+  - wall into-wall now ticking Задача 1 at L3–L5.
+
+**Shown sentences changed** (status draft; sign-off owed). The template sentences are in `templates-parking3.ts`; the demo captions are in `scParkDepth.ts`.
+- sc-park-double briefing:
+  - step 1: «Излез точно по средата на алеята преди реда — и двата реда са в лентите.» → «Излез по средата на алеята преди реда — и двата реда са в лентите.»
+  - step 2: «Подмини гнездото и спри — под 6 км/ч — точно по средата.» → «Подмини гнездото и спри — под 6 км/ч — по средата или до педя вляво от нея.»
+  - step 3: «Помни: една педя вляво вече е чужд ред.» → «Помни: около метър и половина вляво от средата вече си в чуждия ред.»
+- sc-park-gap-short briefing:
+  - step 8: «Върни назад до около 45°, после докрай наляво — щом бронята ти подмине нейната.» → «Върни назад до около 40°, …» (rest unchanged);
+  - step 9: «Влез до дъното, подкарай леко напред за центъра и спри успоредно на бордюра.» → «Влез до дъното, после напред с волан надясно, докато застанеш успоредно, и спри.»
+- gap-short captions:
+  - «Ориентир 2: под ~43°. Спри и погледни назад…» → «Ориентир 2: под около 40°. Спри и погледни назад — сега докрай наляво и назад до дъното.»
+  - «Дъното — а колата още стои леко накосо. Леко напред с волан надясно, докато застанеш успоредно…» → «Дъното — а колата още стои леко накосо. Една корекция: напред с волан надясно, докато застанеш успоредно.»
+  - «…и с прав волан около метър назад, до средата.» → removed.
+  - «Готово: в очертанията, успоредно, с по метър и половина пред и зад теб.» → «Готово: в очертанията, успоредно, с повече от метър пред и зад теб.»
+- night captions:
+  - «Достатъчно назад — колата още стои леко накосо. Леко напред с волан надясно, докато застанеш успоредно…» → «…Напред с волан надясно, докато застанеш успоредно.»
+  - «…и с прав волан около метър назад, до средата.» → removed.
+- Round 1's changes, still owed sign-off:
+  - sc-park-van step 2: «Дръж метър и половина от него…» → «Дръж два метра от него…»;
+  - sc-park-judge try-short card: «…завоят закачи колата отпред, а задницата стигна до колата отзад.» → «…задницата стигна до колата отзад, докато предницата още стърчеше в платното.»
+- The gap-short correct demo now shows the rubric line «В очертанията, с малко отместване (отместване 0,4 м, ъгъл 0°)».
+- The verifier found these true of the drive as recorded: the new double sentences (F1), and gap-short's «около половин метър», «с повече от метър пред и зад теб» and «около 40°» (38.8° on the recorded drive).
+
+**The conditions, and how each stands.**
+- **F2. CARRIED (triage «dokrai»).** «F2 the «ДОКРАЙ» (full lock) captions and briefings are shown with a ghost that peaks at 0.50–0.52 rad of the 0.60 rad lock (≈ 84 %) and «около 40°» is the ghost's angle — a wording decision owed (triage «dokrai»).»
+  - At base the ghost reached 0.600 rad.
+  - The «докрай» texts are unchanged from base: gap-short step 6 and its captions, left «волан ДОКРАЙ НАЛЯВО», and zebra and night «завърти докрай надясно».
+  - The verifier's crude kinematic model is an indication only: no ramps, no tyre slip. Following gap-short literally at full lock, it ends 0.52 m toward the lane from the bay centre, with the left flank 0.12 m outside the bay line. With 45° the same model centres (`calc/fulllock-s0.txt`).
+- **F3. CARRIED.** «F3 the gap-short correct demo shows ★2 («В очертанията, с малко отместване (отместване 0,4 м, ъгъл 0°)») at every rung — offset 0.391 m vs the L5 tolerance 0.425 m; the builder's claim that a centred two-move park keeps only 0.21–0.24 m was not reproduced.»
+  - The margin is 0.034 m.
+  - On base this correct demo was ★3 (the builder).
+- **F4. CARRIED (triage «zebrarev»).** «F4 the zebra car drives over the crossing and reverses back across it for 11 s — law check by retrieval incomplete (the Правилник is not in content/law); its clean sheet depends on the harness's 3 s replay hold (triage «zebrarev»).»
+  - The car reverses with its body on the paint from t = 33.40 to 44.45 s, at ≤ 3.43 km/h.
+  - With an 8 s hold, the car standing on the crossing after the hit draws ILLEGAL_STOP_IN_BAN_ZONE as a lesson mistake at L1–L3 and L5 (`r2-live-hold8.txt`). The 0.6 s pause leaves 0.4 s spare under the 4 s limit.
+- **F5 (N4). The left correct demo's indicator could go dark for the whole reverse,** and all 222 pins stayed green. No caption claims the indicator during the reverse, so this was a teaching gap. PINNED AT INTEGRATION:
+  - The first landing attempt added «STAYS on until the car has entered the bay — and goes off only at rest in it» to the D7 block of `sc-park-depth-drivable.test.ts`, 9/9 green.
+  - N4 re-recorded sc-park-left's shadow-correct trace with the indicator off after the setup pause. It died on «sc-park-left: indicator at t=34.15 (bay entered at t=44.35): expected 'off' to be 'left'» and was restored by sha (`scratch/cd-land/n4-red.txt`).
+  - On the landing tree the pin is present (`sc-park-depth-drivable.test.ts:651`, file of 139 tests). The files in `n4-sha.txt` all match, and traces/ is 169 files, 2,286/2,286 (`scratch/cdt-land/PROGRESS.md`).
+- **F7. ACCEPTED by the integrator.** «F7 the sc-park-45-rev re-ask (budget 0 → 1)».
+  - The re-ask draws a 6.53 m line on the aisle centre, (0, 6.53) → (0, 0), next to the «Паркирай тук» marker at (4.8, 0). It points only toward the bay, but along the aisle, not along the 45° swing.
+  - It loosens another lane's pin (0 → 1).
+  - The builder's claim that no setup keeping the standard sits past the re-ask (y 6.66 against 6.53) was not reproduced.
+- **F1, note.** The unchanged examinerBg «дали замахът остава в твоята половина» holds only read as «your side, not the other row». The setup's front-left corner is at x −1.1, and the swing's west-most corner reaches −1.459 (base −0.49).
+- **F8, note.** judge mistake-short-forward again draws «Стигна точката, но твърде бързо» at L1–L5, as on base (round 1 had it at L1–L2 only).
+
+**PROVEN ON 9390622** (worktree `D:/knijka-lanes/integ-cdt`; tree `9390622` + gate-cd.patch + cdtools-result-r1.patch + the integration edits, staged tree 50685551; `gate-cdt.patch` sha256 89d14967…20cc, 117 files, 0 CR bytes; log `scratch/cdt-land/PROGRESS.md`):
+- **Applying.** gate-cd.patch applied 3-way with no conflict, giving T0 = cf10a9b3. cdtools applied after it with no conflict, giving T1 = 94fc1afb. Only `path-plan.test.mjs` and `policy.mjs` are in both.
+- **The first attempt, checked.** The six bp logs each wrote with caveats only, and the wall's wrote 1 PROBLEM (superseded by cdtools CD-1). The repin log reads «re-pinned COMMITTED from 11 pathrefs (6 lesson(s) moved)». The N4 pin is present.
+- **Manifest.** Verify mode 49/49, so the shown text did not move against the patches; it was not re-recorded.
+- **vitest** (`--maxWorkers=1`, one directory at a time):
+  - lessons/__tests__: 126 files, 2,394 passed, 165 skipped.
+  - lessons/scenario/__tests__: 188 files, 4,541/4,541.
+  - components/sim: 93 files, 1,656/1,656. The first run was killed by the machine crash and re-run.
+  - orchestrator: 41 files, 528/528.
+  - rules: 98 files, 1,779/1,779 (the merge verifier's own full run; the integrator's 1,754 was a mis-added pool-timeout split). 4 files never started on a vitest pool timeout and passed 94/94 when re-run.
+  - traffic 47 files, 561/561; runtime 48, 875/875; scene 45, 745/745; vehicle 21, 296/296.
+  - world 135 files, 2,409/2,409; hud 68 files, 1,274/1,274; traces 169 files, 2,286/2,286.
+- **tsc.** 21 errors in 11 files, the prisma/store environment baseline; none in a touched file.
+- **The tools runner.** Recorded in the cdtools section.
+
+**Owed.**
+- **The rig re-drive.** At least the two-move parks (gap-short, night), sc-park-double and the zebra reverse park, through the drive rig on PC and the phone lens. There is no VehicleSim path-following proof.
+- **Sign-off of the changed sentences** above (status draft).
+- **The dokrai and zebrarev triage** (F2, F4).
+- **The instrument's side** (cdtools, next section): the Slice 0 re-measure of the seven re-planned rows, live pc-path canaries and browser re-drives.
+- **night mistake-no-lights** cannot be judged on the live chain (`liveChainReplay` keeps the headlights off). It is graded by the recorder only.
+- **Other rows' residue, by the builder:**
+  - sc-park-gap-long's demos still draw «твърде бързо», and its correct demo has a 10.2° heading jump;
+  - `scParkBayExitRev.ts` is still cut on 20 mm chords, with the ghost-wheel flicker.
+- **No clip** of the nine drills exists (`public/clips/manifest.json`), so nothing to re-capture.
+- **The row's text in the audit and the Product Map** (doc 88 :10865 still says 36 lessons + 72 mistake demos) is still to be updated to 82 offenders (27 lessons' correct demos + 55 mistake demos). The row stays open.
+
+## Landed: the steering instrument on the re-planned parking corpus. sc-park-wall plans clean by pulling one band corner in; the final forward pull-in no longer overruns its end by more than 0.25 m on the bench, but it can now stop short (zebra seed 13 misses the box); every stale pin is frozen on 9390622's pairs, re-derived, or deleted with provenance. tools/ and doc 93 only, no audit row (2026-10-16)
+
+Lane `cdtools`, round 1, built on `9390622` + `gate-cd.patch` (tree T0 cf10a9b3). SIGNED OFF WITH CONDITIONS.
+- **The patch.** `cdtools-result-r1.patch`: sha256 f21abe33…f2ca, 2,006,337 bytes, 26 files (+830/−106), 0 CR bytes. Every touched file is LF at HEAD.
+- **It reproduces T1.** The verifier applied gate-cd and then this patch, and got T0 = cf10a9b3 and T1 = 94fc1afb, matching the builder.
+- **Files.**
+  - `tools/mobile/lib/path-follow.mjs` and `lib/path-plan/build-pathrefs.mjs`;
+  - `lib/path-plan/policy.mjs` and `__tests__/path-plan.test.mjs`. gate-cd also touches both, and this patch's base T0 already contains those changes, so it applies only after gate-cd. At the landing it applied with no conflict.
+  - `path-refs/sc-park-wall.pathref.json`;
+  - the tests `path-follow`, `path-body-screen`, `path-evidence` and `tools/audit/path-canary`;
+  - the new frozen fixture `__tests__/fixtures/pathref-9390622/` (14 files + MANIFEST) and `fixtures/pathref-9390622.mjs`;
+  - `docs/simulation/93_INSTRUMENT_GAPS.md` (entry CD-1).
+- **What it does not touch:** no platform/ or content/ file (the file list), no Slice 0 MEASURED field, no protected threshold and no pc-path constant. The verifier diffed the libs against `9390622` to confirm the last three.
+- **`path-routing.json` is untouched.**
+- **No file of this lane is in `gate-ns.patch` or `gate-cs.patch`.**
+
+**This landing closes nothing.** The pc-path instrument is LIVE: «No finding may close on a change to tools/» (doc 93).
+- `catalogue-demo-curvature:dae908c7` stays OPEN; a rig re-drive must show it.
+- Every number here is from the bench, in process.
+- The Product Map count is unchanged (21 open).
+
+**What was wrong** (the first curvdepth landing attempt, `scratch/cd-land/PROGRESS.md`):
+- **The wall would not plan.** sc-park-wall's re-plan exited 1: «seg 1 R corner along -1 lat -0.15 yaw 1.5: FEASIBLE-ENDPOSE 0.588 outside its 0.5 m corridor after the tightened re-screen».
+- **The tools tests went red on the re-planned corpus.** The runner had 18 failures:
+  - the wall's stale pathref ×6: path-plan ×3, path-evidence overshootFromSamples, the path-canary file, and the path-follow file, which loads every pathref at import;
+  - four claims the re-plan made false;
+  - the standing deck-captions freeze ×1;
+  - 7 environment reds.
+- **path-follow could not be measured** on the landing set. With the EXIT-1 wall swapped in it gave 97 tests: 71 pass, 22 fail.
+
+**The integrator's decisions** (CD-1, conservative: the instrument claims less).
+- **The wall.** A corner that still leaves its class corridor after the tightened re-screen has its **lat** edge, then its **yaw** edge, pulled in by 0.05 m / 0.5°, exactly as for a body hole.
+  - It applies only on Slice-0-screened, non-designed-negative rows, and only while no body hole is open.
+  - It never moves the along edge and stops at 0.
+  - It is recorded as `armBand.deviationPulled`.
+- **CD-2 to CD-5** are the builder's, signed off with conditions by the verifier.
+
+**What landed** (the builder's description).
+- **CD-1, the wall.** The builder diagnosed it first:
+  - The new demo's geometry alone flips the class: without the reverse cap the new trace is already ENDPOSE (0.558).
+  - The cap adds 0.02–0.03 m.
+  - Two CPU-only searches came back 0.587 and 0.588.
+  - Under the pull-in the wall builds with EXIT 0: lat −0.15 → −0.10 (still ENDPOSE 0.549) → −0.05 (TRACK 0.468). Band along [−1, 0.25], lat [−0.05, 0.15], yaw ±1.5.
+  - The wall was re-pinned and taken off PLANNED_BEFORE_THE_CAP. Its `why` time cite was corrected 31.88 → 35.18 s, with a dated STALE ROW comment.
+- **CD-2, one fix in `path-follow.mjs`.** On the new short final forward pull-ins (gap-short, judge and zebra F2), the D stop latched the coast branch at 2.0–2.7 km/h, under PRESS_MIN 2.58, and the ramped pedal drove on to 3.2 km/h.
+  - On seeds 7–10, F2 overran its end on gap-short (+0.87 / +0.88 / +1.02 m) and judge (+0.93 to +1.04 m). On zebra it overran only on seed 8 (+1.47 m); its other three seeds stopped −0.12 to +0.05 m.
+  - gap-short seed 8 was refused on body clearance: the chassis held a pose 0.042 m from lotgs-bay-4/dret_90, inside the 0.05 m floor. There was no contact.
+  - `isFinalPullIn` selects the last segment when it is forward, not micro, comes after a reverse, and carries only its routeEnd stop.
+  - On that segment, the micro creep's existing `creepLiftRunOutM` anticipation now applies on the coast branch.
+  - It is switchable with `PATH_TUNE.pullIn`.
+  - A first scope also caught bay-exit-rev F1 and stopped seed 8 1.07 m short, so it was narrowed by segment shape.
+- **CD-3, the stale pins.**
+  - Claims about the old corpus moved onto a frozen fixture of HEAD's seven pathref + trace pairs, sha-pinned (`verifyHeadFixture`, aggregate 687b110d…). These are T9.m.1–3, T9.h.2/3/4, T9.k.3, T13.4/4b/5, SQ0–SQ3c and SQD1, three body-screen claims and path-evidence's micro exemption.
+  - Re-derived on the new corpus: T9.e, T9.h.2n, T9.h.4n, T9.k.3n, T13.1, the corpus micro censuses, the body-screen gap-short caveats (6/5) and over-read (0.000987 m), and the canary's seed search and wall shift (1.05 m).
+  - Deleted with provenance: the canary claim that G3's corridor holds while the car is in the wall. The wall is now 1.036 m away, beyond the 0.818 m corridor; HEAD's figures are kept in the comment.
+- **CD-5.** The doc 93 entry «CD-1 … RECORDED 2026-10-16».
+
+**What the verifier reproduced** (worktree `D:/knijka-lanes/cdtools-verify`, tree T1 without the integration edits; log `scratch/cdtools-verify/PROGRESS.md`):
+- **Its own rebuild of the wall** (`bp-wall-v.log`): EXIT 0, with the same two pulls, problems [] and emitBlocked [], reverseAuthority 0.892.
+  - The JSON equals the committed pathref except six timing fields.
+  - The other ten pathrefs are unchanged.
+  - Builder only: witnesses TRACK 0.378 / 0.256 / 0.163, and R1 corridor 0.818 against HEAD's 0.819.
+- **Path files on T1:**
+  - path-follow: 106 tests, 102 pass, 0 fail, 4 todo;
+  - path-plan 123/123, path-body-screen 48/48, path-evidence 12/12, path-disarm 9/9, path-follow-wiring 37/37, path-leakage 9/9;
+  - path-canary: 33 pass, 2 skipped (no `.audit-frames`).
+- **The full tools runner:** 2,028 tests, 2,005 pass, 8 fail, 11 skip, 4 todo.
+  - The 8 are the deck-captions freeze and 7 worktree-environment reds: build-redrive §9a/b/d/e, count-agreement, finding-reader and lane-evidence.
+  - The builder's extra road-witness-wiring timing red did not recur.
+- **The old pairs, swapped back.** With HEAD's seven pairs back in the corpus, every re-derived test went red on assertion text. Afterwards the corpus was restored, cmp OK.
+  - Three pass on both corpora, legitimately: SQ4 (census identical on both), SQD1n (the original claim) and CD-2.3 (invariance).
+- **Its 10 mutants V1–V10 were killed on assertion text,** each restored and sha-checked. V1 (the run-out on the brake branch too) died only on T9.k.3n's product credit.
+- **The fixture** is byte-identical to `git show 9390622` for all 14 files.
+- **The protected values.** No Slice 0 field, protected threshold or pc-path constant changed (lib diff against `9390622`).
+- **Builder only, not re-run by a verifier:**
+  - CD-2's 12/12 credited on seeds 7–10 and its 0 refusals on seeds 1–20;
+  - the pose-for-pose invariance with pullIn on and off;
+  - the builder's 24 mutants A–P, all killed (mutant L only by the full body-screen file);
+  - the T9.arm per-cell figures.
+
+**The conditions, and how each stands.**
+- **V-7. CARRIED, and a lower bound was ADDED AT INTEGRATION.** «V-7 CD-2.2 bounds only how far a pull-in OVERRUNS its end, not how far it stops short — add a lower bound at integration if the measured stops allow one (else record it)».
+  - After CD-2, the builder measured each F2's centre past its witness end on seeds 7–10 (`scratch/cdtools-impl/probe/gs-2.txt`): gap-short −0.505 / +0.023 / +0.102 / −0.069; judge −0.169 to −0.215; zebra −0.108 to −0.266.
+  - The landing measured seeds 1–20, as signed stopErrM (`scratch/cdt-land/PROGRESS.md`): gap-short −0.517 … +0.103 m (19/20 in the box; seed 11 overruns to lon 0.518); judge −0.343 … +0.102 m (20/20); zebra −0.845 … +0.036 m (19/20).
+  - **Zebra seed 13 is a box miss the fix causes.** Its coast trigger fires at 1.87 km/h, 0.754 m out, and the anticipation stops it 0.845 m short (lon −0.815). With the anticipation off, the same seed overruns 0.67 m and rests in the box.
+  - PINNED AT INTEGRATION: `path-follow.test.mjs` CD-2.2b bounds each lesson's short stop at its measured worst + 0.05 m (0.57 / 0.40 / 0.90 m). It also pins the in-box tallies (≥ 19 / 20 / ≥ 19 of 20).
+  - Mutant V1, which passed CD-2.2, is red on CD-2.2b: «sc-park-zebra seed 10: the pull-in came to rest 1.241 m SHORT of its end (bound 0.9 m)». It was restored and the path-follow.mjs sha checked.
+  - These bounds hold the fix where it was signed off; they do not say a 0.85 m short stop is good.
+  - The doc 93 sentence «every pull-in within 0.25 m of its end on seeds 1–20» was corrected at integration. It now reads «no pull-in more than 0.25 m PAST its end on seeds 1–20».
+- **V-8. CARRIED.** «V-8 isFinalPullIn also selects sc-ed-poligon-chain F6 (an 11.54 m segment) and that effect is unmeasured (the bench never reaches F6)».
+  - poligon is `canaryPassed: null` in `path-routing.json`, so no routed leg moves today.
+  - F6 with pullIn on must be measured before poligon is canaried or routed.
+- **V-9. CARRIED.** «V-9 the terminal heading law now engages on lessons it was never measured on and costs sc-park-judge 1.5–2.3° of final heading (20/20 in the box with it vs 19/20 without)».
+  - Without the law, judge's final heading is 0.04–0.67°.
+  - On the wall the law engages on 17 of 20 seeds, giving 0.05–1.06° against 0.94–2.79° without it (the builder).
+  - T9.h.3's «≥ 0.5° closer» claim is kept only on the 9390622 fixture and is not re-asked on the corpus.
+  - Scoping the law, or re-deriving T9.h.3, is the integrator's call. Nothing was changed at the landing.
+- **V-10. CARRIED, owed.** «V-10 the routing (path-routing.json canaries on the old witnesses), the Slice 0 re-measure of the wall row and the browser re-drives are owed».
+  - `path-routing.json` still routes the seven re-planned lessons on canaries driven at 91e5a51 / ad4f3e6-fix3, on witnesses that no longer exist. It is not digest-pinned, so nothing refuses this.
+  - Every MEASURED field of the wall's REVERSE_POLICY row, and the Slice 0 rows of the other six, describe the old demos. The Slice 0 tooling is not on disk.
+  - Fail-closing those rows to `canaryPassed: null` was NOT done at this landing: `path-routing.json` is not in the 117-file landing set. The decision stays owed.
+- **V-11, note: FIXED AT INTEGRATION (test only).** CD-2.3 compared `plant.x` and `plant.z`, which the bench plant does not have (it has `rx`/`rz`, `path-bench.mjs:136`), so that part compared undefined with undefined. It now compares `rx`/`rz`, asserted finite (`path-follow.test.mjs:4527–4528`).
+- **V-12, note: stale text left.**
+  - The `path-follow.mjs` terminal-gate docstring (:585) still says sc-park-wall owes nothing. The new tail owes 0.19° / 2.00°.
+  - The T9.b todo strings still describe HEAD's 0 m lat edge.
+  - The wall's S-14 arm roll reaches 0.267 m at cell 1.5/0.23 (HEAD 0.227). Its p90 of 0.147 is under the 0.20 bar.
+
+**PROVEN ON 9390622** (worktree `D:/knijka-lanes/integ-cdt`, the landing tree: `9390622` + gate-cd + cdtools + the integration edits, which are CD-2.2b, the V-11 field names and the doc 93 correction and «Landing conditions»; `gate-cdt.patch` sha256 89d14967…20cc, 117 files; log `scratch/cdt-land/PROGRESS.md`):
+- **The tools runner** (wave-cycle gate 4): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo. The 8 are the deck-captions freeze and the same 7 environment reds. The one extra test against the verifier's 2,028 is CD-2.2b.
+- **Path files, one at a time, all EXIT 0:**
+  - path-follow: 107 tests, 103 pass, 0 fail, 4 todo;
+  - path-plan 123, path-body-screen 48, path-evidence 12, path-disarm 9, path-follow-wiring 37, path-leakage 9, road-witness-wiring 24;
+  - path-canary: 35 = 33 + 2 skipped (no `.audit-frames`).
+- **No tools test was taught.**
+
+**Owed.**
+- **Live drives.** A live pc-path canary drive and a browser re-drive for each re-planned lesson: 45-rev, gap-short, judge, left, van, wall and zebra. This includes a browser check of the CD-2 pull-in stop, both against gap-short's thin far-side box margin and against zebra's 0.85 m short stop.
+- **Slice 0.** A re-measure of the wall row and of the six other re-planned rows.
+- **The routing decision** (V-10).
+- **The terminal-law decision** (V-9).
+- **The poligon F6 measurement** (V-8).
+- **Stale text** (V-12): the path-follow.mjs:585 docstring and the T9.b todo strings. Doc 93's CD-2 paragraph still says gap-short seed 8 «drove into lotgs-bay-4»; it was refused 0.042 m from it.
+- **The combined tree.** HEAD will be the npcstep + cardstay commit, whose VehicleRig and LessonScene the path-follow frame-order model reads. path-follow must therefore be re-run on nscs + gate-cd + cdtools. The 107/103 above was measured on `9390622` + this landing set, without npcstep.
+
+### Gate «nscdt» (integrator note, 2026-10-17)
+
+The first run of the gate for the npcstep, cardstay and curvdepth + cdtools landings refused on vitest pool timeouts (the box was loaded by two lanes beside it; 0 tests failed). The second run stopped on two TIMEOUTS, not assertions: `static-contact-cadence.census.test.ts` L2 (61.3 s) and L5 (62.8 s) against the 60 s default. That census had already timed out under load in the whycut lane (68–117 s per level) and none of the three landings touches it. It now carries an explicit 600 s budget per level, as the other cadence censuses do; its assertions are unchanged, and run alone it passes 8/8.

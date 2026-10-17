@@ -172,7 +172,8 @@ describe("L14 · HudToasts.tsx implements it", () => {
     // «Защо» is the one card painted and every other card waits. With nothing
     // open the cap is still this module's `toastCapacity`, reached through the
     // same function.
-    expect(TOASTS).toMatch(/visibleToasts\(toasts, quiet, reading\)/);
+    // …and since W7 (2026-10-15) the graded card the column stands for, too.
+    expect(TOASTS).toMatch(/visibleToasts\(toasts, quiet, reading, standing\)/);
   });
 
   it("does NOT bind Space — that is the parking brake while the car moves", () => {

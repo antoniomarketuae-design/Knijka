@@ -197,9 +197,11 @@
  * carries the body KIND (`TrafficSystem.rearBodyBehind`, from which
  * `rearGapMeters` is now derived so the number and the noun are one sweep) and
  * a second authored Bulgarian string («Велосипедист отзад · X м») with its own
- * glyph. The kind is `vehicleCollisionKind`'s — the same A11 marker the rapier
- * shell is tagged with and «Удар във велосипедист» is billed from, not a second
- * opinion.
+ * glyph. The kind is `vehicleCollisionKind`'s — for a staged body its contact
+ * cast's kind, the same fact the rapier shell is tagged with, «Удар във
+ * велосипедист» is billed from and the graded cyclist queries read
+ * (sc-roundabout-entry:08a0b701, lane npcstep rounds 2–4); the A11 curb-offset
+ * marker answers only for a state no cast names. Not a second opinion.
  *
  * ── AND WHAT IS STILL NOT COVERED, because silence here reads as „clear" ────
  *

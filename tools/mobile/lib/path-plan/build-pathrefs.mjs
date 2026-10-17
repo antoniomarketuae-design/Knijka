@@ -13,7 +13,9 @@
 //
 // EXIT 1, loudly, when:
 //   · a witness's class differs from what Slice 0 measured at that start (policy.mjs);
-//   · a band corner leaves its class corridor after the tightened re-screen;
+//   · a band corner leaves its class corridor after the tightened re-screen
+//     (and, since CD-1 2026-10-15, after its lat/yaw edge has been pulled in as far
+//     as the authored pose — `screenCorners`, `deviationPulled`);
 //   · a stop-acceptance band is narrower than 1.0 m.
 // The build is re-run only when a staleness pin goes red (budget 45–60 min, S-13).
 //
@@ -840,6 +842,59 @@ function screenCorners(S, sg, p, witnesses, gate = null) {
       break;
     }
   }
+  // ── CD-1: A DEVIATION HOLE AFTER THE TIGHTENED RE-SCREEN IS PULLED IN THE SAME WAY ──
+  // Integrator decision CD-1 (2026-10-15; docs/simulation/93_INSTRUMENT_GAPS.md).
+  // The curvdepth re-author made sc-park-wall reverse at the car's 4.6 m minimum
+  // radius from a 1.0 m straight, and under the reverse cap the best DEVIATION plan
+  // from its along −1 / lat −0.15 / yaw +1.5 corner is 0.493–0.498 m against a 0.5 m
+  // corridor: the end-pose polish and the clearance pass spend the last millimetres
+  // and the committed witness reads FEASIBLE-ENDPOSE 0.588. Two CPU-only searches
+  // under the same corridor, cap and box (K 16000 / polish 15000 / clear 9000; K
+  // 32000 / knot 0.2 m / polish 30000 / clear 15000) came back 0.587 and 0.588.
+  //
+  // WHAT IT DOES. A corner that still leaves its class corridor after the tightened
+  // re-screen pulls ITS lat edge in, 0.05 m at a time, then its yaw edge, 0.5° at a
+  // time — exactly as a body hole does above. The band only ever NARROWS: the
+  // instrument claims LESS (fewer poses it may arm from), never more. NEVER the along
+  // edge (Slice 0 measured that axis; the acceptance band stays as declared), never
+  // past the authored pose (an edge stops at 0, so lat 0 / yaw 0 stay inside), never
+  // on a designed-negative row, never on a segment Slice 0 did not screen (there the
+  // along loop below is today's remedy and is left alone), and never while a body
+  // hole is open (the body remedies above and below run unchanged). Every step is
+  // RECORDED on the committed band (`deviationPulled`) and printed, so a better
+  // search can give the band back.
+  //
+  // INERT ON EVERY LESSON THAT BUILDS CLEAN TODAY, BY CONSTRUCTION: it acts only on
+  // a deviation failure that would otherwise be reported as a `problem` (EXIT 1).
+  const devPulled = [];
+  if (tightened && p.screenedBySlice0 && !p.designedNegative) {
+    for (let guard = 0; guard < 16; guard++) {
+      if (corners.some((c) => !c.ok && c.why === "body")) break;
+      const bad = corners.filter((c) => !c.ok && c.why === "deviation");
+      if (!bad.length) break;
+      const b0 = bad[0];
+      const why = `corner ${b0.along}/${b0.lat}/${b0.yaw} ${b0.class} ${b0.worstDevM} outside its ${b0.corridorM} m corridor after the tightened re-screen (CD-1)`;
+      const pullDev = (axis, edges, value, step, unit) => {
+        const sd = value > 0 ? 1 : value < 0 ? -1 : 0;
+        if (sd === 0) return null;
+        const idx = sd > 0 ? 1 : 0;
+        const from = edges[idx];
+        const to = r(sd * Math.max(0, Math.abs(from) - step), 3);
+        if (Math.abs(to) >= Math.abs(from) - 1e-9) return null;
+        const next = [...edges];
+        next[idx] = to;
+        say(`    ${axis} edge pulled ${from} -> ${to}${unit} (a DEVIATION hole on the ${sd > 0 ? "+" : "−"} side, CD-1; the other edge is left alone)`);
+        devPulled.push({ axis, from, to, why });
+        return next;
+      };
+      const lat = pullDev("lat", band.latM, b0.lat, BODY_LAT_STEP_M, " m");
+      if (lat) { band = { ...band, latM: lat }; corners = run(band); continue; }
+      const yaw = pullDev("yaw", band.yawDeg, b0.yaw, BODY_YAW_STEP_DEG, "°");
+      if (yaw) { band = { ...band, yawDeg: yaw }; corners = run(band); continue; }
+      say(`    deviation hole at lat ${b0.lat} yaw ${b0.yaw} (along ${b0.along}, ${b0.class} ${b0.worstDevM}): no band edge left to pull (CD-1)`);
+      break;
+    }
+  }
   // Slice 0 screened deviation, never a body, so it cannot vouch for a corner that
   // fails the FLOOR — a band whose edge drives into a car must move whatever the
   // §2.4 table says about it.
@@ -857,7 +912,7 @@ function screenCorners(S, sg, p, witnesses, gate = null) {
       corners = run(band);
     }
   }
-  return { band, corners, tightened, moved, pulled, failed: corners.filter((c) => !c.ok) };
+  return { band, corners, tightened, moved, pulled, devPulled, failed: corners.filter((c) => !c.ok) };
 }
 
 /**
@@ -1364,7 +1419,10 @@ export function buildLesson(lesson, { log = say, reuse = null, bodyHalf = null }
       : `${c.class} ${c.worstDevM} outside its ${c.corridorM} m corridor`);
     if (p.designedNegative) for (const c of screen.failed) notes.push("seg " + sg.k + " R (designed negative) corner along " + c.along + " lat " + c.lat + " yaw " + c.yaw + ": " + cornerWhy(c) + " — recorded, not fatal: this segment is graded by Задача 1's zone, not a pose");
     else for (const c of screen.failed) problems.push(`seg ${sg.k} R corner along ${c.along} lat ${c.lat} yaw ${c.yaw}: ${cornerWhy(c)} after the tightened re-screen`);
-    const bandRow = { ...screen.band, declared: p.band, corners: screen.corners, tightened: screen.tightened, alongMoved: screen.moved, bodyPulled: screen.pulled };
+    // `deviationPulled` (CD-1) is written only when a pull happened, so a lesson the
+    // pull-in never touched is committed exactly as it was before CD-1.
+    const bandRow = { ...screen.band, declared: p.band, corners: screen.corners, tightened: screen.tightened, alongMoved: screen.moved, bodyPulled: screen.pulled, ...(screen.devPulled.length ? { deviationPulled: screen.devPulled } : {}) };
+    if (screen.devPulled.length) for (const d of screen.devPulled) notes.push(`seg ${sg.k} R: ${d.axis} edge pulled ${d.from} -> ${d.to} — ${d.why}`);
     const out = {
       ...base,
       class: p.classAtAuthored,

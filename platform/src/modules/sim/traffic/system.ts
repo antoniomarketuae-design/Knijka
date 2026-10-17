@@ -430,6 +430,9 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly ambientStates: TrafficVehicleState[] = [];
   private readonly stagedPeds: StagedPedestrianAgent[] = [];
   private readonly stagedById = new Map<string, StagedVehicleAgent | StagedPedestrianAgent>();
+  /** The inverse of the state-id half of `stagedById`: published state id →
+   *  the staged spec's id (`stagedActorId`). Filled where the id is minted. */
+  private readonly stagedIdByState = new Map<number, string>();
   /** circulatingTraffic's reused answer (one report, one row pool — the
    *  per-frame roundabout query allocates nothing after warm-up). */
   private readonly circulatingRows: CirculatingVehicle[] = [];
@@ -472,8 +475,32 @@ class TrafficSystemImpl implements TrafficSystem {
    *  to each staged vehicle so its pass guard (and the runner reading its view)
    *  measure „in the lane" against the lane the product built. */
   private readonly laneWidthM: number;
-  /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0). */
+  /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0) —
+   *  `vehicleCollisionKind`'s FALLBACK only, for a state no contact cast
+   *  names (round 4: no query reads it directly any more). */
   private readonly cyclistStateIds = new Set<number>();
+  /** State ids staged `gradedOnlyByOwnRunner`: the three graded queries
+   *  never return them (round 4, integrator N9 — the authored opt-out that
+   *  replaced the sign of a curb offset). */
+  private readonly ownRunnerOnlyStateIds = new Set<number>();
+  /** What the three graded queries ask, ONE Set lookup per state each —
+   *  the shape of the A11 marker predicate they replaced (round 5, the
+   *  round-4 verifier's V4-3: round 4 asked a method, a cache check and two
+   *  Sets per state, +0.15–0.25 µs per graded point). `gradedCyclistIds` =
+   *  the states `vehicleCollisionKind` calls a cyclist, minus those staged
+   *  `gradedOnlyByOwnRunner`; `notGradedVehicleIds` = those it calls a
+   *  cyclist, plus those staged `gradedOnlyByOwnRunner`. Refilled EAGERLY
+   *  by `refreshGradedKinds` at the end of `stage` and of
+   *  `setStagedContactKind` — the only two things that change either answer
+   *  (an ambient state is never in the marker, a cast or the opt-out). */
+  private readonly gradedCyclistIds = new Set<number>();
+  private readonly notGradedVehicleIds = new Set<number>();
+  /** The three queries' predicates, made once (no closure per call). */
+  private readonly isGradedCyclist = (stateId: number): boolean => this.gradedCyclistIds.has(stateId);
+  private readonly isNotAGradedVehicle = (stateId: number): boolean => this.notGradedVehicleIds.has(stateId);
+  /** The director's contact cast, by staged actor id: what each cast vehicle
+   *  IS (`setStagedContactKind`). `vehicleCollisionKind` answers this first. */
+  private readonly stagedContactKind = new Map<string, "vehicle" | "cyclist">();
   /**
    * O59/O62: the STATIC half of "what is behind me", as body boxes. Read only
    * by `rearGapMeters`, which is a HUD channel; no rule-engine query touches
@@ -1243,9 +1270,12 @@ class TrafficSystemImpl implements TrafficSystem {
         );
       }
       this.stagedById.set(spec.id, agent);
+      this.stagedIdByState.set(stateId, spec.id);
       // A11: the curb offset is the staged spec's cyclist marker (audit C3 —
       // v1 "cyclists" are narrow curb-riding vehicle proxies).
       if ((spec.extraRightOffsetM ?? 0) > 0) this.cyclistStateIds.add(stateId);
+      if (spec.gradedOnlyByOwnRunner === true) this.ownRunnerOnlyStateIds.add(stateId);
+      this.refreshGradedKinds();
       return agent.view;
     }
     const path = buildStagedPedPath(spec.path);
@@ -1254,6 +1284,7 @@ class TrafficSystemImpl implements TrafficSystem {
     this.stagedPeds.push(agent);
     this.pedestrians.push(agent.state);
     this.stagedById.set(spec.id, agent);
+    this.stagedIdByState.set(stateId, spec.id);
     return agent.view;
   }
 
@@ -1267,7 +1298,21 @@ class TrafficSystemImpl implements TrafficSystem {
   }
 
   vehicleCollisionKind(stateId: number): "vehicle" | "cyclist" {
+    // ONE FACT (sc-roundabout-entry:08a0b701 round 3): a staged actor its
+    // director casts is what the cast says — the kind its touch is billed as.
+    const actorId = this.stagedIdByState.get(stateId);
+    const cast = actorId === undefined ? undefined : this.stagedContactKind.get(actorId);
+    if (cast !== undefined) return cast;
     return this.cyclistStateIds.has(stateId) ? "cyclist" : "vehicle";
+  }
+
+  setStagedContactKind(actorId: string, kind: "vehicle" | "cyclist"): void {
+    this.stagedContactKind.set(actorId, kind);
+    this.refreshGradedKinds();
+  }
+
+  stagedActorId(stateId: number): string | null {
+    return this.stagedIdByState.get(stateId) ?? null;
   }
 
   pedestrianOnCrossing(crossingId: string): boolean {
@@ -1296,10 +1341,17 @@ class TrafficSystemImpl implements TrafficSystem {
    * the parked body exactly as the old `moving < parked` expression decided it,
    * so no shipped distance moves by a float.
    *
-   * The kind is `vehicleCollisionKind` — the SAME A11 marker `NpcColliders`
-   * tags the rapier shell with and the contact naming bills «Удар във
-   * велосипедист» from. There is no second definition of „is this a cyclist" in
-   * the product and this does not add one.
+   * The kind is `vehicleCollisionKind` — for a staged actor its director
+   * casts, the CAST's kind, which is the kind `NpcColliders`' shell is tagged
+   * with and the contact naming bills «Удар във велосипедист» from; for any
+   * other state the A11 curb-offset marker. Through round 2 of
+   * sc-roundabout-entry:08a0b701 this said there was „no second definition of
+   * is this a cyclist" while the badge read the marker and the bill read the
+   * cast: both riders of sc-vu-bikelane-turn were «Кола отзад» on the badge
+   * and «cyclist» on the sheet. One answer now for the three readers that
+   * NAME a body (this badge, the near-miss stat, the shell) — and, since
+   * round 4, for the three GRADED queries too (`cyclistNear` and its two
+   * siblings below). The marker answers only for a state no cast names.
    *
    * The STATIC half is „vehicle" and that is not a shrug: `staticBodies` is the
    * occupied parking bays plus the scene's held vehicle scenery
@@ -1413,10 +1465,42 @@ class TrafficSystemImpl implements TrafficSystem {
     return report;
   }
 
+  // ── THE THREE GRADED QUERIES OF A STAGED BODY'S KIND (lane npcstep round 4,
+  // integrator N9; the round-3 verifier's V3-2) ────────────────────────────
+  // «Is this body a cyclist» is `vehicleCollisionKind` for them too — the
+  // contact cast's kind for a cast member, the A11 marker only for a state no
+  // cast names — the same answer the bill, the rear badge, the near-miss
+  // stat and the rapier shell give. Through round 3 these three read the A11
+  // marker directly, so both riders of sc-vu-bikelane-turn (cast «cyclist»)
+  // were VEHICLES to the lateral-clearance duty, the overtake-return duty and
+  // the lane-entry tracker. A state staged `gradedOnlyByOwnRunner` is never
+  // returned by any of the three (the counter-flow rider: graded only by its
+  // own CyclistRightHook runner) — an authored field, where until round 4 it
+  // was the sign of its curb offset.
+
+  /** The two answers the graded queries read, EXACTLY: a state is a cyclist
+   *  to `cyclistNear` iff `vehicleCollisionKind` calls it one and it is not
+   *  staged `gradedOnlyByOwnRunner`; it is left out of the same-direction
+   *  VEHICLE queries (`overtakenNear`, `sameDirVehiclesNear` — a cyclist's
+   *  pass is VU-02's act) iff it is a cyclist or staged
+   *  `gradedOnlyByOwnRunner`. An ambient state is never in the A11 marker, a
+   *  cast or the opt-out (only `stage` adds to any of them), so walking the
+   *  staged states is the whole answer. */
+  private refreshGradedKinds(): void {
+    this.gradedCyclistIds.clear();
+    this.notGradedVehicleIds.clear();
+    for (const stateId of this.stagedIdByState.keys()) {
+      const cyclist = this.vehicleCollisionKind(stateId) === "cyclist";
+      const ownRunnerOnly = this.ownRunnerOnlyStateIds.has(stateId);
+      if (cyclist && !ownRunnerOnly) this.gradedCyclistIds.add(stateId);
+      if (cyclist || ownRunnerOnly) this.notGradedVehicleIds.add(stateId);
+    }
+  }
+
   cyclistNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null {
     return cyclistNearFor(
       this.vehicles,
-      (stateId) => this.cyclistStateIds.has(stateId),
+      this.isGradedCyclist,
       px,
       py,
       headingDeg,
@@ -1427,7 +1511,7 @@ class TrafficSystemImpl implements TrafficSystem {
   overtakenNear(px: number, py: number, headingDeg: number, radiusM: number): CyclistApproach | null {
     return sameDirVehicleNearFor(
       this.vehicles,
-      (stateId) => this.cyclistStateIds.has(stateId),
+      this.isNotAGradedVehicle,
       px,
       py,
       headingDeg,
@@ -1438,7 +1522,7 @@ class TrafficSystemImpl implements TrafficSystem {
   sameDirVehiclesNear(px: number, py: number, headingDeg: number, radiusM: number): readonly SameDirVehicle[] {
     return sameDirVehiclesWithinFor(
       this.vehicles,
-      (stateId) => this.cyclistStateIds.has(stateId),
+      this.isNotAGradedVehicle,
       px,
       py,
       headingDeg,

@@ -18,19 +18,19 @@
    "strings": 138
   },
   "template": {
-   "fingerprint": "4fb51c5c93c449951ff3152436ad0c1b628e6dc730921f04901437123290b112",
+   "fingerprint": "369e969ff5c98db6f2b4179f11fe4ec31e002a40a66573496fa9f1929984c05b",
    "units": 167,
    "strings": 4298
   },
   "compiled": {
-   "fingerprint": "80366bd966cf0d9fb298af4b8230503b5e34a8a5434f5508a514e30906553407",
+   "fingerprint": "ce7fceb2a1fbad70b2d84ab09b93a361300fe3fa3aa57d875b48cbfbdb11f192",
    "units": 808,
    "strings": 9083
   },
   "caption": {
-   "fingerprint": "e9cdd164e11608c0bebbbf8e14b63d7192cc2b9353badb8793db568fb5a28607",
+   "fingerprint": "9d11ff2edb98733972652d6c2dd970da272f5822e4e08c6b737a26d838d64ad7",
    "units": 503,
-   "strings": 1871
+   "strings": 1880
   },
   "theory": {
    "fingerprint": "150dc7d3b3c2858da8f3e32c3cf6df3d5ee0eefb52b781533344a75cc79ed0d4",
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "c70c20678d137bc2126155c0d374b7c1600b31a1971a95331bbe768b765102ad",
+   "fingerprint": "ca64468f5d861fb6bef6755b9aaba6b622a72a2ba36c12fe4ea2fb2907eeecc8",
    "units": 487,
-   "strings": 13261
+   "strings": 13270
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",

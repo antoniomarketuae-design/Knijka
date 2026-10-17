@@ -65,6 +65,24 @@
  * the source registers it — against a body and a sim that differ from the
  * frame's sample on every step.
  *
+ * LANE npcstep (sc-roundabout-entry:08a0b701) — A STEP IS GRADED BEFORE THE
+ * NEXT ONE IS TAKEN. The bodies the car can touch (NpcColliders' shells) are
+ * posed by the grid from the world a graded point left, so point k has to be
+ * graded before rapier takes step k + 1 — on every display. RuntimeDriver's
+ * one graded call therefore has a second caller: the function its layout
+ * effect puts in `stepLoopGradeRef` (round 2 — VehicleRig's before-step
+ * callback calls it first, before the step's input is read; round 1 handed it
+ * to `useBeforePhysicsStep` itself), which grades the step just taken when
+ * the frame owes another. §2's model runs that function inside the stepper
+ * (its text is pinned in §3 and it is EXECUTED, cut out of the scene, by
+ * lessons/scenario/__tests__/rapierContactDrive.ts, and under R3F's
+ * reconciler by components/sim/__tests__/step-loop-grade.test.ts): on every
+ * cadence each
+ * step is still graded exactly once, in order, the car read at it — and no
+ * step is ever taken while its predecessor is ungraded. Without the callback
+ * (the wiring through 8cb0707) a 0.5 s frame takes 29 of its 30 steps against
+ * a world nobody has moved.
+ *
  * NOT CLAIMED: this is a model and a reading of the source, not a browser
  * drive. What a real device's first live frame is, and whether React flushes
  * rapier's passive-effect listeners before the first animation frame, are
@@ -231,6 +249,17 @@ interface WiringReport {
   /** The first frames on which it was not. */
   clockFirst: string[];
   first: string[];
+  /** Steps already taken and NOT YET GRADED at the moment rapier takes a step
+   *  (lane npcstep) — min, max. 0 = every step meets the world its
+   *  predecessor left. */
+  ungradedWhenStepping: [number, number];
+  /** Physics steps (after the first) taken when the `shells` hook had last
+   *  been called for a point OTHER than the step before — the bodies that step
+   *  met were not the previous point's. */
+  staleShellsAtStep: number;
+  /** Calls of the `shells` hook: one per graded point, in order. */
+  shellCalls: number;
+  shellsOutOfOrder: number;
 }
 
 /**
@@ -244,6 +273,10 @@ function runWiring(
   seconds: number,
   order: "stepperFirst" | "driverFirst",
   listenerFromFrame = 0,
+  /** RuntimeDriver's step-loop grade (`stepLoopGradeRef`, called first by
+   *  VehicleRig's before-step) runs inside the stepper (the product). false: the wiring through 8cb0707 — graded at the frame's
+   *  end only. */
+  gradeBeforeNextStep = true,
 ): WiringReport {
   const recorder = new PlayerStepTrackRecorder();
   const clock = new PhysicsSessionClock();
@@ -264,6 +297,10 @@ function runWiring(
     accAtOrigin: NaN,
     clockFirst: [],
     first: [],
+    ungradedWhenStepping: [Infinity, -Infinity],
+    staleShellsAtStep: 0,
+    shellCalls: 0,
+    shellsOutOfOrder: 0,
   };
   const note = (s: string) => {
     if (rep_.first.length < 4) rep_.first.push(s);
@@ -294,6 +331,8 @@ function runWiring(
     director: null,
   } as unknown as GradeGridWorld;
   let prevStep = 0;
+  /** The grid point the `shells` hook was last called for (0: never). */
+  let shellsAt = 0;
   const hooks: GradeGridHooks = {
     // LessonScene's hook: discrete channels only — and, like a scene that had
     // gone back to the frame-end sample, a pose the grid must overwrite.
@@ -320,6 +359,13 @@ function runWiring(
         note(`point ${p.k}: signal clock ${signalClock.toFixed(4)} traffic ${trafficClock.toFixed(4)} vs ${(p.k * H).toFixed(4)}`);
       }
     },
+    // NpcColliders' pool, as the scene wires it: handed every graded point,
+    // last, with the student the grid read there.
+    shells: (k, student) => {
+      rep_.shellCalls++;
+      if (k !== shellsAt + 1 || student.position.x !== k) rep_.shellsOutOfOrder++;
+      shellsAt = k;
+    },
   };
   // rapier's stepper — §1, line for line.
   let accumulator = 0;
@@ -329,6 +375,19 @@ function runWiring(
     const clampedDelta = Math.min(Math.max(dt, 0), 0.5);
     accumulator += clampedDelta;
     while (accumulator >= H) {
+      // RuntimeDriver's step-loop grade (§3 pins its text): the step
+      // before this one, if nobody has graded it yet, is graded now — with
+      // nothing drawn positioned and no frame look.
+      if (gradeBeforeNextStep && recorder.stepCount > grid.clock.last) {
+        grid.stepPhysics(recorder, null, null, world, NO_WEATHER, hooks);
+      }
+      if (listening && recorder.stepCount > 0) {
+        const ungraded = recorder.stepCount - grid.clock.last;
+        rep_.ungradedWhenStepping[0] = Math.min(rep_.ungradedWhenStepping[0], ungraded);
+        rep_.ungradedWhenStepping[1] = Math.max(rep_.ungradedWhenStepping[1], ungraded);
+        // The bodies this step meets were posed from the point before it.
+        if (shellsAt !== recorder.stepCount) rep_.staleShellsAtStep++;
+      }
       engineSteps++;
       // VehicleRig's useAfterPhysicsStep: the car after this step.
       if (listening) recorder.record(recorder.stepCount + 1, 0, recorder.stepCount + 1, 0);
@@ -406,6 +465,53 @@ describe("§2 the live wiring — rapier's stepper, then RuntimeDriver: every ph
         `${name}: (session clock − steps·H) is rapier's accumulator`,
       ).toEqual({ off: 0, first: [] });
       expect(r.clockBackward, `${name}: session clock went backwards`).toBe(0);
+    }
+  });
+
+  it(`LANE npcstep — ${WIRING_CADENCES.length} cadences × 120 s: no physics step is taken while its predecessor is ungraded, and the bodies it meets were posed from the point before it — the \`shells\` hook hears every graded point once, in order, with the car at it`, () => {
+    for (const [name, deltas] of WIRING_CADENCES) {
+      const r = runWiring(deltas, 120, "stepperFirst");
+      expect(r.ungradedWhenStepping, `${name}: steps taken and not yet graded when rapier takes the next one`).toEqual([0, 0]);
+      expect(r.staleShellsAtStep, `${name}: physics steps that met bodies posed from an older point`).toBe(0);
+      expect({ calls: r.shellCalls, outOfOrder: r.shellsOutOfOrder }, `${name}: the shells hook`).toEqual({ calls: r.graded, outOfOrder: 0 });
+    }
+  });
+
+  it("…WHAT IT WAS (the wiring through 8cb0707, graded at the frame's end only): on a display of 60 Hz or faster nothing differs — on longer frames every step but the frame's first met a world nobody had moved", () => {
+    // ≤ 1 step per frame: the frame's own call has graded the previous step
+    // before the next one is taken, with or without the before-step callback.
+    for (const name of ["60 Hz", "120 Hz", "144 Hz", "90 Hz", "1 kHz"]) {
+      const deltas = WIRING_CADENCES.find((c) => c[0] === name)![1];
+      const was = runWiring(deltas, 60, "stepperFirst", 0, false);
+      expect(was.ungradedWhenStepping, name).toEqual([0, 0]);
+      expect(was.staleShellsAtStep, name).toBe(0);
+      // …and the before-step callback never grades there: the frame's call did.
+      const now = runWiring(deltas, 60, "stepperFirst");
+      expect({ graded: now.graded, steps: now.steps, shells: now.shellCalls }, name).toEqual({
+        graded: was.graded,
+        steps: was.steps,
+        shells: was.shellCalls,
+      });
+    }
+    // Longer frames: a frame of n steps took n − 1 of them unheard.
+    for (const [name, deltas, worst] of [
+      ["30 Hz", [1 / 30], 1],
+      ["0.37 s", [0.37], 21],
+      ["0.5 s", [0.5], 28],
+      ["phone A", W69, 28],
+    ] as const) {
+      const was = runWiring(deltas, 60, "stepperFirst", 0, false);
+      expect(was.ungradedWhenStepping[1], `${name}: most steps ungraded when a step was taken (at least)`).toBeGreaterThanOrEqual(worst);
+      expect(was.staleShellsAtStep, name).toBeGreaterThan(was.steps / 3);
+      // Graded all the same — once, in order, in the frame it was taken in:
+      // the old wiring was not wrong about the GRADE, only too late for the
+      // physics to meet it.
+      expect({ graded: was.graded, repeated: was.repeated, skipped: was.skipped, unheard: was.unheard }, name).toEqual({
+        graded: was.steps,
+        repeated: 0,
+        skipped: 0,
+        unheard: [0, 0],
+      });
     }
   });
 
@@ -588,20 +694,23 @@ describe("§2 the live wiring — rapier's stepper, then RuntimeDriver: every ph
 
   it("THE ORDER IS A DEPENDENCY: with RuntimeDriver's hook BEFORE rapier's stepper the grade runs a frame behind the car", () => {
     // The same model, hooks reversed. Nothing is repeated or skipped (the grid
-    // is driven by the steps, so it cannot be), but a frame's steps are graded
-    // one frame late: the world the student is shown and graded against is a
-    // whole frame — up to 0.5 s — older than the car he is driving.
+    // is driven by the steps, so it cannot be), but a frame's LAST step is
+    // graded one frame late — with the next frame's look and the next frame's
+    // sample — and what is drawn is positioned a frame behind the car. (The
+    // earlier steps of a long frame are graded inside the step loop whatever
+    // the frame hooks' order: lane npcstep.)
     for (const [name, deltas] of WIRING_CADENCES) {
       const r = runWiring(deltas, 30, "driverFirst");
-      expect(r.unheard[1], `${name}: steps left ungraded when the frame ended`).toBeGreaterThan(0);
+      expect(r.unheard[1], `${name}: steps left ungraded when the frame ended`).toBe(1);
       expect({ repeated: r.repeated, skipped: r.skipped, backward: r.backward }, name).toEqual({
         repeated: 0,
         skipped: 0,
         backward: 0,
       });
     }
-    // On a phone cadence that is not a subtlety: half a second of steps.
-    expect(runWiring([0.5], 30, "driverFirst").unheard[1]).toBe(30);
+    // Graded at the frame's end only (the wiring through 8cb0707) that was a
+    // whole frame of steps: half a second on a phone cadence.
+    expect(runWiring([0.5], 30, "driverFirst", 0, false).unheard[1]).toBe(30);
   });
 
   it("a grid derived from the session time is NOT this clock: at 144 Hz and on 0.1 ms timestamps it asks for a step rapier has not taken (round 4's F2)", () => {
@@ -670,9 +779,16 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
     expect(driver.split(/(?<![A-Za-z])tRef\.current =(?!=)/).length - 1).toBe(1);
     expect(driver).toContain("const sessionClock = useMemo(() => new PhysicsSessionClock(), []);");
     // The grade: the live entry, off the same step source, at the same clock.
-    expect(driver).toMatch(/gradeGrid\.stepPhysics\(\s*steps,\s*tRef\.current,\s*sample\.mirrorGlance,/);
+    // ONE call of it (lane npcstep: in the component-level `gradeTakenSteps`,
+    // so the step loop can make it too); the FRAME makes it with the recorder,
+    // the session clock and the frame's one-shot look, after the clock line.
+    expect(driver).toMatch(/gradeGrid\.stepPhysics\(\s*steps,\s*frameEndSec,\s*frameGlance,/);
     expect(driver.split(".stepPhysics(").length - 1).toBe(1);
-    expect(driver.indexOf(clockLine)).toBeLessThan(driver.indexOf(".stepPhysics("));
+    const frameCall = "gradeTakenSteps(steps, tRef.current, sample.mirrorGlance);";
+    expect(driver.split(frameCall).length - 1).toBe(1);
+    expect(driver.indexOf(clockLine)).toBeLessThan(driver.indexOf(frameCall));
+    // …and its only other caller is the step loop's (below).
+    expect(driver.split("gradeTakenSteps(").length - 1).toBe(2);
     // …and never the session-time entry (the harness's): in the scene it is a
     // second clock beside rapier's — round 4's F2.
     expect(scene).not.toContain(".stepFrame(");
@@ -719,8 +835,11 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       ts.forEachChild(n, walk);
     };
     if (call) walk(call);
-    /** What the cabin and the pedals say — read per frame, graded as the
-     *  frame's value at every grid point inside it (disclosed). */
+    /** What the cabin and the pedals say — the nine channels the call's
+     *  `student` hook copies off the frame's sample (the tenth, the look, is
+     *  the FRAME's argument to `gradeTakenSteps`: `sample.mirrorGlance`,
+     *  pinned above and in ROUND 8 below). Read per frame, and refreshed by
+     *  the step loop's caller before it grades a point inside the frame. */
     const CABIN_CHANNELS = [
       "engineOn",
       "fogLightsOn",
@@ -728,11 +847,159 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       "handbrakeOn",
       "headlights",
       "indicator",
-      "mirrorGlance",
       "seatbeltOn",
       "stalled",
       "throttlePedal",
     ];
+    const flatText = (n: ts.Node) => n.getText(sf).replace(/\s+/g, " ").trim();
+    /** `gradeTakenSteps`: the arrow function the call lives in. */
+    const holder = (() => {
+      for (let p: ts.Node | undefined = call?.parent; p; p = p.parent) {
+        if (ts.isArrowFunction(p) && ts.isVariableDeclaration(p.parent)) return p;
+      }
+      return null;
+    })();
+
+    it("LANE npcstep — the call lives in `gradeTakenSteps`, a function of RuntimeDriver whose body is two reads and the call; its two callers are the frame and the step loop", () => {
+      expect(holder).not.toBeNull();
+      const decl = holder!.parent as ts.VariableDeclaration;
+      expect(decl.name.getText(sf)).toBe("gradeTakenSteps");
+      expect(holder!.parameters.map((p) => p.name.getText(sf))).toEqual(["steps", "frameEndSec", "frameGlance"]);
+      const body = holder!.body as ts.Block;
+      expect(ts.isBlock(body)).toBe(true);
+      expect(body.statements.length).toBe(3);
+      // The frame's sample and the attempt recorder, off their refs — no pose
+      // is aliased above the call (the two names the call then reads).
+      expect(flatText(body.statements[0])).toBe("const sample = sampleRef.current;");
+      expect(flatText(body.statements[1])).toBe("const recorder = attemptRecorderRef?.current;");
+      expect(ts.isReturnStatement(body.statements[2]) && (body.statements[2] as ts.ReturnStatement).expression === call).toBe(true);
+      // Its callers, all of them, with what each hands it.
+      const callers: Array<{ args: string[]; inside: string }> = [];
+      const find = (n: ts.Node) => {
+        if (ts.isCallExpression(n) && n.expression.getText(sf) === "gradeTakenSteps") {
+          let inside = "?";
+          for (let p: ts.Node | undefined = n.parent; p; p = p.parent) {
+            if (ts.isCallExpression(p) && ["useFrame", "useBeforePhysicsStep", "useLayoutEffect"].includes(p.expression.getText(sf))) {
+              inside = p.expression.getText(sf);
+              break;
+            }
+          }
+          callers.push({ args: n.arguments.map(flatText), inside });
+        }
+        ts.forEachChild(n, find);
+      };
+      find(sf);
+      expect(callers).toEqual([
+        { args: ["taken", "null", "null"], inside: "useLayoutEffect" },
+        { args: ["steps", "tRef.current", "sample.mirrorGlance"], inside: "useFrame" },
+      ]);
+    });
+
+    it("LANE npcstep — the step loop's caller is a layout effect of RuntimeDriver's with no dependency list that fills the ref VehicleRig's before-step calls (what it does is EXECUTED elsewhere — round 3)", () => {
+      // ROUND 2: the scene registers NO physics-step hook of its own. The
+      // step loop's caller is put in `stepLoopGradeRef` by a layout effect
+      // of RuntimeDriver's with NO dependency list (re-pointed on every
+      // render, inside the commit), and VehicleRig's before-step callback
+      // calls it — FIRST, before it reads the step's input.
+      const stepHooks: ts.CallExpression[] = [];
+      const fills: ts.CallExpression[] = [];
+      const find = (n: ts.Node) => {
+        if (ts.isCallExpression(n)) {
+          const callee = n.expression.getText(sf);
+          if (callee === "useBeforePhysicsStep" || callee === "useAfterPhysicsStep") stepHooks.push(n);
+          if (callee === "useLayoutEffect" && n.arguments[0]?.getText(sf).includes("stepLoopGradeRef.current =")) fills.push(n);
+        }
+        ts.forEachChild(n, find);
+      };
+      find(sf);
+      expect(stepHooks.length).toBe(0);
+      expect(sceneRaw).toContain('import { Physics } from "@react-three/rapier";');
+      expect(fills.length).toBe(1);
+      expect(driver.split("stepLoopGradeRef.current = grade;").length - 1).toBe(1);
+      // No dependency list: React re-runs it on every commit.
+      expect(fills[0].arguments.length).toBe(1);
+      const effect = fills[0].arguments[0] as ts.ArrowFunction;
+      expect(ts.isArrowFunction(effect) && effect.parameters.length === 0).toBe(true);
+      const effectStatements = (effect.body as ts.Block).statements;
+      expect(effectStatements.length).toBe(3);
+      expect(flatText(effectStatements[1])).toBe("stepLoopGradeRef.current = grade;");
+      expect(flatText(effectStatements[2])).toBe(
+        "return () => { if (stepLoopGradeRef.current === grade) stepLoopGradeRef.current = null; };",
+      );
+      const gradeDecl = (effectStatements[0] as ts.VariableStatement).declarationList.declarations[0];
+      expect(gradeDecl.name.getText(sf)).toBe("grade");
+      const cb = gradeDecl.initializer as ts.ArrowFunction;
+      expect(ts.isArrowFunction(cb) && cb.parameters.length === 0).toBe(true);
+      // One ref, made by the scene, handed to the rig and to the driver.
+      expect(scene.split("const stepLoopGradeRef = useRef<(() => void) | null>(null);").length - 1).toBe(1);
+      expect(scene.split("stepLoopGradeRef={stepLoopGradeRef}").length - 1).toBe(2);
+      // VehicleRig's before-step callback calls the ref — once. WHAT the
+      // step loop's grade does and WHEN the rig calls it are not quoted here
+      // statement for statement any more (round 3): they are EXECUTED —
+      // components/sim/__tests__/step-loop-grade.test.ts §2 (the grade against
+      // a real cabin and a real GradeGrid: the refresh before the grade,
+      // nothing while paused, every owed step after a pause) and §3 (the rig's
+      // callback cut out and run: the scene's turn first, also with no sim),
+      // and lessons/scenario/__tests__/scene-frame-grade.execution.test.ts §2/§3
+      // (the scene's own step-loop grade and frame region on a real grid:
+      // every point once, in order, the shells posed at each, and the drive
+      // failing on a step loop that skips its points).
+      const rigSf = ts.createSourceFile("VehicleRig.tsx", read("components/sim/VehicleRig.tsx"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+      const rigHooks: ts.CallExpression[] = [];
+      const findRig = (n: ts.Node) => {
+        if (ts.isCallExpression(n) && n.expression.getText(rigSf) === "useBeforePhysicsStep") rigHooks.push(n);
+        ts.forEachChild(n, findRig);
+      };
+      findRig(rigSf);
+      expect(rigHooks.length).toBe(1);
+      const rigStatements = ((rigHooks[0].arguments[0] as ts.ArrowFunction).body as ts.Block).statements.map((s) => s.getText(rigSf));
+      expect(rigStatements.filter((s) => s.includes("stepLoopGradeRef")).length).toBe(1);
+      // The refresh writes the cabin's channels and nothing else of the
+      // sample: no pose, and never the look (the grid takes the cabin's looks
+      // itself, through `moreLooks`).
+      const builder = stripComments(read("modules/sim/scene/vehicleSample.ts"));
+      const refresh = builder.slice(builder.indexOf("export function updateCabinChannels("), builder.indexOf("export function updateVehicleSample("));
+      expect(refresh.length).toBeGreaterThan(200);
+      expect([...refresh.matchAll(/out\.([A-Za-z]+)\s*=/g)].map((m) => m[1]).sort()).toEqual(CABIN_CHANNELS);
+      expect(refresh).not.toMatch(/consumeGlanceSample|mirrorGlance|position|headingDeg|speedKmh/);
+      // …and the frame's builder is that same mapping plus the pose and the look.
+      const frameBuilder = builder.slice(builder.indexOf("export function updateVehicleSample("));
+      expect(frameBuilder.split("updateCabinChannels(out, sim, cabin, input);").length - 1).toBe(1);
+      expect([...frameBuilder.matchAll(/out\.([A-Za-z.]+)\s*=/g)].map((m) => m[1]).sort()).toEqual([
+        "headingDeg",
+        "mirrorGlance",
+        "position.x",
+        "position.y",
+        "speedKmh",
+      ]);
+    });
+
+    it("LANE npcstep — NpcColliders has no clock of its own: no frame hook, no step hook, no sample; the scene hands it the traffic system and the ref the grid's `shells` hook calls through", () => {
+      const npc = stripComments(read("components/sim/NpcColliders.tsx"));
+      for (const banned of ["useFrame", "useBeforePhysicsStep", "useAfterPhysicsStep", "sampleRef", "paused", "delta", "setNextKinematic", "setTranslation"]) {
+        expect(npc.includes(banned), `NpcColliders names ${banned}`).toBe(false);
+      }
+      // It fills the ref with its pool's step, on its mounted bodies.
+      expect(npc.replace(/\s+/g, " ")).toContain(
+        "const step: NpcShellStep = (k, student, respawned) => pool.step(k, student, vehBodies.current, pedBodies.current, respawned);",
+      );
+      expect(npc).toContain("shellsRef.current = step;");
+      expect(scene.split("<NpcColliders").length - 1).toBe(1);
+      // …and (round 2) the director's own contact cast: a staged body's shell
+      // is tagged with the kind its runner casts it as.
+      expect(scene).toContain("<NpcColliders traffic={traffic} shellsRef={npcShellsRef} cast={directorContactCast(director)} />");
+      expect(npc.replace(/\s+/g, " ")).toContain("new NpcShellPool(traffic, vehTags, pedTags, cast), [traffic, vehTags, pedTags, cast],");
+      expect(scene.split("npcShellsRef={npcShellsRef}").length - 1).toBe(1);
+      expect(scene).toContain("const npcShellsRef = useRef<NpcShellStep | null>(null);");
+      // The pool itself reads the grid's index and the student it is handed —
+      // no frame, no wall clock, no delta.
+      const pool = stripComments(read("modules/sim/scene/npcShells.ts"));
+      for (const banned of ["useFrame", "delta", "performance.now", "Date.now", "sampleRef", "@react-three"]) {
+        expect(pool.includes(banned), `scene/npcShells.ts names ${banned}`).toBe(false);
+      }
+      expect(pool).toContain("if (this.fresh || k % NPC_SHELL_REBIND_POINTS === 0) {");
+      expect(pool).toContain("export const NPC_SHELL_REBIND_POINTS = Math.round(NPC_SHELL_REBIND_SEC / FIXED_DT);");
+    });
 
     it("there is exactly one such call, in RuntimeDriver, with the six arguments the grid's live entry takes", () => {
       expect(calls.length).toBe(1);
@@ -747,8 +1014,8 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       const flat = (n: ts.Node) => n.getText(sf).replace(/\s+/g, " ").trim();
       expect(call.arguments.slice(0, 5).map(flat)).toEqual([
         "steps",
-        "tRef.current",
-        "sample.mirrorGlance",
+        "frameEndSec",
+        "frameGlance",
         "{ runtime, traffic, director }",
         "conditions",
       ]);
@@ -762,7 +1029,16 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       const hooks = call.arguments[5];
       expect(ts.isObjectLiteralExpression(hooks)).toBe(true);
       const props = (hooks as ts.ObjectLiteralExpression).properties;
-      expect(props.map((p) => p.name?.getText(sf))).toEqual(["student", "moreLooks", "stepContact", "onPoint", "nearMiss"]);
+      expect(props.map((p) => p.name?.getText(sf))).toEqual(["student", "moreLooks", "stepContact", "onPoint", "nearMiss", "shells"]);
+      // THE BODIES THE NEXT STEP MEETS (lane npcstep): the hook hands the
+      // graded point's index and the GRID's student straight to NpcColliders'
+      // pool — it reads nothing of this frame, and it is the only way the pool
+      // is moved (NpcColliders has no frame callback: pinned below).
+      const shells = props[5];
+      expect(ts.isPropertyAssignment(shells) && ts.isArrowFunction(shells.initializer)).toBe(true);
+      expect((shells as ts.PropertyAssignment).initializer.getText(sf).replace(/\s+/g, " ")).toBe(
+        "(k, student, respawned) => npcShellsRef.current?.(k, student, respawned)",
+      );
       // EVERY LOOK THE CABIN STILL HOLDS (round 8): the hook is the cabin's own
       // `consumeGlanceSample`, called through — one look per call, null when
       // the cabin has none — and nothing else. Without it a second look
@@ -790,7 +1066,7 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       expect((nearMiss as ts.PropertyAssignment).initializer.getText(sf)).toBe("onNearMiss");
     });
 
-    it("every read of the frame's `sample` inside the call is one of the cabin's ten channels — never position, heading or speed", () => {
+    it("every read of the frame's `sample` inside the call is one of the cabin's nine channels — never position, heading or speed (the tenth, the look, is the frame's argument)", () => {
       const reads = new Set<string>();
       const bare: string[] = [];
       for (const n of nodes) {
@@ -840,9 +1116,12 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
         "contactListenerRef",
         "director",
         "feedAttemptPoint",
+        "frameEndSec",
+        "frameGlance",
         "gradeGrid",
         "hazardActiveRef",
         "inputRef",
+        "npcShellsRef",
         "onNearMiss",
         "onStagedOutcome",
         "onTelltale",
@@ -853,7 +1132,6 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
         "sample",
         "simRef",
         "steps",
-        "tRef",
         "telltaleCautionLitRef",
         "telltaleLitRef",
         "traffic",
@@ -878,9 +1156,20 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
       expect(readsOff("cabinRef")).toEqual(["consumeGlanceSample"]);
       expect(readsOff("simRef")).toEqual(["steerRad"]);
       expect(readsOff("inputRef")).toEqual(["rawBrake", "rawThrottle"]);
-      // The session clock is the second argument and nothing else in the call
-      // (a hook stamps with the grid point's own `pt.tSec`).
-      expect(nodes.filter((n) => ts.isIdentifier(n) && n.text === "tRef").length).toBe(1);
+      // The frame's end is the second argument and nothing else in the call
+      // (a hook stamps with the grid point's own `pt.tSec`), the frame's look
+      // the third and nothing else; the session clock itself is not named in
+      // `gradeTakenSteps` at all — the frame hands it in.
+      expect(nodes.filter((n) => ts.isIdentifier(n) && n.text === "frameEndSec").length).toBe(1);
+      expect(nodes.filter((n) => ts.isIdentifier(n) && n.text === "frameGlance").length).toBe(1);
+      expect(nodes.filter((n) => ts.isIdentifier(n) && n.text === "tRef").length).toBe(0);
+      const inHolder: ts.Node[] = [];
+      const walkHolder = (n: ts.Node) => {
+        inHolder.push(n);
+        ts.forEachChild(n, walkHolder);
+      };
+      walkHolder(holder!);
+      expect(inHolder.filter((n) => ts.isIdentifier(n) && n.text === "tRef").length).toBe(0);
       // The grader's handler is handed the grid's tick, untouched: `onTick` is
       // called once, with `pt.tick`, and the tick is written nowhere in the
       // call.
@@ -1116,6 +1405,16 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
     // RuntimeDriver's one frame hook: no priority argument (it closes `});`).
     expect(driver.split("useFrame(").length - 1).toBe(1);
     expect(driver).toMatch(/useFrame\(\(_, delta\) => \{/);
+    // It registers NO step hook (round 2): the step loop reaches its grade
+    // through `stepLoopGradeRef`, which VehicleRig's ONE before-step callback
+    // calls first — the step before is graded and the shells posed, then the
+    // car's input for the coming step is read, then rapier steps. That order
+    // is the rig's statement order, not the order two components registered
+    // a callback in (§3 pins the statement).
+    expect(driver.split("useBeforePhysicsStep(").length - 1).toBe(0);
+    expect(driver.indexOf("stepLoopGradeRef.current = grade;")).toBeGreaterThan(0);
+    expect(driver.indexOf("stepLoopGradeRef.current = grade;")).toBeLessThan(driver.indexOf("useFrame("));
+    expect(rig.split("useBeforePhysicsStep(").length - 1).toBe(1);
     expect(driver).toMatch(/\n  \}\);\s*\n\s*return null;\n\}\s*$/);
     // …and it stops with the engine: nothing is added to the clock or graded
     // on a paused frame (the early-out sits above the clock line).

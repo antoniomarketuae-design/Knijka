@@ -150,6 +150,35 @@
  * sampled — so a contact is reported once, at the same point, with the same
  * speed, on every display, and at 60 Hz exactly as before.
  *
+ * THE BODIES THE CAR CAN TOUCH ARE THE GRID'S TOO (sc-roundabout-entry:
+ * 08a0b701, lane npcstep). A road user's rapier body — the kinematic «shell»
+ * NpcColliders mounts — was moved by that component once per render frame, so
+ * inside a frame of several physics steps it leapt and then stood still, and
+ * one drive met a different body on a different display (scene/npcShells.ts
+ * carries the measurements). The pool is posed HERE now: `hooks.shells` is
+ * called once per graded grid point, after the point, with the student the
+ * grid read there — the world the point left is the world physics step k + 1
+ * meets.
+ *
+ * That only holds on every display if grid point k is graded BEFORE rapier
+ * takes step k + 1. So `stepPhysics` has two callers in the live lesson, one
+ * call (LessonScene's RuntimeDriver):
+ *
+ *   · THE FRAME'S END, as always — it grades the frame's last step, positions
+ *     what is drawn, and takes the frame's look;
+ *   · INSIDE THE STEP LOOP, before each further step of a frame that owes
+ *     several (`frameEndSec` null: nothing drawn is positioned) — it grades
+ *     the step rapier has just taken, so the next one meets the world that
+ *     step left.
+ *
+ * A frame of one step — every frame of a display of 60 Hz or faster — is
+ * graded exactly as before: once, at its end. A frame of n steps is graded at
+ * the same n points with the same car, in the same order; what moved is WHEN
+ * within the frame the first n − 1 are graded, and so what the cabin's
+ * frame-sampled channels say at those points (the scene's `student` hook:
+ * the cabin as it stands when the step has been taken, where it was the
+ * frame's sample — the frame's last point still reads the frame's sample).
+ *
  * WHAT STAYS ON THE FRAME: everything the student SEES (the speedometer, the
  * HUD gap readouts, the drawn poses — `traffic.setRenderSessionTime`) and
  * every coaching hint that grades nothing (reverse-assist, stuck-start, the
@@ -257,6 +286,32 @@ export interface GradeGridHooks {
    *  ended on it). */
   onPoint(point: GradeGridPoint): boolean | void;
   /**
+   * THE BODIES PHYSICS STEP k + 1 WILL MEET (sc-roundabout-entry:08a0b701):
+   * called once per graded grid point, LAST — after the world moved to k, the
+   * director decided and the tick was delivered — with the student the grid
+   * read at k. The live lesson poses NpcColliders' kinematic shells here
+   * (scene/npcShells.ts `NpcShellPool.step`): each bound shell gets its
+   * agent's pose at k, and who holds a shell is chosen on k. Like `nearMiss`,
+   * a hook that is HANDED the point's student and is given no way to read a
+   * frame. Called also when this point's `onPoint` ended the session (the
+   * world goes on standing where it is). Omitted (the replay harness — it has
+   * no physics engine): nothing is posed.
+   *
+   * `respawned` (round 2): `GradeGrid.reset()` was called since the last
+   * time this hook ran — the car was put back on its spawn point and the
+   * director re-staged its actors, whose published poses jumped back to their
+   * holds AT THAT CALL (`traffic.stagedCommand(… "reset")` publishes at
+   * once). So this is the first pose the pool is shown after the jump: it
+   * TELEPORTS every shell (a jump must not read as a body sweeping the street
+   * at the jump's speed) and re-chooses its bindings, whatever the rebind
+   * phase. Handed to exactly ONE call: the next point's, for a respawn made
+   * between two points (key R between frames); THIS point's, for one made by
+   * this point's own `onPoint` (the dev rig's R key) — the actors have
+   * already jumped when the hook runs. A fact of the grid: the same point on
+   * every display for a respawn made at the same point.
+   */
+  shells?(k: number, student: Readonly<VehicleSample>, respawned: boolean): void;
+  /**
    * A near miss that RESOLVED at this grid point (the bodies separated), with
    * the running session aggregate — the unscored «мина на косъм» stat, measured
    * by the grid from the student at the point and the traffic state there.
@@ -294,8 +349,55 @@ export function createGradeGridSample(): VehicleSample {
   };
 }
 
+/**
+ * THE GRID'S CLOCK AS EVERYONE BUT THE GRID SEES IT — READ ONLY
+ * (sc-roundabout-entry:08a0b701, lane npcstep round 4; the round-3 verifier's
+ * V3-1). Which grid points have been handed out is the grid's own state, and
+ * a point is handed out ONLY by the path that grades it (`stepPhysics`,
+ * `stepFrame`). Through round 3 `GradeGrid.clock` was the
+ * `SessionGridClock` itself, so any statement holding the grid — anywhere in
+ * the scene's frame callback — could call `clock.advanceSteps(…)` and move
+ * the grid past a point nobody graded: no tick, no director step, no shells
+ * pose, for good. Its verifier placed exactly that one statement above the
+ * region the harnesses executed (mutant R1b) and every test passed.
+ *
+ * Now the clock is private and `clock` is this view: what a reader needs (the
+ * step, the newest graded point, the time of a point, the point of a time)
+ * and nothing that moves it — absent from the TYPE (a skip is a compile
+ * error) and from the OBJECT (a cast finds no method to call: the view is a
+ * frozen object of its own, not the clock behind an interface). Pinned by
+ * scene/__tests__/grade-grid-clock-readonly.test.ts, which also census-checks
+ * that no product module but this file calls `advanceSteps` or builds a
+ * `SessionGridClock`.
+ */
+export interface GradeGridClock {
+  /** The fixed physics step, s (FIXED_DT). */
+  readonly stepSec: number;
+  /** The newest grid point graded (0: none yet — the origin). */
+  readonly last: number;
+  /** Session time of grid point `k` — a product, never a sum. */
+  timeOf(k: number): number;
+  /** The newest grid point at or before session time `tSec`. */
+  indexAt(tSec: number): number;
+}
+
+function readOnlyClock(clock: SessionGridClock): GradeGridClock {
+  return Object.freeze({
+    stepSec: clock.stepSec,
+    get last() {
+      return clock.last;
+    },
+    timeOf: (k: number) => clock.timeOf(k),
+    indexAt: (tSec: number) => clock.indexAt(tSec),
+  });
+}
+
 export class GradeGrid {
-  readonly clock: SessionGridClock;
+  /** The grid's clock, READ ONLY (see `GradeGridClock`). */
+  readonly clock: GradeGridClock;
+  /** The clock itself — advanced only by `stepPhysics` / `stepFrame`, each of
+   *  which grades every point it hands out. */
+  private readonly gridClock: SessionGridClock = new SessionGridClock();
   private readonly span: SessionGridSpan = { first: 0, last: -1 };
   private readonly student: VehicleSample = createGradeGridSample();
   /** The looks not yet heard by a grid point, oldest first (round 8: a FIFO —
@@ -304,6 +406,8 @@ export class GradeGrid {
   private dropped = 0;
   /** The last graded grid index; 0 is the session's origin (none yet). */
   private prevK = 0;
+  /** `reset()` was called and `hooks.shells` has not run since. */
+  private respawned = false;
   /** The car at a physics step (scratch). */
   private readonly stepState: PhysicsStepState = { x: 0, y: 0, speedKmh: 0, headingDeg: 0 };
   /** The near-miss stat (round 7): stepped once per grid point, below. */
@@ -320,8 +424,24 @@ export class GradeGrid {
     staged: null,
   };
 
-  constructor(clock: SessionGridClock = new SessionGridClock()) {
-    this.clock = clock;
+  constructor() {
+    this.clock = readOnlyClock(this.gridClock);
+    // N14 (d) — sc-roundabout-entry:08a0b701, lane npcstep round 6. The
+    // grid's GRADING MACHINERY cannot be replaced on an instance: its methods
+    // live on a FROZEN prototype (below), so `grid.stepPhysics = …` throws a
+    // TypeError in strict code (every module) and defines nothing; the
+    // instance is not extensible, so no own property can be defined over a
+    // method either; `clock` (the read view) and `gridClock` (the clock
+    // itself) are non-writable, non-configurable. The round-5 verifier's P7
+    // (`gradeGrid.stepPhysics = () => 0` inside the frame callback on long
+    // frames) compiled, advanced nothing and graded nothing from then on.
+    // The mutable state (`dropped`, `prevK`, `respawned`, the scratch
+    // objects) stays writable — that is the grid's own business, reached only
+    // through its private members. Pinned by scene/__tests__/
+    // grade-grid-clock-readonly.test.ts §4.
+    Object.defineProperty(this, "clock", { writable: false, configurable: false });
+    Object.defineProperty(this, "gridClock", { writable: false, configurable: false });
+    Object.preventExtensions(this);
   }
 
   /** Looks handed over and not yet heard by a grid point. */
@@ -352,7 +472,7 @@ export class GradeGrid {
     hooks: GradeGridHooks,
     untilSec: number = Infinity,
   ): number {
-    return this.run(this.clock.advance(endSec, this.span, untilSec), endSec, null, frameGlance, world, conditions, hooks);
+    return this.run(this.gridClock.advance(endSec, this.span, untilSec), endSec, null, frameGlance, world, conditions, hooks);
   }
 
   /**
@@ -363,22 +483,28 @@ export class GradeGrid {
    * a 0.5 s frame, the first frame's like any other — and grid point k reads
    * the car after step k. `frameEndSec` is the session clock at the frame end
    * (`PhysicsSessionClock`), used only for what is DRAWN.
+   *
+   * `frameEndSec` NULL — THE CALL FROM INSIDE THE STEP LOOP (sc-roundabout-
+   * entry:08a0b701): the frame has not ended; rapier is about to take another
+   * step and the one it has just taken is graded first, so that step meets
+   * the world this one left (`hooks.shells`). Nothing drawn is positioned —
+   * the frame's own call does that, at its end.
    */
   stepPhysics(
     steps: PhysicsStepSource,
-    frameEndSec: number,
+    frameEndSec: number | null,
     frameGlance: VehicleSample["mirrorGlance"],
     world: GradeGridWorld,
     conditions: GradeGridConditions,
     hooks: GradeGridHooks,
   ): number {
-    const span = this.clock.advanceSteps(steps.stepCount - this.clock.last, this.span);
+    const span = this.gridClock.advanceSteps(steps.stepCount - this.gridClock.last, this.span);
     return this.run(span, frameEndSec, steps, frameGlance, world, conditions, hooks);
   }
 
   private run(
     span: SessionGridSpan,
-    frameEndSec: number,
+    frameEndSec: number | null,
     steps: PhysicsStepSource | null,
     frameGlance: VehicleSample["mirrorGlance"],
     world: GradeGridWorld,
@@ -398,7 +524,7 @@ export class GradeGrid {
         this.hear(more);
       }
     }
-    const H = this.clock.stepSec;
+    const H = this.gridClock.stepSec;
     const { runtime, traffic, director } = world;
     // The staged people the person-in-path distance is measured to: the
     // director's own contact cast (empty with no director, or none staged).
@@ -406,7 +532,7 @@ export class GradeGrid {
     const s = this.student;
     let graded = 0;
     for (let k = span.first; k <= span.last; k++) {
-      const tSec = this.clock.timeOf(k);
+      const tSec = this.gridClock.timeOf(k);
       const dtSec = (k - this.prevK) * H;
       this.prevK = k;
       s.mirrorGlance = null;
@@ -489,9 +615,20 @@ export class GradeGrid {
       if (hooks.nearMiss) {
         for (let i = 0; i < this.resolved.length; i++) hooks.nearMiss(this.resolved[i], this.nearMisses.stats);
       }
+      // THE BODIES THE NEXT PHYSICS STEP MEETS (sc-roundabout-entry:08a0b701):
+      // posed from the world this point left and the student it read — last,
+      // so a staged actor the director moved at this point is where the
+      // director put it.
+      // (Read HERE, after `onPoint`: a respawn this point's own tick made
+      // has already moved the staged actors — see the hook.)
+      const respawned = this.respawned;
+      this.respawned = false;
+      hooks.shells?.(k, s, respawned);
       if (ended) break;
     }
-    traffic.setRenderSessionTime(frameEndSec);
+    // What is DRAWN is positioned by the frame's own call; a call from inside
+    // the step loop (null) leaves it where the last frame put it.
+    if (frameEndSec !== null) traffic.setRenderSessionTime(frameEndSec);
     return graded;
   }
 
@@ -515,5 +652,16 @@ export class GradeGrid {
   reset(): void {
     this.looks.length = 0;
     this.nearMisses.reset();
+    // …and the road users' shells are re-chosen and re-seated at the next
+    // call of their hook (`hooks.shells`' third argument — sc-roundabout-
+    // entry:08a0b701 round 2): the director re-stages with this respawn, and
+    // a shell that followed its actor's jump back to the hold would cross the
+    // street in one step at the jump's speed.
+    this.respawned = true;
   }
 }
+
+// N14 (d): the grading methods cannot be replaced — not on an instance (an
+// assignment to an inherited non-writable property throws in strict code, and
+// the instance is not extensible), not on the class (see the constructor).
+Object.freeze(GradeGrid.prototype);

@@ -1094,7 +1094,7 @@ describe("§5 the shell spends the reading in five places, and the card reports 
   });
 
   it("4 · the fold row's own count uses the same rule for which cards are on the glass, and its press pages the box being read", () => {
-    expect(SHELL).toContain("const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading).length;");
+    expect(SHELL).toContain("const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading, toastReader.standing).length;");
     const reveal = SHELL.match(/const revealMoreToasts = useCallback\(\(\) => \{([\s\S]*?)\}, \[measureToastFold\]\);/);
     expect(reveal).not.toBeNull();
     expect(reveal![1]).toMatch(
@@ -1122,11 +1122,13 @@ describe("§5 the shell spends the reading in five places, and the card reports 
     expect(measure).not.toBeNull();
     expect(measure![1]).toContain("toastReaderRecheckRef.current();");
     expect(SHELL).toMatch(
-      /useLayoutEffect\(\(\) => \{\s*measureToastFold\(\);\s*\}, \[measureToastFold, toastReadingId, toastReader\.held, toastReader\.bannerYields\]\);/,
+      /useLayoutEffect\(\(\) => \{\s*measureToastFold\(\);\s*\}, \[measureToastFold, toastReadingId, toastReader\.held, toastReader\.bannerYields, toastStandTrimmed, toastReader\.summarise\]\);/,
     );
     // …with the reader's CURRENT `recheck`, not the one of the render before: the ref is set in the layout phase too
     expect(SHELL).toMatch(/useLayoutEffect\(\(\) => \{\s*toastReaderRecheckRef\.current = toastReader\.recheck;\s*\}\);/);
-    expect(SHELL.indexOf("toastReaderRecheckRef.current = toastReader.recheck;")).toBeLessThan(SHELL.indexOf("[measureToastFold, toastReadingId, toastReader.held, toastReader.bannerYields]"));
+    expect(SHELL.indexOf("toastReaderRecheckRef.current = toastReader.recheck;")).toBeLessThan(SHELL.indexOf("[measureToastFold, toastReadingId, toastReader.held, toastReader.bannerYields, toastStandTrimmed, toastReader.summarise]"));
+    // …and the stand's trim (W9) is the one more thing the row is re-asked on (cardstay round 2)
+    expect(SHELL).toContain("const toastStandTrimmed = toastReader.standing?.trimAge === true;");
   });
 
   it("the card reports the value the press produced, from the handler — and every card passes it its own id", () => {
@@ -1134,11 +1136,15 @@ describe("§5 the shell spends the reading in five places, and the card reports 
       /const toggleWhy = useCallback\(\(\) => \{\s*const open = !whyOpen;\s*setWhyOpen\(open\);\s*onWhyChange\?\.\(open\);\s*\}, \[whyOpen, onWhyChange\]\);/,
     );
     expect(HUD).toContain("onWhyChange={onWhyChange ? (open) => onWhyChange(t.id, open) : undefined}");
-    expect(HUD).toContain("const shown = visibleToasts(toasts, quiet, reading);");
+    expect(HUD).toContain("const shown = visibleToasts(toasts, quiet, reading, standing);");
   });
 
   it("the reader's check runs after every commit, before paint — a layout effect with no dependency list", () => {
-    expect(HUD).toMatch(/useLayoutEffect\(\(\) => \{\s*setYieldLevel\(yieldTarget\(scrollerRef\.current\)\);\s*\}\);/);
+    // …and in the same effect, the graded card the column stands for (W7, 2026-10-15)
+    // and the paragraph it asks for its summary before paint (cardstay round 2)
+    expect(HUD).toMatch(
+      /useLayoutEffect\(\(\) => \{\s*setYieldLevel\(yieldTarget\(scrollerRef\.current\)\);\s*const seen = look\(scrollerRef\.current\);\s*if \(!sameStand\(seen\.stand, stand\)\) setStand\(seen\.stand\);\s*if \(seen\.summarise !== summariseAsked\) setSummariseAsked\(seen\.summarise\);\s*const pending = [^\n]*\n\s*if \(!pending\) relooks\.current = 0;\s*else if \(relooks\.current < 2\) \{\s*relooks\.current \+= 1;\s*setRelook\(\(n\) => n \+ 1\);\s*\}\s*\}\);/,
+    );
   });
 });
 

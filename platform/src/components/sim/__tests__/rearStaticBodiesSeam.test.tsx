@@ -237,17 +237,24 @@ function districtOnly(districtId: string, samples: readonly TraceSample[]) {
 describe("§1 the mount effect really publishes — measured through the scene", () => {
   const DISTRICT_ID = "lot-van-v1";
 
-  it("SELF-CHECK: the district-only channel is the 141-read state the refuter restored", () => {
+  // RE-MEASURED 2026-10-11 (catalogue-demo-curvature:dae908c7): sc-park-van's
+  // demos were re-authored as drives the product car can perform, and the
+  // mistake demo now STOPS on the van instead of driving 2.3 m into it. Every
+  // count and gap in this file that is read off those two traces is theirs;
+  // the refuter's state was 44 + 97 = 141 reads on the old ones. Round 2
+  // (D1) stops the mistake demo ON its contact point rather than 5 cm short of
+  // it — one more pose, 73 → 74 reads.
+  it("SELF-CHECK: the district-only channel is the 167-read state the refuter restored", () => {
     // Without this the deltas below are statements about nothing. These are the
     // numbers a deleted seam produces, asserted here so that a re-recorded
     // trace or a changed district fails THIS line rather than quietly turning
     // every delta below into a measurement of air.
-    expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "shadow-correct")).finite).toBe(44);
-    expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "mistake-early-turn")).finite).toBe(97);
+    expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "shadow-correct")).finite).toBe(94);
+    expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "mistake-early-turn")).finite).toBe(74);
     expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "mistake-blind-reverse")).finite).toBe(0);
   });
 
-  it("the correct drive: 44 reads of the wrong car become 73 reads with the van in them", () => {
+  it("the correct drive: 94 reads of the wrong car become 148 reads with the van in them", () => {
     const lesson = compiled("sc-park-van");
     expect(lessonDistrictId(lesson)).toBe(DISTRICT_ID);
     const { mounted, traffic, core } = mountScene(lesson, DISTRICT_ID);
@@ -256,25 +263,27 @@ describe("§1 the mount effect really publishes — measured through the scene",
     expect(core.scenarioObstacles).toHaveLength(4);
     const after = replay(traffic, trace("sc-park-van", "shadow-correct"));
     mounted.unmount();
-    expect(after.finite).toBe(73);
-    // 0.40 m, and it is the VAN. The district-only channel's closest read on
+    expect(after.finite).toBe(148);
+    // 0.64 m, and it is the VAN. The district-only channel's closest read on
     // this drive is 3.56 m — a neighbouring bay car — while the body the
     // student is reversing at sits 0.40 m behind. A badge saying „3 m" to
     // someone 0.4 m from a panel van is not silent, it is confidently wrong by
     // a factor of nine, and the student keeps going.
-    expect(after.min).toBeCloseTo(0.401, 2);
+    expect(after.min).toBeCloseTo(0.641, 2);
     expect(districtOnly(DISTRICT_ID, trace("sc-park-van", "shadow-correct")).min).toBeCloseTo(
-      3.561,
+      3.596,
       2,
     );
   });
 
-  it("the wrong drive: 97 → 169 reads, and the student reaches the van (0 m)", () => {
+  it("the wrong drive: the same 74 reads, and the nearest body becomes the van (0.48 m on the fleet box)", () => {
     const { mounted, traffic } = mountScene(compiled("sc-park-van"), DISTRICT_ID);
     const after = replay(traffic, trace("sc-park-van", "mistake-early-turn"));
     mounted.unmount();
-    expect(after.finite).toBe(169);
-    expect(after.min).toBe(0);
+    expect(after.finite).toBe(74);
+    // The demo stops ON the van's real body; the 2.05 m fleet box this channel
+    // stands there until a footprint is published is 0.62 m shorter than it.
+    expect(after.min).toBeCloseTo(0.479, 2);
   });
 
   it("BOTH DIRECTIONS: the drive whose hazard is a PEDESTRIAN stays silent after mounting", () => {
@@ -308,7 +317,7 @@ describe("§2 the footprint callback really publishes — taken off the rendered
     expect(obstacleProps[0].obstacles).toBe(core.scenarioObstacles);
   });
 
-  it("firing it with the van's REAL extents moves the badge from 0.401 m to 0.271 m", () => {
+  it("firing it with the van's REAL extents moves the badge from 0.641 m to 0.511 m", () => {
     const { mounted, traffic, obstacleProps, core } = mountScene(
       compiled("sc-park-van"),
       DISTRICT_ID,
@@ -316,7 +325,7 @@ describe("§2 the footprint callback really publishes — taken off the rendered
     const samples = trace("sc-park-van", "shadow-correct");
     // State the mount-effect answer first, so the delta below is unambiguously
     // the CALLBACK's and cannot be inherited from §1.
-    expect(replay(traffic, samples).finite).toBe(73);
+    expect(replay(traffic, samples).finite).toBe(148);
 
     // The van's index in the vehicle-filtered list, resolved FROM the recipe
     // rather than written down: a hard-coded 3 would keep passing if the recipe
@@ -339,8 +348,8 @@ describe("§2 the footprint callback really publishes — taken off the rendered
     mounted.unmount();
     // The rig is longer than the guess, so the same drive is inside the cue's
     // corridor for longer: 30 more warned samples, closest read 13 cm tighter.
-    expect(after.finite).toBe(103);
-    expect(after.min).toBeCloseTo(0.271, 2);
+    expect(after.finite).toBe(156);
+    expect(after.min).toBeCloseTo(0.511, 2);
   });
 
   it("a footprint for a body that is not there changes nothing — no phantom", () => {
@@ -355,8 +364,8 @@ describe("§2 the footprint callback really publishes — taken off the rendered
     publish([{ index: 99, halfLengthM: 9, halfWidthM: 9 }]);
     const after = replay(traffic, samples);
     mounted.unmount();
-    expect(after.finite).toBe(73);
-    expect(after.min).toBeCloseTo(0.401, 2);
+    expect(after.finite).toBe(148);
+    expect(after.min).toBeCloseTo(0.641, 2);
   });
 });
 

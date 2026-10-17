@@ -789,6 +789,24 @@ describe("route loss — the latch itself", () => {
 // shape, and a spread of ordinary lessons. Running all 167 costs ~40 MB of JSON
 // on a 7200 rpm disk and belongs in a sweep, not in the unit suite.
 const CORRECT_DRIVE_BUDGET: Record<string, number> = {
+  // ONE FIRING OF THE NULL BRANCH, since 2026-10-11 (catalogue-demo-curvature:
+  // dae908c7). The lesson's Задача 2 goal is the bay itself — an OFF-ROAD point
+  // for which `deriveGuidanceRoute` returns null from the aisle, on the old
+  // recording as on this one — so there is no line to lose; the rule's null
+  // branch simply re-asks once the car has moved ROUTE_REDERIVE_MOVE_M on from
+  // where it last asked. The re-authored correct drive (the 45° swing on the
+  // car's own 4.6 m circle) has to stop 1.36 m further up the aisle than the
+  // 5 m-arc demo did: 8.9 m past the point where Задача 1's L1 disc ticked
+  // instead of 7.5 m, against the rule's 8 m. One re-ask, at (0.55, 6.53). It
+  // is NOT silent (round 1 said it moved no line; round 2 measured it): there
+  // was no line before it, and it draws 6.5 m of aisle centre from abeam the
+  // car back to abeam the bay — pinned below to end there and to lead only
+  // toward the bay.
+  // Round 2 (D8) measured the alternative — a shorter straight before the
+  // swing — and it cannot reach 8 m: the nearest setup that keeps 0.25 m from
+  // every echelon car and a square-started car within 0.3 m of the ghost is
+  // y = 6.66, still past the 6.53 m at which the re-ask fires.
+  "sc-park-45-rev": 1,
   // THE ONE REAL FIRING, and it is not sloppy driving. `sc-ed-poligon-chain`
   // gets 126.5 m from its own guidance line on its CORRECT drive, because a
   // manoeuvring ground's 20 graph edges are not where the exercise happens.
@@ -918,11 +936,37 @@ describe("route loss — every recorded correct drive in the corpus", () => {
         const lat = route ? nearestOnRoute(route, s.x, s.y, head).latM : null;
         if (rerouteDue(watch, lat, s.x, s.y, s.speedKmh, s.tSec)) {
           fired += 1;
+          const before = route;
           goal = goalAt(oi, { x: s.x, y: s.y });
           route = deriveGuidanceRoute(graph, { x: s.x, y: s.y, headingDeg: 0 }, goal, {
             lookahead: chainFor(oi, goal, { x: s.x, y: s.y }),
           });
           stamp(s.x, s.y, s.tSec);
+          if (scen === "sc-park-45-rev") {
+            // WHAT THE STUDENT SEES on that one re-ask (round 2, D8 — measured,
+            // and round 1's «moves no line» was wrong). Before it there is no
+            // line: the goal is the bay, off the road graph, and from the
+            // Задача 1 tick the derivation returns null. The re-ask, 0.8 m
+            // before the setup stop, DOES derive one: 6.5 m of aisle centre
+            // from abeam the car straight back to abeam the bay, where the
+            // «Паркирай тук» marker stands 4.8 m to its right. Pinned here so
+            // it cannot change quietly: it ends abeam the bay, and every metre
+            // of it is nearer the bay than the last — it says where the bay
+            // is, and nothing else.
+            expect(before, "45-rev: a line before the re-ask").toBeNull();
+            if (!route || goal?.kind !== "point") throw new Error("45-rev: the re-ask derived no route");
+            const pts = Array.from(route.pts);
+            const end = { x: pts[pts.length - 2], y: pts[pts.length - 1] };
+            expect(Math.abs(end.y - goal.y), "45-rev: the line ends abeam the bay").toBeLessThan(0.5);
+            expect(route.goalS).toBeCloseTo(route.totalLen, 3);
+            let prev = Infinity;
+            for (let k = 0; k < pts.length; k += 2) {
+              const d = Math.hypot(pts[k] - goal.x, pts[k + 1] - goal.y);
+              expect(d, "45-rev: the line leads toward the bay").toBeLessThan(prev + 1e-6);
+              prev = d;
+            }
+            expect(route.totalLen).toBeLessThan(7);
+          }
         }
       }
       expect(fired).toBeLessThanOrEqual(CORRECT_DRIVE_BUDGET[scen] ?? 0);

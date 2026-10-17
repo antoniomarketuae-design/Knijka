@@ -694,3 +694,119 @@ over 0.5 s (shorter spans read a ±0.15 m position step as up to 1.8 m/s); it la
 with the true closing 3.05–3.3 m/s at the pedal can read under the 3 m/s line and be billed where base acquits (round-5 verifier: 136 cells in
 23 synthetic acts). Accepted because the onset precedes the stamp by less than any human reaction time, base itself splits these acts by rate,
 round 5 strictly improves on round 4, and no committed lesson produces the shape. Revisit only if a live drive shows it.
+
+## CD-1 — the curvdepth re-plan of the pc-path corpus, and a deviation hole pulled in like a body hole — **RECORDED 2026-10-16**
+
+**Context.** The curvdepth product lane re-authored the nine parking drills (`traces/scParkDepth.ts`) so that no demo
+turns tighter than the car can (4.6 m circles), and `build-pathrefs.mjs` re-planned seven pathrefs on the new traces
+(45-rev, gap-short, judge, left, van, zebra at the landing; sc-park-wall in the cdtools tools lane, below). The pc-path
+steering instrument is **live** (RULING-1, routed), so its tools tests were re-derived on the new corpus — and **this
+lane closes nothing**: every change here is to `tools/` or `docs/`, and no finding may close on a change to `tools/`.
+
+### Integrator decision CD-1 — a DEVIATION hole after the tightened re-screen pulls the lat/yaw edge in
+
+sc-park-wall's re-plan exited 1: band corner along −1 / lat −0.15 / yaw +1.5 planned FEASIBLE-ENDPOSE 0.588 against its
+0.5 m TRACK corridor after the tightened re-screen. Diagnosed four ways first (scratch, nothing committed): as built 0.588
+(best deviation 0.498, the end-pose polish 0.535, the clearance pass 0.588 in a 1.47 m corridor); deviation only 0.535; no
+reverse cap 0.558 (best 0.477); 9390622's trace with the cap TRACK 0.477 (and without it 0.469, the 9390622 build). So
+**the demo geometry flips the class on its own** (the gear change moved from about (0.9, −11.66) to (−0.2, −12.01), and the
+reverse is a 4.6 m swing from a 1.0 m straight); the cap adds 0.02–0.03 m; the end-pose polish spends the last millimetres.
+Two CPU-only searches under the same corridor, cap and box (K 16000 / polish 15000 / clear 9000; K 32000 / knot 0.2 m /
+polish 30000 / clear 15000) came back 0.587 and 0.588.
+
+**Decided (conservative — the instrument claims LESS):** `screenCorners` now treats a corner that still leaves its class
+corridor after the tightened re-screen exactly as a body hole: its **lat** edge is pulled in 0.05 m at a time, then its
+**yaw** edge 0.5° at a time. Never the along edge; never past the authored pose (an edge stops at 0); never on a
+designed-negative row; never on a row Slice 0 did not screen (the along loop is that row's remedy); never while a body hole
+is open. Every pull is recorded on the committed band (`armBand.deviationPulled`) and in the build log. It is inert on
+every lesson that builds clean today, by construction: it acts only where the build would otherwise exit 1.
+
+**sc-park-wall, re-planned under it:** lat −0.15 → −0.10 (corner −1/−0.10/+1.5 still ENDPOSE 0.549) → −0.05 (TRACK 0.468);
+committed band along [−1, 0.25] (as declared), lat [−0.05, 0.15], yaw [−1.5, 1.5]; problems [] / emitBlocked []; witnesses
+−1 / −0.5 / 0 TRACK 0.378 / 0.256 / 0.163, all in the product park box; R1 corridor 0.818 (9390622: 0.819; the refused
+EXIT-1 file would have widened it to 0.938). The other ten pathrefs are byte-identical (sha256 before/after); COMMITTED was
+re-pinned by `repin-committed.mjs --write` (only the wall moved; a second print had nothing to re-pin); the wall left
+PLANNED_BEFORE_THE_CAP. **Mutant:** with the pull-in disabled the EXIT 1 comes back with the same corner text, and that
+file, committed, reds `path-plan.test.mjs` 4 times. `path-plan.test.mjs` pins the pull-in's invariants and its census
+(exactly sc-park-wall R1's lat − edge, to −0.05).
+
+### What stays stale and owed
+
+- **sc-park-wall's Slice 0 row is stale.** Every MEASURED field of `REVERSE_POLICY["sc-park-wall"]` (class, devAtAuthoredM,
+  band, witnessGrid, expect, screenedBySlice0, «robust to −1.0 (0.22)») was measured on the old demo. Nothing in it was
+  edited to make the build pass; the only correction is the derived trace-time cite (31.88 → 35.18 s), with a dated
+  STALE ROW comment. **A Slice 0 re-measure is owed, and the Slice 0 tooling is not on disk** (scratchpad/ is gitignored, no
+  FEASIBILITY.md). The other six re-planned rows are in the same position: their Slice 0 rows describe the old demos.
+- **The routing rests on canaries of the old witnesses.** `tools/audit/path-routing.json` routes all nine parking lessons
+  on canaries driven at 91e5a51 / ad4f3e6-fix3, on witnesses that no longer exist for seven of them. The file is not
+  digest-pinned, so nothing refuses this. **Owed: a live pc-path canary drive and a browser re-drive per re-planned lesson**
+  before any pc-path leg on them is read as evidence. Fail-closing the rows to `canaryPassed: null` is the integrator's
+  call; this lane did not make it.
+
+### CD-2 — the one follower fix: the final forward pull-in overran its end
+
+The re-authored gap-short, judge and zebra end R1 outside the product box by design and are credited only after a real
+forward pull-in (1.52 / 1.94 / 2.48 m, not micro). The follower drove it from rest, the D stop trigger latched its COAST
+branch at 2.0–2.7 km/h (under PRESS_MIN 2.58), and the lifted pedal, ramped past the crawl ceiling, drove the car on to
+3.2 km/h: F2 rested +0.87…+1.47 m past its end, the product credited none of gap-short's or judge's seeds 7–10, and
+gap-short seed 8 drove into lotgs-bay-4 (body-clearance). Fixed in `path-follow.mjs` by applying the micro creep's own
+run-out anticipation (`creepLiftRunOutM`) to that one shape (`isFinalPullIn`: the last segment, forward, not micro, after a
+reverse, carrying only its route end; coast branch only; switch `PATH_TUNE.pullIn`). After: 0 refusals and no pull-in
+more than 0.25 m PAST its end on seeds 1–20 (stopping SHORT is a separate matter — see «Landing conditions» below: up to
+0.845 m short, one zebra seed out of the box); credited 12/12 on seeds 7–10. Proven pose for pose invariant (pullIn on vs off) on
+every other lesson, seeds 7–10 (sc-ed-poligon-chain qualifies but the bench never reaches its F6 — vacuous there, and said
+so in CD-2.3). A first scope that included sc-park-bay-exit-rev F1 (it waits for its walker 2.9 m before its end) stopped
+seed 8 1.07 m short, and was narrowed by shape. Bench only: gap-short's F2 witness ends at lon ≈ 0.40 of a 0.5 m
+tolerance, so a browser overrun of 0.1 m is a box miss — the live drive is owed with the rest.
+
+### Claims moved onto the frozen 9390622 pairs, re-derived, or deleted
+
+A frozen, sha256-pinned fixture holds 9390622's pathref + trace pairs for the seven re-planned lessons
+(`tools/mobile/__tests__/fixtures/pathref-9390622/`, verified byte for byte before use). Moved there, never re-baselined:
+T9.m.1–3 (the browser heading near-misses and the weak-wheel stress), T9.e's inserted R→D stop, T9.h.2–4 (the terminal
+gate as measured), T9.k.3 (credit at the reverse rest), T13.4 / T13.4b / T13.5 (no reverse arc of the new corpus
+saturates), SQ0–SQ3c and SQD1 (no micro square-up is left in the corpus; `MICRO_LESSONS` is now asserted non-empty), the
+body screen's 45-rev pool caveat, the 0.0318 m point-screen over-read and refinement-converges, and path-evidence's micro
+exemption. Re-derived on the new corpus, each red with 9390622's pairs swapped back in: T9.e (authored segmentEnd rests),
+T9.h.2n / T9.h.4n (the gate read per witness: it now opens on sc-park-wall −1 / 0 and sc-park-van +0.5, and is shut on all
+of gap-short's), T9.k.3n (credited in D, 0/4 without CD-2), T13.1 (the stop that began is the FINAL one — every R1 now has
+a mid-reverse authored stop), the corpus micro censuses, the body screen's gap-short caveats (6 / 5) and corpus over-read
+(0.000987 m, re-pinned exactly), the canary fixture's seed search (every timed stop, not only the gear change) and its wall
+shift (1.05 m, searched and pinned). **Deleted with provenance:** the canary's «G3's corridor still holds while the car is
+in the wall» — on the new wall witness the wall is 1.036 m away, beyond the 0.818 m corridor, so G3 now sees any drive
+that reaches it; 9390622's figures are in the test's comment. Undecided rows decided by measurement: T9.arm (S-14 p90 arm
+roll sc-park-wall 0.147 m, 9390622 0.126; judge 0.127 / 0.126 — under the 0.20 m bar, unchanged) and T12.1 (green on the
+new wall). Observed, not acted on: `path-follow.mjs`'s terminal-gate docstring still says sc-park-wall's tail owes nothing;
+on the new wall it owes 0.19 / 2.00°, the law engages on 17 of 20 seeds and squares the rest heading (0.05–1.06° vs
+0.94–2.79° off), and on sc-park-judge it costs 1.5–2.3° of final heading (20/20 in the box with it, 19/20 without).
+
+### Landing conditions (curvdepth + cdtools landing, 2026-10-16) — carried, the instrument claims no more than this
+
+The cdtools lane was SIGNED OFF WITH CONDITIONS by its adversarial verifier. At the landing (gate «cdt») they stand as:
+
+- **V-7 — CD-2.2 bounded only the overrun; a lower bound is now added, and what it shows is recorded.** Measured on seeds
+  1–20 (signed stop error, − = short of the end): gap-short −0.517 … +0.103 m (19/20 in the product box; seed 11 overruns
+  to lon 0.518), judge −0.343 … +0.102 m (20/20), zebra −0.845 … +0.036 m (19/20). **Zebra seed 13 is a box miss the fix
+  causes:** its coast trigger fires at 1.87 km/h 0.754 m out and the run-out anticipation stops it 0.845 m short (lon
+  −0.815); with the anticipation off the same seed overruns 0.67 m and rests in the box. `path-follow.test.mjs` CD-2.2b pins
+  each lesson's measured worst short stop + 0.05 m (0.57 / 0.40 / 0.90 m) and the in-box tallies (≥ 19 / 20 / ≥ 19 of 20).
+  Mutant V1 (the run-out on the brake branch too), which passed CD-2.2, is RED on CD-2.2b alone: «sc-park-zebra seed 10:
+  the pull-in came to rest 1.241 m SHORT of its end (bound 0.9 m)». These bounds hold the fix where it was signed off;
+  they do not say a 0.85 m short stop is good.
+- **V-8 — `isFinalPullIn` also selects sc-ed-poligon-chain F6, an 11.54 m segment, and that effect is UNMEASURED.** The
+  bench never reaches F6 (F4 gear-change-missed), so CD-2.3's invariance on poligon is vacuous (the test says so and goes
+  red the day the bench reaches F6). poligon is `canaryPassed: null` in path-routing.json, so no routed leg moves today; its
+  F6 with `pullIn` on must be measured before poligon is canaried or routed.
+- **V-9 — the terminal heading law now engages on lessons it was never measured on.** T9.h.2n pins the gate open on
+  sc-park-wall −1 / 0, van +0.5, 45-rev, driveway, judge and zebra; T9.h.3's «brings the rest heading ≥ 0.5° closer» is kept
+  only on the 9390622 fixture and is not re-asked on the corpus. On sc-park-judge the law costs 1.5–2.3° of final heading
+  (0.04–0.67° without it), 20/20 in the box with it vs 19/20 without. Whether to scope the law or re-derive T9.h.3 on the
+  corpus is an integrator decision still owed; nothing was changed at the landing.
+- **V-10 — the routing, the Slice 0 re-measure and the browser re-drives are owed** (see «What stays stale and owed»
+  above): path-routing.json routes the seven re-planned lessons on canaries of the old witnesses; the wall's Slice 0 row
+  and the six other re-planned rows describe the old demos; a live pc-path canary and a browser re-drive per re-planned
+  lesson are owed before any pc-path leg on them is read as evidence.
+- **V-11 (note, fixed in the test only):** CD-2.3 compared `plant.x / plant.z`, which the bench plant does not have
+  (undefined vs undefined); it now compares the rear axle `rx / rz`, asserted finite.
+
+**No finding may close on a change to `tools/`.** This landing closes nothing; the Product Map count is unchanged.

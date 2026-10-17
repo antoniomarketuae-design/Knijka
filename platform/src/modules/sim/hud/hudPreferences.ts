@@ -335,6 +335,29 @@ export interface ToastReading {
   held: boolean;
 }
 
+/**
+ * A GRADED CARD THE COLUMN STANDS FOR — sc-roundabout-entry:fe081cf1, the card
+ * nobody pressed (integrator decision W7, 2026-10-15). `id` is a graded fault
+ * or «Научи» card (`hudToastCarriesWhy`) on the glass that was found cut below
+ * the column's window — the advisor's card or praise arriving, or the banner
+ * growing. While it stands the advisor's card and praise wait (`visibleToasts`
+ * below, the shell's advisor gate). Measured and latched by
+ * `HudToasts.useToastReader` until the card leaves the glass. `null`: the
+ * column as shipped.
+ */
+export interface ToastStanding {
+  id: number;
+  /**
+   * W9 (2026-10-15): the column has given everything else it may and the card
+   * is still cut, so its age stamp («сега» / «преди N с»), which then stands
+   * on a footer row of its own, is not painted for the rest of the stand — the
+   * one row of the summary the student is not judged by. Absent: the card as
+   * shipped. See `HudToasts`, „…AND WHERE THE BARE COLUMN CANNOT HOLD THE
+   * SUMMARY".
+   */
+  trimAge?: boolean;
+}
+
 /** The cards quiet mode lets through, in queue order (newest first). */
 function audibleToasts<T extends { event: { kind: string } }>(
   toasts: readonly T[],
@@ -371,16 +394,26 @@ function audibleToasts<T extends { event: { kind: string } }>(
  *     function has always given.
  * A reading id that is not in the column (expired, dismissed, praise in quiet
  * mode) changes nothing.
+ *
+ * …AND WHILE THE COLUMN STANDS FOR A GRADED CARD NOBODY OPENED (W7,
+ * `standing`), praise waits too: it is the one kind the student is not judged
+ * by, so it may not be what pushes a graded card out of the window. It keeps
+ * its own clock, exactly as it does behind an opened explanation (W5). A
+ * standing id that is not in the column changes nothing.
  */
 export function visibleToasts<T extends { id?: number; event: { kind: string } }>(
   toasts: readonly T[],
   quiet: boolean,
   reading: ToastReading | null = null,
+  standing: ToastStanding | null = null,
 ): T[] {
   const audible = audibleToasts(toasts, quiet);
   if (reading !== null) {
     const opened = audible.find((t) => t.id === reading.id);
     if (opened !== undefined) return [opened];
+  }
+  if (standing !== null && audible.some((t) => t.id === standing.id)) {
+    return audible.filter((t) => hudToastCarriesWhy(t.event.kind)).slice(0, toastCapacity(quiet));
   }
   return audible.slice(0, toastCapacity(quiet));
 }

@@ -23,7 +23,7 @@ import { samplesDigest, tangents, traceSamples, gearSegments, segmentPoints } fr
 import { dubinsWords, planSegment } from "../lib/path-plan/planner.mjs";
 import {
   ACCEPT_MIN_WIDTH_M, ARM_ROLL_ALLOW_M, ARM_ROLL_EXP_M, COMMITTED, CORRIDOR_ALLOWANCE_M, FORWARD_EXPECT, PATH_LESSONS,
-  PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, PRODUCT, REST_BACK_M, REVERSE_LOCK_AUTHORITY, REVERSE_POLICY, TRACK, bayFrame,
+  PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, PRODUCT, REST_BACK_M, REVERSE_LOCK_AUTHORITY, REVERSE_POLICY, TIGHT_LAT_M, TIGHT_YAW_DEG, TRACK, bayFrame,
 } from "../lib/path-plan/policy.mjs";
 import { CHASSIS_HALF, FLEET_BODY_HALF, PARKED_WEIGHTS, assignCivilianModel } from "../lib/path-plan/body-screen.mjs";
 
@@ -216,7 +216,11 @@ describe("§2 every committed pathref, from the outside", () => {
       it("its reverse witnesses never ask for more wheel than the car has in reverse", () => {
         // sc-park-bay-exit-rev came off this list on 2026-10-06: re-planned on its
         // re-authored demo (sc-park-bay-exit-rev:49af2940), it now records the cap.
-        const PLANNED_BEFORE_THE_CAP = ["sc-park-wall", "sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-short"];
+        // sc-park-judge, sc-park-45-rev and sc-park-gap-short came off it on 2026-10-15
+        // (curvdepth landing): re-planned on their re-authored demos, they record the cap.
+        // sc-park-wall came off it on 2026-10-16 (cdtools, CD-1): re-planned on its
+        // re-authored demo with the CD-1 deviation pull-in, it records the cap.
+        const PLANNED_BEFORE_THE_CAP = ["sc-pk-driveway", "sc-ed-poligon-chain"];
         const reverse = ref.segments.filter((sg) => sg.gear === -1);
         if (!reverse.length) return; // nothing to cap: a lesson with no reverse segment
         const auth = ref.generator.reverseAuthority;
@@ -299,6 +303,40 @@ describe("§2 every committed pathref, from the outside", () => {
         }
       });
 
+      /* CD-1 (integrator decision 2026-10-15, docs/simulation/93_INSTRUMENT_GAPS.md). A
+       * corner that still leaves its class corridor after the tightened re-screen may pull
+       * ITS lat edge, then its yaw edge, in by 0.05 m / 0.5° at a time — the band narrows,
+       * the instrument claims less. Read here from the outside: every recorded pull is one
+       * step toward the authored pose and never past it, never on the along axis, never on
+       * a designed-negative or Slice-0-unscreened row, and the committed edge on that side
+       * is the last pull's `to` and inside the tightened declared band. */
+      it("a CD-1 deviation pull-in only narrows a lat/yaw edge toward the authored pose, one step at a time, and is recorded", () => {
+        for (const sg of ref.segments.filter((x) => x.gear === -1 && x.armBand?.deviationPulled)) {
+          const p = REVERSE_POLICY[ref.lesson][sg.k];
+          const pulls = sg.armBand.deviationPulled;
+          assert.ok(Array.isArray(pulls) && pulls.length > 0, `${ref.lesson} R${sg.k}: deviationPulled is present but empty — the builder writes it only when a pull happened`);
+          assert.ok(!p.designedNegative && p.screenedBySlice0 === true && sg.armBand.tightened === true, `${ref.lesson} R${sg.k}: a CD-1 pull on a row that is designed-negative, unscreened or never tightened`);
+          const last = new Map();
+          for (const d of pulls) {
+            assert.ok(d.axis === "lat" || d.axis === "yaw", `${ref.lesson} R${sg.k}: a CD-1 pull on the ${d.axis} axis — only lat and yaw may be pulled`);
+            const step = d.axis === "lat" ? 0.05 : 0.5;
+            assert.ok(d.from !== 0 && Math.abs(d.to) <= Math.abs(d.from) - 1e-9, `${ref.lesson} R${sg.k}: ${d.axis} ${d.from} -> ${d.to} does not narrow`);
+            assert.ok(Math.abs(Math.abs(d.to) - Math.max(0, Math.abs(d.from) - step)) <= 1e-9, `${ref.lesson} R${sg.k}: ${d.axis} ${d.from} -> ${d.to} is not one ${step} step`);
+            assert.ok(d.to === 0 || Math.sign(d.to) === Math.sign(d.from), `${ref.lesson} R${sg.k}: ${d.axis} ${d.from} -> ${d.to} crosses the authored pose`);
+            assert.match(d.why, /outside its [\d.]+ m corridor after the tightened re-screen \(CD-1\)/);
+            const key = `${d.axis}${Math.sign(d.from)}`;
+            if (last.has(key)) assert.equal(d.from, last.get(key), `${ref.lesson} R${sg.k}: the ${key} pulls are not a chain`);
+            last.set(key, d.to);
+          }
+          for (const [key, to] of last) {
+            const edges = key.startsWith("lat") ? sg.armBand.latM : sg.armBand.yawDeg;
+            assert.equal(edges[key.endsWith("-1") ? 0 : 1], to, `${ref.lesson} R${sg.k}: the committed ${key} edge is not the last CD-1 pull`);
+          }
+          assert.ok(sg.armBand.latM[0] >= -TIGHT_LAT_M - 1e-9 && sg.armBand.latM[1] <= TIGHT_LAT_M + 1e-9 && sg.armBand.yawDeg[0] >= -TIGHT_YAW_DEG - 1e-9 && sg.armBand.yawDeg[1] <= TIGHT_YAW_DEG + 1e-9, `${ref.lesson} R${sg.k}: a pulled band outside the tightened declared band`);
+          assert.ok(sg.armBand.latM[0] <= 0 && sg.armBand.latM[1] >= 0 && sg.armBand.yawDeg[0] <= 0 && sg.armBand.yawDeg[1] >= 0, `${ref.lesson} R${sg.k}: the authored pose (lat 0 / yaw 0) left the band`);
+        }
+      });
+
       it("its speed profiles are the trace's, with no empty bin", () => {
         for (const sg of ref.segments) {
           assert.ok(sg.speed.movingMedianKmh.every((b) => b !== null));
@@ -361,7 +399,8 @@ describe("§2 every committed pathref, from the outside", () => {
         // worse. Both are outside the 0.5 m the harness judges with, so that segment's
         // park is UNJUDGED either way and the 27 mm changes nothing; it is named here
         // so it cannot spread to a lesson that WAS re-planned without anyone noticing.
-        const NOT_REPLANNED = ["sc-park-judge", "sc-park-45-rev", "sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-long"];
+        const NOT_REPLANNED = ["sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-long"];
+        // sc-park-judge and sc-park-45-rev left this list on 2026-10-15 (curvdepth landing): their demos were re-authored drivable and re-planned, and every witness of the graded reverse carries the clearance objective (judge R1 3/3, body ≥ 0.58 m; 45-rev R1 3/3, body ≥ 0.45 m), so an entry here would only excuse a regression. The judge R1 0.771 m note above predates that re-plan.
         // sc-park-bay-exit-rev left this list on 2026-10-06: its demo was re-authored drivable and re-planned WITH the clearance objective (pathref R0 rung 0.5, planned 0.459 m), so an entry here would only excuse a regression.
         for (const w of seg.witnesses) {
           const last = w.rows[gradedRow(w)];
@@ -465,6 +504,20 @@ describe("§2 every committed pathref, from the outside", () => {
       });
     });
   }
+
+  // THE CD-1 CENSUS (2026-10-16). sc-park-wall is the one lesson whose band the CD-1
+  // deviation pull-in narrowed (lat −0.15 → −0.10 → −0.05: corners along −1 / yaw +1.5
+  // at FEASIBLE-ENDPOSE 0.588 and 0.549; bp-wall log in the cdtools lane). A rebuild that
+  // pulls ANOTHER lesson, or stops pulling this one, is a fact the register (doc 93, CD-1)
+  // must record before it is accepted — so the set is pinned, not a count range.
+  it("CD-1 census: the deviation pull-in narrowed exactly sc-park-wall R1's lat − edge, to −0.05", () => {
+    const pulled = REFS.filter((r) => r.segments.some((sg) => sg.gear === -1 && sg.armBand?.deviationPulled)).map((r) => r.lesson).sort();
+    assert.deepEqual(pulled, ["sc-park-wall"]);
+    const sg = REFS.find((r) => r.lesson === "sc-park-wall").segments.find((x) => x.k === 1);
+    assert.deepEqual(sg.armBand.deviationPulled.map((d) => [d.axis, d.from, d.to]), [["lat", -0.15, -0.1], ["lat", -0.1, -0.05]]);
+    assert.deepEqual(sg.armBand.latM, [-0.05, 0.15]);
+    assert.deepEqual(sg.armBand.alongM, REVERSE_POLICY["sc-park-wall"][1].band.alongM, "CD-1 never moves the along edge");
+  });
 
   it("the reverse authority is LIVE: the lessons planned with it have rows standing on the cap, not merely under it", () => {
     // A cap no row reaches would pass the per-lesson test above whether or not the planner

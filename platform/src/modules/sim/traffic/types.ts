@@ -358,9 +358,11 @@ export interface OncomingApproach {
 /**
  * VU-02 (doc 72 „Тясно изпреварване на колело") — one same-direction CYCLIST
  * PROXY's live pose, as returned by TrafficSystem.cyclistNear. The v1 cyclist
- * IS a narrow staged vehicle-agent riding the curb (audit C3; tagged by
- * `extraRightOffsetM > 0` at stage time — the vehicleCollisionKind marker,
- * reused), so the query surfaces only those states, same-direction filtered:
+ * IS a narrow staged vehicle-agent riding the curb (audit C3); the query
+ * surfaces only states `vehicleCollisionKind` calls a cyclist (the contact
+ * cast's kind for a cast member, the A11 `extraRightOffsetM > 0` marker
+ * otherwise — lane npcstep round 4) and never one staged
+ * `gradedOnlyByOwnRunner`, same-direction filtered:
  * an ONCOMING cyclist is a different duty (meeting, not passing) and never
  * returns. Point telemetry only (the VehicleProfile point-geometry law): the
  * runtime's lateral-clearance tracker owns the half-width honesty.
@@ -743,6 +745,10 @@ export interface StagedVehicleSpec {
   decelMps2?: number;
   /** Extra rightward offset from the lane center, m — cyclists ride the curb. */
   extraRightOffsetM?: number;
+  /** The graded cyclist queries (`cyclistNear`, `overtakenNear`,
+   *  `sameDirVehiclesNear`) never return this actor — its own runner alone
+   *  grades it (contracts.ts `StagedActorPathSpec.gradedOnlyByOwnRunner`). */
+  gradedOnlyByOwnRunner?: true;
   /** Loop the path (roundabout circulation) instead of finishing at its end. */
   loop?: boolean;
   /** Presentation palette index. */
@@ -1021,9 +1027,12 @@ export interface TrafficSystemStats {
  * body it belongs to.
  *
  * The kind vocabulary is `vehicleCollisionKind`'s, deliberately and exactly —
- * the A11 marker the rapier shell is tagged with and the contact naming bills
- * from. A second opinion about „is that a cyclist" is the defect shape
- * `collision/bodies.ts` records twice; there is one answer and this reuses it.
+ * for a staged actor its director casts, the cast's kind (the kind the rapier
+ * shell is tagged with and a touch is billed as); for any other state the A11
+ * curb-offset marker. A second opinion about „is that a cyclist" is the defect
+ * shape `collision/bodies.ts` records twice; there is one answer and this
+ * reuses it (round 3 of sc-roundabout-entry:08a0b701 made it one for the
+ * staged riders too).
  */
 export interface RearBodyBehind {
   /** Bumper-to-bumper metres, never negative — `rearGapMeters`' own number. */
@@ -1317,14 +1326,49 @@ export interface TrafficSystem {
   /** …of `pedestrians[i]`. */
   pedestrianRenderPose(i: number, out: TrafficRenderPose): TrafficRenderPose;
   /**
-   * A11: how a published VEHICLE state should read in a collision
-   * (`SimTickEvent` collision `withWhat`). Staged curb-riding cyclist proxies
-   * report "cyclist", every other vehicle state "vehicle". The v1 cyclist IS
-   * a narrow staged vehicle-agent riding the curb (audit C3) — its defining
-   * trait in the staged spec is `extraRightOffsetM > 0`, which is what tags
-   * it here. `stateId` is TrafficVehicleState.id (staged ids >= 1000).
+   * WHAT KIND OF BODY a published VEHICLE state is, for every reader that
+   * NAMES it: the collision `withWhat` the rapier shell is tagged with, the
+   * rear-proximity badge's noun (`rearBodyBehind`), the near-miss stat's
+   * kind (scene/nearMissMeter.ts). `stateId` is TrafficVehicleState.id
+   * (staged ids >= 1000).
+   *
+   * ONE FACT (sc-roundabout-entry:08a0b701, round 3): for a STAGED actor its
+   * director's contact cast names (`setStagedContactKind`, registered by
+   * `createScenarioDirector` from that cast) the answer IS the cast's kind —
+   * the kind its runner bills a touch as. Only a state no cast names (an
+   * ambient agent; a staged actor whose runner casts nothing) falls back to
+   * the A11 curb-offset marker (`extraRightOffsetM > 0` at stage time: the v1
+   * curb-riding cyclist proxy, audit C3). Through round 2 the marker answered
+   * for every state, and it called both riders of sc-vu-bikelane-turn
+   * «vehicle» while their runner bills them «cyclist».
+   *
+   * The three GRADED queries `cyclistNear`, `overtakenNear` and
+   * `sameDirVehiclesNear` read THIS answer too since round 4 (integrator N9;
+   * through round 3 they read the marker directly) — except that a state
+   * staged `gradedOnlyByOwnRunner` is returned by none of them.
    */
   vehicleCollisionKind(stateId: number): "vehicle" | "cyclist";
+  /**
+   * The director's contact cast, handed over once (createScenarioDirector):
+   * the staged actor `actorId` IS a `kind` — what `vehicleCollisionKind`
+   * answers for its state from now on. Vehicle-bodied cast members only (a
+   * pedestrian is a pedestrian state). Idempotent; the last word wins.
+   */
+  setStagedContactKind(actorId: string, kind: "vehicle" | "cyclist"): void;
+  /**
+   * WHICH STAGED ACTOR a published state is (sc-roundabout-entry:08a0b701,
+   * round 2): the `StagedActorSpec.id` the state with this id was staged
+   * under, or null for an ambient agent (and for an id nobody holds). The
+   * inverse of `staged(id)`, for vehicle and pedestrian states alike (staged
+   * ids are one sequence from 1000).
+   *
+   * It exists so that the rapier shell a staged actor wears can be tagged with
+   * the kind its OWN runner casts it as (the director's contact cast is keyed
+   * by this id — scene/npcShells.ts), instead of a second answer derived from
+   * the curb offset: two answers billed one touch on a staged rider twice, as
+   * two kinds, one step apart.
+   */
+  stagedActorId(stateId: number): string | null;
   readonly timeSec: number;
   readonly stats: TrafficSystemStats;
 }

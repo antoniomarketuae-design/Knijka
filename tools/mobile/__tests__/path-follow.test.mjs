@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { VEHICLE, maxSteerAtKmh, yawGainAtKmh } from "../lib/guidance.mjs";
 import { steerForBearingError } from "../lib/reverse-plan.mjs";
 import { samplesDigest } from "../lib/path-plan/geom.mjs";
+import { HEAD_FIXTURE_LESSONS, HEAD_FIXTURE_ROOT, verifyHeadFixture } from "./fixtures/pathref-9390622.mjs";
 import {
   DISARM_BRAKE,
   PATH_TESTIMONY,
@@ -109,6 +110,16 @@ const PATHREF_DIR = resolve(REPO, "tools", "mobile", "path-refs");
 const LESSONS = readdirSync(PATHREF_DIR).filter((f) => f.endsWith(".pathref.json")).map((f) => f.replace(".pathref.json", ""));
 const plans = new Map(LESSONS.map((l) => [l, loadPathRef(l, REPO)]));
 const plan = (l) => plans.get(l);
+// THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16; fixtures/pathref-9390622.mjs): the claims measured on the
+// witnesses the curvdepth re-plan replaced are driven HERE, never re-baselined onto the new corpus. The
+// fixture is verified byte for byte before a single pair is loaded; a drifted fixture fails this file.
+verifyHeadFixture();
+const headPlans = new Map(HEAD_FIXTURE_LESSONS.map((l) => [l, loadPathRef(l, HEAD_FIXTURE_ROOT)]));
+const headPlan = (l) => {
+  const p = headPlans.get(l);
+  if (!p) throw new Error(`${l} is not in the frozen 9390622 fixture (${HEAD_FIXTURE_LESSONS.join(", ")})`);
+  return p;
+};
 
 /* ═══════════════════════════ T1 frames and yaw ═══════════════════════════ */
 
@@ -308,6 +319,16 @@ describe("T2 the committed reference", () => {
     assert.throws(() => loadPathRef("sc-no-such-lesson", tmp), (e) => e.code === "no-pathref");
     const lf = trace.replace(/\r\n/g, "\n");
     assert.equal(samplesDigest(lf), samplesDigest(lf.replace(/\n/g, "\r\n")));
+  });
+
+  it("T2.1b the frozen 9390622 fixture is byte for byte what it was frozen from, loads through loadPathRef, and is NOT the corpus", () => {
+    assert.deepEqual(verifyHeadFixture().lessons, [...HEAD_FIXTURE_LESSONS].sort());
+    for (const l of HEAD_FIXTURE_LESSONS) {
+      assert.equal(headPlan(l).lesson, l);
+      // every pair it holds was REPLACED by the re-plan: a fixture lesson whose committed trace is the
+      // same again is no longer frozen history, and the claims pinned on it must move back to the corpus
+      assert.notEqual(headPlan(l).trace.samplesDigest, plan(l).trace.samplesDigest, `${l}: the fixture's trace is the corpus trace`);
+    }
   });
 
   it("T2.2 selectWitness: the largest grid ≤ the start along, lead ≤ 0.5, outside the band refuses", () => {
@@ -2513,6 +2534,12 @@ const bench = (lesson, seed, opts = {}) => {
   if (!benchCache.has(key)) benchCache.set(key, runBench({ plan: plan(lesson), seed, ...opts }));
   return benchCache.get(key);
 };
+/** The same bench on the frozen 9390622 pair (CD-3). */
+const headBench = (lesson, seed, opts = {}) => {
+  const key = `HEAD|${lesson}|${seed}|${JSON.stringify(opts)}`;
+  if (!benchCache.has(key)) benchCache.set(key, runBench({ plan: headPlan(lesson), seed, ...opts }));
+  return benchCache.get(key);
+};
 const psiOf = (pl) => ((pl.psi % 360) + 360) % 360;
 
 describe("T9 closed-loop benches", () => {
@@ -2917,11 +2944,17 @@ describe("T9 closed-loop benches", () => {
    * With the re-approach: 0 of 12 gear-change-missed; left 11 → 7 and van 5 → 1, every remaining one a
    * LATERAL miss or a yaw miss beyond yawCreepMaxDeg, which must stay refusals. Across S2, W47 and a
    * stressed timing at nominal steering (9 lessons × 12 seeds each) no re-approach fires and every drive
-   * is pose-for-pose the drive it was. */
+   * is pose-for-pose the drive it was.
+   *
+   * T9.m.1–3 ARE PINNED ON THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16). Both browser refusals and the
+   * weak-wheel stress were measured on those witnesses and bands; on the curvdepth re-plan sc-park-left's
+   * band is ±0.25 m / ±2.5° (the w55 rest of 1.55° is inside it) and the 45-rev approach changed (9 of 12
+   * re-approaches fire under the same stress, measured pf-1). A count is never moved to fit; the claim is
+   * kept where it was measured. T9.m.4 still reads the live corpus. */
   const FWD_WEAK = { kappaScale: 0.6, revKappaScale: 0.92 / 0.6 };
   it("T9.m.1 yawReapproach: fires for the two browser refusals, and stays a refusal for a lateral miss, a big yaw miss, no room, a rest past the band, spent creeps or a full-lock demand", () => {
-    const r45 = plan("sc-park-45-rev").segments.find((s) => s.gear === -1);
-    const rLeft = plan("sc-park-left").segments.find((s) => s.gear === -1);
+    const r45 = headPlan("sc-park-45-rev").segments.find((s) => s.gear === -1);
+    const rLeft = headPlan("sc-park-left").segments.find((s) => s.gear === -1);
     const ask = (seg, fr, extra = {}, tune = PATH_TUNE) => yawReapproach({ fr, band: seg.armBand, acceptAlongM: seg.stopTarget.acceptAlongM, stopTargetAlongM: seg.stopTarget.alongM, gcPsi: seg.gearChangePose.psi, latOk: true, creeps: 0, ...extra }, tune);
     const t = PATH_TUNE.stops;
     // canary-path-91e5a51 sc-park-45-rev__pc-path.drive.log:185
@@ -2962,12 +2995,12 @@ describe("T9 closed-loop benches", () => {
 
   it("T9.m.2 a heading near-miss at the gear change is CORRECTED, not refused — 45-rev under a weak forward wheel: 0 of 12 refused (11 without the re-approach), every re-approach steered, ended in band and held the drive floor", () => {
     const lesson = "sc-park-45-rev";
-    const r1 = plan(lesson).segments.find((s) => s.gear === -1);
+    const r1 = headPlan(lesson).segments.find((s) => s.gear === -1);
     const off = { ...PATH_TUNE, stops: { ...PATH_TUNE.stops, yawCreepMaxDeg: 0 } };
     let fired = 0;
     let refusedOff = 0;
     for (let seed = 1; seed <= 12; seed++) {
-      const r = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK });
+      const r = runBench({ plan: headPlan(lesson), seed, plantOpts: FWD_WEAK });
       const codes = r.state.refusals.map((x) => x.code);
       assert.ok(!codes.includes("gear-change-missed"), `seed ${seed}: ${JSON.stringify(r.state.refusals)}`);
       const gcs = r.books.follow.segments.flatMap((sg) => (sg.stops ?? []).filter((x) => x.tag === "gearChange"));
@@ -2982,7 +3015,7 @@ describe("T9 closed-loop benches", () => {
         assert.ok(after.creep >= 1 && after.alongM >= r1.stopTarget.acceptAlongM[0] && after.alongM <= r1.stopTarget.acceptAlongM[1] && after.yawErrDeg >= r1.armBand.yawDeg[0] && after.yawErrDeg <= r1.armBand.yawDeg[1], `seed ${seed}: rest after the re-approach ${JSON.stringify(after)}`);
       }
       for (const bc of r.books.follow.bodyClearance) assert.ok(bc.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `seed ${seed} ${bc.gear === -1 ? "R" : "F"}${bc.k}: held ${bc.worstHeldM} m from ${bc.body}`);
-      const rOff = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK, tune: off });
+      const rOff = runBench({ plan: headPlan(lesson), seed, plantOpts: FWD_WEAK, tune: off });
       if (rOff.state.refusals.some((x) => x.code === "gear-change-missed")) refusedOff += 1;
       assert.equal(rOff.books.follow.yawCreeps.length, 0);
     }
@@ -2996,8 +3029,8 @@ describe("T9 closed-loop benches", () => {
       let on = 0;
       let wasOff = 0;
       for (let seed = 1; seed <= 12; seed++) {
-        const r = runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK });
-        const band = plan(lesson).segments.find((s) => s.gear === -1).armBand;
+        const r = runBench({ plan: headPlan(lesson), seed, plantOpts: FWD_WEAK });
+        const band = headPlan(lesson).segments.find((s) => s.gear === -1).armBand;
         for (const x of r.state.refusals.filter((q) => q.code === "gear-change-missed")) {
           on += 1;
           // either the re-approach declined and says why, or the rest it ended in is a LATERAL miss the same band refuses
@@ -3005,7 +3038,7 @@ describe("T9 closed-loop benches", () => {
           const latMiss = lat <= band.latM[0] + 0.005 || lat >= band.latM[1] - 0.005;
           assert.ok(/no heading re-approach: (lat .* outside|yaw is .* more than|\d+ of \d+ creeps spent)/.test(x.why) || latMiss, `${lesson} seed ${seed}: ${x.why}`);
         }
-        if (runBench({ plan: plan(lesson), seed, plantOpts: FWD_WEAK, tune: off }).state.refusals.some((q) => q.code === "gear-change-missed")) wasOff += 1;
+        if (runBench({ plan: headPlan(lesson), seed, plantOpts: FWD_WEAK, tune: off }).state.refusals.some((q) => q.code === "gear-change-missed")) wasOff += 1;
         for (const bc of r.books.follow.bodyClearance) if (bc.gear === 1) assert.ok(bc.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `${lesson} seed ${seed} F${bc.k}: ${bc.worstHeldM}`);
       }
       assert.ok(on < wasOff, `${lesson}: ${on} refusals with the re-approach vs ${wasOff} without`);
@@ -3091,10 +3124,29 @@ describe("T9 closed-loop benches", () => {
       changes += plan(l).segments.length - 1 + (plan(l).segments[0].gear === -1 ? 1 : 0);
     }
     assert.equal(changes, 19);
+    // THE R→D SWITCHES OF THE CORPUS ARE AUTHORED RESTS NOW (re-derived 2026-10-16, cdtools CD-3). The
+    // curvdepth re-author ends zebra, gap-short and judge R1 at an authored rest the trace holds
+    // (geom.mjs authoredStops → tag «segmentEnd», its dwell the trace's), so the builder inserts nothing.
+    // Read off the NEW pathrefs: 1.15 / 1.10 / 1.10 s at the end of R1. HEAD 9390622's pairs carried
+    // «inserted» (frac 1, dwell 1.0, authoredDwellS 0) on all three — the case below on the fixture.
     for (const lesson of ["sc-park-zebra", "sc-park-gap-short", "sc-park-judge"]) {
       const seg = plan(lesson).segments[1];
-      assert.equal(seg.stops[seg.stops.length - 1].tag, "inserted");
+      const last = seg.stops[seg.stops.length - 1];
+      assert.equal(last.tag, "segmentEnd", `${lesson} R1 ends at ${JSON.stringify(last)}`);
+      assert.ok(last.frac === 1 && last.authoredDwellS > 0, `${lesson} R1's rest is not the trace's own: ${JSON.stringify(last)}`);
       const r = bench(lesson, 7);
+      const rev = r.books.samples.filter((s) => s.phase === "reverse");
+      assert.equal(rev[rev.length - 1].kmh, 0, `${lesson}: the reverse ends at rest before the disarm`);
+      assert.equal(r.books.disarms.length, 1);
+    }
+    assert.equal(LESSONS.filter((l) => plan(l).segments.some((sg) => (sg.stops ?? []).some((st) => st.tag === "inserted"))).length, 0, "an inserted R→D stop is back in the corpus — the fixture case below is no longer the only subject");
+  });
+
+  it("T9.e (9390622 fixture) the no-stop R→D switches get an INSERTED stop at v = 0 — the mechanism, on the pairs that still have no authored rest there", () => {
+    for (const lesson of ["sc-park-zebra", "sc-park-gap-short", "sc-park-judge"]) {
+      const seg = headPlan(lesson).segments[1];
+      assert.equal(seg.stops[seg.stops.length - 1].tag, "inserted");
+      const r = headBench(lesson, 7);
       const rev = r.books.samples.filter((s) => s.phase === "reverse");
       assert.equal(rev[rev.length - 1].kmh, 0, `${lesson}: the reverse ends at rest before the disarm`);
       assert.equal(r.books.disarms.length, 1);
@@ -3251,15 +3303,15 @@ describe("T9 closed-loop benches", () => {
  */
 const { terminalHeadingCommand, terminalHeadingGate } = await import("../lib/path-follow.mjs");
 const TERMINAL_OFF = { ...PATH_TUNE, terminal: { ...PATH_TUNE.terminal, on: false } };
-const finalReverse = (l) => plan(l).segments.filter((s) => s.gear === -1).at(-1);
+const finalReverse = (l, getPlan = plan) => getPlan(l).segments.filter((s) => s.gear === -1).at(-1);
 const finalReverseBook = (r) => r.books.follow.segments.filter((s) => s.gear === -1).at(-1);
 // the heading the final reverse comes to rest at (its last reverse-capture sub-tick): where the terminal law
 // acts. The final pose is not that heading once the micro square-up (squareUpCommand, SQ) has steered the
 // disarm roll and the creep after it, so T9.h.3 reads this, not `r.plant.psi`.
-const reverseRestPsi = (l, seed, tune) => {
-  const k = finalReverse(l).k;
+const reverseRestPsi = (l, seed, tune, getPlan = plan) => {
+  const k = finalReverse(l, getPlan).k;
   let psi = null;
-  runBench({ plan: plan(l), seed, ...(tune ? { tune } : {}), onSubTick: ({ state, plant }) => {
+  runBench({ plan: getPlan(l), seed, ...(tune ? { tune } : {}), onSubTick: ({ state, plant }) => {
     const seg = state.plan.segments[state.segIndex];
     if (seg && seg.gear === -1 && seg.k === k && state.mode === "reverse-capture") psi = plant.psi;
   } });
@@ -3290,10 +3342,18 @@ describe("T9.h the terminal heading law", () => {
     assert.equal(terminalHeadingCommand({ uPursuit: 0.3, psi: -10, psiT: 0, toEndM: 0.1, kmh: 3, t: { ...t, on: false } }).u, 0.3);
   });
 
-  it("T9.h.2 the gate, read off the committed pathrefs: every final-reverse witness of gap-short, judge and zebra owes rotation to the heading the next segment starts from; none of left, van or wall does; a designed-negative segment never engages", () => {
+  /* T9.h.2–4 ARE PINNED ON THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16). The gate is read off a witness's
+   * unreached tail, and the curvdepth re-plan changed every tail: on the new corpus gap-short's three final
+   * reverse witnesses owe NOTHING (owed −3.98 / −1.76 / −3.10°: R1 now ends at an authored rest and the
+   * park is credited after the forward pull-in), judge and zebra owe 0.52–1.91°, and the gate OPENS on
+   * sc-park-wall −1 / 0 (0.19 / 2.00°) and sc-park-van +0.5 (0.31°). The claims as measured — «gap-short,
+   * judge, zebra owe; left, van, wall do not; the hand-over brings the rest heading ≥ 0.5° closer» — are
+   * kept on the pairs they were measured on. What the live corpus is asked is re-derived below (T9.h.2n,
+   * T9.h.4n) and goes red with HEAD's pairs swapped back in. */
+  it("T9.h.2 (9390622 fixture) the gate, read off the pathrefs: every final-reverse witness of gap-short, judge and zebra owes rotation to the heading the next segment starts from; none of left, van or wall does; a designed-negative segment never engages", () => {
     for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
-      const seg = finalReverse(l);
-      const next = plan(l).segments[plan(l).segments.indexOf(seg) + 1];
+      const seg = finalReverse(l, headPlan);
+      const next = headPlan(l).segments[headPlan(l).segments.indexOf(seg) + 1];
       for (const w of seg.witnesses) {
         const g = terminalHeadingGate(seg, w);
         assert.equal(g.engage, true, `${l} witness ${w.startAlongM}: ${JSON.stringify(g)}`);
@@ -3302,19 +3362,41 @@ describe("T9.h the terminal heading law", () => {
       }
     }
     for (const l of ["sc-park-left", "sc-park-van", "sc-park-wall"]) {
-      const seg = finalReverse(l);
+      const seg = finalReverse(l, headPlan);
       for (const w of seg.witnesses) assert.equal(terminalHeadingGate(seg, w).engage, false, `${l} witness ${w.startAlongM}: its tail turns away from (or not toward) ${seg.authoredEnd.psi}°`);
     }
-    const gs = finalReverse("sc-park-gap-short");
+    const gs = finalReverse("sc-park-gap-short", headPlan);
     assert.equal(terminalHeadingGate({ ...gs, designedNegative: true }, gs.witnesses[0]).engage, false, "an authored end pose declared infeasible is never a target");
   });
 
-  it("T9.h.3 where the gate opens the hand-over happens and brings the rest heading toward the authored end on every seed — gap-short, judge, zebra × seeds 7–10 — with no refusal and every body held above the drive floor", () => {
+  // RE-DERIVED on the curvdepth corpus (2026-10-16), read off the NEW pathrefs' final-reverse tails
+  // (cdtools probe gates.mjs): the gate's reading of every witness is pinned EXACTLY — a set, not a count
+  // — and each reading is the sign of its own owed rotation, so a re-plan that moves a tail moves this.
+  it("T9.h.2n the gate on the live corpus: which final-reverse witnesses owe rotation, witness by witness, and ψT is the authored end heading", () => {
+    const want = {
+      "sc-park-gap-short": [false, false, false], "sc-park-judge": [true, true, true], "sc-park-zebra": [true, true, true],
+      "sc-park-left": [false, false, false], "sc-park-van": [false, false, true], "sc-park-wall": [true, false, true],
+      "sc-park-45-rev": [false, false, true], "sc-pk-driveway": [true, true, false],
+    };
+    for (const [l, engage] of Object.entries(want)) {
+      const seg = finalReverse(l);
+      const got = seg.witnesses.map((w) => terminalHeadingGate(seg, w));
+      assert.deepEqual(got.map((g) => g.engage), engage, `${l}: ${JSON.stringify(got)}`);
+      for (const g of got) {
+        assert.equal(g.engage, g.owedDeg > 0, `${l}: the gate is not the sign of what the tail owes (${JSON.stringify(g)})`);
+        angNear(g.psiT, seg.authoredEnd.psi, 1e-9, `${l}: ψT is the segment's authored end heading`);
+      }
+    }
+    const gs = finalReverse("sc-park-zebra");
+    assert.equal(terminalHeadingGate({ ...gs, designedNegative: true }, gs.witnesses[0]).engage, false, "an authored end pose declared infeasible is never a target");
+  });
+
+  it("T9.h.3 (9390622 fixture) where the gate opens the hand-over happens and brings the rest heading toward the authored end on every seed — gap-short, judge, zebra × seeds 7–10 — with no refusal and every body held above the drive floor", () => {
     for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
-      const psiT = finalReverse(l).authoredEnd.psi;
+      const psiT = finalReverse(l, headPlan).authoredEnd.psi;
       for (const seed of [7, 8, 9, 10]) {
-        const on = bench(l, seed);
-        const off = bench(l, seed, { tune: TERMINAL_OFF });
+        const on = headBench(l, seed);
+        const off = headBench(l, seed, { tune: TERMINAL_OFF });
         const bk = finalReverseBook(on);
         assert.equal(bk.terminal.engage, true, `${l} seed ${seed}`);
         assert.ok(bk.terminal.handedM >= 1.0, `${l} seed ${seed}: only ${bk.terminal.handedM} m under the hand-over`);
@@ -3322,8 +3404,8 @@ describe("T9.h the terminal heading law", () => {
         // measured where the law acts — the heading the final reverse comes to rest at — not the final pose,
         // which the micro square-up (squareUpCommand, SQ) moves afterwards in both runs (judge seed 8's final
         // pose: 2.22° from the authored end with the law, 1.57° without). The 0.5° bar is unchanged.
-        const eOn = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, null)));
-        const eOff = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, TERMINAL_OFF)));
+        const eOn = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, null, headPlan)));
+        const eOff = Math.abs(wrapDeg(psiT - reverseRestPsi(l, seed, TERMINAL_OFF, headPlan)));
         assert.ok(eOn <= eOff - 0.5, `${l} seed ${seed}: rests ${eOn.toFixed(2)}° from the authored end heading with the law, ${eOff.toFixed(2)}° without`);
         assert.deepEqual(on.state.refusals, [], `${l} seed ${seed}`);
         for (const b of on.books.follow.bodyClearance) assert.ok(b.worstHeldM >= DRIVE_CLEARANCE_FLOOR_M, `${l} seed ${seed} ${b.gear === -1 ? "R" : "F"}${b.k}: held ${b.worstHeldM} m from ${b.body}`);
@@ -3331,17 +3413,42 @@ describe("T9.h the terminal heading law", () => {
     }
   });
 
-  it("T9.h.4 where the gate stays shut the drive is the law-off drive, pose for pose — sc-park-left, -van, -wall × seeds 7–10 (their lateral box margin is the binding one; squaring them up costs it)", () => {
+  it("T9.h.4 (9390622 fixture) where the gate stays shut the drive is the law-off drive, pose for pose — sc-park-left, -van, -wall × seeds 7–10 (their lateral box margin is the binding one; squaring them up costs it)", () => {
     for (const l of ["sc-park-left", "sc-park-van", "sc-park-wall"]) {
       for (const seed of [7, 8, 9, 10]) {
-        const on = bench(l, seed);
-        const off = bench(l, seed, { tune: TERMINAL_OFF });
+        const on = headBench(l, seed);
+        const off = headBench(l, seed, { tune: TERMINAL_OFF });
         const bk = finalReverseBook(on);
         assert.equal(bk.terminal.engage, false, `${l} seed ${seed}`);
         assert.equal(bk.terminal.handedM, 0, `${l} seed ${seed}`);
         assert.deepEqual([on.plant.rx, on.plant.rz, on.plant.psi], [off.plant.rx, off.plant.rz, off.plant.psi], `${l} seed ${seed}: the rest pose moved`);
       }
     }
+  });
+
+  // RE-DERIVED on the curvdepth corpus: the lessons whose EVERY final-reverse witness the gate shuts (read
+  // off the new pathrefs — T9.h.2n: sc-park-left and sc-park-gap-short) are driven exactly as with the
+  // law off, pose for pose, seeds 7–10; and on every other lesson a drive whose SELECTED witness the gate
+  // shut is the law-off drive too. On HEAD's pairs gap-short's gate is open on every witness, so this case
+  // reads red there (the old-pair proof, cdtools lane).
+  it("T9.h.4n where the gate stays shut on the live corpus the drive is the law-off drive, pose for pose", () => {
+    const PARK6 = ["sc-park-left", "sc-park-gap-short", "sc-park-judge", "sc-park-zebra", "sc-park-van", "sc-park-wall"];
+    const allShut = PARK6.filter((l) => finalReverse(l).witnesses.every((w) => !terminalHeadingGate(finalReverse(l), w).engage));
+    assert.deepEqual(allShut.sort(), ["sc-park-gap-short", "sc-park-left"]);
+    let shutDrives = 0;
+    for (const l of PARK6) {
+      for (const seed of [7, 8, 9, 10]) {
+        const on = bench(l, seed);
+        const bk = finalReverseBook(on);
+        if (allShut.includes(l)) assert.equal(bk.terminal.engage, false, `${l} seed ${seed}`);
+        if (bk.terminal.engage) continue;
+        shutDrives += 1;
+        const off = bench(l, seed, { tune: TERMINAL_OFF });
+        assert.equal(bk.terminal.handedM, 0, `${l} seed ${seed}`);
+        assert.deepEqual([on.plant.rx, on.plant.rz, on.plant.psi], [off.plant.rx, off.plant.rz, off.plant.psi], `${l} seed ${seed}: the rest pose moved`);
+      }
+    }
+    assert.ok(shutDrives >= 8, `only ${shutDrives} drives on a shut gate — the two all-shut lessons alone are 8`);
   });
 });
 
@@ -3409,9 +3516,9 @@ const productTickOf = (pl) => {
 };
 
 /** Drive the bench and step the PRODUCT's parkInBay evaluator every frame; the first credited frame, or null. */
-const creditedPark = async (lesson, seed, opts = {}) => {
+const creditedPark = async (lesson, seed, { getPlan = plan, ...opts } = {}) => {
   const O = await productObjectives();
-  const park = plan(lesson).product.park;
+  const park = getPlan(lesson).product.park;
   const params = O.parseObjectiveParams({
     id: `${lesson}:t9g`, kind: "completeManeuver", titleBg: "t9g",
     params: { maneuver: "parkInBay", bay: park.bay, centerTolM: park.centerTolM, headingTolDeg: park.headingTolDeg, ...(park.entry ? { entry: park.entry } : {}), ...(Number.isFinite(park.holdSec) ? { holdSec: park.holdSec } : {}) },
@@ -3419,7 +3526,7 @@ const creditedPark = async (lesson, seed, opts = {}) => {
   let st = O.createEvalState(params);
   let credit = null;
   let frames = 0;
-  const r = runBench({ plan: plan(lesson), seed, ...opts, onFrame: (pl) => {
+  const r = runBench({ plan: getPlan(lesson), seed, ...opts, onFrame: (pl) => {
     if (credit) return;
     frames += 1;
     const tick = productTickOf(pl);
@@ -3475,12 +3582,17 @@ describe("T9.k the product's own parkInBay evaluator, stepped on the bench — w
     }
   });
 
-  it("T9.k.3 gap-short is credited at the REVERSE REST — the degrees that decide it come from the terminal law, and the square-up is its backstop", async () => {
+  // T9.k.3 IS PINNED ON THE FROZEN 9390622 PAIR (CD-3, 2026-10-16). «Credited at the reverse rest» is
+  // false BY DESIGN on the curvdepth corpus: gap-short's R1 now ends at lon −1.207, outside the product box,
+  // and the park is credited only after the 1.52 m forward pull-in (objectives.ts; T9.k.3n below). The
+  // mechanism this case proves — the terminal law decides the reverse-rest credit and the micro square-up
+  // is its backstop — exists only on the pair it was measured on.
+  it("T9.k.3 (9390622 fixture) gap-short is credited at the REVERSE REST — the degrees that decide it come from the terminal law, and the square-up is its backstop", async () => {
     for (const seed of [7, 8, 9, 10]) {
-      const on = await creditedPark("sc-park-gap-short", seed);
+      const on = await creditedPark("sc-park-gap-short", seed, { getPlan: headPlan });
       assert.ok(on.credit, `seed ${seed}: never credited`);
       assert.equal(on.credit.gear, "R", `seed ${seed}: credited in ${on.credit.gear}, not at the reverse rest — re-read this test's header`);
-      const off = await creditedPark("sc-park-gap-short", seed, { tune: TERMINAL_OFF });
+      const off = await creditedPark("sc-park-gap-short", seed, { getPlan: headPlan, tune: TERMINAL_OFF });
       // without the terminal law the reverse rests out of tolerance and is NOT credited there…
       assert.ok(!off.credit || off.credit.gear !== "R", `seed ${seed}: the law-off drive was credited at the reverse rest (${off.credit?.headingDeg}°) — the terminal law is not what decides this lesson`);
       // …and THE SQUARE-UP IS THE BACKSTOP, which is the only thing it is for in the product: the
@@ -3488,6 +3600,29 @@ describe("T9.k the product's own parkInBay evaluator, stepped on the bench — w
       // (squareUpCommand, SQ) get the car credited in D. On the bench the terminal law makes this
       // branch unreachable at nominal; on a browser leg 0.1–0.5° inside the line, it is what is left.
       assert.ok(off.credit && off.credit.gear === "D", `seed ${seed}: with the terminal law off the square-up did not get the park credited (${off.credit ? `credited in ${off.credit.gear}` : "never credited"}) — the backstop is gone`);
+    }
+  });
+
+  // RE-DERIVED on the curvdepth corpus (2026-10-16): the re-authored gap-short, judge and zebra end R1
+  // OUTSIDE the product box by design and are credited only after the forward pull-in, IN D — never at the
+  // reverse rest. And the pull-in is what earns it: with the CD-2 run-out anticipation off (PATH_TUNE.pullIn,
+  // the follower as the curvdepth landing found it) the coast-branch overrun carried gap-short and judge
+  // 0.87–1.04 m past their end and the product credited none of their seeds 7–10 (cdtools probe gs-1.txt).
+  // On HEAD's pairs gap-short is credited at the reverse rest, in R, so this reads red there.
+  it("T9.k.3n the pull-in lessons are credited IN D after the forward pull-in, never at the reverse rest — and not without the CD-2 run-out anticipation", async () => {
+    const PULL_IN_OFF = { ...PATH_TUNE, pullIn: { on: false } };
+    for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
+      const lastSeg = plan(l).segments.at(-1);
+      assert.ok(lastSeg.gear === 1 && lastSeg.micro !== true && plan(l).segments.at(-2).gear === -1, `${l}: the last segment is no longer a forward pull-in after a reverse`);
+      let offCredited = 0;
+      for (const seed of [7, 8, 9, 10]) {
+        const on = await creditedPark(l, seed);
+        assert.ok(on.credit, `${l} seed ${seed}: never credited`);
+        assert.equal(on.credit.gear, "D", `${l} seed ${seed}: credited in ${on.credit.gear} — the re-authored reverse rest is outside the box by design`);
+        const off = await creditedPark(l, seed, { tune: PULL_IN_OFF });
+        if (off.credit) offCredited += 1;
+      }
+      if (l !== "sc-park-zebra") assert.equal(offCredited, 0, `${l}: ${offCredited}/4 credited with the pull-in anticipation off — the CD-2 fix is no longer what earns this park`);
     }
   });
 });
@@ -3559,17 +3694,29 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
   /** + = the centre is PAST the witness end (the car faces out of the bay). */
   const pastEnd = (w, c) => { const e = witnessEnd(w); const h = headingUnit(e.psi); return -((c.x - e.x) * h.x + (c.z - e.z) * h.z); };
   /** Run a bench and book, per frame: the worst overrun, and every frame the R accelerator is down after a stop state began. */
+  // THE STOP THAT BEGAN IS THE FINAL ONE (re-derived 2026-10-16, cdtools CD-3). Every re-authored R1 now
+  // carries a mid-reverse AUTHORED stop («Спри на половината завой», scParkDepth.ts), served by a latch
+  // and a dwell after which the reverse RESUMES — its R accelerator rightly goes down again. `holdAt`
+  // used to be the FIRST latch, which on the new corpus is that mid stop (pf-1: 69 frames of S «after
+  // the stop began»). It is now the first latch toward the FINAL stop (`currentStop` absent or at frac 1,
+  // exactly reverseStep's `isFinal`), or a refusal; `midStops` counts the mid-reverse stops the drive
+  // served, so T13.1 can say the re-derivation has a subject.
   const endRun = (opts) => {
-    const book = { maxPastM: -Infinity, witness: null, holdAt: null, sAfterHold: 0, sAfterImpactFrames: 0, wAtHit: null };
+    const book = { maxPastM: -Infinity, witness: null, holdAt: null, sAfterHold: 0, sAfterImpactFrames: 0, wAtHit: null, midStops: 0, sAfterMid: 0, midAt: null };
     const r = runBench({
       plan: plan(LEFT), stopAfterRouteEndMs: 8000, maxMs: 120_000, ...opts,
       onSubTick: ({ state, plant }) => {
         if (state.mode === "reverse-follow" && state.witness) book.witness = state.witness;
-        if (book.holdAt === null && (state.latch.hold || state.latch.wBrake || state.latch.coast || state.mode === "refused")) book.holdAt = plant.ft;
+        const latched = state.latch.hold || state.latch.wBrake || state.latch.coast;
+        const finalStop = !state.currentStop || !(state.currentStop.frac < 1 - 1e-9);
+        if (state.mode === "reverse-stop" && book.midAt === null) { book.midStops += 1; book.midAt = plant.ft; }
+        if (state.mode !== "reverse-stop" && book.midAt !== null && book.holdAt === null) book.midAt = null;
+        if (book.holdAt === null && ((latched && finalStop) || state.mode === "refused")) book.holdAt = plant.ft;
       },
       onFrame: (pl) => {
         if (book.witness) book.maxPastM = Math.max(book.maxPastM, pastEnd(book.witness, plantCentre(pl)));
         if (book.holdAt !== null && pl.ft - book.holdAt > 0.25 && pl.gear === "R" && pl.keys.S) book.sAfterHold += 1;
+        if (book.holdAt === null && book.midStops > 0 && book.midAt === null && pl.gear === "R" && pl.keys.S) book.sAfterMid += 1;
         if (pl.wall?.hitAt != null && pl.ft - pl.wall.hitAt > 0.4 && pl.gear === "R" && pl.keys.S) book.sAfterImpactFrames += 1;
         if (pl.wall?.hitAt != null && book.wAtHit === null) book.wAtHit = pl.keys.W;
       },
@@ -3579,9 +3726,14 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
 
   it("T13.1 an R creep after the end is braked and HELD: never past the end by more than the tolerance, never the accelerator again, W down at the end (HEAD: W lifted at rest, 1.7 km past, «followed»)", () => {
     const endX = plan(LEFT).segments[1].authoredEnd.x;
+    // the subject of the re-derivation, read off the NEW pathref: R1 stops mid-reverse at an authored stop
+    const mid = plan(LEFT).segments[1].stops.filter((st) => st.tag === "authored" && st.frac < 1);
+    assert.equal(mid.length, 1, `sc-park-left R1's mid-reverse authored stops: ${JSON.stringify(plan(LEFT).segments[1].stops)}`);
     for (const seed of [1, 2, 3, 4]) {
       const { r, book } = endRun({ seed, plantOpts: { creepMps2: 0.35, creepAfterX: endX + 0.6 } });
       assert.deepEqual(r.state.refusals.map((x) => x.code), [], `seed ${seed}`);
+      assert.equal(book.midStops, 1, `seed ${seed}: the mid-reverse authored stop was served ${book.midStops} time(s)`);
+      assert.ok(book.sAfterMid > 0, `seed ${seed}: the reverse never resumed after its mid-reverse stop`);
       assert.ok(book.maxPastM <= PATH_TUNE.stops.overrunM, `seed ${seed}: the centre went ${book.maxPastM.toFixed(2)} m past its witness end`);
       assert.equal(book.sAfterHold, 0, `seed ${seed}: the R accelerator was down on ${book.sAfterHold} frame(s) after the stop began`);
       assert.equal(r.plant.keys.W, true, `seed ${seed}: the functional brake is not held at the end`);
@@ -3761,9 +3913,12 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
    * lifted and the world running (ledger rtt 538 ms, then a 1147 ms gap; 0.28 m and 0.49 m moved). */
   const CARD = Object.freeze({ k: 1, toEndM: 5.06, stallMs: 540, drainMs: 1150, worldRate: 0.5, decelMps2: 1.25 });
   const HEAD_BUDGET = { ...PATH_TUNE, runner: { ...PATH_TUNE.runner, nearLockBudgetMs: 500 }, clearance: { refuse: false } };
-  const trackRun = (lesson, seed, opts = {}) => {
+  // The pair a T13.4/4b/5 claim was measured on: the frozen 9390622 fixture where the lesson was re-planned,
+  // the corpus where it was not (sc-pk-driveway's pathref and trace are 9390622's, byte for byte).
+  const headOrCorpus = (l) => (HEAD_FIXTURE_LESSONS.includes(l) ? headPlan(l) : plan(l));
+  const trackRun = (lesson, seed, { getPlan = plan, ...opts } = {}) => {
     const rows = [];
-    const r = runBench({ plan: plan(lesson), seed, ...opts, onSubTick: ({ state, row, plant }) => { const c = plantCentre(plant); rows.push({ mode: state.mode, u: row.u, v: row.v, s: row.s, ct: row.ct, t: plant.t, cx: c.x, cz: c.z, psi: plant.psi }); } });
+    const r = runBench({ plan: getPlan(lesson), seed, ...opts, onSubTick: ({ state, row, plant }) => { const c = plantCentre(plant); rows.push({ mode: state.mode, u: row.u, v: row.v, s: row.s, ct: row.ct, t: plant.t, cx: c.x, cz: c.z, psi: plant.psi }); } });
     const rev = rows.filter((x) => x.mode === "reverse-follow" && Number.isFinite(x.ct));
     const s0 = rev[0]?.s ?? 0;
     const s1 = rev[rev.length - 1]?.s ?? 0;
@@ -3791,10 +3946,15 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
   };
   const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor((s.length - 1) / 2)]; };
 
-  it("T13.4 calibration: at HEAD's 500 ms runner the bench turns 0.87–0.92 of lock on saturated reverse arcs (product 0.892–0.896), and it reproduces the browser — clean R1 ≤ 0.20 m, with the canary's card R1 runs ≥ 0.35 m wide in the last third (browser 0.47 m)", () => {
+  /* T13.4, T13.4b AND T13.5 ARE PINNED ON THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16). The calibration needs a
+   * reverse that SATURATES, and the curvdepth re-plan put every reverse on a 4.6 m demo under the 0.892 cap: no
+   * arc of the new corpus reaches lock (pf-1: «no saturated arc to calibrate on»). The near-lock budget and the
+   * card-drain refusal were measured on the same witnesses (the card's toEndM 5.06 m is a place on HEAD's
+   * sc-park-left R1). They are kept where they were measured; the clean-drive census T13.5b stays on the corpus. */
+  it("T13.4 (9390622 fixture) calibration: at HEAD's 500 ms runner the bench turns 0.87–0.92 of lock on saturated reverse arcs (product 0.892–0.896), and it reproduces the browser — clean R1 ≤ 0.20 m, with the canary's card R1 runs ≥ 0.35 m wide in the last third (browser 0.47 m)", () => {
     const fr = [];
     for (const seed of [1, 2, 3, 4]) {
-      const t = trackRun("sc-park-wall", seed, { tune: HEAD_BUDGET });
+      const t = trackRun("sc-park-wall", seed, { getPlan: headPlan, tune: HEAD_BUDGET });
       if (Number.isFinite(t.satFrac)) fr.push(t.satFrac);
     }
     assert.ok(fr.length >= 3, "no saturated arc to calibrate on");
@@ -3820,7 +3980,7 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
     // every run rather than assumed, so the next reader knows which lesson answered and can
     // see it move if the clearance re-plan touches that one too.
     const satMedian = (lesson, plantOpts) => median([1, 2, 3, 4]
-      .map((seed) => trackRun(lesson, seed, { tune: HEAD_BUDGET, ...(plantOpts ? { plantOpts } : {}) }).satFrac)
+      .map((seed) => trackRun(lesson, seed, { getPlan: headOrCorpus, tune: HEAD_BUDGET, ...(plantOpts ? { plantOpts } : {}) }).satFrac)
       .filter(Number.isFinite));
     let control = null;
     for (const l of ["sc-park-wall", LEFT, "sc-park-judge", "sc-park-zebra", "sc-park-van", "sc-park-gap-short", "sc-pk-driveway", "sc-park-45-rev"]) {
@@ -3831,18 +3991,19 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
     if (control) console.log(`T13.4 control witness: ${control.l} — calibrated ${control.cal.toFixed(3)} vs revKappaScale 1 ${control.raw.toFixed(3)}`);
     assert.ok(control, "neither sc-park-wall nor sc-park-left saturates its reverse at revKappaScale 1, so the plant term is UNMEASURED here — this claim is not passed, it is unanswerable on these witnesses");
     assert.ok(control.raw >= control.cal + 0.03, `${control.l}: revKappaScale 1 turns ${control.raw.toFixed(3)} vs calibrated ${control.cal.toFixed(3)}`);
-    const clean = [1, 2, 3, 4, 5, 6].map((seed) => trackRun(LEFT, seed, { tune: HEAD_BUDGET }).lastThird);
-    const card = [1, 2, 3, 4, 5, 6].map((seed) => trackRun(LEFT, seed, { tune: HEAD_BUDGET, disturbances: [CARD] }).lastThird);
+    const clean = [1, 2, 3, 4, 5, 6].map((seed) => trackRun(LEFT, seed, { getPlan: headPlan, tune: HEAD_BUDGET }).lastThird);
+    const card = [1, 2, 3, 4, 5, 6].map((seed) => trackRun(LEFT, seed, { getPlan: headPlan, tune: HEAD_BUDGET, disturbances: [CARD] }).lastThird);
     assert.ok(median(clean) <= 0.2, `clean R1 last third median ${median(clean).toFixed(3)}`);
     assert.ok(median(card) >= 0.35, `with the canary's card R1 last third median ${median(card).toFixed(3)} — the bench does not reproduce the browser's 0.47 m`);
   });
 
-  it("T13.4b the near-lock runner budget: 1000 ms turns more and tracks tighter than HEAD's 500 ms on sc-park-wall, and keeps the reverse's INDEPENDENT route measured through the card (2000 ms did not)", () => {
+  it("T13.4b (9390622 fixture) the near-lock runner budget: 1000 ms turns more and tracks tighter than HEAD's 500 ms on sc-park-wall, and keeps the reverse's INDEPENDENT route measured through the card (2000 ms did not)", () => {
     const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
     const p = (a, q) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(q * (s.length - 1))]; };
-    const head = seeds.map((seed) => trackRun("sc-park-wall", seed, { tune: HEAD_BUDGET }));
+    const head = seeds.map((seed) => trackRun("sc-park-wall", seed, { getPlan: headPlan, tune: HEAD_BUDGET }));
     const noBodyGuard = { ...PATH_TUNE, clearance: { refuse: false } };
-    const now = seeds.map((seed) => trackRun("sc-park-wall", seed, { tune: noBodyGuard }));
+    const now = seeds.map((seed) => trackRun("sc-park-wall", seed, { getPlan: headPlan, tune: noBodyGuard }));
+    const headTrace = JSON.parse(readFileSync(resolve(HEAD_FIXTURE_ROOT, "content", "traces", LEFT, "shadow-correct.trace.json"), "utf8"));
     assert.equal(PATH_TUNE.runner.nearLockBudgetMs, 1000);
     assert.ok(median(now.map((x) => x.satFrac)) >= median(head.map((x) => x.satFrac)) + 0.008, `turning ${median(now.map((x) => x.satFrac))} vs ${median(head.map((x) => x.satFrac))}`);
     assert.ok(p(now.map((x) => x.lastThird), 0.9) < p(head.map((x) => x.lastThird), 0.9), `p90 last third ${p(now.map((x) => x.lastThird), 0.9)} vs HEAD ${p(head.map((x) => x.lastThird), 0.9)}`);
@@ -3852,8 +4013,8 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
     // MUST-BE-MEASURED check can only make it harder to pass, so it is left as found. The
     // 2000 ms comparison below is the one whose sample may not move, and it is on 1–3.)
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const t = trackRun(LEFT, seed, { tune: noBodyGuard, disturbances: [CARD] });
-      const ev = computePathEvidence({ samples: t.r.books.samples, trace: traceJson(LEFT), lesson: LEFT });
+      const t = trackRun(LEFT, seed, { getPlan: headPlan, tune: noBodyGuard, disturbances: [CARD] });
+      const ev = computePathEvidence({ samples: t.r.books.samples, trace: headTrace, lesson: LEFT });
       const rseg = ev.routeBySegment.find((sg) => sg.gear === -1);
       assert.equal(rseg.measured, true, `seed ${seed}: the independent R route went UNMEASURED (${rseg.why})`);
     }
@@ -3885,7 +4046,7 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
      * sample — sc-park-left, the card, seeds 1–3 — did not move. (3) keeps the tracking fact
      * visible so it cannot quietly flip back into a reason. */
     const long = { ...noBodyGuard, runner: { ...PATH_TUNE.runner, nearLockBudgetMs: 2000 } };
-    const routeOf = (tune, seed) => computePathEvidence({ samples: trackRun(LEFT, seed, { tune, disturbances: [CARD] }).r.books.samples, trace: traceJson(LEFT), lesson: LEFT }).routeBySegment.find((sg) => sg.gear === -1);
+    const routeOf = (tune, seed) => computePathEvidence({ samples: trackRun(LEFT, seed, { getPlan: headPlan, tune, disturbances: [CARD] }).r.books.samples, trace: headTrace, lesson: LEFT }).routeBySegment.find((sg) => sg.gear === -1);
     const at1000 = [1, 2, 3].map((seed) => routeOf(noBodyGuard, seed));
     const at2000 = [1, 2, 3].map((seed) => routeOf(long, seed));
     const counts = at2000.map((x, i) => `seed ${i + 1}: ${at1000[i].measured ? at1000[i].n : "UNMEASURED"} at 1000 ms, ${x.measured ? x.n : "UNMEASURED"} at 2000 ms`).join("; ");
@@ -3898,13 +4059,13 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
     const unmeasured = at2000.filter((x) => !x.measured).length;
     assert.ok(unmeasured >= 1, `2000 ms was rejected because it can lose the independent R route through the canary's card, and on seeds 1–3 it now loses it on none — re-derive the budget (${counts})`);
     // (3) …and not because it tracks worse: it does not (sc-park-wall, the same seeds as the 1000-vs-500 case above)
-    const longWall = seeds.map((seed) => trackRun("sc-park-wall", seed, { tune: long }));
+    const longWall = seeds.map((seed) => trackRun("sc-park-wall", seed, { getPlan: headPlan, tune: long }));
     assert.ok(p(longWall.map((x) => x.lastThird), 0.9) <= p(now.map((x) => x.lastThird), 0.9), `2000 ms now tracks WORSE than 1000 ms on sc-park-wall (last-third p90 ${p(longWall.map((x) => x.lastThird), 0.9)} vs ${p(now.map((x) => x.lastThird), 0.9)}) — the tracking half of this decision has changed, re-read it`);
     // no key crosses a yield at any budget (the screenshot contract, §5.3)
     for (const t of now) assert.equal(t.r.books.steerAcrossYield, 0);
   });
 
-  it("T13.5 the body-clearance guard: with the canary's card every sc-park-left R1 is refused WHILE IT IS STILL CLEAR of the neighbour it is heading for — the drive that drove 0.31-0.78 m INTO lotlf-bay-2 with the guard off (HEAD: «followed», the browser touched at 0.58 m)", () => {
+  it("T13.5 (9390622 fixture) the body-clearance guard: with the canary's card every sc-park-left R1 is refused WHILE IT IS STILL CLEAR of the neighbour it is heading for — the drive that drove 0.31-0.78 m INTO lotlf-bay-2 with the guard off (HEAD: «followed», the browser touched at 0.58 m)", () => {
     // WHAT THIS TEST USED TO PIN, AND WHY IT DOES NOT ANY MORE. Until 2026-09-16 it pinned
     // `policy.mjs BAY_FLANKS`: a hand-kept face per side of the bay, a tuned margin, and a
     // LATERAL OFFSET FROM THE BAY AXIS. That was a proxy for body clearance written when
@@ -3921,12 +4082,12 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
     const contact = leftGuard.at(-4.512, 0.587, 97.62);
     assert.ok(contact.m < 0, `the browser's contact pose reads ${contact.m} m — it was a contact`);
     assert.match(contact.body, /^lotlf-bay-2\//);
-    near(bayFrame(plan(LEFT).product.park.bay, -4.512, 0.587).latM, -0.587, 1e-3);
+    near(bayFrame(headPlan(LEFT).product.park.bay, -4.512, 0.587).latM, -0.587, 1e-3);
     let refusedClear = 0;
     let wouldHaveHit = 0;
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       let atRefusal = null;
-      const on = runBench({ plan: plan(LEFT), seed, disturbances: [CARD], onSubTick: ({ state, plant }) => {
+      const on = runBench({ plan: headPlan(LEFT), seed, disturbances: [CARD], onSubTick: ({ state, plant }) => {
         if (atRefusal === null && state.refusals.length) { const c = plantCentre(plant); atRefusal = leftGuard.at(c.x, c.z, plant.psi); }
       } });
       const codes = on.state.refusals.map((x) => x.code);
@@ -3936,7 +4097,7 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
       assert.ok(atRefusal && atRefusal.m > 0, `seed ${seed}: refused at ${atRefusal ? atRefusal.m : "?"} m — not before the contact`);
       refusedClear += 1;
       // …and the same seed WITHOUT the guard drives into the neighbour
-      const off = runBench({ plan: plan(LEFT), seed, disturbances: [CARD], tune: { ...PATH_TUNE, clearance: { refuse: false } } });
+      const off = runBench({ plan: headPlan(LEFT), seed, disturbances: [CARD], tune: { ...PATH_TUNE, clearance: { refuse: false } } });
       const cf = plantCentre(off.plant);
       if (leftGuard.at(cf.x, cf.z, psiOf(off.plant)).m < 0) wouldHaveHit += 1;
     }
@@ -4073,19 +4234,30 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
  * release, so the creep ran up to 0.61 m past its end pose.
  * Each case below names the mutation it kills (mutate.mjs M1-M7 in the scratch copy).
  */
-const { squareUpCommand, creepLiftRunOutM, CREEP_THROTTLE } = await import("../lib/path-follow.mjs");
+const { squareUpCommand, creepLiftRunOutM, CREEP_THROTTLE, isFinalPullIn } = await import("../lib/path-follow.mjs");
 const { createPlant, sendKeys, advance } = await import("../lib/path-bench.mjs");
 const r2t = (v) => Math.round(v * 100) / 100;
-const MICRO_LESSONS = LESSONS.filter((l) => plan(l).segments.some((s) => s.micro && s.gear === 1));
+// THE SQ CASES ARE PINNED ON THE FROZEN 9390622 PAIRS (CD-3, 2026-10-16). The curvdepth re-author replaced
+// the three micro square-ups (gap-short 0.69 m, judge 0.76 m, zebra 0.42 m) with forward pull-ins of 1.52 /
+// 1.94 / 2.48 m, so NO corpus pathref has a micro segment any more, and over the corpus SQ2/SQ3/SQ3c passed on
+// an empty list — every mutant M1–M7 would have survived them (scoping report §2a). The square-up still ships
+// in path-follow.mjs and still drives any micro a future plan carries, so its claims are kept on the pairs
+// they were measured on, and `MICRO_LESSONS` is asserted non-empty before any case iterates it (SQ0).
+const MICRO_LESSONS = HEAD_FIXTURE_LESSONS.filter((l) => headPlan(l).segments.some((s) => s.micro && s.gear === 1));
+const CORPUS_MICRO_LESSONS = LESSONS.filter((l) => plan(l).segments.some((s) => s.micro && s.gear === 1));
 const microEndPsi = (l) => {
-  const seg = plan(l).segments.find((s) => s.micro && s.gear === 1);
+  const seg = headPlan(l).segments.find((s) => s.micro && s.gear === 1);
   const rows = seg.witnesses[0].rows;
   return rows[rows.length - 1][5];
 };
 
 describe("SQ the micro square-up steers onto the plan's end heading, drives what is left of the micro, and stops on its end pose", () => {
-  it("SQ0 the lessons this covers: every pathref whose last forward segment is a micro square-up", () => {
+  it("SQ0 the lessons this covers: every 9390622 fixture pathref whose last forward segment is a micro square-up — never an empty list — and the corpus has none", () => {
+    assert.ok(MICRO_LESSONS.length >= 1, "no micro lesson in the fixture set — every SQ case below would pass on nothing");
     assert.deepEqual([...MICRO_LESSONS].sort(), ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]);
+    // the corpus census (re-derived on the curvdepth pathrefs): no micro segment. A re-plan that brings one
+    // back must point these cases at it rather than leave them on the fixture alone.
+    assert.deepEqual(CORPUS_MICRO_LESSONS, [], `the corpus carries a micro square-up again (${CORPUS_MICRO_LESSONS.join(", ")}) — point SQ at it`);
   });
 
   it("SQ1 squareUpCommand: the plan's end heading, clockwise-positive in D, the error closed over the distance left (floored), and nothing without a yaw", () => {
@@ -4119,7 +4291,7 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
         // the square-up measured on its own: the terminal heading law (T9.h) off, so what is asserted is this
         // mechanism's work. With both on, the reverse leaves gap-short less error to close: on seed 9 its creep
         // then travels 0.042 m and turns 0.29°, under the 0.05 m / 0.5° bars below (measured 2026-09-21).
-        const r = bench(lesson, seed, { tune: TERMINAL_OFF });
+        const r = headBench(lesson, seed, { tune: TERMINAL_OFF });
         const sq = r.books.follow.squareUp;
         const settle = sq.find((b) => b.phase === "settle");
         assert.ok(settle, `${lesson} s${seed}: the disarm roll into the micro was never steered (no square-up decision booked in forward-settle)`);
@@ -4141,7 +4313,7 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
   it("SQ2b the wheel built up through the disarm roll is not dropped at the creep's entry (kills M5)", () => {
     for (const seed of [7, 8, 9, 10]) {
       const entries = [];
-      runBench({ plan: plan("sc-park-gap-short"), seed, onSubTick: ({ row, cmd }) => { if (row.why === "micro-creep") entries.push(cmd.steer); } });
+      runBench({ plan: headPlan("sc-park-gap-short"), seed, onSubTick: ({ row, cmd }) => { if (row.why === "micro-creep") entries.push(cmd.steer); } });
       assert.equal(entries.length, 1, `seed ${seed}: the micro creep was entered ${entries.length} times`);
       assert.notEqual(entries[0], 0, `seed ${seed}: the creep's entry sub-tick released the wheel with degrees still to deliver`);
     }
@@ -4153,7 +4325,7 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
   it("SQ3 the micro creep stops on its end pose: never past it by more than stops.overrunM on any micro lesson, seeds 1-20 (kills M4, M6)", () => {
     for (const lesson of MICRO_LESSONS) {
       for (let seed = 1; seed <= 20; seed++) {
-        const r = bench(lesson, seed);
+        const r = headBench(lesson, seed);
         const micro = r.books.follow.segments.find((s) => s.micro === true);
         assert.ok(micro, `${lesson} s${seed}: no micro segment book`);
         if (micro.stopErrM === null) continue; // skipped: the disarm roll already carried the car past it (microOvershootM)
@@ -4173,7 +4345,7 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
     for (const lesson of MICRO_LESSONS) {
       for (let seed = 1; seed <= 20; seed++) {
         let startM = null;
-        const r = runBench({ plan: plan(lesson), seed, onSubTick: ({ row, cmd }) => {
+        const r = runBench({ plan: headPlan(lesson), seed, onSubTick: ({ row, cmd }) => {
           if (row.why !== "micro-creep" || startM !== null) return;
           const m = /micro square-up: (-?[0-9.]+) m/.exec(cmd.why ?? "");
           startM = m ? Number(m[1]) : NaN;
@@ -4211,10 +4383,14 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
   });
 
   it("SQ4 the forward segment after every reverse begins in «roll»: the gear-change stop's wantStop is withdrawn when the reverse begins (kills M1)", () => {
-    for (const lesson of [...MICRO_LESSONS, "sc-ed-poligon-chain"]) {
+    // the fixture's micro lessons, and — re-derived on the corpus (2026-10-16) — every pathref with a forward
+    // segment after a reverse (gap-short, judge, zebra pull-ins; poligon; bay-exit-rev F1), read off the pathrefs
+    const corpusFwdAfterRev = LESSONS.filter((l) => plan(l).segments.some((sg, i) => i > 0 && sg.gear === 1 && plan(l).segments[i - 1].gear === -1));
+    assert.deepEqual([...corpusFwdAfterRev].sort(), ["sc-ed-poligon-chain", "sc-park-bay-exit-rev", "sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]);
+    for (const [lesson, getPlan] of [...MICRO_LESSONS.map((l) => [l, headPlan]), ...corpusFwdAfterRev.map((l) => [l, plan])]) {
       const firsts = [];
       let prevMode = null;
-      runBench({ plan: plan(lesson), seed: 7, onSubTick: ({ state, phase }) => {
+      runBench({ plan: getPlan(lesson), seed: 7, onSubTick: ({ state, phase }) => {
         if (state.mode === "reverse-settle" && prevMode !== "reverse-settle") assert.equal(state.flags.wantStop, false, `${lesson}: the reverse began still asking for a stop`);
         if (state.mode === "forward-settle" && prevMode !== "forward-settle") firsts.push({ wantStop: state.flags.wantStop, phase });
         prevMode = state.mode;
@@ -4247,15 +4423,115 @@ describe("SQ the micro square-up steers onto the plan's end heading, drives what
  * this is the case that says so first.
  */
 describe("SQD the micro square-up and the terminal heading law together", () => {
-  it("SQD1 sc-park-gap-short rests no more than 5.0° off the product box's heading on every seed 7–10, with no refusal — the margin the two mechanisms buy only together", () => {
+  // SQD1 IS PINNED ON THE FROZEN 9390622 PAIR (CD-3): its 5.0° bar is the margin the micro square-up and the
+  // terminal law buy TOGETHER, and on the curvdepth corpus gap-short has neither (no micro; its final-reverse
+  // gate is shut, T9.h.2n). The live corpus is asked the in-box half (SQD1n).
+  it("SQD1 (9390622 fixture) sc-park-gap-short rests no more than 5.0° off the product box's heading on every seed 7–10, with no refusal — the margin the two mechanisms buy only together", () => {
+    const lesson = "sc-park-gap-short";
+    for (const seed of [7, 8, 9, 10]) {
+      const r = headBench(lesson, seed);
+      assert.deepEqual(r.state.refusals, [], `${lesson} seed ${seed}`);
+      const box = productBoxPrediction(headPlan(lesson).product.park, plantCentre(r.plant), psiOf(r.plant));
+      assert.equal(box.inBox, true, `${lesson} seed ${seed}: ${JSON.stringify(box)}`);
+      assert.ok(box.headingOffsetDeg <= 5.0, `${lesson} seed ${seed}: rests ${box.headingOffsetDeg}° off the bay heading (bar 5.0°; both mechanisms on measured 4.15° worst) — ${JSON.stringify(box)}`);
+    }
+  });
+
+  // THE IN-BOX HALF ON THE LIVE CORPUS (CD-2, 2026-10-16). Before the pull-in fix gap-short ended seeds 7–10
+  // 0.87–1.26 m past its F2 end, out of the box (seed 7: lon 1.275, inBox false; seed 8 refused body-clearance).
+  it("SQD1n sc-park-gap-short ends IN the product box with no refusal on every seed 7–10 after its forward pull-in", () => {
     const lesson = "sc-park-gap-short";
     for (const seed of [7, 8, 9, 10]) {
       const r = bench(lesson, seed);
       assert.deepEqual(r.state.refusals, [], `${lesson} seed ${seed}`);
       const box = productBoxPrediction(plan(lesson).product.park, plantCentre(r.plant), psiOf(r.plant));
       assert.equal(box.inBox, true, `${lesson} seed ${seed}: ${JSON.stringify(box)}`);
-      assert.ok(box.headingOffsetDeg <= 5.0, `${lesson} seed ${seed}: rests ${box.headingOffsetDeg}° off the bay heading (bar 5.0°; both mechanisms on measured 4.15° worst) — ${JSON.stringify(box)}`);
     }
+  });
+});
+
+/* ═══════════════════ CD-2 the final forward pull-in (2026-10-16) ═══════════════════
+ *
+ * The curvdepth re-author gave sc-park-gap-short, -judge and -zebra a real forward pull-in after the reverse
+ * (1.52 / 1.94 / 2.48 m, not micro) and moved the product's credit to its end. Measured at the landing
+ * (cdtools probe gs-1.txt, f2-trace): the follower drives it from rest, the D stop trigger latches its COAST
+ * branch at 2.0–2.7 km/h (under PRESS_MIN 2.58 km/h, so S cannot be pressed), and the lifted pedal — ramped
+ * past the crawl ceiling — keeps driving the car to 3.2 km/h before it coasts: F2 came to rest +0.87 /
+ * +0.88 / +1.02 m past its end on gap-short (seed 8 refused body-clearance on lotgs-bay-4), +0.93…+1.04 m on
+ * judge and +1.47 m on zebra seed 8, and the product credited none of gap-short's or judge's seeds 7–10.
+ * The fix (path-follow.mjs isFinalPullIn, PATH_TUNE.pullIn) applies the micro creep's own run-out
+ * anticipation (creepLiftRunOutM, 2026-09-21) to that one segment shape, on the coast branch only.
+ */
+describe("CD-2 the final forward pull-in stops on its end", () => {
+  const PULL_IN_OFF = { ...PATH_TUNE, pullIn: { on: false } };
+  it("CD-2.1 which segments are a final pull-in, read off the pathrefs: the last, forward, not micro, after a reverse, carrying only its route end", () => {
+    const got = LESSONS.filter((l) => isFinalPullIn(plan(l), plan(l).segments.length - 1)).sort();
+    assert.deepEqual(got, ["sc-ed-poligon-chain", "sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]);
+    // bay-exit-rev F1 is a forward after a reverse too, but it waits for its walker before its route end
+    const bx = plan("sc-park-bay-exit-rev");
+    assert.equal(isFinalPullIn(bx, bx.segments.length - 1), false);
+    for (const l of LESSONS) for (let i = 0; i < plan(l).segments.length - 1; i++) assert.equal(isFinalPullIn(plan(l), i), false, `${l} segment ${i} is not the last`);
+    // the micro square-ups of 9390622 are the creep's, never this
+    for (const l of MICRO_LESSONS) assert.equal(isFinalPullIn(headPlan(l), headPlan(l).segments.length - 1), false, `${l} (9390622): a micro is not a pull-in`);
+  });
+
+  it("CD-2.2 every pull-in comes to rest within stops.overrunM of its end and no drive is refused — gap-short, judge, zebra × seeds 1–20; with the anticipation off it overruns by more than half a metre", () => {
+    for (const l of ["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"]) {
+      let worstOff = -Infinity;
+      for (let seed = 1; seed <= 20; seed++) {
+        const r = bench(l, seed);
+        assert.deepEqual(r.state.refusals.map((x) => x.code), [], `${l} seed ${seed}`);
+        const last = r.books.follow.segments.at(-1);
+        assert.ok(Number.isFinite(last.stopErrM) && last.stopErrM <= PATH_TUNE.stops.overrunM, `${l} seed ${seed}: the pull-in came to rest ${last.stopErrM} m past its end (bound ${PATH_TUNE.stops.overrunM} m)`);
+        if (seed >= 7 && seed <= 10) {
+          const off = bench(l, seed, { tune: PULL_IN_OFF }).books.follow.segments.at(-1).stopErrM;
+          if (Number.isFinite(off)) worstOff = Math.max(worstOff, off);
+        }
+      }
+      assert.ok(worstOff >= 0.5, `${l}: with the pull-in anticipation off the worst seed 7–10 overrun is only ${worstOff} m — the fix no longer has its subject`);
+    }
+  });
+
+  // THE OTHER SIDE OF CD-2.2 (landing condition V-7, 2026-10-16). CD-2.2 bounds only how far a pull-in OVERRUNS;
+  // the verifier's V1 (the run-out on the brake branch too) moved F2's stop and passed it. Measured at the landing
+  // (scratch/cdt-land/probe/v7-base.txt), seeds 1–20, signed stopErrM (− = short of the end):
+  //   gap-short −0.517 (seed 7) … +0.103 (seed 11) — 19/20 in the product box (seed 11 overruns to lon 0.518)
+  //   judge     −0.343 (seed 2) … +0.102 (seed 12) — 20/20
+  //   zebra     −0.845 (seed 13) … +0.036 (seed 1) — 19/20: seed 13's coast trigger fires at 1.87 km/h 0.754 m out,
+  //             the anticipation stops it 0.845 m SHORT (lon −0.815, OUT of the box); with the anticipation off the
+  //             same seed overruns 0.67 m and is in the box. The fix trades that seed — recorded in doc 93 CD-2.
+  // The bounds below are each lesson's measured worst plus 0.05 m, and the in-box tallies are the measured ones:
+  // they hold the fix where it was signed off, they do not claim the stop-short side is good.
+  it("CD-2.2b (V-7) no pull-in stops further short of its end than its measured worst + 0.05 m, and the product-box tally of seeds 1–20 does not fall — gap-short ≥ 19, judge 20, zebra ≥ 19", () => {
+    const SHORT_BOUND_M = { "sc-park-gap-short": 0.57, "sc-park-judge": 0.4, "sc-park-zebra": 0.9 };
+    const IN_BOX_MIN = { "sc-park-gap-short": 19, "sc-park-judge": 20, "sc-park-zebra": 19 };
+    for (const l of Object.keys(SHORT_BOUND_M)) {
+      let inBox = 0;
+      for (let seed = 1; seed <= 20; seed++) {
+        const r = bench(l, seed);
+        const last = r.books.follow.segments.at(-1);
+        assert.ok(Number.isFinite(last.stopErrM) && last.stopErrM >= -SHORT_BOUND_M[l], `${l} seed ${seed}: the pull-in came to rest ${-last.stopErrM} m SHORT of its end (bound ${SHORT_BOUND_M[l]} m)`);
+        if (productBoxPrediction(plan(l).product.park, plantCentre(r.plant), psiOf(r.plant)).inBox) inBox += 1;
+      }
+      assert.ok(inBox >= IN_BOX_MIN[l], `${l}: ${inBox}/20 seeds rest in the product box after the pull-in (measured at the landing ${IN_BOX_MIN[l]}/20)`);
+    }
+  });
+
+  it("CD-2.3 every other lesson is driven pose for pose exactly as with the anticipation off — seeds 7–10 (T9.m.4-style invariance)", () => {
+    for (const l of LESSONS.filter((x) => !["sc-park-gap-short", "sc-park-judge", "sc-park-zebra"].includes(x))) {
+      for (const seed of [7, 8, 9, 10]) {
+        const on = bench(l, seed);
+        const off = bench(l, seed, { tune: PULL_IN_OFF });
+        assert.deepEqual(on.books.samples, off.books.samples, `${l} seed ${seed}: the outer samples moved`);
+        // the bench plant carries the REAR AXLE as rx/rz (path-bench.mjs createPlant); x/z do not exist on it (V-11)
+        assert.ok(Number.isFinite(on.plant.rx) && Number.isFinite(on.plant.rz), `${l} seed ${seed}: the plant has no rx/rz`);
+        assert.deepEqual([on.plant.rx, on.plant.rz, on.plant.psi, on.plant.t], [off.plant.rx, off.plant.rz, off.plant.psi, off.plant.t], `${l} seed ${seed}: the end state moved`);
+        assert.deepEqual(on.state.refusals, off.state.refusals, `${l} seed ${seed}`);
+      }
+    }
+    // sc-ed-poligon-chain qualifies (CD-2.1) but the bench never reaches its F6 (T9.c todo: F4 gear-change-missed),
+    // so its invariance above is not evidence about F6 — said here so nobody reads it as such
+    assert.ok(bench("sc-ed-poligon-chain", 7).state.refusals.some((x) => x.code === "gear-change-missed"), "poligon now reaches F6 on the bench — CD-2.2 must cover it");
   });
 });
 

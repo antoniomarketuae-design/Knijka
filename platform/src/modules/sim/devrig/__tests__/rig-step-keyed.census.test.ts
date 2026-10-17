@@ -38,6 +38,28 @@
  *   A15 a pause, a hidden tab, a long stall and a window blur apply no input
  *        twice and move nothing;
  *   D-3 script KEY edges stay frame-timed — stated, and measured as such.
+ *
+ * 2026-10-13 (sc-roundabout-entry:08a0b701, lane npcstep round 2) — THE GRADE
+ * OF A MULTI-STEP FRAME IS INTERLEAVED WITH ITS STEPS. The product now grades
+ * point k before physics step k + 1 reads its input (VehicleRig's before-step
+ * callback calls the scene's `stepLoopGradeRef` first; the frame's last point
+ * is still graded at the frame's end). So `onTick` — where the rig learns a
+ * «drive» start, freezes at the lesson's end and dispatches its key edges —
+ * runs at point k BEFORE step k + 1 on every cadence, as it always did at one
+ * step per frame. The frame model below has both orders (`grade`): "stepLoop"
+ * is the product and the default; "frameEnd" is the wiring through 8cb0707,
+ * kept as the contrast. Measured in the last describe:
+ *   · ONE STEP PER FRAME: the two orders are one sequence, byte for byte —
+ *     applied commands, car states, sample columns, key edges and the step
+ *     count each was dispatched at (a named start, 60 Hz and 144 Hz);
+ *   · a «drive» start has NO late decisions on any cadence (it had 29 on a
+ *     0.5 s first frame);
+ *   · a script's KEY edges are dispatched at their grid point before the next
+ *     step's input is read — on every cadence (they landed after the frame's
+ *     steps: up to 29 steps late at 2 fps);
+ *   · after the lesson's end point the rig's command is the frozen one from
+ *     the very next step on every cadence (ADR-017 L1: on a long frame the
+ *     completing frame's later steps used to read live decisions).
  */
 import RAPIER from "@dimforge/rapier3d-compat";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -254,6 +276,17 @@ interface DriveOpts {
   remapSteps?: (step: number) => boolean;
   /** Frames (indices) that are PAUSED: render reads only, no steps, no grade. */
   pausedFrames?: (frame: number) => boolean;
+  /**
+   * WHEN A POINT OF A MULTI-STEP FRAME IS GRADED. "stepLoop" (the product since
+   * 2026-10-13, and the default): point k before step k + 1's input is read —
+   * VehicleRig's before-step calls the scene's step-loop grade first, which
+   * refreshes the cabin's channels (one more `read()`) and grades; the
+   * frame's last point at the frame's end. "frameEnd": every point after the
+   * frame's steps (the wiring through 8cb0707).
+   */
+  grade?: "stepLoop" | "frameEnd";
+  /** The lesson the ticks are graded against (default: nowhere to arrive). */
+  lesson?: LessonSpec;
   /** Dispatch a window blur before this frame. */
   blurBeforeFrame?: number;
 }
@@ -270,6 +303,8 @@ interface DriveResult {
   blocked: boolean[];
   /** The script's transition log (why each step ended). */
   log: { label: string; reason: string; endedAtSec: number }[];
+  /** The grid point whose tick ended the lesson (-1: it did not end). */
+  endedAt: number;
 }
 
 const H = FIXED_DT;
@@ -323,7 +358,29 @@ function drive(o: DriveOpts): DriveResult {
   );
   const assist = createDriveAssistState();
 
-  let session = createLessonSession(LESSON);
+  const lesson = o.lesson ?? LESSON;
+  let session = createLessonSession(lesson);
+  let endedAt = -1;
+  /** RuntimeDriver's graded call: one point per step not graded yet — the
+   *  frame's (after its steps) and, in the product's order, the step loop's. */
+  const gradeOwed = () => {
+    clock.advanceSteps(rec.stepCount - clock.last, span);
+    for (let k = span.first; k <= span.last; k++) {
+      // The shell stops delivering ticks once the lesson has ended (GradeGrid
+      // breaks on the ending point; the session is final).
+      if (endedAt >= 0) continue;
+      if (!rec.stateAtStep(k, scratch)) throw new Error(`step ${k} not held`);
+      const tick = tickAt(clock.timeOf(k), scratch);
+      const step = applyTick(session, tick);
+      session = step.state;
+      gradingK = k;
+      if (rig !== null) rig.onTick(tick, step);
+      if (base !== null) base.onTick(tick);
+      gradingK = -1;
+      if (session.phase === "completed" || session.phase === "aborted") endedAt = k;
+    }
+  };
+  const gradeMode = o.grade ?? "stepLoop";
   const applied: Applied[] = [];
   const states: PhysicsStepState[] = [];
   const blocked: boolean[] = [];
@@ -354,7 +411,14 @@ function drive(o: DriveOpts): DriveResult {
           input.reversePedalRemapSource = "assist";
           input.reversePedalRemap = remap;
         }
-        // VehicleRig useBeforePhysicsStep: read → applyDifficulty → sim.update
+        // VehicleRig useBeforePhysicsStep, FIRST the scene's turn
+        // (`stepLoopGradeRef`): a step taken and not graded yet is graded
+        // now — the cabin's channels refreshed (a `read()`), then the call.
+        if (gradeMode === "stepLoop" && rec.stepCount > clock.last) {
+          input.read();
+          gradeOwed();
+        }
+        // …then: read → applyDifficulty → sim.update
         const raw = input.read();
         applied.push({
           throttle: raw.throttle,
@@ -381,18 +445,9 @@ function drive(o: DriveOpts): DriveResult {
     for (let i = 0; i < reads; i++) input.read();
     if (o.arm.kind === "call" && o.arm.afterFrame === f && o.arm.phase === "afterRenderReads") armNow();
     if (paused) continue;
-    // RuntimeDriver: gradeGrid.stepPhysics — one point per new step, after the steps.
-    clock.advanceSteps(rec.stepCount - clock.last, span);
-    for (let k = span.first; k <= span.last; k++) {
-      if (!rec.stateAtStep(k, scratch)) throw new Error(`step ${k} not held`);
-      const tick = tickAt(clock.timeOf(k), scratch);
-      const step = applyTick(session, tick);
-      session = step.state;
-      gradingK = k;
-      if (rig !== null) rig.onTick(tick, step);
-      if (base !== null) base.onTick(tick);
-      gradingK = -1;
-    }
+    // RuntimeDriver's frame: gradeGrid.stepPhysics — every step not graded
+    // yet (the frame's last; all of them under "frameEnd").
+    gradeOwed();
   }
 
   const status = rig?.handle.status();
@@ -412,6 +467,7 @@ function drive(o: DriveOpts): DriveResult {
     readErrors: status?.readErrors ?? 0,
     blocked,
     log,
+    endedAt,
   };
 }
 
@@ -595,10 +651,15 @@ describe("ADR-017 — THE REGRESSION ANCHOR: one step per frame is bit-identical
     }
   }, 120_000);
 
-  it("…and the anchor has teeth: on the phone lens the pre-ADR-017 rig does NOT match its own 60 Hz drive", () => {
-    const was60 = drive({ frames: [1 / 60], steps: SCRIPT, totalSteps: TOTAL, rig: "base", arm: { kind: "autorun" } });
-    const wasPhone = drive({ frames: W69, steps: SCRIPT, totalSteps: TOTAL, rig: "base", arm: { kind: "autorun" } });
+  it("…and the anchor has teeth: on the phone lens the pre-ADR-017 rig, under the frame-end grade it lived in, does NOT match its own 60 Hz drive", () => {
+    const was60 = drive({ frames: [1 / 60], steps: SCRIPT, totalSteps: TOTAL, rig: "base", arm: { kind: "autorun" }, grade: "frameEnd" });
+    const wasPhone = drive({ frames: W69, steps: SCRIPT, totalSteps: TOTAL, rig: "base", arm: { kind: "autorun" }, grade: "frameEnd" });
     expect(firstDiff(wasPhone.applied, was60.applied, TOTAL)).not.toBeNull();
+    // (2026-10-13: with the grade interleaved with the steps a rig that decides in
+    // onTick is decided before every step too — the old rig would match. The
+    // step-keyed pad stays: it does not depend on where the grade runs.)
+    const nowPhone = drive({ frames: W69, steps: SCRIPT, totalSteps: TOTAL, rig: "base", arm: { kind: "autorun" }, grade: "stepLoop" });
+    expect(firstDiff(nowPhone.applied, was60.applied, TOTAL)).toBeNull();
   }, 120_000);
 });
 
@@ -642,9 +703,9 @@ describe("ADR-017 — the START is referenced to a step, not to the call that ar
     ).toThrow(/start step 10 has passed/);
   });
 
-  it("\"drive\" on a lesson with no pre-drive starts at the first grid point; where that point's frame already took steps, their decisions are LATE (counted) — the stated limit", () => {
-    const at60 = drive({ frames: [1 / 60], steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" } });
-    const at2 = drive({ frames: [0.5], steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" } });
+  it("\"drive\" on a lesson with no pre-drive starts at the first grid point; UNDER THE FRAME-END GRADE (through 8cb0707), where that point's frame already took steps, their decisions were LATE (counted) — the limit as it stood", () => {
+    const at60 = drive({ frames: [1 / 60], steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" }, grade: "frameEnd" });
+    const at2 = drive({ frames: [0.5], steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" }, grade: "frameEnd" });
     expect(at60.startStep).toBe(1);
     expect(at2.startStep).toBe(1);
     expect(at60.lateDecisions).toBe(0);
@@ -757,10 +818,10 @@ describe("ADR-017 / attack A15 — pause, a hidden tab, a long stall, a blur", (
   }, 120_000);
 });
 
-describe("ADR-017 D-3 — script KEY edges stay frame-timed (stated, measured)", () => {
+describe("ADR-017 D-3 — script KEY edges under the frame-end grade (through 8cb0707): frame-timed, measured", () => {
   it("a step's keys go down at the grid point whose decision entered the step — the same point on every cadence — but only after that frame's steps have run", () => {
     const edges = CADENCES.map(([name, frames]) => {
-      const r = drive({ frames, steps: SCRIPT, totalSteps: TOTAL, rig: "new", arm: { kind: "autorun", start: 1 } });
+      const r = drive({ frames, steps: SCRIPT, totalSteps: TOTAL, rig: "new", arm: { kind: "autorun", start: 1 }, grade: "frameEnd" });
       const down = r.keyEdges.find((e) => e.type === "keydown" && e.code === "KeyQ");
       const up = r.keyEdges.find((e) => e.type === "keyup" && e.code === "KeyQ");
       return { name, down, up };
@@ -781,6 +842,102 @@ describe("ADR-017 D-3 — script KEY edges stay frame-timed (stated, measured)",
     const phone = edges.find((e) => e.name === "2 fps lens")!;
     expect(phone.down!.stepCount).toBeGreaterThan(phone.down!.gradingK);
     expect(ref.down!.stepCount).toBe(ref.down!.gradingK);
+  }, 240_000);
+});
+
+describe("2026-10-13 — the grade interleaved with the frame's steps: what a rig script sees", () => {
+  const edgesOf = (r: DriveResult) => r.keyEdges.map((e) => `${e.type} ${e.code} @${e.gradingK} steps ${e.stepCount}`);
+
+  it("ONE STEP PER FRAME, a named start: the step-loop order and the frame-end order are one sequence byte for byte — applied commands, car states, sample columns, key edges and the step count each was dispatched at", () => {
+    for (const [name, frames] of [
+      ["60 Hz", [1 / 60]],
+      ["144 Hz", [1 / 144]],
+    ] as const) {
+      const was = drive({ frames, steps: SCRIPT, totalSteps: TOTAL, rig: "new", arm: { kind: "autorun", start: 1 }, grade: "frameEnd" });
+      const now = drive({ frames, steps: SCRIPT, totalSteps: TOTAL, rig: "new", arm: { kind: "autorun", start: 1 }, grade: "stepLoop" });
+      expect(JSON.stringify(now.applied), `${name}: applied`).toBe(JSON.stringify(was.applied));
+      expect(JSON.stringify(now.states), `${name}: states`).toBe(JSON.stringify(was.states));
+      expect(JSON.stringify(now.cols), `${name}: sample columns`).toBe(JSON.stringify(was.cols));
+      expect(edgesOf(now), `${name}: key edges`).toEqual(edgesOf(was));
+      expect(JSON.stringify(now.log), `${name}: script log`).toBe(JSON.stringify(was.log));
+      expect({ late: now.lateDecisions, errors: now.readErrors, start: now.startStep }, name).toEqual({
+        late: was.lateDecisions,
+        errors: was.readErrors,
+        start: was.startStep,
+      });
+      expect(edgesOf(now).length, `${name}: the script's Q look fired`).toBeGreaterThanOrEqual(2);
+    }
+  }, 240_000);
+
+  it("a script's KEY edges are dispatched at their grid point BEFORE the next physics step — on every cadence the same point and the same step count (they landed after the frame's steps: 2 fps, the contrast)", () => {
+    const edges = CADENCES.map(([name, frames]) => {
+      const r = drive({ frames, steps: SCRIPT, totalSteps: TOTAL, rig: "new", arm: { kind: "autorun", start: 1 } });
+      return { name, edges: edgesOf(r), raw: r.keyEdges };
+    });
+    const ref = edges[0]!;
+    expect(ref.edges.length).toBeGreaterThanOrEqual(2);
+    for (const e of edges) {
+      expect({ cadence: e.name, edges: e.edges }).toEqual({ cadence: e.name, edges: ref.edges });
+      // Dispatched while point k is graded, with exactly k steps taken: step
+      // k + 1 has not read its input yet.
+      for (const k of e.raw) expect({ cadence: e.name, at: k.gradingK, steps: k.stepCount }).toEqual({ cadence: e.name, at: k.gradingK, steps: k.gradingK });
+    }
+  }, 240_000);
+
+  it("a «drive» start has NO late decisions on any cadence, and the drive is the 60 Hz drive — the frame that brings the first grid point no longer takes its other steps unheard", () => {
+    const ref = drive({ frames: [1 / 60], steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" } });
+    expect({ start: ref.startStep, late: ref.lateDecisions }).toEqual({ start: 1, late: 0 });
+    for (const [name, frames] of CADENCES.slice(1)) {
+      const r = drive({ frames, steps: SCRIPT, totalSteps: 300, rig: "new", arm: { kind: "autorun", start: "drive" } });
+      expect({ cadence: name, start: r.startStep, late: r.lateDecisions, errors: r.readErrors }).toEqual({ cadence: name, start: 1, late: 0, errors: 0 });
+      expect(firstDiff(r.applied, ref.applied, 300), name).toBeNull();
+      expect(firstStateDiff(r.states, ref.states, 300), name).toBeNull();
+    }
+  }, 240_000);
+
+  it("AFTER THE LESSON'S END POINT (ADR-017 L1): the command every later step applies is the frozen one, on every cadence — under the frame-end grade the completing frame's later steps read live decisions", () => {
+    // A lesson that ENDS: a zone the 30 км/ч «go» reaches a little after 3 s.
+    const probe = drive({ frames: [1 / 60], steps: [{ label: "go", speedKmh: 30, forSec: 20 }], totalSteps: 200, rig: "new", arm: { kind: "autorun", start: 1 } });
+    const at = probe.states[199]!;
+    const ending: LessonSpec = {
+      ...LESSON,
+      id: "t-rig-step-keyed-ends",
+      objectives: [{ id: "o-near", titleBg: "Близо", kind: "reachZone", params: { x: at.x, y: at.y, radiusM: 3 } }],
+    };
+    const go: DriveStep[] = [{ label: "go", speedKmh: 30, forSec: 20 }];
+    const N = 420;
+    const run = (frames: readonly number[], grade: "stepLoop" | "frameEnd") =>
+      drive({ frames, steps: go, totalSteps: N, rig: "new", arm: { kind: "autorun", start: 1 }, lesson: ending, grade });
+    const ref = run([1 / 60], "stepLoop");
+    expect(ref.endedAt).toBeGreaterThan(100);
+    expect(ref.endedAt).toBeLessThan(N - 40);
+    // Frozen: every step after the end point applies the end point's decision.
+    const frozen = ref.applied[ref.endedAt]!; // step endedAt + 1
+    for (let i = ref.endedAt; i < N; i++) {
+      expect([ref.applied[i]!.rawThrottle, ref.applied[i]!.rawBrake, ref.applied[i]!.rawSteer], `60 Hz step ${i + 1}`).toEqual([
+        frozen.rawThrottle,
+        frozen.rawBrake,
+        frozen.rawSteer,
+      ]);
+    }
+    for (const [name, frames] of CADENCES.slice(1)) {
+      const r = run(frames, "stepLoop");
+      expect({ cadence: name, endedAt: r.endedAt }).toEqual({ cadence: name, endedAt: ref.endedAt });
+      expect(firstDiff(r.applied, ref.applied, N), name).toBeNull();
+      expect(firstStateDiff(r.states, ref.states, N), name).toBeNull();
+    }
+    // The contrast — L1 as the rigstep verifier measured it: on long frames
+    // the steps the completing frame still owed read LIVE decisions. (Frames
+    // of 0.35 s and 0.5 s alternate, so the end point is not a frame's last
+    // step: 21, 51, 72, … 174, 204.)
+    const LONG = [0.35, 0.5];
+    const was = run(LONG, "frameEnd");
+    expect(was.endedAt).toBe(ref.endedAt);
+    const diff = firstDiff(was.applied, ref.applied, N);
+    expect(diff).not.toBeNull();
+    expect(Number(diff!.split(" ")[1].replace(":", "")), "the first live decision is applied right after the end point").toBe(ref.endedAt + 2);
+    // …and the same frames under the product's order are the 60 Hz drive.
+    expect(firstDiff(run(LONG, "stepLoop").applied, ref.applied, N)).toBeNull();
   }, 240_000);
 });
 

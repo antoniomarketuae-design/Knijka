@@ -216,55 +216,74 @@ describe("§2 sc-park-van — the body the student is reversing at", () => {
     expect(OBSTACLES).toHaveLength(4);
     const bodies = rearStaticBodiesFrom(OBSTACLES);
     expect(bodies).toHaveLength(4);
-    // The correct drive passes within 0.4 m of the van's body; the wrong one
-    // touches it. If a re-recorded trace ever stopped doing that, every number
-    // below would be measuring air.
+    // The correct drive passes within 0.64 m of the van's body (as the fleet
+    // box stands it); the wrong one touches the van itself. If a re-recorded
+    // trace ever stopped doing that, every number below would be measuring air.
+    // RE-MEASURED 2026-10-11 (catalogue-demo-curvature:dae908c7): the lesson's
+    // demos were re-authored as drives the product car can perform — the 90°
+    // swing on its own 4.6 m circle from 2 m off the row, and a mistake demo
+    // that STOPS on the van instead of driving 2.3 m into it. The numbers below
+    // are those drives'; what each one proves is unchanged.
     const vanBox = bodies.find((b) => b.y === -2.7)!;
     let closestCorrect = Infinity;
     for (const s of trace("sc-park-van", "shadow-correct")) {
       const d = obbSeparationM(playerObb(s.x, s.y, s.headingDeg), vanBox);
       if (d < closestCorrect) closestCorrect = d;
     }
-    expect(closestCorrect).toBeCloseTo(0.4, 1);
+    expect(closestCorrect).toBeCloseTo(0.64, 1);
     expect(closestCorrect).toBeGreaterThan(0); // correct drive does NOT touch
   });
 
-  it("the badge was reporting 3.56 m of air with the van 0.40 m behind", () => {
+  it("the badge was reporting 3.60 m of air with the van 0.64 m behind", () => {
     const samples = trace("sc-park-van", "shadow-correct");
     const before = replay(DISTRICT_ID, samples);
     const after = replay(DISTRICT_ID, samples, rearStaticBodiesFrom(OBSTACLES));
-    // The district-only channel: 44 reads, none of them the van.
-    expect(before.finite).toBe(44);
-    expect(before.min).toBeCloseTo(3.561, 2);
+    // The district-only channel: 94 reads, none of them the van.
+    expect(before.finite).toBe(94);
+    expect(before.min).toBeCloseTo(3.596, 2);
     // With the scene's own bodies: the van is nearer, and it is nearer early.
-    expect(after.finite).toBe(73);
-    expect(after.min).toBeCloseTo(0.401, 2);
-    expect(after.first!.tSec).toBeCloseTo(34.1, 1);
+    expect(after.finite).toBe(148);
+    expect(after.min).toBeCloseTo(0.641, 2);
+    expect(after.first!.tSec).toBeCloseTo(37.85, 1);
     expect(after.first!.speedKmh).toBeLessThan(0); // reversing, not on approach
   });
 
-  it("…and on the WRONG drive the student reaches it: 0.59 m → 0.00 m", () => {
+  it("…and on the WRONG drive the student reaches it: 2.31 m → 0.48 m on the fleet box, 0.00 m on the van's own", () => {
     const samples = trace("sc-park-van", "mistake-early-turn");
     const before = replay(DISTRICT_ID, samples);
     const after = replay(DISTRICT_ID, samples, rearStaticBodiesFrom(OBSTACLES));
-    expect(before.finite).toBe(97);
-    expect(before.min).toBeCloseTo(0.592, 2);
-    expect(after.finite).toBe(169);
-    expect(after.min).toBe(0);
+    // The same 74 poses read a body either way; WHICH body is the difference:
+    // the bay car 2.31 m off, or the van the tail is about to meet.
+    expect(before.finite).toBe(74);
+    expect(before.min).toBeCloseTo(2.309, 2);
+    expect(after.finite).toBe(74);
+    expect(after.min).toBeCloseTo(0.479, 2);
     expect(after.first!.speedKmh).toBeLessThan(0);
+    // The re-recorded demo comes to rest ON the van (0.12 m into the 2.65 m
+    // body the gate stands there, 0.18 m into the van's own) instead of 2.3 m
+    // inside it — so the 2.05 m fleet box still shows half a metre of air, and it is the van's OWN
+    // footprint (§1: half-length 2.67, the 0.62 m the box is short) that reads
+    // the contact. That is the footprint channel doing its job, on this drive.
+    const real = replay(
+      DISTRICT_ID,
+      samples,
+      rearStaticBodiesFrom(OBSTACLES, [{ index: 3, halfLengthM: 2.67, halfWidthM: 1.05 }]),
+    );
+    expect(real.finite).toBe(74);
+    expect(real.min).toBe(0);
   });
 
   it("what the STUDENT sees at the closest point of the CORRECT drive", () => {
-    // Credit is read off what reaches the glass. 0.40 m while reversing at
-    // −3.828 km/h is inside REAR_CUE_DANGER_M and the gap is closing, so this
+    // Credit is read off what reaches the glass. 0.64 m while reversing at
+    // −2.376 km/h is inside REAR_CUE_DANGER_M and the gap is closing, so this
     // is the O61 band as well: red, and the number is honest.
-    const cue = stepRearCue(null, 0.4015, -3.828);
+    const cue = stepRearCue(null, 0.6408, -2.376);
     expect(cue).not.toBeNull();
     expect(cue!.level).toBe("danger");
-    expect(rearCueLabelBg(cue!)).toBe("Кола отзад · 0 м");
+    expect(rearCueLabelBg(cue!)).toBe("Кола отзад · 1 м");
     // …and what it USED to say, from the same drive, before this wiring: the
     // bay car three and a half metres away, in amber-adjacent calm.
-    expect(rearCueLabelBg(stepRearCue(null, 3.5613, -3.828)!)).toBe("Кола отзад · 4 м");
+    expect(rearCueLabelBg(stepRearCue(null, 3.596, -2.376)!)).toBe("Кола отзад · 4 м");
   });
 
   it("a drive whose hazard is NOT a static body stays silent, before and after", () => {
@@ -325,11 +344,14 @@ describe("§4 what is NOT fed, and one filed premise that is false", () => {
 
   it("REFUTED: „mistake-into-wall is silent for the entire drive“ is true and means nothing", () => {
     // THE FINDING AS FILED: the lesson is literally called „into the wall" and
-    // the cue says nothing for the whole drive — 0 finite reads of 681 samples.
+    // the cue says nothing for the whole drive — 0 finite reads of 681 samples
+    // (651 since the drive was re-authored on the car's own circle, 2026-10-11,
+    // and 652 since round 2 stops it ON its contact point instead of 5 cm
+    // short of it: catalogue-demo-curvature:dae908c7).
     // The count is exact and reproduced below. The inference drawn from it is
     // false, and the trace says so in three independent ways.
     const samples = trace("sc-park-wall", "mistake-into-wall");
-    expect(samples).toHaveLength(681);
+    expect(samples).toHaveLength(652);
 
     // ONE. The drive NEVER REVERSES. Not „reverses slowly", not „reverses
     // below the gate" — there is not one negative sample in it. The whole
@@ -338,16 +360,23 @@ describe("§4 what is NOT fed, and one filed premise that is false", () => {
     expect(Math.max(...samples.map((s) => s.speedKmh))).toBeCloseTo(17.82, 1);
 
     // TWO. The wall is IN FRONT at the contact. The last moving sample is
-    // +6 км/ч at t = 32.45 s, and the wall (5.03, 8.6) is 0.22 m past the
-    // car's nose along its own heading at the final pose. The lesson's closing
-    // annotation says the same thing in Bulgarian: «Предницата опря в стената
-    // в края на реда» — the FRONT touched the wall.
+    // +2.4 км/ч at t = 30.95 s, and at the final pose the car's NOSE (2.02 m
+    // ahead of its centre, along its own heading) is 0.02 m past the wall's
+    // south face (the wall is 0.4 m thick about y = 8.6, so its face is 8.4)
+    // and inside its 6 m length. The lesson's closing annotation says the same
+    // thing in Bulgarian: «Предницата опря в стената в края на реда» — the
+    // FRONT touched the wall. (The old demo drove 0.4 m THROUGH the wall and
+    // this check measured against its centre line; the re-authored one stops
+    // on its face.)
     const last = samples[samples.length - 1];
     expect(last.speedKmh).toBe(0); // stopped ON the wall
     const rad = (last.headingDeg * Math.PI) / 180;
-    const forwardToWall = (5.03 - last.x) * Math.sin(rad) + (8.6 - last.y) * Math.cos(rad);
-    expect(forwardToWall).toBeCloseTo(-0.22, 1);
-    expect(Math.abs(forwardToWall)).toBeLessThan(0.5); // i.e. touching, at the nose
+    const noseX = last.x + 2.02 * Math.sin(rad);
+    const noseY = last.y + 2.02 * Math.cos(rad);
+    expect(noseY - 8.4).toBeCloseTo(0.02, 1);
+    expect(Math.abs(noseY - 8.4)).toBeLessThan(0.15); // i.e. touching, at the nose
+    expect(noseX).toBeGreaterThan(5.03 - 3);
+    expect(noseX).toBeLessThan(5.03 + 3);
 
     // THREE. Wiring the wall in would not change this drive by one sample:
     // it is never in the rear corridor at any pose of any of the lesson's

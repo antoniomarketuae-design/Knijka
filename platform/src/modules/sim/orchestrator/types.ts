@@ -36,6 +36,15 @@ export interface StagedTrafficPort {
    * boundaries, exactly as before.
    */
   setStagedSubstepListener?(listener: StagedSubstepListener | null): void;
+  /**
+   * sc-roundabout-entry:08a0b701 round 3 — ONE FACT: the director hands the
+   * traffic system its contact cast's kind for every vehicle-bodied cast
+   * member, once, at creation; the traffic system then names that body by it
+   * wherever it names a body (`TrafficSystem.vehicleCollisionKind`: the
+   * rapier shell's tag, the rear-proximity badge, the near-miss stat).
+   * Optional so a fake port in a test stays valid.
+   */
+  setStagedContactKind?(actorId: string, kind: "vehicle" | "cyclist"): void;
 }
 
 /**

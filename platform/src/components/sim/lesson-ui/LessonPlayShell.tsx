@@ -1163,6 +1163,21 @@ export function objectiveTitleUnderHold(
  * glass the moment the card is closed or leaves; a banner with no hold lead —
  * the task and its speed cap — is never cut. Not to be changed without a new
  * decision.
+ *
+ * …AND THAT NEW DECISION IS W8 (integrator, 2026-10-15, display only). While
+ * the column STANDS for a judged card nobody opened (`useToastReader`'s
+ * `standing`, W7 — a graded fault or «Научи» card the column would otherwise
+ * cut), the banner under a route hold falls to this same one-line form,
+ * exactly as it does during a reading: only as the stand's second step
+ * (`bannerYields`), only while that card is still cut once the advisor's card
+ * and praise have waited, only under a hold, the whole sentence in the DOM,
+ * and back on the glass the moment the card leaves (at most the card's own
+ * 8 s). The frame it answers: on the 1165 × 650 stage 18 catalogued summaries
+ * (137.5–181.5 px) were whole before the crash pin and lost their law chip for
+ * the rest of their life when the banner grew 48.7 → 76.2 px (lane `cardstay`
+ * round 1, its verifier's F1). A banner with no hold lead is still never cut —
+ * this function's own `hold !== null`. The name stays: a stand is the column
+ * reading a card on the student's behalf.
  */
 export function bannerOneLineWhileReading(hold: RouteHold | null, bannerYields: boolean): boolean {
   return bannerYields && hold !== null;
@@ -3300,6 +3315,22 @@ export function measureToastColumnFold(scroller: HTMLElement): ToastFold {
   if (stack === null) return NO_TOAST_FOLD;
   const rows = toastCardRowsInScrollCoords(scroller, stack);
   const scrollTop = scroller.scrollTop;
+  // …AND A WINDOW THE ROW SQUEEZED TO NOTHING IS STILL A WINDOW — sc-roundabout-
+  // entry:fe081cf1, rig-w3g CONTROL-NOPRESS-SIM (2026-10-15). With the advisor's
+  // card and the pinned banner above it the scroller had 29.6 px; the row's own
+  // 23.5 + 6 left it 0.1, which `clientHeight` rounds to 0 — and `rowsBelowFold`
+  // reads 0 as „not laid out, no claim". So the row took itself down, the window
+  // came back to 29.6, the card was cut again and the row went back up: 30 ↔ 0.1
+  // px every one or two frames for 3 s. A scroller whose cards HAVE a height is
+  // laid out; its window is 0, and every card in it is below the fold and unseen.
+  // Whether the row is needed is asked, as below, of the column without it.
+  if (scroller.clientHeight <= 0 && rows.some((r) => r.height > 0)) {
+    const squeezedBy = scroller.parentElement?.querySelector<HTMLElement>(":scope > [data-hud-toast-more]") ?? null;
+    if (squeezedBy !== null && rowsBelowFold(rows, scrollTop, toastScrollerHeightWithoutRow(scroller, squeezedBy)) > 0) {
+      const laidOut = rows.filter((r) => r.height > 0).length;
+      return { belowFold: laidOut, unseenBelowFold: laidOut };
+    }
+  }
   // …AND THE CARD BEING READ SCROLLS INSIDE ITSELF (W2, 2026-10-13). Its box
   // never crosses this scroller's fold — `HudToasts` shrinks it to the window
   // — so the rows above count it whole, and the cut, when there is one, is
@@ -6999,11 +7030,17 @@ export function LessonPlayShell({
   //   · the fold row reads and pages the opened card's body box
   //     (`measureToastColumnFold`, `pageToastRead`), and the fade follows it;
   //   · the full-frame debrief waits for it (`debriefVisibility.reading`).
+  //   · and (W7, 2026-10-15) with nothing open, a graded fault or «Научи»
+  //     card on the glass that the advisor's card, praise or the banner's
+  //     growth has cut is STOOD FOR: the advisor's card (`held`) and praise
+  //     (`standing`) wait until it leaves — `HudToasts`, „THE GRADED CARD
+  //     NOBODY PRESSED". The banner is not touched (W6 is the reading's).
   const toastReader = useToastReader({
     toasts,
     scroller: toastScrollRef,
     whyChanged,
     holdAllBut,
+    quiet: toastsQuiet,
   });
   // A layout effect, every commit: the fold is also measured in the layout
   // phase (the effect below), and a `recheck` one render old would judge the
@@ -7016,11 +7053,21 @@ export function LessonPlayShell({
   // row standing under the column was raised for one of them; the observer
   // below would take it down a painted frame later, and for that frame the
   // opened card would be 29.5 px shorter than its window. Keyed on the three
-  // things the reading changes in this column and on nothing else.
+  // things the reading changes in this column and on nothing else — and on the
+  // one thing a stand changes that none of them does: its last step takes the
+  // stood card's age stamp off (W9, `trimAge`), and the row raised while that
+  // card was cut stood one painted frame over the card the trim had just made
+  // whole (cardstay round 2, measured: «Изпреварване в зона със забрана» on the
+  // 1165 × 650 stage, its law chip under a 131.9 px window for one frame).
   const toastReadingId = toastReader.reading === null ? null : toastReader.reading.id;
+  // …and on the paragraph the reader asks for its summary (`summarise`): the card
+  // renders that summary in the commit that carries the ask, and the row raised
+  // over the cut paragraph is re-asked in the same commit, not a painted frame
+  // later.
+  const toastStandTrimmed = toastReader.standing?.trimAge === true;
   useLayoutEffect(() => {
     measureToastFold();
-  }, [measureToastFold, toastReadingId, toastReader.held, toastReader.bannerYields]);
+  }, [measureToastFold, toastReadingId, toastReader.held, toastReader.bannerYields, toastStandTrimmed, toastReader.summarise]);
   // …AND THE ROW LEAVES WITH THE LAST CARD, in the same commit rather than one
   // frame later. `toastsBelowFold` is state, and the only thing that zeroes it
   // once `HudToasts` stops rendering is the observer effect below, re-created
@@ -7031,7 +7078,7 @@ export function LessonPlayShell({
   // the repair does not depend on it. `visibleToasts` is the very rule
   // `HudToasts` returns null on, so this count is zero exactly when there is no
   // card to be below anything.
-  const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading).length;
+  const toastsShownCount = visibleToasts(toasts, toastsQuiet, toastReader.reading, toastReader.standing).length;
   useEffect(() => {
     const el = toastScrollRef.current;
     if (el === null) return;
@@ -8382,6 +8429,10 @@ export function LessonPlayShell({
           // it or it leaves (`useToastReader` — the yield is measured, latched,
           // and taken before paint). The banner above goes to one line only
           // if that was not enough (`bannerOneLineWhileReading`).
+          // …nor would it push a graded fault or «Научи» card nobody opened
+          // out of the window (W7, sc-roundabout-entry:fe081cf1 rig-w3g
+          // CONTROL-NOPRESS-SIM): it waits while that card stands on the
+          // glass and is painted when it leaves (`useToastReader.standing`).
           !toastReader.held &&
           snap.advisorPrompt.textBg !== advisorDismissed ? (
             <AdvisorCard
@@ -8670,6 +8721,12 @@ export function LessonPlayShell({
                   // The card whose «ЗАЩО» is open, and whether the column has
                   // yielded to it — see `toastReader`, above `toastsShownCount`.
                   reading={toastReader.reading}
+                  // The graded card the column stands for (W7): praise waits
+                  // while it does.
+                  standing={toastReader.standing}
+                  // …and the paragraph the reader asks for its summary before
+                  // paint, so a cut frame is never painted (cardstay round 2).
+                  summarise={toastReader.summarise}
                   onWhyChange={toastReader.onWhyChange}
                   readMaskCss={toastsBelowFold > 0 && toastFoldInRead ? TOAST_FADE_MASK_CSS : null}
                   // A `scroll` does not bubble: a wheel over the paragraph moves the

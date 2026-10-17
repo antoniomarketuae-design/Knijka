@@ -781,16 +781,37 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // that is the check on this story: the lot has no static body behind a
     // car backing out of lot-bay-3, before or after, so none of the new frames
     // can raise the badge.
-    expect(samples).toBe(36925);
+    //
+    // 36 925 → 38 989 on 2026-10-11: the NINE parking-depth lessons of
+    // traces/scParkDepth.ts (gap-short, van, 45-rev, left, zebra, wall, night,
+    // double, judge — 27 recordings) were RE-AUTHORED the same way
+    // (catalogue-demo-curvature:dae908c7): every swing on the car's own 4.6 m
+    // circle with the wheel wound on and off in ramps, a stop and a look
+    // half-way round, the last twelve metres to the setup at 5.5 km/h, and each
+    // mistake demo STOPPING on the body it touches instead of driving on
+    // through it. The 24 other recordings in the corpus are byte-identical.
+    // `badgeUp` 4 358 → 4 800 and `slowReverseClearAir` 571 → 647 are the
+    // longer, slower reverses; `red` 2 296 → 1 981 is the frames the old demos
+    // spent reversing INSIDE a parked car, which no longer exist. The two
+    // zeroes below are untouched, and they are the check on this story.
+    //
+    // 38 989 → 39 114 on round 2 of the same row (2026-10-15): the short and
+    // the night slot parked in TWO moves instead of three (no roll back), the
+    // hidden-pedestrian demo PARKED by reversing into the slot before the
+    // crossing (a reverse it did not have), the contact demos stopping ON the
+    // body the live scene mounts, and a few new looks. `badgeUp` 4 800 → 4 700,
+    // `red` 1 981 → 2 018 and `slowReverseClearAir` 647 → 674 (re-measured, not
+    // apportioned between those changes). The two zeroes are still zero.
+    expect(samples).toBe(39114);
     // …and the badge is up for all eight of them (4 350 → 4 358): the beat is
     // a braked pause in the parallel slot with the car behind still inside the
     // cue's range, so the badge state does not change — only its duration.
-    expect(badgeUp).toBe(4358);
+    expect(badgeUp).toBe(4700);
     // MEASURED: red went 82 → 2,296 frames, all of them reversing inside 4 m.
     // UNCHANGED by the eight new samples, and that is the check on the story
     // above rather than a coincidence: those samples are `speedKmh: 0` under a
     // held brake, and `danger` requires `rearCueClosing(speedKmh)`.
-    expect(red).toBe(2296);
+    expect(red).toBe(2018);
     // The two that must be zero, and they are the whole honesty argument.
     //
     // A REFUTER CALLED BOTH OF THESE TAUTOLOGIES AND THE MEASUREMENT SAYS
@@ -818,7 +839,7 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // reading it off the function — which is what the file must never start
     // doing, and is why `stepRearCue` is called rather than reimplemented.
     expect(redWhileNeither, "red while neither reversing nor at traffic speed").toBe(0);
-    expect(slowReverseClearAir, "the false-refusal population must be non-empty").toBe(571);
+    expect(slowReverseClearAir, "the false-refusal population must be non-empty").toBe(674);
     expect(slowReverseClearAirRed, "slow reverse with 4 m+ of air must never be red").toBe(0);
   });
 });

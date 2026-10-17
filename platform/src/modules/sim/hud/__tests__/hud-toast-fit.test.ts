@@ -1980,7 +1980,8 @@ function wiringFaults(hud: string, shell: string): string[] {
           "the body <p> is no longer collapsed while the choice is pending — the shell's fold measurement would see the paragraph",
         );
     }
-    if (!/useToastBodyChoice\(\s*canSummarise\s*,\s*violationToastBodyBg\(\s*event\s*,\s*false\s*\)\s*\)/.test(toast))
+    // (lane cardstay round 2: a third argument, the column's pre-paint ask — `summariseNow`)
+    if (!/useToastBodyChoice\(\s*canSummarise\s*,\s*violationToastBodyBg\(\s*event\s*,\s*false\s*\)\s*(?:,\s*summariseNow\s*)?\)/.test(toast))
       faults.push("ViolationToast no longer measures with useToastBodyChoice(canSummarise, violationToastBodyBg(event, false))");
     if (!/const\s+showParagraph\s*=\s*!summarised\s*\|\|\s*whyOpen\s*;/.test(toast))
       faults.push("showParagraph is no longer «not summarised, or opened by the chip»");
@@ -2295,8 +2296,8 @@ describe("THE VERIFIER'S EIGHT — each one-line edit turns this file RED", () =
     {
       n: 1,
       name: "the card never asks to be measured — useToastBodyChoice(false)",
-      from: "useToastBodyChoice(canSummarise, violationToastBodyBg(event, false))",
-      to: "useToastBodyChoice(false, violationToastBodyBg(event, false))",
+      from: "useToastBodyChoice(canSummarise, violationToastBodyBg(event, false), summariseNow)",
+      to: "useToastBodyChoice(false, violationToastBodyBg(event, false), summariseNow)",
       behaviour: /not "pending" — the card never waits/,
       pin: /useToastBodyChoice\(canSummarise, violationToastBodyBg/,
     },

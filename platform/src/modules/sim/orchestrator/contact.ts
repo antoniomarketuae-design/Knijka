@@ -259,6 +259,31 @@ import type { DirectorInput, StagedTrafficPort } from "./types";
 export type ContactWith = "vehicle" | "pedestrian" | "cyclist";
 
 /**
+ * WHAT KIND OF ROAD USER A STAGED VEHICLE BODY IS — read off the rig it is
+ * drawn and boxed with (sc-roundabout-entry:08a0b701, round 2).
+ *
+ * A staged «cyclist» is a narrow vehicle agent on the bicycle rig; whether a
+ * touch on it reads «Удар във велосипедист» or as a car crash was decided in
+ * TWO places that did not agree — the runner's cast (an argument at each call
+ * site) and the traffic system's curb-offset marker (which tags the rapier
+ * shell) — so one touch on a staged rider was billed twice, one grid point
+ * apart, as two kinds (measured: sc-vu-bikelane-turn, sentinel «cyclist» at
+ * point 1157, the shell «vehicle» at 1158). 15 of the catalogue's 784 cast
+ * members disagreed: the two bikelane riders (cast cyclist, shell vehicle —
+ * their curb offsets are negative) and the child of sc-vu-child-cyclist (cast
+ * vehicle, shell cyclist — a child on a bicycle, cast by the cut-in runner as
+ * the car that runner usually stages).
+ *
+ * The profile is the one fact all three share: it is what the student SEES,
+ * it sizes the sentinel's box and the rapier shell, and the cast already
+ * carries it. The cast's kind is now this function of it, and the shell's tag
+ * is read off the cast (scene/npcShells.ts) — there is no second table.
+ */
+export function contactKindOfProfile(profile: VehicleProfile | undefined): "vehicle" | "cyclist" {
+  return profile === "cyclist" || profile === "childCyclist" ? "cyclist" : "vehicle";
+}
+
+/**
  * ONE STAGED BODY OF AN EVENT'S CAST — declared, not published.
  *
  * This is a DESCRIPTION of a body that exists in the world, and it is

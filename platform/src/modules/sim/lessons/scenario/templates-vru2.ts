@@ -341,8 +341,12 @@ const VUG_STREET_M = 360;
  * releaseDistM 360 exceeds the spawn's ~345 m node distance, so the whole
  * column rolls from the first frame (no hold theater on an empty street).
  * The GRADING is the runtime's vulnerable-pass tracker, once per rider.
- * A11: extraRightOffsetM > 0 at stage time is what tags each proxy a CYCLIST —
- * it drives both `cyclistNear` (the tracker's feed) and collision(cyclist).
+ * Each rider is a CYCLIST because its runner casts it one (the profile's kind,
+ * orchestrator/contact.ts `contactKindOfProfile`): that one fact is what
+ * `cyclistNear` (the tracker's feed), collision(cyclist), the rear badge and
+ * the near-miss stat all read (sc-roundabout-entry:08a0b701, lane npcstep
+ * rounds 2–4). extraRightOffsetM +2.6 is the curb line — geometry; the A11
+ * marker it also sets answers only for a state no cast names.
  */
 const VUG_COLUMN: readonly CyclistRightHookSpec[] = [1, 2, 3, 4, 5].map((n) => ({
   // n = 1 is the LEAD rider (furthest up the street), n = 5 the tail.
@@ -630,11 +634,13 @@ const VUCC_STREET_M = 300;
  * SHIPPED as the FO-03 cut-in's own machinery, so this template needs no engine
  * work — it needs the right actor. Four dials do the whole job:
  *
- *  1. THE RIG + THE GRADING TAG: `extraRightOffsetM` +2.6 puts him on the curb
- *     line AND tags him a CYCLIST (A11 vehicleCollisionKind — the marker that
- *     drives `cyclistNear`, which is the vulnerable-pass tracker's only feed).
- *     The spec's own doc-comment says to keep the offset ≤ 0 „a positive curb
- *     offset tags the actor as a cyclist proxy" — here that IS the requirement.
+ *  1. THE RIG: `extraRightOffsetM` +2.6 puts him on the curb line. He is a
+ *     CYCLIST to every reader — `cyclistNear` (the vulnerable-pass tracker's
+ *     only feed), the bill, the rear badge, the near-miss stat — because his
+ *     runner casts him one from his "childCyclist" profile (lane npcstep
+ *     rounds 2–4: the cast's kind, read through `vehicleCollisionKind`). The
+ *     positive offset also sets the A11 marker, which now answers only for a
+ *     state no cast names; the same answer here.
  *  2. THE PACE: matchPlayer with `paceAheadM` 400 — an unreachable gap, so the
  *     proportional law's target (playerMps + 0.55 × (400 − gap)) is ALWAYS far
  *     above `maxMatchSpeedMps`, and the actor simply saturates the cap. Net
@@ -651,7 +657,10 @@ const VUCC_STREET_M = 300;
  *     he visibly leans into it. `minCutSpeedKmh` 5 is authored DOWN to a floor
  *     no drive can miss: the swerve must be a fact of the street, identical in
  *     all three recordings, never a function of how the driver behaved.
- *  4. THE CONTACT: the runner's ONLY emitted event is collision(vehicle), and
+ *  4. THE CONTACT: the runner's ONLY emitted event is a collision — billed
+ *     «cyclist» since sc-roundabout-entry:08a0b701 round 2 (the cast's kind
+ *     is the profile's: orchestrator/contact.ts `contactKindOfProfile`; it
+ *     was «vehicle», a child on a bicycle billed as a car) — and
  *     since 2026-08-10 it is EXACT BODY GEOMETRY (sim/collision) sized from the
  *     actor's own `profile` — here "childCyclist", 1.5 × 0.33 m. It used to be
  *     an isotropic 3.0 m circle around two points, which billed both authored
@@ -673,8 +682,10 @@ const VUCC_CHILD: CutInLeadCarSpec = {
     // The CHILD bicycle rig (render only — CutInLeadCarRunner forwards the
     // profile; without it the cut-in actor renders as a fleet CAR, the exact
     // founder-reported bug). "childCyclist" ≈ 0.72-scale bike + upright
-    // hi-vis rider; grading is untouched (the A11 curb-offset tag above is
-    // still what feeds cyclistNear / collision(cyclist)).
+    // hi-vis rider. What the body IS — to the graded cyclistNear query, the
+    // collision bill, the shell's tag, the rear badge and the near-miss stat
+    // alike — is the cast's kind, «cyclist» from this profile
+    // (sc-roundabout-entry:08a0b701, lane npcstep rounds 2–4).
     profile: "childCyclist",
   },
   paceAheadM: 400, // unreachable by design — see dial 2 above
@@ -933,10 +944,18 @@ const VBL_CF_Y = -8.26; // westbound rider line (lane center − 4.2)
  * THE WITH-FLOW RIDER — the classic curb cyclist going the driver's own
  * direction (the sc-vu-cyclist-hook recipe, reused). Holds ~26 m short of the
  * mouth curb-side; released as the driver closes; cruises STRAIGHT through the
- * junction as the driver overtakes then turns across it. extraRightOffsetM 2.6
- * lands it on the south track's inner line (y = −6.66) AND tags it a cyclist
- * (A11 vehicleCollisionKind → collision(cyclist)). Adjudicated by the shipped
- * CyclistRightHookRunner (prioritySituation "cyclist-right-hook").
+ * junction as the driver overtakes then turns across it. Adjudicated by the
+ * shipped CyclistRightHookRunner (prioritySituation "cyclist-right-hook"); a
+ * CYCLIST to every reader (the bill, the shell, the rear badge, the near-miss
+ * stat and the graded cyclistNear query) because its runner casts it one —
+ * lane npcstep rounds 2–4, never the sign of the offset.
+ *
+ * CONTENT QUESTION, CARRIED (not changed by lane npcstep — it moves a rider):
+ * the offset is AUTHORED as `VBL_WF_Y − VBL_THROUGH_Y` = −6.66 − (−4.06) =
+ * −2.6, and offsetPolyline offsets to the RIGHT OF TRAVEL (south, for this
+ * eastbound rider). So −2.6 carries it 2.6 m NORTH, to y ≈ −1.46 — not the
+ * south curb line y = −6.66 the lines above intend (that needs +2.6). Measured
+ * in the lane (r2/out/pos.txt); filed for the integrator as a content row.
  */
 const VBL_RIDER_WF: CyclistRightHookSpec = {
   id: "sc-vbl-rider-wf",
@@ -948,7 +967,7 @@ const VBL_RIDER_WF: CyclistRightHookSpec = {
     pathNodes: ["vu-n-w", "vu-n-c", "vu-n-e"],
     hold: { nodeIndex: 1, offsetM: -30 }, // curb-side, 30 m short of vu-n-c
     cruiseSpeedMps: 3.0, // ~11 km/h — a city cyclist; overtaken below the follow floor
-    extraRightOffsetM: VBL_WF_Y - VBL_THROUGH_Y, // +2.6 — the south curb line + the A11 tag
+    extraRightOffsetM: VBL_WF_Y - VBL_THROUGH_Y, // −2.6 AS AUTHORED: rides at y ≈ −1.46, not the south curb line — the content question above
     colorIndex: 1,
   },
   junctionNodeIndex: 1,
@@ -963,11 +982,14 @@ const VBL_RIDER_WF: CyclistRightHookSpec = {
  * same south track. Its extraRightOffsetM is NEGATIVE (−12.32) because
  * offsetPolyline offsets to the RIGHT OF TRAVEL, and this actor travels WEST —
  * so a negative offset carries it across to the SOUTH side (y = −8.26), onto
- * the two-way track next to its with-flow mate. A negative offset also leaves
- * it UNTAGGED by the cyclistNear feed (that marker is offset > 0), which is
- * correct here: the counter-flow rider is graded ONLY by its own
- * CyclistRightHookRunner (prioritySituation + the runner's collision channel),
- * never by the vulnerable-pass tracker. Held ~36 m short of the mouth so it
+ * the two-way track next to its with-flow mate. The counter-flow rider is
+ * graded ONLY by its own CyclistRightHookRunner (prioritySituation + the
+ * runner's collision channel), never by the vulnerable-pass tracker: that is
+ * the AUTHORED `gradedOnlyByOwnRunner: true` below (contracts.ts
+ * StagedActorPathSpec; lane npcstep round 4). Until then the opt-out was the
+ * negative sign of this offset (the A11 marker is offset > 0) — the graded
+ * queries now read the cast's kind, «cyclist», so the sign no longer says
+ * anything. Held ~36 m short of the mouth so it
  * arrives ~2.4 s AFTER the with-flow rider — the driver clears one, then the
  * other, then turns.
  */
@@ -983,6 +1005,9 @@ const VBL_RIDER_CF: CyclistRightHookSpec = {
     cruiseSpeedMps: 4.0, // ~14 km/h — a brisk commuter; clears the mouth briskly
     extraRightOffsetM: VBL_CF_Y - 4.06, // −12.32 — westbound lane (+4.06) shoved south
     colorIndex: 3,
+    // Graded only by its own runner — never by the vulnerable-pass tracker,
+    // the overtake-return duty or the lane-entry tracker (see above).
+    gradedOnlyByOwnRunner: true,
   },
   junctionNodeIndex: 1,
   releaseDistM: 60,

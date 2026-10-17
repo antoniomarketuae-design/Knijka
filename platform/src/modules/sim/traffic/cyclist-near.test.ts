@@ -150,4 +150,33 @@ describe("TrafficSystem.cyclistNear — the staged-proxy integration", () => {
     // querying a window that only reaches the car.
     expect(traffic.cyclistNear(4.06, 139, 0, 5)).toBeNull();
   });
+
+  // Lane npcstep round 5 (its own mutant N9h): `gradedOnlyByOwnRunner` keeps a
+  // staged body out of ALL THREE graded queries — the two same-direction
+  // VEHICLE queries too, not only the clearance feed — whatever its kind. In
+  // the catalogue the only member authored with it is a rider (already out of
+  // the vehicle queries as a cyclist), so only a plain staged car shows it.
+  it("a plain staged car staged `gradedOnlyByOwnRunner` is returned by none of the three graded queries; the same car without it is a vehicle to both vehicle queries", () => {
+    const stageCar = (ownRunnerOnly: boolean) => {
+      const traffic = createTrafficSystem(district, { seed: 7, vehicleCount: 0, pedestrianCount: 0 });
+      const car = traffic.stage({
+        kind: "vehicle",
+        id: "probe-car",
+        pathNodes: ["n-a", "n-b"],
+        hold: { nodeIndex: 0, offsetM: 140 },
+        cruiseSpeedMps: 10,
+        ...(ownRunnerOnly ? { gradedOnlyByOwnRunner: true as const } : {}),
+      });
+      expect(car).not.toBeNull();
+      return traffic;
+    };
+    const plain = stageCar(false);
+    expect(plain.overtakenNear(4.06, 125, 0, 30)).not.toBeNull();
+    expect(plain.sameDirVehiclesNear(4.06, 125, 0, 30)).toHaveLength(1);
+    expect(plain.cyclistNear(4.06, 125, 0, 30)).toBeNull();
+    const own = stageCar(true);
+    expect(own.overtakenNear(4.06, 125, 0, 30)).toBeNull();
+    expect(own.sameDirVehiclesNear(4.06, 125, 0, 30)).toHaveLength(0);
+    expect(own.cyclistNear(4.06, 125, 0, 30)).toBeNull();
+  });
 });

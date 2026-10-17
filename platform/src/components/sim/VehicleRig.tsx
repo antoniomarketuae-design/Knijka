@@ -382,6 +382,7 @@ export function VehicleRig({
   lessonRequiredKmh,
   onCollision,
   contactListenerRef,
+  stepLoopGradeRef,
   collisionMinKmh = COLLISION_MIN_KMH,
   night = false,
   rain = false,
@@ -441,6 +442,34 @@ export function VehicleRig({
    *  grid point. Filled on mount, emptied on unmount. Without it the rig
    *  hears no contact. */
   contactListenerRef?: MutableRefObject<ChassisContactListener | null>;
+  /**
+   * THE SCENE'S TURN BEFORE A PHYSICS STEP'S INPUT IS READ (sc-roundabout-
+   * entry:08a0b701, round 2). LessonScene's RuntimeDriver fills it — in a
+   * layout effect, on every render — with «grade the step just taken, if it
+   * has not been graded»; this rig calls it FIRST in its before-step callback,
+   * and only then reads the input for the step about to be taken. On a frame
+   * of one step it finds nothing to grade (the frame's own call graded the
+   * previous step) and costs one compare.
+   *
+   * WHY IT IS CALLED FROM HERE and is not a second `useBeforePhysicsStep` of
+   * RuntimeDriver's (round 1 had that):
+   *   · ORDER. Point k is graded, THEN the input of step k + 1 is read — the
+   *     order a frame of one step always had (the grade at the frame's end,
+   *     the next frame's read after it). Whatever the grade of point k changes
+   *     that an input read sees — the dev rig's pad and its key edges, a
+   *     respawn — reaches step k + 1 on every display. Two callbacks in
+   *     @react-three/rapier's set run in the order their passive effects
+   *     registered them, which a remount of either component can reverse;
+   *   · NO STALE RENDER. @react-three/rapier keeps a before-step callback in a
+   *     ref it updates in a PASSIVE effect, while R3F updates a frame callback
+   *     in a layout effect — so a frame drawn between a commit and its passive
+   *     flush would have graded its earlier points with the previous render's
+   *     `paused` and props, and its last point with this one's. This rig's
+   *     own callback only DEREFERENCES this ref; what it finds there was put
+   *     by the committed render, in the same layout phase as the frame's.
+   * Without it (a rig mounted outside a lesson) nothing is graded from here.
+   */
+  stepLoopGradeRef?: RefObject<(() => void) | null>;
   /** Minimum impact speed (km/h) that grades as a collision. Defaults to the
    *  street nudge-tolerance COLLISION_MIN_KMH (10). Parking scenarios pass a
    *  low/zero threshold (S0 seam — see ScenarioObstacles) so ANY bumper
@@ -633,6 +662,11 @@ export function VehicleRig({
   // Runs once per fixed 60 Hz substep, right before world.step() — exactly
   // the contract VehicleSim.update() requires. Always the fixed dt.
   useBeforePhysicsStep(() => {
+    // THE SCENE'S TURN FIRST (`stepLoopGradeRef` above): the step rapier has
+    // just taken is graded — and the road users' shells are posed from the
+    // world it left — before this step's input is read. Before the `sim`
+    // guard: the grade owes nothing to this rig having a sim.
+    stepLoopGradeRef?.current?.();
     const sim = simRef.current;
     if (!sim) return;
     // SURFACE-PATCH slice: modulate grip from the authored waterPatch/icePatch
