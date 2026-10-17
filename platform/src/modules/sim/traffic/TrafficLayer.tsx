@@ -53,10 +53,13 @@
  * the same mapping district-v1.json documents. Vehicle geometry noses +Z in
  * local space; yaw = atan2(dirX, -dirY) points it along the travel direction.
  *
- * When `runtime` is passed the layer drives `system.update` itself inside its
- * useFrame (fine for drop-in use). For explicit frame ordering next to the
- * rule engine, omit `runtime` and call `system.update` yourself — the layer
- * then only renders state.
+ * The layer ONLY RENDERS state: it never calls `system.update`. The world is
+ * advanced once per fixed 1/60 s grid point by the grade grid (ADR-014,
+ * scene/gradeGrid.ts) and by the clip feed — the callers that hand the traffic
+ * both signal reads. (A «drop-in» mode that stepped the system from this
+ * component's own useFrame was removed with sc-sig-controller-postures:5ee4301e
+ * round 2: no mount passed it a runtime, it advanced the world per render frame,
+ * which ADR-014 forbids, and nothing could test what it fed the traffic.)
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
@@ -79,10 +82,10 @@ import {
   type Object3D as AnyObject3D,
 } from "three";
 import {
+  CONTROLLER_ATTENTION_LEAD_SEC,
   PERCEPTUAL_ROAD_SCALE,
   type ActorLabelSpec,
   type HazardStimulusSpec,
-  type SignalPhase,
 } from "../contracts";
 import { edgeTravelHalfWidth, isMotorwayEdge, nodeOpenRadiusM } from "../world/builders/network";
 import { isExtraUrbanCarriageway } from "../world/builders/constants";
@@ -122,7 +125,6 @@ import type {
   TrafficDistrict,
   TrafficRenderPose,
   TrafficSystem,
-  TrafficUpdateContext,
   VehicleIndicator,
 } from "./types";
 
@@ -333,11 +335,11 @@ export const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about loca
  * all, which is the only reading a student can actually get wrong.
  */
 export const OFC_ARM_FWD_RAD = 0.44;
-/** „Внимание" window before the flip, s — sized to the recorded narrations:
- *  the postures shadow's „ръката му се вдига" lands ≈ t 19 on the flip-30
- *  drills (raise = 30 − 11), and the live drill's shadow crosses at ≈ t 13,
- *  safely before its own raise at 26 − 11 = 15. */
-const OFC_RAISE_LEAD_SEC = 11;
+/** „Внимание" window before the flip, s — the ONE window the runtime's ambient
+ *  read holds the cross traffic on too (contracts.ts CONTROLLER_ATTENTION_LEAD_SEC,
+ *  sc-sig-controller-postures:5ee4301e): the raised arm and the cars that obey
+ *  it can never disagree. */
+const OFC_RAISE_LEAD_SEC = CONTROLLER_ATTENTION_LEAD_SEC;
 const OFC_TURN_RATE = 3.2; // whole-figure yaw damp toward the halted axis, 1/s
 const OFC_ARM_RATE = 4.2; // posture damp, 1/s
 
@@ -1686,14 +1688,6 @@ export interface ControllerFigureRead {
 
 export interface TrafficLayerProps {
   system: TrafficSystem;
-  /** When provided, the layer calls system.update each frame (drop-in mode). */
-  runtime?: { signalPhase(signalNodeId: string): SignalPhase };
-  /** Player chassis object (three space); read for position each frame. */
-  playerRef?: RefObject<AnyObject3D | null>;
-  /** Player speed for pedestrian gap logic (drop-in mode). */
-  playerSpeedKmhRef?: RefObject<number>;
-  /** Player heading (0 = north, cw) so agents follow rather than tailgate. */
-  playerHeadingDegRef?: RefObject<number>;
   /** Cull radius around the camera, meters. */
   maxDrawDistanceM?: number;
   /**
@@ -1779,10 +1773,6 @@ export interface TrafficLayerProps {
 
 export function TrafficLayer({
   system,
-  runtime,
-  playerRef,
-  playerSpeedKmhRef,
-  playerHeadingDegRef,
   maxDrawDistanceM = 150,
   night = false,
   district = null,
@@ -2001,7 +1991,6 @@ export function TrafficLayer({
   interface Scratch {
     dummy: Object3D;
     color: Color;
-    playerPos: { x: number; y: number };
     // Per-vehicle cosmetic state.
     dispYaw: Float32Array; // slerp-smoothed heading
     prevYaw: Float32Array; // previous smoothed heading (for steer rate)
@@ -2044,7 +2033,6 @@ export function TrafficLayer({
     qFlat: Quaternion; // Rx(-90): lays a decal flat on the ground
     qBlob: Quaternion;
     qLat: Quaternion; // officer lateral arm raise about local Z
-    ctx: TrafficUpdateContext;
   }
   const scratchRef = useRef<Scratch | null>(null);
   // The painted canvas is cached against the POSTURE (`scratch.bubblePosture`),
@@ -2058,12 +2046,6 @@ export function TrafficLayer({
     if (s) s.bubblePosture = -1;
   }, [controllerCaption]);
 
-  // Bound once per runtime — the frame loop must not allocate closures.
-  const boundSignalPhase = useMemo(
-    () => (runtime ? (id: string) => runtime.signalPhase(id) : null),
-    [runtime],
-  );
-
   // Instanced-buffer setup + scratch (re)build.
   useLayoutEffect(() => {
     const color = new Color();
@@ -2071,7 +2053,6 @@ export function TrafficLayer({
     const scratch: Scratch = {
       dummy: new Object3D(),
       color,
-      playerPos: { x: 0, y: 0 },
       dispYaw: new Float32Array(nVeh),
       prevYaw: new Float32Array(nVeh),
       steer: new Float32Array(nVeh),
@@ -2101,7 +2082,6 @@ export function TrafficLayer({
       qFlat,
       qBlob: new Quaternion(),
       qLat: new Quaternion(),
-      ctx: { signalPhase: () => "green", playerPos: null },
     };
     scratchRef.current = scratch;
     // Bodies/wheels (the GLB fleet) manage their own draw usage; only the
@@ -2256,23 +2236,6 @@ export function TrafficLayer({
   useFrame((frame, dt) => {
     const scratch = scratchRef.current;
     if (!scratch) return;
-    // --- Drop-in drive mode.
-    if (boundSignalPhase) {
-      const ctx = scratch.ctx;
-      ctx.signalPhase = boundSignalPhase;
-      const player = playerRef?.current;
-      if (player) {
-        scratch.playerPos.x = player.position.x;
-        scratch.playerPos.y = -player.position.z; // three -> district
-        ctx.playerPos = scratch.playerPos;
-        ctx.playerSpeedKmh = playerSpeedKmhRef?.current;
-        ctx.playerHeadingDeg = playerHeadingDegRef?.current;
-      } else {
-        ctx.playerPos = null;
-      }
-      system.update(dt, ctx);
-    }
-
     const cam = frame.camera.position;
     const maxD2 = maxDrawDistanceM * maxDrawDistanceM;
     const dummy = scratch.dummy;

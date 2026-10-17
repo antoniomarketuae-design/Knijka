@@ -1219,6 +1219,13 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
   signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase;
   /**
+   * The signal an AMBIENT car obeys on its own approach — `SignalController.ambientPhase` (the posted officer's
+   * permission, his raised-arm window, else the lamp facing `approachBearingDeg`; null on a link inside one signal
+   * complex). sc-sig-controller-postures:5ee4301e — the traffic layer reads this, never `signalPhase(node)`, so cross
+   * traffic stops on its own red and on the officer's halt. Nothing graded reads it.
+   */
+  ambientSignalPhase(signalNodeId: string, approachBearingDeg: number, fromNodeId: string): SignalPhase | null;
+  /**
    * Rail-barrier ARM state for the guarded crossing nearest (x, y) (district
    * meters — the world prop's own position): true = down/barred. Read-only
    * render seam (the animated arm), evaluated from the SAME validated
@@ -4042,6 +4049,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase {
       return signals.phaseForApproach(signalNodeId, bearingDeg);
+    },
+
+    ambientSignalPhase(signalNodeId: string, approachBearingDeg: number, fromNodeId: string): SignalPhase | null {
+      return signals.ambientPhase(signalNodeId, approachBearingDeg, fromNodeId);
     },
 
     railBarrierDownAt(x: number, y: number): boolean {

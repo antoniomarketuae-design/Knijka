@@ -185,7 +185,7 @@
  * «втори замах» cue). What is GRADED may not.
  */
 
-import type { NearMissEvent, NearMissStats, VehicleSample, WorldRuntime } from "@/modules/sim/contracts";
+import type { NearMissEvent, NearMissStats, SignalPhase, VehicleSample, WorldRuntime } from "@/modules/sim/contracts";
 import {
   directorContactCast,
   vruAheadMeters,
@@ -206,7 +206,14 @@ import {
 
 /** The world the chain advances — the live objects LessonScene builds. */
 export interface GradeGridWorld {
-  runtime: Pick<WorldRuntime, "update" | "sample" | "signalPhase">;
+  runtime: Pick<WorldRuntime, "update" | "sample" | "signalPhase"> & {
+    /**
+     * The signal an ambient car obeys on its own approach (DistrictWorldRuntime.ambientSignalPhase —
+     * sc-sig-controller-postures:5ee4301e). The live runtime has it and the grid hands it to the traffic
+     * every point; optional only so the bench worlds of the grid's own tests need not stub it.
+     */
+    ambientSignalPhase?(signalNodeId: string, approachBearingDeg: number, fromNodeId: string): SignalPhase | null;
+  };
   traffic: Pick<
     TrafficSystem,
     | "update"
@@ -526,6 +533,7 @@ export class GradeGrid {
     }
     const H = this.gridClock.stepSec;
     const { runtime, traffic, director } = world;
+    const ambientSignal = runtime.ambientSignalPhase ? runtime.ambientSignalPhase.bind(runtime) : null;
     // The staged people the person-in-path distance is measured to: the
     // director's own contact cast (empty with no director, or none staged).
     const cast = directorContactCast(director);
@@ -550,9 +558,11 @@ export class GradeGrid {
       runtime.update(dtSec);
       const ctx: TrafficUpdateContext = {
         signalPhase: (id) => runtime.signalPhase(id),
+        ambientSignal,
         playerPos: { x: s.position.x, y: s.position.y },
         playerSpeedKmh: hooks.trafficSpeedKmh ? hooks.trafficSpeedKmh(s) : s.speedKmh,
         playerHeadingDeg: s.headingDeg,
+        playerIndicator: s.indicator,
         playerTrack: null,
         sessionTimeSec: tSec,
       };

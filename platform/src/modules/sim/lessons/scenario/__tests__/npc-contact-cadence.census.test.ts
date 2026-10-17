@@ -10,10 +10,45 @@
  * WHO IS IN IT, STATED (`NPC_CONTACT_DEMOS`, enumerated by lesson). The replay
  * harness was run over every committed demo × every rung its template authors
  * (2,434 cells, 60 Hz) and every cell whose ledger carries a COLLISION with a
- * vehicle, a pedestrian or a cyclist was listed: 200 cells, 56 demos, 35
+ * vehicle, a pedestrian or a cyclist was listed: 174 cells, 49 demos, 34
  * lessons (no cell carries a static-object collision — the replay has no
  * rapier). The list is pinned; `NPC_CONTACT_ENUMERATE=1` re-derives it from
  * the replay (5 min) and fails if it has moved.
+ *
+ * RE-DERIVED 2026-10-17 on 1f1536d + posturescross r9 (sc-sig-controller-postures:5ee4301e
+ * and :4f446777 — ambient cars obey their OWN approach's lamp and the junction-box protocol,
+ * and drive through a box on a connector instead of hopping to the node). Measured, not
+ * relaxed: the enumeration above, run on 1f1536d, returns the old list exactly (200 cells,
+ * 56 demos, 35 lessons — green); run on the merged tree it returns this one. 30 cells left
+ * it and 4 joined:
+ *   LEFT — 30 cells whose only road-user contact was an AMBIENT car (report body null) that,
+ *   at 1f1536d, either
+ *   (a) entered its junction against its OWN approach's lamp while the node's group (what it
+ *       read) was green — 18 cells: sc-sig-green-wave shadow-correct and mistake-sleep-at-green
+ *       L1–L5 (car 0 over sw-n-tl1's line at step 1350 / car 2 at 1228, own lamp red, into his
+ *       lane ahead of him; struck at 1501 at 33 км/ч and 1967 at 42 км/ч), sc-jx-blocked-exit
+ *       mistake-enter-full-box L1–L5 (car 0 over sx-n-c's line on its own red at 667–850 into his
+ *       exit lane, standing there behind the staged queue when he entered the full box) and
+ *       sc-jx-blocked-exit shadow-correct L3–L5 (car 2 over sx-n-c's line on its own red, into
+ *       the box at 17 км/ч where he stood: step 3490). On the merged tree car 0 of both demos
+ *       stands at its line on its own red (sw-n-tl1 / sx-n-c; the probe's reason for the hold),
+ *       car 2 of sc-jx-blocked-exit waits on its red and then for him at the box gate, and car 2
+ *       of sc-sig-green-wave L3–L5 is no longer in his lane (the fleet's history differs from the
+ *       first red it now obeys; it waits on sw-n-tl2's red far ahead); or
+ *   (b) hopped 5.7–5.8 m in one 1/60 s step from its lane's end to the next lane's arc 0 at the
+ *       node and stood there inside the drawn box, or entered the box ungated and stood at its
+ *       lane's last metre — 12 cells: sc-signal-flashing shadow-correct L1–L5 (car 0 standing
+ *       at the node from 1293–1304 to his touch at 2003/2004) and mistake-cut L1, L2, L3, L5,
+ *       sc-junction-left shadow-correct L5 (car 1 at (−4.06, −0.9) from 1544), sc-junction-rhr
+ *       mistake-barge L3, L4 (car 3 at its lane's last metre, 4.1 m from tj-n-c, from 1055); on
+ *       the merged tree each drives the connector or is held at its line by the box gate
+ *       («box … for 1000 + student»).
+ *   No lost contact is of any other class (pcfloor probe: every car's line crossing read on
+ *   1f1536d against the merged tree's own reason for holding it; scratch, not committed).
+ *   JOINED — 4 contacts of the lawful world: sc-signal-flashing mistake-barge L1, L2 (he
+ *   barges the flashing junction into the staged priority car 1000 at 27.8 км/ч; the rung
+ *   list was 3, 5) and sc-signal-redyellow mistake-jump L1, L2 (he jumps the red-yellow into
+ *   ambient car 3 crossing on its OWN green — at 1f1536d that car stood on the node's red).
  *
  * WHAT A DRIVEN CELL IS AND IS NOT. The tape is followed by a per-step pursuit
  * driver, not replayed — so the car physically meets the shell. The follower
@@ -81,11 +116,7 @@ const NPC_CONTACT_DEMOS: ReadonlyArray<readonly [string, string, readonly Scenar
   ["sc-hz-accident-scene", "mistake-squeeze", [1, 2, 3, 4, 5], "pedestrian"],
   ["sc-hz-brake-dont-swerve", "mistake-blind-swerve", [1, 2, 3, 4, 5], "vehicle"],
   ["sc-hz-emergency-stop", "mistake-late-reaction", [1, 2, 3, 4, 5], "pedestrian"],
-  ["sc-junction-left", "shadow-correct", [5], "vehicle"],
-  ["sc-junction-rhr", "mistake-barge", [3, 4], "vehicle"],
   ["sc-junction-rhr", "mistake-no-look", [1, 2, 3, 4, 5], "vehicle"],
-  ["sc-jx-blocked-exit", "mistake-enter-full-box", [1, 2, 3, 4, 5], "vehicle"],
-  ["sc-jx-blocked-exit", "shadow-correct", [3, 4, 5], "vehicle"],
   ["sc-jx-equal-left", "mistake-cut-oncoming", [3, 4, 5], "vehicle"],
   ["sc-jx-equal-left", "mistake-cut-right", [3, 4, 5], "vehicle"],
   ["sc-jx-equal-left", "shadow-correct", [3, 4, 5], "vehicle"],
@@ -108,12 +139,9 @@ const NPC_CONTACT_DEMOS: ReadonlyArray<readonly [string, string, readonly Scenar
   ["sc-rb-ped-exit", "mistake-exit-through-ped", [5], "pedestrian"],
   ["sc-rx-tram-stop-doors", "mistake-creep-through", [1, 3], "pedestrian"],
   ["sc-rx-tram-stop-doors", "mistake-thread-doors", [1, 2, 3, 4, 5], "pedestrian"],
-  ["sc-sig-green-wave", "mistake-sleep-at-green", [1, 2, 3, 4, 5], "vehicle"],
   ["sc-sig-green-wave", "mistake-sprint", [1, 2, 3, 4, 5], "vehicle"],
-  ["sc-sig-green-wave", "shadow-correct", [1, 2, 3, 4, 5], "vehicle"],
-  ["sc-signal-flashing", "mistake-barge", [3, 5], "vehicle"],
-  ["sc-signal-flashing", "mistake-cut", [1, 2, 3, 5], "vehicle"],
-  ["sc-signal-flashing", "shadow-correct", [1, 2, 3, 4, 5], "vehicle"],
+  ["sc-signal-flashing", "mistake-barge", [1, 2, 3, 5], "vehicle"],
+  ["sc-signal-redyellow", "mistake-jump", [1, 2], "vehicle"],
   ["sc-turn-left-oncoming", "mistake-cut-gap", [1, 5], "vehicle"],
   ["sc-turn-left-oncoming", "mistake-no-indicator", [5], "vehicle"],
   ["sc-turn-left-oncoming", "shadow-correct", [5], "vehicle"],
@@ -133,10 +161,10 @@ const REF: NpcContactRow[] = [];
 const WRONG: string[] = [];
 
 describe("the NPC-contact census — one drive meets one body at one step, on every display", () => {
-  it("the census holds 56 demos of 35 lessons: 200 cells", () => {
-    expect(NPC_CONTACT_DEMOS.length).toBe(56);
-    expect(new Set(NPC_CONTACT_DEMOS.map((d) => d[0])).size).toBe(35);
-    expect(NPC_CONTACT_DEMOS.reduce((n, d) => n + d[2].length, 0)).toBe(200);
+  it("the census holds 49 demos of 34 lessons: 174 cells", () => {
+    expect(NPC_CONTACT_DEMOS.length).toBe(49);
+    expect(new Set(NPC_CONTACT_DEMOS.map((d) => d[0])).size).toBe(34);
+    expect(NPC_CONTACT_DEMOS.reduce((n, d) => n + d[2].length, 0)).toBe(174);
     // Every rung listed is one the template authors.
     for (const [id, , levels] of NPC_CONTACT_DEMOS) {
       const spec = SCENARIO_TEMPLATES.find((s) => s.id === id);
@@ -169,8 +197,8 @@ describe("the NPC-contact census — one drive meets one body at one step, on ev
   }
 
   it("what the census drove: every cell, the cells that physically struck a road user, and the ones that did not (stated, never counted as agreement)", () => {
-    expect(REF.length).toBe(200);
-    expect(ROWS.length).toBe(200 * (1 + CADENCES.length));
+    expect(REF.length).toBe(174);
+    expect(ROWS.length).toBe(174 * (1 + CADENCES.length));
     expect(WRONG).toEqual([]);
     const struck = REF.filter((r) => r.firstNpcStep > 0);
     const byKind = (k: string) => struck.filter((r) => r.firstNpcKind === k).length;
@@ -184,7 +212,20 @@ describe("the NPC-contact census — one drive meets one body at one step, on ev
     // The census is only worth its name while most of it strikes something, of
     // every kind, most of it MOVING (a standing shell never depended on the
     // frame) — measured at the landing: see the lane's report.
-    expect(struck.length).toBeGreaterThanOrEqual(150);
+    // RE-DERIVED 2026-10-17 (the posturescross landing on 1f1536d; see the list's
+    // note above). Measured at 60 Hz: on 1f1536d's 200 cells 167 struck (vehicle
+    // 128, pedestrian 39, cyclist 0; 115 moving) against floors 150/100/30/80. On
+    // the merged tree the same 200 cells strike 137 (vehicle 98, pedestrian 36,
+    // cyclist 3; 99 moving) — the 30 lost are the ambient defects listed above,
+    // and sc-vu-bikelane-turn mistake-cut-path L1–L3 now meet the staged rider
+    // first because the ambient pavement walker 1 no longer stands in the junction
+    // (:4f446777). The re-derived 174 cells strike 141 (vehicle 102, pedestrian 36,
+    // cyclist 3; 103 moving). The struck floor keeps the landing's own proportion
+    // (150 of 167 ≈ 0.90 → 0.90 × 141 = 126.9 → 125); the other three floors are
+    // unchanged — the four joined cells keep vehicle at 102 ≥ 100. With the shells
+    // off (NpcShellPool.step returning at once) this test is red on its first
+    // floor: «expected 0 to be greater than or equal to 125».
+    expect(struck.length).toBeGreaterThanOrEqual(125);
     expect(byKind("vehicle")).toBeGreaterThanOrEqual(100);
     expect(byKind("pedestrian")).toBeGreaterThanOrEqual(30);
     expect(moving).toBeGreaterThanOrEqual(80);

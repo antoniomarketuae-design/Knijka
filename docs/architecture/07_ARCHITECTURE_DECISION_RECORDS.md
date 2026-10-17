@@ -1045,3 +1045,125 @@ from its own traffic-model account (`StagedActorView.playerShedMps`).
 - **Comparability.** Rig evidence captured before this update is comparable step for step on PC one-step frames only — not on the phone lens and not on PC two-step frames. Whether the pre-ADR-017 rig would now match its own 60 Hz drive on the phone deltas was not measured and is not claimed.
 - **The rig's call of the step-loop grade is pinned (integration, 2026-10-16; ADR-014's V6-1).** The round-6 verifier's V1, the call put behind a condition, had passed the targeted set and the 87-file wide set. The before-step callback's FIRST statement is, by its exact syntax, the unconditional `stepLoopGradeRef?.current?.();`, and the rig names the ref nowhere else but the prop's declaration and its destructured parameter; `sceneGradeCut()` refuses the scene's cut otherwise, so a rig change that skips, conditions or moves the scene's turn fails every harness that executes the scene's frame, at collection or at its first call of the cut, on the refusal's text.
 - **Owed.** The re-drive of the 08a0b701 kept cells (L4 H1810, L1 H1711, L1 H1707) on PC and the phone lens. A browser drive of the rig on both lenses (L4 stands): that the layout effect fills the step-loop ref before the first step, that every physics step reads the pad, and that DOM key events dispatched from a physics callback behave as in process.
+
+## ADR-018: Ambient vehicles obey their own approach's signal and the officer, and share the junction box with the student by one protocol
+
+**Status.** Accepted by the integrator on 2026-10-17.
+- **Where its parts come from.**
+  - The protocol is made of the integrator's decisions, all inside the founder's delegation of 2026-10-08. None of them is a founder ruling:
+    - round-3 D6, the patience bound (2026-10-11);
+    - P1–P3 (2026-10-12);
+    - D1–D5 (2026-10-13);
+    - E1–E17 (2026-10-14 to 2026-10-16).
+  - One class, founder question 7, is decided by the integrator under the founder's explicit delegation of 2026-10-16 (below).
+- **Lane.** `posturescross`, nine rounds on `2e9268f`. Rows `sc-sig-controller-postures:5ee4301e` (critical) and `:4f446777` (major).
+  - Rounds 1, 3 and 4 were refuted.
+  - Rounds 2 and 5 returned BLOCKED, round 5 with a measured frontier.
+  - Rounds 6 and 7 returned BLOCKED on one decision each and were then refuted as decided.
+  - Round 8 was refuted on the decision itself.
+  - Round 9 was SIGNED OFF WITH CONDITIONS (doc 88).
+- **Patch.** `posturescross-result-r9.patch`: sha256 06b26a97…, 44 files, +7,491/−173. It lands applied 3-way onto `1f1536d`, with the integrator's test-only pins, as `gate-pc.patch` (sha256 ee2b7eeb…a25c, 46 files; doc 88).
+- **What it changes and what it does not.**
+  - It changes what ambient traffic and pavement walkers do.
+  - It adds no graded rule and moves no protected threshold.
+  - Four recorded demo tapes are re-authored, and two caption lines of sc-junction-blind's correct demo changed in round 3: one added (none → `487183ee1d75`) and one replaced (`1b95c586e00c` «Пътят е чист — завиваме наляво уверено.» → `9cadbad8e2cd` «Отдясно вече не идва никой — завиваме наляво уверено.»). The founder is told both (doc 88).
+  - It runs on ADR-014's grid.
+- **Evidence.** The proof is in-process only. Neither row is closed until a rig re-drive on PC and on the phone lens shows it.
+
+**Context.**
+- **The wrong lamp.** An ambient car asked the runtime for the node's own axis group on every approach, which on a single-node cluster is the arterial's. So the cross street drove on the student's green, against its own red, into his path. Nothing ambient read the officer.
+  - Measured at base by the round-1 verifier: 53 / 134 / 257 ambient crossings against their own signal or the officer on its three instruments.
+  - On the round-3 verifier's officer grid: 18 lawful cells of 1,378 at base end in a COLLISION.
+- **The walkers.** Pavement walkers' beats started at the junction node and crossed the other street's carriageway: 80 of 155 live traffic configurations at base.
+- **Why the box needed one protocol.** Once ambient cars obeyed the right lamp, every round found that how an ambient turner shares the box with the student decides whether a careful student is struck or an ambient car freezes. The builder and the verifiers measured a frontier:
+  - releasing the oncoming turner for a student who signals left strikes him if he then drives straight;
+  - holding it for as long as he stands stalls the oncoming stream for a student who is waiting for that stream (below).
+
+**Decision.**
+- **Each car obeys its own approach.**
+  - `SignalController.ambientPhase(signalNodeId, approachBearingDeg, fromNodeId)` (`runtime/signals.ts`), exposed as `DistrictWorldRuntime.ambientSignalPhase`, answers for the car's own approach:
+    - **Where a controller is posted,** his permission for its axis governs, never the lamp (ЗДвП чл. 7): «proceed» is green and «halt» is red. Through his raised-arm window, `CONTROLLER_ATTENTION_LEAD_SEC` (11 s, `contracts.ts`, the same constant the officer figure raises his arm on), it is yellow for both axes: stop if you still can, clear the junction if you cannot (the officer's signals, ППЗДвП; the article number is not in content/law and is not cited). This holds with live or dark lamps, since a posted officer keeps the cluster «controlled».
+    - **Otherwise** it is the live cycle of the approach's own axis group.
+    - **On a link inside one signal complex** it is null.
+    - **At a dark or flashing cluster** it is unchanged, the node's own group. The right-hand rule for ambient cars there is owed (Consequences).
+  - The grade grid, the trace recorder and the clip feed hand this read and the student's indicator to the traffic at every grid point. Nothing graded calls it. TrafficLayer only renders: its per-frame update, which no mount used, is removed (ADR-014).
+- **Connectors.** An ambient vehicle drives a built connector through the box (`traffic/graph.ts` `laneConnector`). It no longer hops the lane seam at the node.
+- **P1: all yielding is decided at the line.** An ambient vehicle enters only if its whole path through the box will be clear for the time it needs.
+- **P3: the student is predicted at his earliest arrival,** launching from where he stands while his signal or the officer permits him, plus the taught margin `AMBIENT_LEFT_TURN_GAP_SEC` 4 s. A guard-stopped staged car is not taken as standing for good.
+- **Patience (round-3 D6, kept under P3).** A car that has held its way open for a student at rest for `AMBIENT_YIELD_PATIENCE_SEC` = 5 s (the rule engine's `hesitationSustainSec`) drops only the taught margin. It goes only if it can clear before the earliest he could reach its path.
+- **WAITING and COMING (D1 / E1).**
+  - The student is WAITING when he travels against this car's approach, his left indicator is on, and his car is either at rest or still able to stop short of his own line at the fleet's comfortable deceleration, 2.2 m/s². Otherwise he is COMING.
+  - For a waiting student the oncoming stream is released, where his own left turn runs clear of the turner's (`opposingLeftsClear`). Where the two opposing left turns cross, he is still waited for.
+  - A coming student is predicted along the straight path his car is on, until his car itself shows the turn.
+- **The last safe point W (D3).**
+  - A released turner keeps deciding after its line, up to W: the last point on its connector where it can still stop with no part of its body in a lane his straight path uses.
+  - If he becomes coming before it reaches W, it holds there and goes again by the same test. Past W it clears and does not brake for him. A vehicle never stops in a lane another stream drives through.
+  - Where a connector has no W, the vehicle decides at its line only. By the builder that is 11 of 352 signalised movements, none on sx-v1.
+- **In the box (E13).**
+  - A student who is WAITING by E1 is read as at his line, wherever he stands, and the turner goes.
+  - A student at rest who is NOT waiting (indicator off or right, or changed away from left while he stands) is protected by his room for as long as he stands. `studentLeavesRoom` reads whether the turner can clear his straight corridor before he could reach it from where he stands, from his present speed, at `cfg.accelMps2` = 1.8 m/s² (the fleet's «Gentle acceleration», `traffic/types.ts`), capped at the node limit. A blocked run leaves no room.
+  - A moving student is read by the line's own branch.
+  - A staged car standing inside the junction's drawn radius that has not yet stood for the patience bound is read by its room from rest at the same acceleration. Once it has stood for the bound, it is a standing body.
+- **The bounds** (census, `junction-box-clears.census`):
+  - every rest inside a junction's carriageway counts against `BOX_REST_BOUND_SEC` = yellow + all-red + red-yellow = 5 s, unchanged, unless one of these excuses it;
+  - a waiting-point hold is excused only while the body the product holds it FOR (`waitingPointHoldFor`, E6) is coming. It must end within the launch (0.3 / 1.8 = 0.167 s, a test tolerance) plus one grid step, 0.1834 s in all, after that body is the product's restart distance `STUDENT_PATH_SEP_M` 5.8 m (`stagedPathSepM` for a staged car) clear of its path, or has turned off it or stopped (E5). The measured tail is 0.183 s;
+  - a hold or queue bounded by the student's own standing is excused while he stands (E10);
+  - a vehicle queued behind an excused hold is excused for as long as that hold is (E15). As built (builder deviation 6c), each follower must move within `QUEUE_RESTART_SEC` 0.900 s of its own leader: the fleet IDM's restart lag of 0.867 s plus two grid steps. A car standing at its own line may have its leader across the junction in its corridor.
+- **The indicator at dark and flashing junctions (E14).** It keeps its E1 meaning there.
+- **Pavement walkers.** A pavement walker's beat stops where the world draws the pavement at a junction: the junction-trimmed centre line pulled in by `sidewalkEndInsetM`. It is checked clear of every carriageway. A way-split joint or a dead end keeps its old end.
+- **FOUNDER QUESTION 7 AND ITS ANSWER.**
+  - **The question,** put to the founder on 2026-10-16: «a student signals left, stops in the junction, then drives straight into the car his signal let turn — hit through no fault of his own, or by his own misleading signal?»
+  - **He answered:** «do it how you think its right».
+  - **The integrator's ruling under that delegation** (2026-10-16, memory `founder-ruling-2026-10-16-q7-own-false-signal`): «a student who signals LEFT, stands in the junction, then drives straight into the turner his signal released is struck by his own misleading signal — posturescross lands as built». The class is the student's own false signal, not a defect. Nothing bills the indicator; no sheet row is added for it.
+  - **Superseded comments.** The doc comment of `studentLeavesRoom` (`traffic/vehicles.ts`, «founder question 7, open») and the boxstop test's comment in `junction-box-clears.census.test.ts` («founder question 7 (open)») predate the answer and were not edited at the landing. This ruling supersedes both; a comment-only edit citing it is owed (doc 88).
+  - **The class as measured** (round-9 verifier):
+    - a student who stops in the box signalling LEFT and then drives straight: 137 of 1,344 boxstop cells;
+    - a student who cancels his left signal after the turner it released has committed at W: 186 struck on the 11 cancel grids (1,232 lawful cells). «Committed» is the verifier's proxy: past W or within its 5.5 m/s² hard-braking distance. Every one of these is also a hit with the indicator kept left.
+    - Base, measured on the y −4 grids (boxstop LEFT 0 of 112; cancel 0 of 224), gives 0: at base no ambient car reads the indicator.
+  - **What stays protected:** the same acts with the indicator off or right, or cancelled before the turner commits. They measure 0.
+  - **If he later rules the other way,** a new round is owed: hold the turner for as long as he stands (round 8's E9), and solve the stall that brings back.
+
+**Corrections to the decision texts and an earlier report, found by the lane.**
+- **E9's premise is false.** The round-8 decision text placed the turner's waiting point «clear of every lane, D3». W is clear of every lane the student's straight path uses, but it can lie in the turner's own approach lane (round-8 verifier, R8-F1). Holding the turner at W therefore stalls the oncoming straight stream behind it: heads over the bound in 77 of 120 deep-wait cells, and the staged follow car passing 0 of 25 at 11–24 m (5 of 5 at 10 m).
+- **E14's premise is false.** E14 said «the sc-signal-dead L5 / L1 cells it was built for bill FAILED_TO_YIELD». They do not:
+  - sc-signal-dead L5 go60 h2 is an unbilled COLLISION, clean at base;
+  - L1 go50 h1 is an unbilled COLLISION, where base bills FAILED_TO_YIELD.
+  - In both, the open-loop tape drives into a staged car from his right standing in his lane at a dark junction.
+  - E14 stands on its other reason. Without it, the mutual wait at dark and flashing junctions is 53.7–90 s. With it, the opposite arm's longest rest is 31–42 s.
+- **The reach arithmetic (R7-C3; the round-7 builder's numbers, corrected as E11 ordered).**
+  - The body's lowest point in his corridor is y = 3.34.
+  - His reach times from y −4 / −7 / −10 / −14 / −20 are 2.28 / 2.86 / 3.34 / 3.90 / 4.63 s at 2 m/s², and 1.63 / 2.05 / 2.40 / 2.79 / 3.30 s at 3.9 m/s². The round-7 builder's 1.73 / 2.45 / 3.00 / 3.60 / 4.36 s were wrong.
+  - From its W at (−1.69, 15.19) the turner needs 15.10 m, 4.10 s at 1.8 m/s², to get its body out of his corridor (round-7 verifier).
+  - The conclusion stands: every reach is under 4.10 s except y −20 at 2 m/s².
+
+**Alternatives rejected.** Each was measured by a verifier, or by the builder where marked.
+- **A release on the patience clock alone (round 3).** On the officer grid a careful lawful student was struck in 33 cells other than base's 18 of 1,378. The verifier attributed 7 of them, at the line at go 37 s, to that release. Patience is kept only under P3 (above).
+- **Releasing on the left indicator while he moves (round 4).** 116 of 790 lawful cells struck.
+- **Tying waiting to a place (D1b).** On the y −4 / 2 m/s² boxstop grid 11 of 112 were struck, and heads stood in 42 of 80 boxwait cells (3–9 m).
+- **The in-box reach at the brisk launch (XF).** 0 of 112 struck on that grid, but 80 of 80 boxwait W holds froze, for up to 68 s.
+- **K1 / K3b.** Struck 69 and 42 of 1,344 (the builder, round 7).
+- **Holding at the line (K2).** Heads stood in 56 of 80 cells, and the follow car passed 0 of 20 (the builder, round 7).
+- **Holding at W for as long as he stands (K2b / E9, round 8).** The stall above.
+- **Dropping the indicator's meaning at dark and flashing junctions** (round 8's deviation). It brought back the 53.7–90 s mutual wait.
+
+**Consequences.**
+- **JB-1, the class question 7 decides.** It is counted and unbilled. A rig judge must not refute or still a clause on it.
+- **JB-2, owed: the right-hand rule for ambient cars** at dark and flashing junctions, where they still read the node's own phantom cycle. In it:
+  - 12 sc-sig-flash-amber-ped cells, where the tape rear-ends an ambient car and is billed PEDESTRIAN_CROSSING_TOO_FAST;
+  - the two sc-signal-dead staged-car cells above.
+- **JB-3, the grading gap.** A contact with a priority car from his right standing in his lane at an uncontrolled junction bills COLLISION but not FAILED_TO_YIELD. It is the rule engine's to fix.
+- **JB-4, pinned at integration.** E15's follower relation now has negative rows too (`junction-box-clears.census.test.ts`, test-only: the relation moved unchanged into `followLeaderOf()` and `standingNearJunction()`). VR9_FOLLOW_ACROSS_ANY dies «expected 2 to be null» and VR9_FOLLOW_REACH_WIDE dies «expected [ 1, 2, 3 ] to deeply equal []»; the merge verifier reproduced both (doc 88, «PINNED AT INTEGRATION»).
+- **JB-5, census-only survivors.** D3_INTO_LANE, D3_NO_CLEAR, O3, O4, O6 and E6_STALE_REASON survive their census-only kill sets; each `_U` variant is killed. D4_STAGED_UNBOUNDED is near-equivalent.
+- **JB-6, known rests.** The census's STUCK column holds 79 cells:
+  - 75 staged roundabout circulators (scripted, identical at base);
+  - 4 sc-ed-d2-priority-run cells (ambient car 5, 18.7 s, the pinned short-link slot chain; base has the same class).
+- **JB-7.** Seven clips with ambient traffic must be re-captured.
+- **JB-8.** Neither row is closed until the rig re-drives them on PC and the phone lens.
+- **JB-9, npcstep's NPC-contact pins (landed in `1f1536d` with its ADR-014 amendment) are re-derived on this traffic.** 30 census cells lost their road-user contact, each an ambient car of a class this ADR removes: 18 entered against their own approach's red, 12 jumped to the node or stood ungated in the box. The census's own enumeration now gives 174 cells (30 out, and 4 contacts that the repaired traffic now produces joined: two of the student barging a flashing junction into a staged priority car, two of the student jumping the red-yellow into an ambient car crossing on its own green), and the «struck» floor is 150 → 125; the other floors are unchanged. The ear-only ambient-pedestrian cell lost its pavement walker to the walker repair and moved to an ambient walker on sc-pk-crossing-ban L5's zebra. Tests only; measured and checked in doc 88.
+
+**Five questions.**
+1. **Learning outcomes.** The cross traffic now acts out what the officer drills and the lamp lessons teach: it stops for its own red and for the officer's halt.
+2. **Safer drivers.** A student who obeys his signal or the officer is no longer struck by a car that obeyed the wrong lamp: 0 of 1,590 lawful cells on the 2,756-cell officer grid. At base, the round-3 verifier's 1,378-cell grid had 18 lawful collisions. A left signal he gives is believed, as in real traffic.
+3. **Retention.** The left-turn lesson's encounter still arrives for a student who waits at or inside the junction (the follow car passes 20 of 20 at 12–24 m).
+4. **Measurable progress.** Ambient crossings against their own signal are 0 on all three instruments, and box rests are bounded and censused per hold reason.
+5. **Business value.** It removes a critical class in which the product's world contradicted its own lesson. No graded rule changes; the sheets of 49 census rows change because the traffic does, and two demo captions changed (round 3).

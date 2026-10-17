@@ -170,29 +170,71 @@ describe("a contact with a road user — one drive, one body, one step, on every
  *             class of the row's (i), the stamp that moved with the display;
  *   go 1600 — an AMBIENT pedestrian on the arm: no runner casts him, so the
  *             sentinel never speaks and the ear's is the only report.
+ *
+ * THE THIRD CELL, RE-POINTED 2026-10-17 (the posturescross landing on 1f1536d,
+ * sc-sig-controller-postures:4f446777). The go-1600 walker was an ambient
+ * PAVEMENT walker whose beat ran on into the roundabout's junction — the defect
+ * that repair removes: the beat now stops where the pavement does (walker 0 on
+ * x 8.8 walked to y −18.1 at 1f1536d, to −36.6 now). Swept as npcstep swept it
+ * (hold −50, go 900–3300 every 20 steps, 121 drives): 1f1536d 18 ambient-
+ * pedestrian contacts (go 1260–1600, every one the ear's), 3 vehicle, 100 none;
+ * the merged tree 0 — 3 vehicle, 118 none. No committed census cell strikes an
+ * ambient pedestrian any more either (1f1536d: 3, sc-vu-bikelane-turn
+ * mistake-cut-path L1–L3, the same pavement-walker class). The ear-only path is the same for any
+ * walker no runner casts, so the cell moved to one the lawful world still
+ * offers: an ambient walker on a MARKED crossing. Every template × rung was
+ * scanned for an ambient crossing walker whose zebra a committed path crosses
+ * (2 places: sc-pk-crossing-ban L5's pkx-x-zebra at y 260 and sc-ed-d2-city-run
+ * L5); on sc-pk-crossing-ban L5 (its correct path, 12 км/ч) a student standing
+ * at y 250–252 lets walker 0 step out (a standing car does not close the
+ * crossing's gate) and drives into him: hold 252, go 2200–2700 every 10 steps,
+ * 51 drives → 9 contacts, go 2260–2340 contiguous, every one walker 0 at
+ * 6.1 км/ч, ear only (report body null, the sentinel silent), no static bill
+ * (hold 250: 5 more, go 2260–2300). go 2300 is the middle of the band: the
+ * first contact at grid point 2435, judged 3.2 км/ч.
  */
-const RB_ENTRY_CELLS: ReadonlyArray<{ what: string; cell: WrongTimingCell; kind: "vehicle" | "pedestrian"; billedBy: NpcContactRow["billedBy"]; staticToo: boolean }> = [
+interface RbEntryCell {
+  what: string;
+  cell: WrongTimingCell;
+  kind: "vehicle" | "pedestrian";
+  billedBy: NpcContactRow["billedBy"];
+  staticToo: boolean;
+  /** The lesson, path and rung driven, when not sc-roundabout-entry's shadow-correct L1. */
+  where?: { id: string; file: string; level: ScenarioLevel };
+}
+const RB_ENTRY_CELLS: ReadonlyArray<RbEntryCell> = [
   { what: "the circulating car, crossing (the sentinel first)", cell: { holdAtY: -50, goStep: 2300, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "sentinel", staticToo: true },
   { what: "the circulating car, touched by rapier alone", cell: { holdAtY: -50, goStep: 2320, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "ear", staticToo: false },
-  { what: "an ambient pedestrian (the ear's only)", cell: { holdAtY: -50, goStep: 1600, cruiseKmh: 12, runSteps: 1500 }, kind: "pedestrian", billedBy: "ear", staticToo: false },
+  {
+    what: "an ambient pedestrian on a marked crossing (the ear's only)",
+    cell: { holdAtY: 252, goStep: 2300, cruiseKmh: 12, runSteps: 1500 },
+    kind: "pedestrian",
+    billedBy: "ear",
+    staticToo: false,
+    where: { id: "sc-pk-crossing-ban", file: "shadow-correct.trace.json", level: 5 },
+  },
 ];
 
-describe("the row's own lesson — sc-roundabout-entry L1, hold at y = −50, enter at 12 км/ч at a named step", () => {
-  const drive = (c: WrongTimingCell, label: string, deltas: readonly number[]) =>
-    drivePath("sc-roundabout-entry", "shadow-correct.trace.json", 1, c, label, deltas);
-  const refs = new Map<number, NpcContactRow>();
-  const ref = (c: WrongTimingCell) => {
-    let r = refs.get(c.goStep);
+describe("the row's own lesson — sc-roundabout-entry L1, hold at y = −50, enter at 12 км/ч at a named step (and the ear's-only walker on sc-pk-crossing-ban L5's zebra)", () => {
+  const ROW_OWN = { id: "sc-roundabout-entry", file: "shadow-correct.trace.json", level: 1 as ScenarioLevel };
+  const drive = (c: RbEntryCell, label: string, deltas: readonly number[]) => {
+    const w = c.where ?? ROW_OWN;
+    return drivePath(w.id, w.file, w.level, c.cell, label, deltas);
+  };
+  const refs = new Map<string, NpcContactRow>();
+  const ref = (c: RbEntryCell) => {
+    const key = `${(c.where ?? ROW_OWN).id}/${c.cell.goStep}`;
+    let r = refs.get(key);
     if (!r) {
       r = drive(c, "60 Hz", [1 / 60]);
-      refs.set(c.goStep, r);
+      refs.set(key, r);
     }
     return r;
   };
 
   it("at 60 Hz each cell is the contact its name says: whom, a MOVING road user, which reporter stamped the bill — and the crossing cell goes on to strike the island", () => {
     for (const c of RB_ENTRY_CELLS) {
-      const r = ref(c.cell);
+      const r = ref(c);
       expect(r.firstNpcStep, c.what).toBeGreaterThan(c.cell.goStep);
       expect(r.firstNpcKind, c.what).toBe(c.kind);
       expect(r.firstNpcSpeedKmh, `${c.what}: the road user's own speed`).toBeGreaterThan(3);
@@ -204,12 +246,12 @@ describe("the row's own lesson — sc-roundabout-entry L1, hold at y = −50, en
 
   for (const c of RB_ENTRY_CELLS) {
     it(`${c.what} (go ${c.cell.goStep}): 30 Hz, 13 fps, 0.37 s frames and a 0.37 s hitch at 15 positions around the contact — the stamp's step, the fault list, the car after every step and the close are 60 Hz's`, () => {
-      const r60 = ref(c.cell);
+      const r60 = ref(c);
       const wrong: string[] = [];
-      for (const [label, deltas] of CADENCES) wrong.push(...rowDiffs(drive(c.cell, label, deltas), r60));
+      for (const [label, deltas] of CADENCES) wrong.push(...rowDiffs(drive(c, label, deltas), r60));
       for (let j = 0; j < 15; j++) {
         const before = r60.firstNpcStep - 8 + j;
-        wrong.push(...rowDiffs(drive(c.cell, `60 Hz, 0.37 s hitch after ${before} frames`, hitchAfter(before, 0.37)), r60));
+        wrong.push(...rowDiffs(drive(c, `60 Hz, 0.37 s hitch after ${before} frames`, hitchAfter(before, 0.37)), r60));
       }
       expect(wrong.slice(0, 8)).toEqual([]);
     }, 900_000);

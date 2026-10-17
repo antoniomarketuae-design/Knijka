@@ -127,7 +127,7 @@ sc-hz-emergency-stop/mistake-swerve	919e03742642 9355c52cab14 d31ba41432fc 16360
 sc-hz-emergency-stop/shadow-correct	72766a8e3a9a 54a7903aced8 81736cbff085 f09fdf6a52b8 b72af5410ea8 9e889eb0dc68 9c942483c708
 sc-junction-blind/mistake-barge	26350c829702 3bcca1321d2b 8e0217d7999a
 sc-junction-blind/mistake-no-look	e26fb342f6fa a82204fb4caf 398e104d20ca 5b251d318a96
-sc-junction-blind/shadow-correct	bb703f3acc2d 115a6f12e0c3 c381f3255109 f8dce134ea1e 1b95c586e00c 6cc55fab69b8
+sc-junction-blind/shadow-correct	0bfbe55eaeda 115a6f12e0c3 c381f3255109 f8dce134ea1e 487183ee1d75 9cadbad8e2cd 6cc55fab69b8
 sc-junction-gap/mistake-creep-out	374f7e7539ec 8f56a0f7b50e b0b08f043915 327cae9168c4
 sc-junction-gap/mistake-cut-gap	374f7e7539ec 3d28594279d9 903f806011b5 5c7e7bb4d1a9
 sc-junction-gap/shadow-correct	0697d8e9dcc6 3ed3c038cec1 52ef92eb2942 a57f68b94914 21f94da29a87 037f6d567fec

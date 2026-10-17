@@ -12,7 +12,7 @@
  * random walk can always be closed into a loop.
  */
 
-import { nodeOpenRadiusM } from "../world/builders/network";
+import { JUNCTION_TRIM_MAX_FRACTION, nodeOpenRadiusM } from "../world/builders/network";
 import type { TrafficDistrict, DistrictEdge } from "./types";
 
 export interface LaneCrossing {
@@ -387,4 +387,127 @@ export function sampleLane(
   out.dirX = dx * inv;
   out.dirY = dy * inv;
   out.segHint = i;
+}
+
+// ---------------------------------------------------------------------------
+// Junction connectors — how an ambient car gets from one lane to the next.
+// ---------------------------------------------------------------------------
+
+/**
+ * The path a car drives from the end of lane `from` onto lane `to` — sc-sig-controller-postures:5ee4301e, round 2.
+ *
+ * THE CAUSE IT REPLACES. Lanes are the edge centrelines offset to the right, cut square at the node. They do not meet:
+ * on sx-v1 the eastbound lane ends at (0, −4.06) and the southbound one starts at (−4.06, 0). An ambient car used to
+ * run its lane to the last metre and carry the remainder into the next lane's arc 0, so its published pose HOPPED the
+ * 5.7 m between them in one step (the „teleporting like ambient agents do at lane boundaries" staged.ts names). For a
+ * RIGHT turn the next lane starts BEHIND the car: it overshot to the node, hopped back beside its own follower and had
+ * to re-cross the lane it came on in front of that follower. Measured on sc-turn-left-oncoming (phone L3, live chain):
+ * ambient car 1, entering lawfully on its own green, went (−1.1, −4.1) → (−4.1, 0) heading 180 between two samples and
+ * then stood at 0 km/h in the box for the rest of the drive — the staged oncoming car 2 m behind it would not close on
+ * it (staged.ts 3b), it would not close on the staged car (vehicles.ts, the any-angle clamp), and the student's turn
+ * ended in that frozen car.
+ *
+ * WHAT A CONNECTOR IS. The car leaves the lane line where the drawn junction patch begins and rejoins the next lane
+ * where the patch ends — `exitS` / `entryS` are the junction CUT on each lane, the same number the world builder trims
+ * the ribbons with and the stop lines are set back from (`junctionRadiusM`, clamped at JUNCTION_TRIM_MAX_FRACTION of
+ * the lane) — and between the two it follows one smooth curve, tangent to both lanes, of its TRUE length. So a car
+ * that has passed its stop line is on a path that leaves the box, a right turn stays on the near side of the junction
+ * and never crosses its own approach, and the published pose moves exactly `speed × dt` every step.
+ *
+ * Where the node has no drawn patch (a dead end, a joint between two edges) the cut is half the gap between the two
+ * lane ends, which is what closes that gap with a curve of the lanes' own lateral spacing. A U-TURN — onto the same
+ * edge's other direction — is always made that way, about the END of the lane, junction or not: the half circle
+ * whose diameter is the distance between the two directions' lane centres. Cut at the junction's radius it would be
+ * made in the MOUTH of the arm, across the lane traffic leaves the junction by (measured: sc-junction-blind's own
+ * correct demo, L3, drove into an ambient car U-turning at (−13.3, 1.4), 13 m up the arm it was leaving by); about
+ * the lane end it is made where the car used to flip, in the middle of the box.
+ *
+ * `length === 0` — no connector: the lanes already meet end to start (to a micrometre: equal-offset lanes of one
+ * straight road share their end point), or the pair is not contiguous at all (a bench route that wraps a single
+ * lane). `exitS` is then the lane's length and `entryS` 0, i.e. exactly the old seam.
+ */
+export interface LaneConnector extends SampledPath {
+  /** Arc on `from` where the car leaves the lane line. */
+  exitS: number;
+  /** Arc on `to` where it rejoins. */
+  entryS: number;
+  /** True arc length of the curve between them, meters. */
+  length: number;
+}
+
+/** Lanes whose ends are closer than this already meet: there is no gap to drive. A micrometre — float noise on
+ *  shared end points, nothing a pose could be seen to hop (d2-v1 has seams 1–2 cm apart: they get a connector). */
+const CONNECTOR_MEET_M = 1e-6;
+/** One polyline segment per this much turning, so the published heading never steps more than this. */
+const CONNECTOR_SEG_RAD = (3 * Math.PI) / 180;
+
+const connectorCache = new WeakMap<LaneGraph, Map<number, LaneConnector>>();
+const connSamp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
+
+/** The connector from `from` onto `to` (built once per pair, then cached on the graph). */
+export function laneConnector(graph: LaneGraph, from: DirectedLane, to: DirectedLane): LaneConnector {
+  let byPair = connectorCache.get(graph);
+  if (!byPair) connectorCache.set(graph, (byPair = new Map()));
+  const key = from.index * graph.lanes.length + to.index;
+  let c = byPair.get(key);
+  if (!c) byPair.set(key, (c = buildLaneConnector(graph, from, to)));
+  return c;
+}
+
+function buildLaneConnector(graph: LaneGraph, from: DirectedLane, to: DirectedLane): LaneConnector {
+  const none = (): LaneConnector => ({
+    px: new Float64Array(2),
+    py: new Float64Array(2),
+    cum: new Float64Array(2),
+    exitS: from.length,
+    entryS: 0,
+    length: 0,
+  });
+  if (from.toNode !== to.fromNode) return none();
+  const n = from.px.length - 1;
+  const gap = Math.hypot(to.px[0] - from.px[n], to.py[0] - from.py[n]);
+  if (gap < CONNECTOR_MEET_M) return none();
+
+  const uTurn = to.index === from.reverse;
+  const reach = uTurn ? gap / 2 : Math.max(graph.junctionRadiusM.get(from.toNode) ?? 0, gap / 2);
+  const exitS = from.length - Math.min(reach, from.length * JUNCTION_TRIM_MAX_FRACTION);
+  const entryS = Math.min(reach, to.length * JUNCTION_TRIM_MAX_FRACTION);
+  sampleLane(from, exitS, n - 1, connSamp);
+  const x0 = connSamp.x;
+  const y0 = connSamp.y;
+  const d0x = connSamp.dirX;
+  const d0y = connSamp.dirY;
+  sampleLane(to, entryS, 0, connSamp);
+  const x3 = connSamp.x;
+  const y3 = connSamp.y;
+  const d3x = connSamp.dirX;
+  const d3y = connSamp.dirY;
+  const chord = Math.hypot(x3 - x0, y3 - y0);
+  if (chord < CONNECTOR_MEET_M) return { ...none(), exitS, entryS };
+
+  // One cubic, tangent to both lanes. The handle is the circular-arc one for the turn between the two headings
+  // (4/3·tan(θ/4)·r with r = chord / (2·sin(θ/2))), which tends to chord/3 — the plain lane shift — as θ → 0.
+  const cos = Math.max(-1, Math.min(1, d0x * d3x + d0y * d3y));
+  const theta = Math.acos(cos);
+  const handle = theta < 1e-3 ? chord / 3 : ((2 / 3) * chord * Math.tan(theta / 4)) / Math.sin(theta / 2);
+  const x1 = x0 + d0x * handle;
+  const y1 = y0 + d0y * handle;
+  const x2 = x3 - d3x * handle;
+  const y2 = y3 - d3y * handle;
+  const segs = Math.min(64, Math.max(8, Math.ceil(theta / CONNECTOR_SEG_RAD), Math.ceil(chord)));
+  const px = new Float64Array(segs + 1);
+  const py = new Float64Array(segs + 1);
+  const cum = new Float64Array(segs + 1);
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const u = 1 - t;
+    const b0 = u * u * u;
+    const b1 = 3 * u * u * t;
+    const b2 = 3 * u * t * t;
+    const b3 = t * t * t;
+    px[i] = b0 * x0 + b1 * x1 + b2 * x2 + b3 * x3;
+    py[i] = b0 * y0 + b1 * y1 + b2 * y2 + b3 * y3;
+    if (i > 0) cum[i] = cum[i - 1] + Math.hypot(px[i] - px[i - 1], py[i] - py[i - 1]);
+  }
+  return { px, py, cum, exitS, entryS, length: cum[segs] };
 }

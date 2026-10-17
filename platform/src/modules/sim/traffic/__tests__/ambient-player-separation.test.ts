@@ -35,6 +35,15 @@
  * worth 0.55 m, because the lane graph trims both lanes back from the node. The
  * pose HOPS the junction box; nothing crosses it.
  *
+ * (2026-10-11, sc-sig-controller-postures:5ee4301e round 2: that hop is gone —
+ * an ambient car now DRIVES a connector through the box, graph.ts
+ * `laneConnector`. The guarantee below is unchanged and still looks up the pose
+ * it will publish. What changed in this file is how the student gets into the
+ * box: the harness used to place him there on the first frame after t = 20 s,
+ * which was safe only while no car was ever inside a box; he now stops there on
+ * the first frame from t = 20 s on which no car is within two car lengths of
+ * the pose — he arrives, he does not materialise inside a car driving through.)
+ *
  * WHAT KEEPS THIS FROM BEING A FORCE FIELD, and both halves are tested here:
  *   · the freeze is closing-only, so a student who drives into traffic still
  *     closes the gap himself — `jblind-model-line-in-compiled-traffic.test.ts`
@@ -66,6 +75,8 @@ const SPAWN = { x: 4.06, y: -115 };
 const BOX = { x: -1.14, y: -6.47 };
 /** Out on the west arm — objective 2's side of the junction. */
 const WEST = { x: -60, y: 4.06 };
+/** He takes the pose only when no car is within this of it: two car lengths. */
+const ARRIVE_CLEAR_M = 2 * CLIP_M;
 /** What L1…L5 compile to via SCENARIO_FAMILY_TRAFFIC_BASELINE.junction. */
 const COUNTS = [4, 5, 6];
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
@@ -102,10 +113,14 @@ describe("a student stopped in the junction box is never driven into", () => {
     for (const seed of SEEDS) {
       for (const n of COUNTS) {
         const tr = build(seed, n);
+        let inBox = false;
         for (let i = 0; i < 120 * 30; i++) {
           const t = i * DT;
-          // He drives the stem for 20 s, then stops in the box and stays.
-          const inBox = t >= 20;
+          // He drives the stem for 20 s, then stops in the box — once it is clear
+          // of cars driving through it — and stays.
+          if (!inBox && t >= 20) {
+            inBox = tr.vehicles.every((v) => Math.hypot(v.x - BOX.x, v.y - BOX.y) >= ARRIVE_CLEAR_M);
+          }
           tr.update(DT, ctxAt(inBox ? BOX : SPAWN));
           if (!inBox) continue;
           for (const v of tr.vehicles) {

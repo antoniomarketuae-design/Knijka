@@ -43,6 +43,54 @@
  * pair had run through and finished before the student arrived, the follow
  * car was pulling away from its hold again (−141 to −159 m, 1.9–10 m/s), and
  * its distance over that rising speed is not anyone's time to the junction.
+ *
+ * ROUND 3 OF sc-sig-controller-postures:5ee4301e (2026-10-12) — §1 IS NOW A PINNED CENSUS, NOT «ALL 420 TURN ✓».
+ *
+ * §1 used to require the turn ✓ on every one of the 420 drives. That held only on a junction that did not work:
+ * ambient cars on the oncoming (east-west) street obeyed the boulevard's lamp instead of their own, and an ambient
+ * car turning at the node hopped into the box and froze there with the lesson's staged pair behind it. Once ambient
+ * cars obey the lamp of their own approach and drive the box (traffic/vehicles.ts `laneEndSignal`, traffic/graph.ts
+ * `laneConnector`), the lesson's own oncoming pair runs — and 21 of the 140 drives per cadence, all open-loop, turn
+ * across one of those two cars while it is coming at 45 km/h less than 1.3 s away. The car has to brake for the
+ * student and the engine bills FAILED_TO_YIELD, which is right, and the turn is then not ✓.
+ *
+ * WHY THOSE 21 PASSED AT BASE (2e9268f), cell class by cell class — the defect itself in both classes:
+ *   · «wait 30 s», stops 64.5 / 63 / 61 / 60.2 / 59.5 m, all four tapes (20 cells): at base every one of them ENDED IN
+ *     A COLLISION — the tape drove into a car that had been standing 22–30 s in a deadlocked box (staged 1000 and
+ *     ambient 3 on the L1 tapes; staged 1001, 1000 and ambient 1, 0, 4 on the L3 tapes) — and this file tolerated a
+ *     collision as long as the turn row was ✓. Evidence: r2/esbwhy-base.json (`restInBox`), r2b/esbwhy-tree-final.json.
+ *   · «stop 55 m, wait 15 s» on phone-L1 (1 cell): at base the tape turned past an oncoming queue STANDING ON ITS OWN
+ *     GREEN (an ambient car at the east-west line obeying the boulevard's red, the staged pair queued behind it).
+ *     Evidence: r2/esbwhy-base.json (no inbound mover at the commit), r2/ltapwhy-base.json.
+ * On this tree no vehicle stands in the box in any of the 420 drives (junction-box-clears.census.test.ts).
+ *
+ * WHAT §1 PINS NOW: the exact cells where the turn is not ✓ (`NOT_TURNED`, the same on all three cadences — one
+ * drive, one sheet); for each of them that the only bill is FAILED_TO_YIELD, that it was written by the lesson's own
+ * two oncoming encounters, and that at the frame the turn began one of the lesson's STAGED oncoming cars was on the
+ * oncoming lane, had been running at its 45 km/h within the last 6 s, had already begun to shed speed for him, and
+ * was less than the taught 4 s from him at that speed (measured: 0.4–1.3 s); the count; and the turn ✓ in every
+ * other cell. THE PROPERTY THIS FILE EXISTS FOR — never «не беше започнат» on the row, and the same row on both
+ * layouts — is still asserted on all 420.
+ *
+ * ROUND 4 (2026-10-13, the junction-box protocol) — THE CENSUS IS 31 CELLS PER CADENCE, RE-DERIVED CELL BY CELL.
+ * The 21 of round 3 are all still in it, each with the same cause. TEN MORE joined, every one a «wait 10 s» cell
+ * (phone-L1 61, 60.2, 59.5, 55 m; phone-L3 60.2, 59.5, 55 m; pc-L1 55 m; pc-L3 59.5, 55 m). In round 3 those ten were
+ * ✓ for a reason that was itself the round-3 refutation: the ambient car at the head of the oncoming queue is a
+ * left-turner, round 3 held it at its line for the patience bound after its green and then let it go on the clock
+ * (measured there: 9.1–10.6 s standing on its own green at x = −31.8), and the lesson's staged pair, queued behind
+ * it, reached the junction after the tape had turned. Now that car is not waiting for a student who is signalling a
+ * left turn of his own (traffic/vehicles.ts `studentHoldsBox`: two opposing left turns pass each other), the pair
+ * runs on time, and the open-loop tape that waited only 10 s rolls into the lead car's lane: at the frame the turn
+ * begins the staged lead car is 8–16 m from him and has ALREADY braked to 0–25 km/h for him (it was doing 45 km/h
+ * within the last 6 s). FAILED_TO_YIELD by the lesson's own two encounters, the row says «зави при 2.0–3.6 с — под
+ * нормата от 4 секунди», and every assertion below holds on them unchanged. Evidence: r4/esb-all-e.json.
+ *
+ * AND ONE THING IT PINS BY NAME BECAUSE IT IS WRONG AND NOT THIS LANE'S TO REPAIR (`PRAISED_UNDER_THE_BILL`): on 6
+ * of those 21 drives the row under the billed turn reads «Интервал: зави при 7.1 с — над нормата от 4 секунди,
+ * точно така се преценява.» The figure is the braked car's distance over the speed it has LEFT (7.9 m at 1.5 m/s);
+ * the car was 0.6 s away at the speed it was doing before the student rolled into its lane. Owed to the
+ * sc-turn-left-oncoming lane (the F6 figure, on a car the student has already forced to brake). It is asserted
+ * exactly as measured, so a repair and a regression both turn this file red.
  */
 
 import { readFileSync } from "node:fs";
@@ -51,6 +99,8 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SessionEndScreen, objectiveDetailText } from "../../../hud/SessionEndScreen";
+import { LEFT_TURN_GAP_SAFE_SEC } from "../../../runtime";
+import { STAGED_STATE_ID_BASE } from "../../../traffic/staged";
 import type { ScenarioTrace, TraceSample } from "../../../traces/types";
 import { compileScenario } from "../compile";
 import { SC_LTAP_TIGHT_EVENT, SC_TURN_LEFT_ONCOMING } from "../templates-junctions";
@@ -178,7 +228,15 @@ interface Commit {
   /** Seconds the nearest MOVING vehicle bound for the junction from the
    *  oncoming side still needed to reach it, at the frame he began the turn. */
   nearestOncomingSec: number | null;
+  /**
+   * The lesson's STAGED cars on the oncoming carriageway at that frame — west of the student, heading east —
+   * nearest first: how far from him, the speed each has now, and the fastest it went in the 6 s before
+   * (what it was doing before he was in its way).
+   */
+  stagedOncoming: Array<{ id: number; distM: number; mps: number; cruiseMps: number }>;
 }
+/** How far back «the speed it was doing before he was in its way» is read, s. */
+const CRUISE_LOOKBACK_SEC = 6;
 
 function drive(
   leg: Leg,
@@ -186,6 +244,7 @@ function drive(
   cadence: Cadence,
 ): { o: LiveReplayOutcome; turnDone: boolean; ending: string | null; gap: number | null; sentence: string | null; commit: Commit | null } {
   let commit: Commit | null = null;
+  const stagedSpeeds = new Map<number, Array<[number, number]>>();
   const deltas = deltasOf(rows, cadence);
   const o = liveChainReplay({
     lesson: compileScenario(SC_TURN_LEFT_ONCOMING, leg.level),
@@ -194,9 +253,27 @@ function drive(
     applyOutcomes: true,
     holdAfterSec: 0,
     ...(deltas ? { frameDeltas: deltas } : {}),
-    afterApply: ({ tick, traffic }) => {
+    afterApply: ({ t, tick, traffic }) => {
       if (commit) return;
+      for (const v of traffic.vehicles) {
+        if (v.id < STAGED_STATE_ID_BASE) continue;
+        let h = stagedSpeeds.get(v.id);
+        if (!h) stagedSpeeds.set(v.id, (h = []));
+        h.push([t, v.speedMps]);
+        while (h[0][0] < t - CRUISE_LOOKBACK_SEC) h.shift();
+      }
       if (!tick.events.some((e) => e.kind === "turnStarted" && e.direction === "left")) return;
+      const stagedOncoming: Commit["stagedOncoming"] = [];
+      for (const v of traffic.vehicles) {
+        if (v.id < STAGED_STATE_ID_BASE || v.dirX < 0.7 || v.x >= tick.position.x || Math.abs(v.y - J.y) > 8) continue;
+        stagedOncoming.push({
+          id: v.id,
+          distM: Math.hypot(v.x - tick.position.x, v.y - tick.position.y),
+          mps: v.speedMps,
+          cruiseMps: Math.max(...(stagedSpeeds.get(v.id) ?? [[0, 0]]).map((p) => p[1])),
+        });
+      }
+      stagedOncoming.sort((a, b) => a.distM - b.distM);
       let nearest: number | null = null;
       for (const v of traffic.vehicles) {
         const dx = J.x - v.x;
@@ -209,7 +286,7 @@ function drive(
         const sec = dist / v.speedMps;
         if (nearest === null || sec < nearest) nearest = sec;
       }
-      commit = { nearestOncomingSec: nearest };
+      commit = { nearestOncomingSec: nearest, stagedOncoming };
     },
   });
   const turn = o.result.objectives.find((x) => x.id === TURN_ID);
@@ -259,21 +336,91 @@ function tasksSection(o: LiveReplayOutcome, compact: boolean): string {
 const STOPS_M = [66, 64.5, 63, 61, 60.2, 59.5, 55] as const;
 const WAITS_S = [10, 15, 20, 30, 45] as const;
 
-describe("§1 a student who stops early, waits, rolls up and turns: never «не беше започнат» under his ✓ turn", () => {
+/**
+ * THE PINNED CENSUS (round 3 of sc-sig-controller-postures:5ee4301e — see the header): the cells, «stop m/wait s»,
+ * where the open-loop drive turns across the lesson's own oncoming car and the turn is therefore not ✓. The same on
+ * every cadence. 31 of 140 (round 4; 21 in round 3 — the ten «wait 10 s» cells joined, see the header).
+ */
+const WAIT_30 = ["64.5/30", "63/30", "61/30", "60.2/30", "59.5/30"] as const;
+const NOT_TURNED: Record<LegName, readonly string[]> = {
+  "phone-L1": [...WAIT_30, "55/15", "61/10", "60.2/10", "59.5/10", "55/10"],
+  "phone-L3": [...WAIT_30, "60.2/10", "59.5/10", "55/10"],
+  "pc-L1": [...WAIT_30, "55/10"],
+  "pc-L3": [...WAIT_30, "59.5/10", "55/10"],
+};
+/** Of those, the drives whose row praises the interval under the bill — a false sentence, pinned by name (header). */
+const PRAISED_UNDER_THE_BILL: Record<LegName, readonly string[]> = {
+  "phone-L1": ["64.5/30", "63/30"],
+  "phone-L3": ["64.5/30", "63/30"],
+  "pc-L1": ["61/30"],
+  "pc-L3": ["61/30"],
+};
+const ABOVE_THE_NORM = "над нормата от 4 секунди, точно така се преценява";
+/** The lesson's two oncoming encounters — the only things that may have written the bill. */
+const OWN_ONCOMING_EVENTS = (SC_TURN_LEFT_ONCOMING.staged ?? [])
+  .filter((e) => (e as { kind?: string }).kind === "oncomingLeftTurn")
+  .map((e) => e.id)
+  .sort();
+
+describe("§1 a student who stops early, waits, rolls up and turns: never «не беше започнат» on his row; the turn ✓ except in the pinned cells where he turns across the lesson's own oncoming car", () => {
+  it("the census names 31 of the 140 drives, and the bill can only come from the lesson's two oncoming encounters", () => {
+    expect(LEGS.reduce((n, name) => n + NOT_TURNED[name].length, 0)).toBe(31);
+    expect(OWN_ONCOMING_EVENTS).toEqual(["sc-ltap-follow", "sc-ltap-tight"]);
+    expect(LEFT_TURN_GAP_SAFE_SEC).toBe(4);
+    for (const name of LEGS) {
+      for (const k of NOT_TURNED[name]) {
+        const [x, w] = k.split("/").map(Number);
+        expect(STOPS_M as readonly number[], k).toContain(x);
+        expect(WAITS_S as readonly number[], k).toContain(w);
+      }
+      for (const k of PRAISED_UNDER_THE_BILL[name]) expect(NOT_TURNED[name], k).toContain(k);
+    }
+  });
+
   for (const name of LEGS) {
     for (const cadence of CADENCES) {
       it(`${name} at ${CADENCE_NAME[cadence]}: ${STOPS_M.length * WAITS_S.length} early stops`, () => {
         const leg = TAPES[name];
         const wrong: string[] = [];
+        const notTurned: string[] = [];
+        const praised: string[] = [];
         let bandStops = 0;
         for (const xStop of STOPS_M) {
           for (const wait of WAITS_S) {
             const d = drive(leg, earlyStop(leg.rows, xStop, wait), cadence);
             const cell = `stop ${xStop} m, wait ${wait} s`;
-            // Every one of these drives makes the turn — that is what makes «не беше
-            // започнат» false on it.
+            const key = `${xStop}/${wait}`;
             expect(d.o.session.phase, cell).toBe("completed");
-            expect(d.turnDone, cell).toBe(true);
+            if (NOT_TURNED[name].includes(key)) {
+              // A PINNED CELL: he turned across the lesson's own oncoming car and was billed for exactly that.
+              notTurned.push(key);
+              expect(d.turnDone, cell).toBe(false);
+              expect(d.o.violationCodes, cell).toEqual(["FAILED_TO_YIELD"]);
+              const billed = d.o.outcomes.filter((x) => x.kind === "oncomingLeftTurn" && !x.success) as Array<{
+                eventId: string;
+                detail?: string;
+                committed?: boolean;
+              }>;
+              expect(billed.map((x) => x.eventId).sort(), cell).toEqual(OWN_ONCOMING_EVENTS);
+              for (const b of billed) {
+                expect(b.detail, cell).toBe("violation");
+                expect(b.committed, cell).toBe(true);
+              }
+              // The car: one of the lesson's staged pair, on the oncoming lane, coming at its 45 km/h until he was
+              // in its way, already shedding speed for him at the frame his turn began, and less than the taught
+              // 4 s from him at the speed it had been doing.
+              const car = d.commit?.stagedOncoming[0];
+              expect(car, cell).toBeDefined();
+              expect(car!.id, cell).toBeGreaterThanOrEqual(STAGED_STATE_ID_BASE);
+              expect(car!.cruiseMps, cell).toBeCloseTo(45 / 3.6, 1);
+              expect(car!.mps, cell).toBeLessThan(car!.cruiseMps);
+              expect(car!.distM / car!.cruiseMps, cell).toBeLessThan(LEFT_TURN_GAP_SAFE_SEC);
+              if ((d.sentence ?? "").includes(ABOVE_THE_NORM)) praised.push(key);
+            } else {
+              // Every other drive makes the turn — that is what makes «не беше започнат» false on it.
+              expect(d.turnDone, cell).toBe(true);
+              expect(d.o.violationCodes, cell).not.toContain("FAILED_TO_YIELD");
+            }
             if (xStop > 60 && xStop <= SC_LTAP_TIGHT_EVENT.armDistM) bandStops++;
             if (d.ending === "noTurn" || (d.sentence ?? "").includes(NOT_BEGUN)) {
               wrong.push(`${cell}: ${d.sentence}`);
@@ -286,6 +433,10 @@ describe("§1 a student who stops early, waits, rolls up and turns: never «не
         }
         expect(bandStops).toBe(4 * WAITS_S.length);
         expect(wrong).toEqual([]);
+        expect(notTurned).toEqual([...NOT_TURNED[name]].sort((a, b) => STOPS_M.indexOf(Number(a.split("/")[0]) as never) - STOPS_M.indexOf(Number(b.split("/")[0]) as never) || Number(a.split("/")[1]) - Number(b.split("/")[1])));
+        expect(notTurned.length).toBe(NOT_TURNED[name].length);
+        // The false praise under the bill, exactly as measured (owed to the sc-turn-left-oncoming lane — header).
+        expect(praised.sort()).toEqual([...PRAISED_UNDER_THE_BILL[name]].sort());
       });
     }
   }

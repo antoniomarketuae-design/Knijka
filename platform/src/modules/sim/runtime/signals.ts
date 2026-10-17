@@ -25,7 +25,7 @@
  * are bit-identical.
  */
 
-import type { SignalLampState, SignalPhase } from "../contracts";
+import { CONTROLLER_ATTENTION_LEAD_SEC, type SignalLampState, type SignalPhase } from "../contracts";
 import type { District } from "./district";
 import { axisOfBearing, bearingDeg, fnv1a, type Axis } from "./geometry";
 import type { DistrictIndex } from "./spatial";
@@ -318,6 +318,47 @@ export class SignalController {
     const node = this.nodes.get(signalNodeId);
     if (!node) return "red";
     return phaseInCycle(this.tSec + this.offsets[node.clusterIdx], axisOfBearing(approachBearingDeg));
+  }
+
+  /**
+   * THE SIGNAL AN AMBIENT DRIVER OBEYS — a car on `approachBearingDeg` (travel bearing INTO the junction) whose lane
+   * leaves `fromNodeId` and ends at `signalNodeId`. sc-sig-controller-postures:5ee4301e: the traffic layer used to read
+   * `phase(node)`, the node's OWN axis-group, for every approach — on a single-node junction that is the arterial's
+   * group, so the cross street drove on the arterial's green, against its own lamp, into the student's path. This is
+   * what every graded and rendered read already answers for the student (the stop line's `group` is the axis of its
+   * approach bearing, stoplines.ts; the head lights `lampState(node, bearing)`):
+   *
+   *  · a controller POSTED here (mode "controlled", schedule set) governs, never the lamp (ЗДвП чл. 7, the same
+   *    `controllerPermission` the stop lines adjudicate with): "proceed" → "green", "halt" → "red", and through his
+   *    raised-arm window (`CONTROLLER_ATTENTION_LEAD_SEC` before the authored flip — the arm the officer figure raises
+   *    on the same constant) → "yellow" for both axes: stop if you still can, clear the junction if you cannot
+   *    («участниците …, които са навлезли в кръстовището, трябва да го освободят», ППЗДвП чл. 29, ал. 3);
+   *  · a cluster whose lamps carry NO phase (mode "dark" / "flashingAmber" — uncontrolled, the right-hand rule
+   *    governs it): UNCHANGED, the node's own group as `phase()` reads it. There is no lamp for an approach to obey,
+   *    and what an ambient driver should do instead (the right-hand rule) is not this repair — reported owed;
+   *  · otherwise the live cycle of the APPROACH's axis-group, through the same offsets every pin writes;
+   *  · null — no stop line on this approach: a link between two members of one signal complex (the stop-line
+   *    builder's C1 rule, `buildStopLines`: «real complexes paint stop lines only on their OUTER approaches»).
+   *
+   * Unknown node ids fail like `phase()`: "red". Read by the ambient traffic only — nothing graded calls it.
+   */
+  ambientPhase(signalNodeId: string, approachBearingDeg: number, fromNodeId: string): SignalPhase | null {
+    const node = this.nodes.get(signalNodeId);
+    if (!node) return "red";
+    const ci = node.clusterIdx;
+    const from = this.nodes.get(fromNodeId);
+    if (from !== undefined && from.clusterIdx === ci) return null;
+    if (this.isClusterUncontrolled(ci)) return phaseInCycle(this.tSec + this.offsets[ci], node.group);
+    const group = axisOfBearing(approachBearingDeg);
+    const permission = this.controllerPermission(ci, group);
+    if (permission !== null) {
+      const flipAt = this.controllers[ci]?.flipAtSec;
+      if (flipAt !== undefined && this.tSec < flipAt && flipAt - this.tSec <= CONTROLLER_ATTENTION_LEAD_SEC) {
+        return "yellow";
+      }
+      return permission === "halt" ? "red" : "green";
+    }
+    return phaseInCycle(this.tSec + this.offsets[ci], group);
   }
 
   /**

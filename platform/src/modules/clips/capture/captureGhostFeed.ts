@@ -132,9 +132,11 @@ export function createCaptureFeedStepper(args: CaptureFeedArgs): CaptureFeedStep
         runtime.update(dt);
         traffic.update(dt, {
           signalPhase: (id) => runtime.signalPhase(id),
+          ambientSignal: (id, bearing, from) => runtime.ambientSignalPhase(id, bearing, from),
           playerPos: { x: pt.x, y: pt.y },
           playerSpeedKmh: Math.abs(pt.speedKmh),
           playerHeadingDeg: pt.headingDeg,
+          playerIndicator: pt.indicator,
         });
         const leadGap = traffic.leadGapMeters(pt.x, pt.y, pt.headingDeg);
         sample.position.x = pt.x;

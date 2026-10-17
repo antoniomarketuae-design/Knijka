@@ -246,6 +246,8 @@ function scJunctionBlindShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Равнозначно кръстовище, но сграда на ъгъла крие гледката надясно — приближаваме с готовност за спиране." },
       { kind: "glance", mirror: "rear" },
+      // The tape stands 5 s on its spawn before it sets off (round 3, D3 — see the hold below for why and how measured).
+      { kind: "pause", sec: 5.0, brake: true },
       { kind: "drive", points: BLIND_APPROACH, targetKmh: 20 },
       { kind: "annotation", textBg: "Ляв мигач и се оглеждаме: първо наляво, после НАДЯСНО, изпълзявайки докато видим зад сградата." },
       { kind: "indicator", setting: "left" },
@@ -261,9 +263,29 @@ function scJunctionBlindShadowScript(): DriveScript {
         targetKmh: 9,
       },
       { kind: "annotation", textBg: "Кола отдясно се показа иззад сградата — тя има предимство. Спираме и я пропускаме." },
-      { kind: "pause", sec: 8.0, brake: true },
+      // THE HOLD IS TWO LOOKS, 4 s + 9.85 s, AND THE TAPE SETS OFF 5 s LATE (sc-sig-controller-postures:5ee4301e round 3,
+      // integrator decision D3). It was one 8 s pause from an immediate start, timed on a street whose ambient cars
+      // hopped the junction: once they drive through it (traffic/graph.ts `laneConnector`) a second car from the
+      // right, at the densest rung, is in the mouth when an 8 s hold releases — the tape pulled out in front of it and
+      // the lesson convicted its own model answer (L5, live chain: FAILED_TO_YIELD, ambient car 1 braked from 22 km/h
+      // to 0 at (4.5, −0.1)). The careful drive at a blind junction does not go on the first gap it is shown: it
+      // looks again.
+      // HOW THE TWO NUMBERS WERE CHOSEN (an open-loop tape cannot react, so they are measured, not argued): start
+      // delays 0–9 s × holds 7–16 s through BOTH gates this tape has — the live chain on the street each rung
+      // compiles to (lessons/scenario/__tests__/jblind-model-line-every-rung.live.test.ts: 0 points on L1–L5, nobody
+      // coming from the right at the pull-out, never within 4 m of an ambient body) and the 20-seed ratchet
+      // (jblind-model-line-in-compiled-traffic.test.ts, 1/1/0/0/0, never raised). Delay 5 s + a hold of just under
+      // 14 s is the one region of that grid clean in both: 0 of 20 seeds on every rung for holds 13.8–13.95 s at
+      // delays 4.75–5.25 s (at 14.0 s one seed of the densest rung convicts again), closest ambient pass 4.4 m of
+      // boxes. 13.85 s is the middle of it. THE SEED SWEEP IS A LOTTERY BY ITS OWN ACCOUNT («a scripted tape cannot
+      // react»): this is the tape that is clean on the street each rung really compiles to, and inside the ratchet.
+      // A hold of 17 s or more runs into the staged priority car's SECOND lap.
+      { kind: "pause", sec: 4.0, brake: true },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътят е чист — завиваме наляво уверено." },
+      { kind: "annotation", textBg: "Първата кола мина, но не тръгваме веднага — зад сградата може да идва още една. Гледаме пак надясно, докато сме сигурни." },
+      { kind: "pause", sec: 9.85, brake: true },
+      { kind: "glance", mirror: "right" },
+      { kind: "annotation", textBg: "Отдясно вече не идва никой — завиваме наляво уверено." },
       {
         kind: "drive",
         points: [

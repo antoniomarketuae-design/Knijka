@@ -41,6 +41,7 @@ import {
   buildPedSidewalkRoute,
   createPedestrianAgent,
   footwaylessEdgeIds,
+  pedPavementWorld,
   SIDEWALK_MIN_EDGE_M,
   updatePedestrian,
   type PedestrianAgent,
@@ -65,6 +66,7 @@ import {
 import {
   createVehicleAgent,
   separateVehicleFrom,
+  trackStagedRest,
   updateVehicle,
   type NodeReservation,
   type VehicleAgent,
@@ -660,6 +662,10 @@ class TrafficSystemImpl implements TrafficSystem {
         cfg.footwaylessRoadClasses,
         cfg.laneWidthM,
       );
+      // sc-sig-controller-postures:4f446777 — a PAVEMENT walker's beat stops where
+      // the world's pavement does at a junction and is checked clear of every
+      // carriageway (pedestrians.ts «WHERE THE PAVEMENT ENDS»).
+      const pavement = pedPavementWorld(district.roads.edges, cfg.laneWidthM);
       const walkable = district.roads.edges.filter(
         (e) => !footwayless.has(e.id) && e.geometry.length >= 2 && e.length >= SIDEWALK_MIN_EDGE_M,
       );
@@ -686,7 +692,7 @@ class TrafficSystemImpl implements TrafficSystem {
           // beats along the edge rather than stacking them on one spot.
           const side: 1 | -1 = placed % 2 === 0 ? 1 : -1;
           const anchorS = edge.length * ((pass + 0.5) / 4 + rngRange(rng, -0.12, 0.12));
-          const route = buildPedSidewalkRoute(edge, cfg.laneWidthM, side, anchorS, rng);
+          const route = buildPedSidewalkRoute(edge, cfg.laneWidthM, side, anchorS, rng, pavement);
           if (!route) continue;
           const agent = createPedestrianAgent(
             pedId,
@@ -710,6 +716,7 @@ class TrafficSystemImpl implements TrafficSystem {
       reservations: this.reservations,
       crossingCounts: this.crossingCounts,
       signalPhase: () => "green",
+      ambientSignal: null,
       timeSec: 0,
       hasPlayer: false,
       playerX: 0,
@@ -802,6 +809,8 @@ class TrafficSystemImpl implements TrafficSystem {
     const vEnv = this.vehicleEnv;
     const pEnv = this.pedestrianEnv;
     vEnv.signalPhase = ctx.signalPhase;
+    vEnv.ambientSignal = ctx.ambientSignal ?? null;
+    vEnv.playerIndicator = ctx.playerIndicator ?? "off";
     pEnv.signalPhase = ctx.signalPhase;
     if (ctx.playerPos) {
       vEnv.hasPlayer = true;
@@ -909,6 +918,7 @@ class TrafficSystemImpl implements TrafficSystem {
         for (let i = 0; i < this.pedestrianAgents.length; i++) {
           updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
         }
+        trackStagedRest(vEnv);
         for (let i = 0; i < this.vehicleAgents.length; i++) {
           updateVehicle(this.vehicleAgents[i], dt, vEnv);
         }
@@ -1048,6 +1058,7 @@ class TrafficSystemImpl implements TrafficSystem {
       for (let a = 0; a < this.pedestrianAgents.length; a++) {
         updatePedestrian(this.pedestrianAgents[a], H, pEnv);
       }
+      trackStagedRest(vEnv);
       for (let a = 0; a < this.vehicleAgents.length; a++) {
         updateVehicle(this.vehicleAgents[a], H, vEnv);
       }

@@ -213,6 +213,18 @@ describe("one slow frame is one frame of world", () => {
    * recomputed per body — would still make §2's ratio green while quietly
    * moving every gap, every sustain window and every graded verdict on the
    * machines that were fine. Only a golden taken from the OLD code can catch it.
+   *
+   * 2026-10-11, sc-sig-controller-postures:5ee4301e round 2 — WHICH ROWS ARE STILL
+   * THE OLD CODE'S. Ambient cars now drive a connector across every gap between
+   * two lanes instead of hopping it (graph.ts `laneConnector`), so a car that has
+   * crossed a lane seam by t = 30 s is no longer where the 2026-08-19 build put
+   * it — all ten have (car 5 by 1.6 mm: its seam was a 1 cm gap). The sub-step
+   * loop was not touched by that lane. What still pins the loop against the OLD
+   * code, byte for byte, is the clock and both pedestrian rows. The two car rows
+   * are re-recorded on this tree (2e9268f gave −44.89081338110693,
+   * 211.38362583425754, 11.475623702503672 and 462.24910097334146,
+   * −291.9428485855432, 0): they pin today's kinematics at this frame length,
+   * not the old loop.
    */
   it("is bit-identical to the pre-fix build above 10 fps", () => {
     const system = createTrafficSystem(loadRealDistrict(), { seed: 7 });
@@ -221,10 +233,10 @@ describe("one slow frame is one frame of world", () => {
 
     expect(system.timeSec).toBe(29.999999999999577);
     expect([system.vehicles[0].x, system.vehicles[0].y, system.vehicles[0].speedMps]).toEqual([
-      -44.89081338110693, 211.38362583425754, 11.475623702503672,
+      -45.23800007307607, 211.59314647780462, 8.52497325327134,
     ]);
     expect([system.vehicles[3].x, system.vehicles[3].y, system.vehicles[3].speedMps]).toEqual([
-      462.24910097334146, -291.9428485855432, 0,
+      462.24910097336334, -291.94284858613105, 0,
     ]);
     expect([system.pedestrians[0].x, system.pedestrians[0].y]).toEqual([
       16.174578620019197, -441.84212833321845,

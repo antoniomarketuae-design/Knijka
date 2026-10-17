@@ -13766,3 +13766,317 @@ Lane `cdtools`, round 1, built on `9390622` + `gate-cd.patch` (tree T0 cf10a9b3)
 ### Gate «nscdt» (integrator note, 2026-10-17)
 
 The first run of the gate for the npcstep, cardstay and curvdepth + cdtools landings refused on vitest pool timeouts (the box was loaded by two lanes beside it; 0 tests failed). The second run stopped on two TIMEOUTS, not assertions: `static-contact-cadence.census.test.ts` L2 (61.3 s) and L5 (62.8 s) against the 60 s default. That census had already timed out under load in the whycut lane (68–117 s per level) and none of the three landings touches it. It now carries an explicit 600 s budget per level, as the other cadence censuses do; its assertions are unchanged, and run alone it passes 8/8.
+
+## Wave C verdicts — 2026-10-17
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1f1536dfab0a`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 7 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 13 |
+
+**Open list: 21 → 20**, out of 1547 filed across the whole programme (1526 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3h: the first drives of the npcstep and cardstay landings at `1f1536d` — `sc-roundabout-entry:08a0b701` CLOSED, `sc-roundabout-entry:fe081cf1` PARTIAL (integrator note, 2026-10-17)
+
+Workflow `rig-wave-w3h` (wf_f3e9f81e-d9b) ran at `1f1536d` (health attested `1f1536df`): one capture and one judge per row, and an adversarial verifier on the proposed closure. Frames and sidecars are under `.audit-frames/rig-w3h/sc-roundabout-entry/`; the journal is `handoff-2026-10-08/reports/rig-w3h-journal.jsonl`. **Open list 21 → 20 (3 critical, 16 major, 1 minor).**
+
+- **`08a0b701` CLOSED, and its verifier could not refute it.** Six kept cells, step-keyed and byte-identical on both lenses (L4 H1776 / H1780 / H1810, L1 H1707 / H1710 / H1711), were driven 2× on PC and 4× on the phone: 36 runs, every cell one sheet with the same stamp steps on both lenses (for example L4 H1776 FAILED_TO_YIELD@3266 + COLLISION@3266 = 20 on all 6; H1810 COLLISION@3365 on all 6, where rig-w3d's phone gave 3359–3362). On the phone the contact fell inside frames of 4–9 grid points that did not start on it, so the multi-step case was exercised. The careful control drive (stops at y −50 and at the give-way line, entry at 11.6 km/h with the circulator 23.8 m past the mouth) is 0 points, ИЗДЪРЖАН, both tasks ticked, on both lenses. What changed: ADR-014 «Amendment 2026-10-13» (npcstep).
+- **`fe081cf1` PARTIAL.**
+  - **Closed on these frames:**
+    - the phone's L3 peek as it first appears (whole);
+    - the PC un-pressed single card on every measured stage at or above the 548 px floor: judged parts out on 0 of 419–469 rAFs on LB-1440 ×2, FS-1440 and FS-1280; the advisor waits; no oscillation (cardstay W7–W9);
+    - the PC opened «ЗАЩО» card, still closed under W2.
+  - **Recorded, not held against the row:** on LB-1366 (514 px, below the floor) the law chip is out on 260 of 433 rAFs under «↓ ОЩЕ 1 ИЗВЕСТИЕ — ПОКАЖИ». That is founder question 8.
+  - **New, STILL:** with two judged cards on FS-1280x720 — above the 582 px two-card floor — the OLDER FAILED_TO_YIELD card loses its one-liner and law chip for 74 rAFs (≈ 1.33 s, its whole overlap with the collision card). On LB-1440 the same happens for 4 rAFs. Under cardstay's X2 rule the column stands only for the TOP judged card, and the older card is announced by the fold row. The judge reads this as contradicting the stated two-card floor.
+- **Next (integrator):** a cardstay follow-up round on the two-card case, so the older judged card keeps its title, one-liner and law chip or is announced without being cut. Then a re-drive of TWO-FAULT-FS1280.
+
+## Landed: an ambient car obeys the signal for its own approach and the officer's permission for its axis, a careful student is no longer struck by cross traffic in the junction box, and a pavement walker's beat stops where the drawn pavement ends at a junction — in process — `sc-sig-controller-postures:5ee4301e` (critical) and `sc-sig-controller-postures:4f446777` (major) (2026-10-17)
+
+Lane `posturescross`, nine rounds, built on `2e9268f`.
+- Rounds 1, 3 and 4 were REFUTED by the adversarial verifier.
+- In round 2 the builder found and fixed round 1's cause (the lane-seam hop) and returned BLOCKED on a decision about the test that pinned the broken junction. The integrator took it in round 3 (round-3 decisions D1–D6, 2026-10-11).
+- In round 5 the builder returned BLOCKED with a measured frontier.
+- In rounds 6 and 7 the builder returned BLOCKED on one decision each, and the verifier then REFUTED the tree as decided.
+- Round 8 was REFUTED on the integrator's decision itself, not on the build.
+- Round 9 was SIGNED OFF WITH CONDITIONS. Its conditions are below.
+
+The patch and the files:
+- **The patch.** `posturescross-result-r9.patch`: sha256 06b26a97…, 3,634,661 bytes, 44 files, +7,491/−173, 0 CR bytes.
+  - It is cumulative against the lane's base `2e9268f`, not against HEAD, and it lands applied 3-way onto `1f1536d`.
+  - It shares nine files with what `1f1536d` adds on top of `9390622` (npcstep, cardstay, curvdepth, cdtools): `contracts.ts`, `scene/gradeGrid.ts`, `traffic/system.ts`, `traffic/types.ts` and five reviewed-text manifest files. Against the lane's base `2e9268f` it shares eleven: also `runtime/signals.ts` and `traffic/index.ts`, which applied cleanly in the builder's check against `9390622`.
+  - The builder's apply check against `9390622` found one conflict, the generated `reviewed-text-manifest/manifest.json` (round 3's hunk).
+- **Product files (13):**
+  - `traffic/vehicles.ts`, `graph.ts`, `pedestrians.ts`, `system.ts`, `types.ts`, `index.ts` and `TrafficLayer.tsx`;
+  - `runtime/signals.ts` and `worldRuntime.ts`;
+  - `scene/gradeGrid.ts`, `traces/recorder.ts` and `clips/capture/captureGhostFeed.ts`, the three callers that hand the traffic its signal read and the student's indicator;
+  - `contracts.ts`: `CONTROLLER_ATTENTION_LEAD_SEC`, 11 s, moved there unchanged from TrafficLayer's `OFC_RAISE_LEAD_SEC`.
+- **Four recorded demo tapes were re-authored** (content and public copies), from `traces/scJunctions2.ts`, `scJunctions3.ts` and `scJxGivewayB1.ts`. The reasons are the builder's:
+  - `sc-junction-blind` shadow-correct (round 3, by round-3 decision D3): the committed correct demo was convicted at L5 on the repaired traffic. The tape now stands 5 s at spawn and holds 4 s + 9.85 s in two looks; it was one 8 s hold.
+  - `sc-junction-left` mistake-cut-gap (round 3): it told «Колата с предимство трябваше да намали заради теб» while the tape drove into an ambient car that had stopped for it.
+  - `sc-jx-giveway-b1` shadow-correct (round 4): the correct demo was newly convicted at L3 and L4 because an ambient car now queues at the Б1 line.
+  - `sc-jx-giveway-b1` mistake-barge-priority (round 5): it crosses at 30 km/h, and L1–L4 are FAILED_TO_YIELD with no contact.
+- **Two caption lines the student sees changed** (round 3, sc-junction-blind's correct demo, `content/` and `platform/public/` copies; the builder's shown-text report). Against `1f1536d` the reviewed-text unit `sc-junction-blind/shadow-correct` goes from 5 to 6 strings (its shape id moves with it):
+  - **none → `487183ee1d75`** (added, shown 4 s into the hold): «Първата кола мина, но не тръгваме веднага — зад сградата може да идва още една. Гледаме пак надясно, докато сме сигурни.» (120 characters, never laid out in a browser).
+  - **`1b95c586e00c` → `9cadbad8e2cd`** (replaced, at the pull-out): «Пътят е чист — завиваме наляво уверено.» became «Отдясно вече не идва никой — завиваме наляво уверено.» On two rungs a car was turning round inside the junction at that instant, so «the road is clear» was not true on every frame. `jblind-model-line-every-rung.live` asserts «nobody from the right» per rung. The round-3 verifier found the captions true per rung. The old string stays in the manifest: sc-junction-rhr's and sc-signal-dead's correct demos still show it.
+  - **The founder is told** both lines at this landing. Any earlier statement that no shown sentence changed (the round brief's, or the integrator's «No shown text moved against the patches», which is true only against the lane's own patch) does not describe the landing against `1f1536d`.
+  - No other caption or card text changed, and rounds 4–9 changed no shown string.
+  - The round-3 verifier checked the cut-gap card's «на около секунда и половина»: the staged car's timing at the stop equals base (6.5 m against 6.6 m).
+- **Test files (15):**
+  - New (10): `junction-box-protocol`, `ambient-own-approach-signal`, `pavement-walker-junction`, `junction-connector`, `ambient-junction-yield`, `ambient-yield-patience`, `controller-cross-traffic`, the `junction-box-clears.census`, `jblind-model-line-every-rung.live` and `mistake-demos-tell-their-own-story.live`.
+  - Updated (5): `traffic/__tests__/fixtures.ts`, `substep`, `player-shed`, `ambient-player-separation` and `ltap-early-stop-band.live`.
+- **What did not change.** No staged actor, graded rule or protected threshold changed (the builder). Shown text: only the two round-3 caption lines above. The verifier's census found 0 correct demos newly convicted.
+  - The reviewed-text manifest was re-recorded on `1f1536d` because its generated `manifest.json` conflicted. The re-record keeps round 3's two caption entries (`487183ee1d75` and `9cadbad8e2cd`); see PROVEN below.
+- **ADR-018 is new**: the junction-box protocol, with the founder-question-7 class and its answer.
+
+**The rows are NOT closed by this landing.** `sc-sig-controller-postures:5ee4301e` and `:4f446777` both stay OPEN.
+- Every number this lane reports for its tree was measured in process. Nothing was driven in a browser by the builder or by any verifier.
+- A rig re-drive on PC and on the phone lens is owed (below): the careful student crossing on the officer's «proceed», the cross traffic, and the walkers. Whether its frames close either row is for that wave's judge and verifier.
+- This landing does not change the Product Map's open-row count.
+
+**What was wrong.**
+- **5ee4301e, cross traffic.** An ambient car asked `runtime.signalPhase` for the node's own axis group on every approach. On the single-node cluster `sx-n-c` that is NS. So east–west cross traffic stopped on the NS red and drove off on the NS green — the student's green — against its own lamp. Nothing in the ambient code read the officer. In a 160 s L1 probe of sc-sig-controller-postures, a westbound car left its line into the box at 16.5 km/h three times on the student's green after the officer had turned side-on, against its own red and the officer, exactly when the student was told to go.
+- **4f446777, walkers.** `buildPedSidewalkRoute` started a pavement beat at s = 0, the junction node, so a pavement walker walked across the crossing road's carriageway to its centre line and back. On sx-v1, walker 2 of sx-e-e stood on the N–S carriageway from t 97.7 to 118.6 s, out to x = 0.03 beside the officer, through the northbound lane the student was told to drive, during the officer's release.
+- **Measured at base.**
+  - The round-1 verifier counted ambient crossings against their own signal or the officer: shadow 53, park 134, and the careful controller sweep 257.
+  - It found pavement walkers on a carriageway in 80 of 155 live traffic configurations.
+  - On the round-3 verifier's officer grid, 18 lawful cells of 1,378 (go 48.5–50 s) end in a COLLISION.
+
+**How nine rounds got here.** Obeying the right lamp was repaired in round 1 and has measured 0 on the signal instruments since. Every later round was about one question: how an ambient car shares the junction box with the student.
+- **Round 1** was refuted:
+  - the left-turn catalogue regressed by 23 tests;
+  - an ambient car's pose jumped across the lane seam at the node and froze in the box.
+- **Round 2.** The builder fixed that cause (built connectors) and returned BLOCKED on a decision about the test that pinned the broken junction. Round-3 decisions D1–D6 took it.
+- **Round 3** was refuted on two findings:
+  - on the officer grid a careful lawful student was struck in 33 cells other than base's 18 of 1,378; the verifier attributed 7 of them (at the line, go 37 s) to the 5 s patience release on the clock alone;
+  - a box deadlock between an ambient turner and a guard-stopped staged car.
+- **Round 4** (one protocol, P1–P3) was refuted on three findings:
+  - the left indicator released the oncoming turner for a student who then drove straight: 116 of 790 lawful cells;
+  - a 6.1 / 6.4 s rest in the box on the cut-gap demo;
+  - a mutual wait with a student waiting inside the junction: the head stood over the bound in 42 of 80 cells.
+- **Round 5** (D1–D5) returned BLOCKED with a measured frontier: D2 broke the left-turn lesson, and one rule (R-E) met every target. E1–E4 adopted R-E.
+- **Round 6** (E1–E4) was refuted on two findings:
+  - the passage bound failed for a slow coming student: holds ended 0.60–1.33 s after his clearing at 6–15 km/h;
+  - a student who stops in the box signalling left and goes straight was struck in 25 of 112 cells at y −4, against base 0.
+- **Round 7.** The builder's E7 frontier: every causal rule measured either strikes that student (137 / K1 69 / K3b 42 of 1,344 cells), or holds the turner for as long as he stands, or freezes the left-turn lesson. The verifier refuted on R7-F1: a student who had cancelled his left signal and stood in the box with OFF or RIGHT was struck in 6 / 11 / 4 / 13 of 112 cells per grid, against base 0.
+- **Round 8** (E9: the in-box release reads his room) put every boxstop grid at 0. It was refuted on R8-F1, against the decision itself:
+  - a left-turn student waiting 10–24 m inside the junction left the oncoming head standing on its own green over the bound in 77 of 120 cells;
+  - the staged follow car passed 0 of 25 times at 11–24 m (5 of 5 at 10 m);
+  - the cause: the turner's waiting point W lies in its OWN approach lane, so holding it there stalls the stream he is waiting for.
+- **Round 9** (E13–E17) reads a waiting student as at his line and protects a student who is not waiting. Among strikes by ambient vehicles on a student who obeys his signal, that leaves one class: founder question 7. The staged dark-junction cells of R9-C2 are carried separately.
+
+**The integrator's decisions**, inside the 2026-10-08 delegation. The founder is told them at this landing. Their texts are in `finish-2026-09-26/make-wave-g-r3.cjs` (round 3) and `finish-2026-09-26/make-posturescross-r4.cjs`…`r9.cjs`.
+- **Round-3 D1–D6 (2026-10-11).** Test-and-demo decisions; their names are not round 5's D1–D5.
+  - D1/D2: the ltap test and the delay sweep are restated as pinned censuses.
+  - D3: sc-junction-blind's correct demo may not land convicted, so it is re-authored.
+  - D4: the six mistake demos that newly collide are checked against their story.
+  - D5: the shown-only cells are classified by mechanism.
+  - D6: the patience bound (5 s), kept under P1/P3.
+- **P1–P3 (round 4).**
+  - P1: all yielding happens at the line.
+  - P2: a vehicle that has entered the box clears it. D3 amended it: a vehicle never stops in a lane another stream drives through, and a turner may hold at its waiting point.
+  - P3: at the line the student is predicted at his earliest arrival from his launch, and a guard-stopped staged car is not standing for good.
+- **D1.** WAITING is the left indicator plus at rest, wherever he stands.
+- **D2** (amended by E1). COMING once his car moves toward the conflict.
+- **D3.** The last safe point W: a released turner keeps deciding up to W and never stops in his lane.
+- **D4.** A rest in a box beyond the bound is a defect on every demo. Every committed demo is driven by the census.
+- **D5.** The round-4 conditions are work, and the clips to re-capture are listed.
+- **E1.** WAITING is the left indicator plus either at rest or still able to stop short of his own line at 2.2 m/s²; otherwise he is COMING.
+- **E2** (replaced by E5). A waiting-point hold while a coming vehicle passes is not a freeze.
+- **E3.** The census drives every committed demo.
+- **E4.** The round-5 numbers are the acceptance.
+- **E5.** The passage bound is a distance: the product's restart distance `STUDENT_PATH_SEP_M` 5.8 m, plus the launch, plus one step.
+- **E6.** The census reads the product's own hold reason.
+- **E7.** A design search with a measured frontier before any founder question.
+- **E8.** The surviving mutants are work.
+- **E9** (amended by E13). In the box the release reads his room.
+- **E10.** A hold or queue bounded by his standing is excused while he stands.
+- **E11.** Pin the staged hold reason and the staged restart distance, and correct the reach arithmetic.
+- **E12.** Round-8 acceptance.
+- **E13.** In the box a WAITING student is read as at his line. A student at rest who is NOT waiting is protected by his room.
+- **E14.** The indicator keeps its E1 meaning at dark and flashing junctions; the round-8 deviation is reverted.
+- **E15.** A vehicle queued behind a hold that E10 excuses is excused for as long as that hold is, and judged by the hold's own bound. As built (deviation 6c), each follower must move within `QUEUE_RESTART_SEC` of its own leader, and a car at its own line may have its leader across the junction.
+- **E16.** Pin the round-8 survivors on executed tests.
+- **E17.** Round-9 acceptance.
+
+None of these is a founder ruling. Founder question 7 is answered below.
+
+**Founder question 7, and its answer: ANSWERED 2026-10-16, by delegation.**
+- **The ruling, as recorded** (memory `founder-ruling-2026-10-16-q7-own-false-signal`): «a student who signals LEFT, stands in the junction, then drives straight into the turner his signal released is struck by his own misleading signal — posturescross lands as built». The class is not a defect of the traffic.
+- **The question, as put to him on 2026-10-16:** «a student signals left, stops in the junction, then drives straight into the car his signal let turn — hit through no fault of his own, or by his own misleading signal?» The integrator recommended «his own misleading signal».
+- **His answer, verbatim:** «do it how you think its right».
+- **THE RULING** (the integrator, under that delegation, 2026-10-16; memory `founder-ruling-2026-10-16-q7-own-false-signal`): **the class is the student's own false signal. Nothing bills the indicator; no sheet row is added for it.** The repair lands as built in round 9:
+  - a waiting student (left indicator, at rest or able to stop short) releases the oncoming turner, in the box as at his line;
+  - a student who is not signalling left is protected by his room for as long as he stands.
+- **Why.** Rounds 7–9 measured that no causal rule protects that student without holding the turner for as long as he stands. That hold stalls the oncoming stream for a left-turn student waiting deep in the junction (round 8: 77 of 120 heads over the bound, the staged follow car 0 of 25 at 11–24 m). A turner trusting a left signal is what real traffic does.
+- **Scope.** It covers question 7 only. If he later rules the other way, a new round is owed: the K2b + E10 family, with its stall cost stated.
+- **Two code comments still say «open».** The doc comment of `studentLeavesRoom` (`traffic/vehicles.ts:1603`, «founder question 7, open») and the boxstop test's comment (`junction-box-clears.census.test.ts:1785`, «founder question 7 (open)») predate the answer. This ruling supersedes both. Neither was edited at this landing. `vehicles.ts` is the lane's product file, and the landing patch carries it as the lane built it. The census test's comment was left as the lane wrote it, although the integrator's R9-C3 pin edits that file. Bringing both comments in line with the ruling is a comment-only edit, owed (below).
+
+**What landed.** This is the builder's description; the next heading says what the verifier reproduced.
+- **Own-approach signal (5ee4301e).**
+  - `SignalController.ambientPhase(signalNodeId, approachBearingDeg, fromNodeId)`, exposed as `DistrictWorldRuntime.ambientSignalPhase`, answers the signal for the car's own approach:
+    - where a controller is posted, his permission: «proceed» green, «halt» red, and yellow for both axes through his raised-arm window, `CONTROLLER_ATTENTION_LEAD_SEC` before the authored flip, the same constant the officer figure raises his arm on;
+    - otherwise the live cycle of the approach's own axis group;
+    - null on a link inside one signal complex;
+    - at dark and flashing clusters, the node's own group as before. That is owed (below).
+  - The grade grid, the trace recorder and the clip feed hand it, and the student's indicator, to the traffic at every grid point. Nothing graded calls it.
+  - TrafficLayer only renders. Its per-frame «drop-in» update, which no mount used, is removed (ADR-014).
+- **Junction connectors.** Ambient vehicles drive a built connector through the box (`graph.ts` `laneConnector`) instead of hopping the lane seam at the node.
+- **The junction-box protocol** (`traffic/vehicles.ts`) is ADR-018. It contains:
+  - P1 and P3 at the line, with the taught 4 s margin `AMBIENT_LEFT_TURN_GAP_SEC`;
+  - the round-3 patience bound `AMBIENT_YIELD_PATIENCE_SEC` 5 s, kept under P3;
+  - E1's waiting / coming; the release at the line also needs the two opposing left turns to pass clear (`opposingLeftsClear`);
+  - D3's last safe point W;
+  - E13's in-box reading through `studentLeavesRoom` at `cfg.accelMps2` 1.8 m/s²;
+  - the staged room rule, bounded by patience.
+  The `studentLeavesRoom` comment still calls question 7 «open»; the 2026-10-16 ruling above supersedes it.
+
+  By the builder, 352 signalised movements:
+  - proper left turns: 55 with a W, 2 without, 12 NaN;
+  - 11 movements without a W, at three d2-v1 / district-v1 nodes. None is on sx-v1.
+  - On sx-v1 a left turner's W is 12.25 m into its 49 m connector.
+- **The census reads the product's own hold reason** (`waitingPointHoldFor`). `HoldLedger` excuses a hold bounded by his standing (E10) and follows a queue to its head (E15).
+  - `QUEUE_RESTART_SEC` = the fleet IDM's restart lag at the grid step, 0.867 s, + 2 steps = 0.900 s (the builder).
+  - `BOX_REST_BOUND_SEC` stays 5 s (yellow + all-red + red-yellow).
+- **Pavement walkers (4f446777).** A pavement walker's beat stops where `world/builders/roads.ts` draws the pavement at a junction: the junction-trimmed centre line, pulled in by `sidewalkEndInsetM`. It is checked clear of every carriageway. A way-split joint or a dead end keeps its old end.
+
+**What the round-9 verifier reproduced** (its own lane, `2e9268f` + the patch, sha matched; log `scratch/posturescross-verify/PROGRESS.md` R9-V0…R9-V27; cell for cell against the trees named).
+- **Deep boxwait (R8-F1 is gone).** He stops at his line, pulls 3–24 m into the junction signalling left and waits 60 s.
+  - 12–24 m: 80 of 80 cells identical to round 7, 0 ambient heads over the bound, staged 1001 passes 20 of 20.
+  - 10 and 11 m: 40 clean, 0 heads over, 1001 passes 10 of 10.
+  - 3–9 m: identical to round 8.
+  - Wait cells: 36 clean, follow car 9 of 9.
+  - Its own deep creep at 0.25 and 0.31 m/s: 0 heads over, 1001 passes 10 of 10.
+- **Boxstop** (36 grids: y 0 to −20, launches 2 and 3.9 m/s², 112 lawful cells each):
+  - OFF ×12 and RIGHT ×12: 0 lawful COLLISION each, identical to round 8.
+  - LEFT ×12 (question 7): 137 of 1,344, identical to round 7. At 2 m/s², y 0/−4/−7/−10/−14/−20 give 0/25/11/4/0/0; at 3.9 m/s², 0/40/30/19/8/0.
+- **The R7-F1 grids:** 5 grids, 0 each.
+- **Standlong** (60 s standing at y −4):
+  - LEFT: the longest W hold is 2.03 s (the turner is released);
+  - OFF and RIGHT: 0 holds;
+  - cancelled: 69.90 s, held for the student.
+- **Officer grids, identical to round 8:**
+  - indicator off: 0 of 1,590 lawful cells struck (2,756 cells);
+  - left: 0 of 790, with 182 W holds, max 6.28 s, tail 0.183 s;
+  - right: 0 of 790. Straight with the right indicator: 0 of 790;
+  - rolling at 30 and 45 km/h: 0 of 424 each.
+- **Timid grid:** 0 of 882. **E5 at 6–40 km/h:** tail 0.183 s, 0 over the bound.
+- **Left-turn lesson, identical to round 8:** sweep 80/18/2, line-wait 118/4/3, early-stop band 109/31, each also in its held-open view.
+- **Census.** 2,434 rows identical to round 8.
+  - Against base (round-6 verifier, unchanged since): 49 sheet changes and 51 shown-only, 0 correct demos newly convicted, 16 cleaned.
+  - STUCK 79 = 75 staged roundabout rests + 4 sc-ed-d2-priority-run.
+- **Filed defects.** Ambient crossings against their own signal or the officer: 0 of 137 (shadow; LATE 3, the base class of cars that could not stop), 0 of 320 (park) and 0 of 6,857 (careful). Walker rows are identical to round 8: 7 pavement configurations / 16 samples, each 1–5 samples at a joint boundary and identical at base (round-1 verifier).
+- **Lamp lessons** (1,012 cells per indicator):
+  - L is identical to round 7; O and R are identical to rounds 7 and 8;
+  - SW: the 14 R7-F1 contacts of round 7 are gone, and the 12 changes against round 8 are all at dark or flashing junctions;
+  - the dark-junction probe with LEFT is identical to round 7: the longest opposite-arm rest is 31–42 s.
+- **Its own search, OFF and RIGHT** (creep at 0.9 and 1.1 km/h, tap-and-go, flicking, reversing, plain): 0 of 112 each. The fine grids O −4 a3.9, R −10 a3.9 and O −17 a2: 0 of 640 each.
+- **Mutants** (one at a time, every restore sha-verified):
+  - Killed on assertion text: every named round-9 mutant, the round-8 E10 and staged mutants, the round-8 survivors (now on executed tests), the rounds 5–7 set except the census-only survivors below, XF, R8_XF8, D4b and all 27 round-4 mutants.
+  - Its own VR9_WAIT_RIGHT_TOO, VR9_QUEUE_LAG_LOOSE and VR9_INBOX_SLOW_AS_REST were killed.
+  - VR9_ROOM_ACCEL_HALF was killed by unit tests only.
+  - Survivors: below.
+- **Regression** (lane tree):
+  - lessons/scenario/__tests__: 185 files, 4,407 of 4,407;
+  - lessons + lesson-ui: 3,052 passed, 165 skipped, 1 failed;
+  - traffic, runtime, scene, orchestrator, clips/capture, traces and sim/__tests__: 360 files, 5,032 passed, 1 failed;
+  - the two failures are ENOENT on the lane's missing tools/mobile checkout, as in rounds 4–8;
+  - tsc: 22 errors, the same 12-file set as round 8.
+- **Builder only, not re-run by a verifier:** the 352-movement W table, the E16 staged-pose probe (94 of 4,424 staged poses differ at 3.93 m/s²), and the 0 in-box followers of an excused hold on the 7 boxstop grids.
+
+**The conditions, and how each stands.**
+- **R9-C1. The cancel-after-commit act. RULED: question 7 covers it** (the 2026-10-16 ruling above).
+  - The act: he signals LEFT at his line and while standing in the box, cancels to OFF or RIGHT a lead time before he sets off, and then drives straight.
+  - Result: on 11 cancel grids (1,232 lawful cells), 186 cells are struck. Base, measured on the two y −4 grids, gives 0 of 224.
+  - In every hit, the striking turner had already committed at its last safe point W 0.03–1.58 s before he cancelled. «Committed» is the verifier's proxy: past W, or within its 5.5 m/s² hard-braking distance. Released by his left signal, under D3 the turner can no longer stop outside his lane.
+  - Every hit cell is also a hit cell of the grid with the indicator kept left (bsL); none lies outside that set.
+  - A cancel made before the turner commits gives 0 hits.
+  - Evidence: `r9/out/v9c-cx*.json`, `base-cx0.1_*.json`, `v9-tl-cx05.json`.
+  - Like the boxstop LEFT class (137 of 1,344), it is the student's own false signal. Nothing bills it.
+- **R9-C2. CARRIED, verbatim:** «two dark-junction cells with a STAGED car from his right standing in his lane (sc-signal-dead L5 go60 h2 unbilled, L1 go50 h1 unbilled — the owed right-hand-rule / grading class at uncontrolled junctions; not ambient vehicles)».
+  - The verifier: L5 go60 h2 is clean at base. Its sheet change traces to the E14 revert. L1 go50 h1 bills FAILED_TO_YIELD at base and is identical on rounds 6–8.
+  - The 12 flash-amber-ped cells are billed PEDESTRIAN_CROSSING_TOO_FAST. Dead L5 go50 h1 is billed FAILED_TO_YIELD.
+  - E17's literal «0 unbilled lamp hits where base is clean» is not met by L5 go60 h2.
+- **R9-C3. E15's follower relation is pinned on its positive cases only.**
+  - The verifier's VR9_FOLLOW_ACROSS_ANY excuses a follower at its line behind any car across the junction, not only one the ledger holds. VR9_FOLLOW_REACH_WIDE sets FOLLOW_REACH_M ×4.
+  - Each survives the standlong-cancelled, standlong-left and boxstop pins (3 passed each). Evidence: `r9/mutants/summary.txt`, PROGRESS R9-V16/V17.
+  - The negative rows must make both die on assertion text.
+  - **PINNED AT INTEGRATION** (tests only). In `junction-box-clears.census.test.ts` the follower relation's code moved unchanged out of `officerLeftGrid` into `followLeaderOf()` and `standingNearJunction()`, and one new test, «E15 — a standing car follows only the car just ahead of it in its lane, or one HELD AT A WAITING POINT across the junction in its corridor; and only within two queue gaps of the drawn junction», adds bench negative rows beside the positive ones:
+    - not a leader: a car across the junction whose rest has ledger null, or for which the census has no rest open; a held car across the junction a lane over or behind; a car a lane over; a car more than a queue gap ahead that nobody holds;
+    - the reach: with a 20 m drawn radius, standing cars 15 m beyond it are followed; standing cars 17 m and 40 m beyond it, and a moving car, are not.
+    - VR9_FOLLOW_ACROSS_ANY dies «AssertionError: expected 2 to be null» at :1762 (the ledger-null row). VR9_FOLLOW_REACH_WIDE (`FOLLOW_REACH_M` 8 × `QUEUE_GAP_M`) dies «AssertionError: expected [ 1, 2, 3 ] to deeply equal []» at :1779.
+    - One mutant at a time, each restored byte for byte (sha256 cf3e3a2a…); green after, with the new test and all 6 E15-filtered census tests, including the boxstop grids and the left / cancelled standlong runs. The merge verifier reproduced both kills on the same assertion text.
+- **Census-only survivors. CARRIED, verbatim:** «D3_INTO_LANE, D3_NO_CLEAR, O3, O4, O6, E6_STALE_REASON survive their census-only kill sets (each _U variant killed), D4_STAGED_UNBOUNDED near-equivalent». This is as in round 8. D4_STAGED_UNBOUNDED and its _U variant both survive.
+- **Builder deviations 6a–6e. CARRIED, verbatim from the round-9 report:**
+  - «a) E14's sentence «the sc-signal-dead L5/L1 cells it was built for bill FAILED_TO_YIELD» is false for the cell the round-8 rule was built for. sc-signal-dead L5 go60 h2 reads COLLISION only, on lampsL and on lampsSW. The lampsSW case is the R7-F1 act, indicator OFF while he stands. It is unbilled, base-clean, and clean on r8. Staged 1001 comes from his RIGHT at the dark junction and stands at (6.7, 4.1), in his lane, from 69.5 s. He sets off about 69.75 and drives into it. E14's operative reason (the mutual wait at dark/flashing junctions) holds, and is measured above. In substance this is a right-hand-rule violation by the open-loop tape, which the sheet does not bill. With E14 as decided it cannot be 0 on lampsSW.»
+  - «b) sc-signal-dead L1 go50 h1 is an unbilled COLLISION with a staged car from his right on OFF, RIGHT, LEFT and SW. Base billed FAILED_TO_YIELD there. It is identical on r6, r7 and r8 OFF, so it is not new this round. Round 8 misreported it as FAILED_TO_YIELD + COLLISION; that was my error. So E17's literal «0 unbilled lamp hits where base is clean» is not met by these 2 cells. Both are a staged car with priority standing in his lane at a dark junction (the owed right-hand-rule class).»
+  - «c) E15's follower relation adds «standing at its line with the hold across the junction in its corridor», because the R8-C2 queue no longer forms inside the box. QUEUE_RESTART_SEC includes 2 grid steps over the IDM derivation, and the measurement sits exactly on it (0.900 s).»
+  - «d) D4_STAGED_UNBOUNDED survives (near-equivalent, as in rounds 6–8).»
+  - «e) Retired mutants, whose code is gone: R8_UNCONTROLLED_* and VR8_UNCTRL_DARK_ONLY (E14); VR8_PAST_5M (the `past` clause); R8_E9_SIGNAL (= the product now; its inverse is R9_E13_ROOM_FOR_WAITING); VR8_INBOX_ATREST_ONLY (= the product's clause now; re-anchored as R9_MOVING_WAITING_NOT_RELEASED_IN_BOX).»
+  - **E14's premise is corrected** in ADR-018: the two sc-signal-dead cells are unbilled collisions, not FAILED_TO_YIELD. E14's operative reason, the mutual wait at dark and flashing junctions (31–42 s with E14, against 53.7–90 s without it, round-8 verifier), stands.
+- **The reviewed-text manifest** conflicted with HEAD. It was re-recorded on `1f1536d`, keeping round 3's two caption entries; no shown text changed in rounds 4–9. The result is reported under PROVEN below.
+
+**PROVEN ON 1f1536d** (the integrator, worktree `D:/knijka-lanes/integ-pc`; log `scratch/pc-land/PROGRESS.md`, results `scratch/pc-land/results.json`; vitest `--maxWorkers=1`, one run at a time).
+- **The patch.** The lane patch (sha 06b26a97… matched) applied with `git apply --3way --index --binary`: all 44 files.
+  - Eleven of them changed on both sides between `2e9268f` and `1f1536d`: `contracts.ts`, `scene/gradeGrid.ts`, `runtime/signals.ts`, `traffic/index.ts`, `traffic/system.ts`, `traffic/types.ts` and five reviewed-text manifest files. Every 3-way merge was clean except the generated `manifest.json`.
+  - The merged wiring, checked by hand: the grid's single `TrafficUpdateContext` carries posturescross's `ambientSignal` and `playerIndicator` beside npcstep's in-loop grade; `trackStagedRest` runs before `updateVehicle` in both of `system.ts`'s stepping loops. The merge verifier found the only `traffic.update` sites outside tests are `gradeGrid`, the recorder and `captureGhostFeed`, and all three pass the read.
+- **The reviewed-text manifest.** HEAD's side of `manifest.json` was taken so the file parsed, then re-recorded (`RECORD_REVIEWED_TEXT_MANIFEST=1`). The recorder printed «nothing changed against the previous recording», and every `strings.*` / `units.*` file is byte-identical to the merged state (sha-checked). `manifest.json` moved: caption 9d11ff2e…/1,880 → 0af2781e…/1,881 strings, source ca64468f…/13,270 → 167fe0df…/13,271. The +1 in each is the string round 3 added to sc-junction-blind's correct demo (its unit goes from 5 to 6 strings); both entries, `487183ee1d75` and `9cadbad8e2cd`, are kept. The merge verifier counted the same stages (base 1,871 / HEAD 1,880 / lane 1,872 / merged 1,881).
+- **R9-C3** is pinned (above).
+- **Two npcstep pins went red on the merged tree, and were re-derived (tests only).** Both are tests `1f1536d` carries from the npcstep landing, meeting this patch's two repairs; neither is a merge error. The fixer measured on two scratch copies (`scratch/pcfloor`: a `git archive` of `1f1536d`, and the same plus the staged patch), and a checker re-measured each claim in its own copy (`scratch/pc-land/check`; verdict ACCEPT).
+  - **The NPC-contact census** (`npc-contact-cadence.census.test.ts:187`, «expected 137 to be greater than or equal to 150»). On the same 200 cells at 60 Hz, `1f1536d` strikes 167 (vehicle 128, pedestrian 39, cyclist 0; 115 moving) and the merged tree 137 (vehicle 98, pedestrian 36, cyclist 3; 99 moving). The merged rows match the integrator's `census-merged.json` in 200 of 200 cells. 30 cells lost their contact and none gained one. Every lost report has body null: an ambient car of one of two classes this patch removes.
+    - **18 cells entered against their own approach's red while the node's group read green** (the 5ee4301e class). sc-sig-green-wave shadow-correct and mistake-sleep-at-green L1–L5 (10): car 0 crossed sw-n-tl1's line at step 1350 and car 2 at step 1228, each on its own red, into the student's lane ahead of him; contacts at step 1501 (33 km/h) and step 1967 (42 km/h). sc-jx-blocked-exit mistake-enter-full-box L1–L5 (5): car 0 crossed sx-n-c on its own red and stood in his exit lane. sc-jx-blocked-exit shadow-correct L3–L5 (3): car 2 drove its own red into the box at 17 km/h where he stood (step 3490). On the merged tree car 0 is held at its line on its own red (and in sc-jx-blocked-exit then at the box gate); car 2 of sc-jx-blocked-exit waits on its red and then at the box gate; car 2 of sc-sig-green-wave never comes near him, because the traffic's history changes from the first red it now obeys and it waits at sw-n-tl2's red far ahead. That last attribution rests on the changed history, not on a direct hold (the checker's note).
+    - **12 cells were the old junction box.** In 10 (sc-signal-flashing shadow-correct L1–L5 and mistake-cut L1/L2/L3/L5, sc-junction-left shadow-correct L5) the car jumped 5.7–5.8 m in one 1/60 s step to the node and stood there inside the box. In sc-junction-rhr mistake-barge L3/L4, car 3 entered the box with no gate and stood at its lane's last metre, 4.1 m from tj-n-c. On the merged tree these cars drive the connector or are held at the box gate.
+    - **The 3 sc-vu-bikelane-turn mistake-cut-path L1–L3 cells** change from pedestrian to cyclist because of this patch, not npcstep r4 as first written: at `1f1536d` the first contact is ambient pavement walker 1 standing in the junction (the 4f446777 class); merged, the student meets the staged rider first.
+    - **The re-derivation.** The census pins its own cell list: `NPC_CONTACT_ENUMERATE=1` re-derives it from the replay and fails if it moved. That passes on `1f1536d` with the old list and failed on the merged tree. Re-run there, it gives 174 cells, 49 demos, 34 lessons: the 30 cells out, and 4 legitimate contacts in (sc-signal-flashing mistake-barge L1/L2, the student barging into staged priority car 1000 at 27.8 km/h; sc-signal-redyellow mistake-jump L1/L2, the student jumping the red-yellow into ambient car 3 crossing on its own green). The list is replaced by it; the 174 cells strike 141 (vehicle 102, pedestrian 36, cyclist 3; 103 moving).
+    - **The floors.** Only «struck» moved: 150 → 125, at the landing's own proportion (150 of 167 ≈ 0.90; 0.90 × 141 ≈ 127). Vehicle ≥ 100, pedestrian ≥ 30 and moving ≥ 80 are unchanged; vehicle has 2 cells of headroom. The file's comment gives all 30 cells, their class, the measurements and the date.
+    - **Teeth.** With the shells off (`NpcShellPool.step` returning at once, scratch copy only) the census is red «AssertionError: expected 0 to be greater than or equal to 125» at `:228`, and «THE TWO REPORTERS» fails. The checker's own STAGED_ONLY mutant (a shell bound only for a staged body) strikes 119 of 174 (vehicle 80) and is red «expected 119 to be greater than or equal to 125». `npcShells.ts` was restored and sha-checked after each mutant.
+  - **The cadence pin's ambient-pedestrian cell** (`npc-contact-cadence.test.ts:196`, «an ambient pedestrian (the ear's only): expected -1 to be greater than 1600»).
+    - **The old cell is gone, as 4f446777 intends.** Swept as npcstep swept it (sc-roundabout-entry L1, hold −50, go 900–3300 every 20 steps, 121 drives): `1f1536d` has 18 ambient-pedestrian contacts (go 1260–1600, each reported by the ear alone); the merged tree has 0 (118 none, 3 vehicle). The walker's beat ran to y −18.1 and now stops at −36.6, where the pavement ends. He was a pavement walker running into the junction, not a walker on a marked crossing, so the repair did not overreach (the merge verifier's V1 question; the checker). No census cell on the merged tree strikes an ambient pedestrian any more.
+    - **The new cell** is an ambient walker on a marked crossing. A scan of every lesson and rung found 2 places where a committed path crosses such a zebra: sc-pk-crossing-ban L5 and sc-ed-d2-city-run L5; only the first was swept. sc-pk-crossing-ban L5, correct path, hold at y 252, go at step 2300, 12 km/h: the student stands short of the zebra, ambient walker 0 steps out, and the student drives into him. The 51-drive sweep gave 9 contacts in one unbroken band (go 2260–2340), every one walker 0 at 6.1 km/h, reported by the ear only (sentinel silent, report body null), with no static-object bill. Go 2300 is mid-band: first contact at grid point 2435, judged 3.2 km/h.
+    - **The checker's probe** of that cell: first contact step 2435, pedestrian id 0, 3.15 km/h, reports [[2435, pedestrian, null], [2449, pedestrian, null]], billed by the ear; walker 0 has no staged id and stands on segment kind «cross» of `pkx-x-zebra`. With STAGED_ONLY the cadence file is red «an ambient pedestrian on a marked crossing (the ear's only): expected -1 to be greater than 2300»; with the pool moved once per frame, or the scene's before-step grade skipped, the cell splits on all three cadences and at all four hitch positions sampled.
+    - **What changed in the test.** Every assertion is kept. Each cell names the lesson it drives, and 60 Hz references are cached by lesson plus go step (the circulating-car cell also goes at 2300).
+  - **Both files in the worktree** (the checker): the census 53 passed, 1 skipped; the cadence file 19 of 19 (95 s); the enumeration (`NPC_CONTACT_ENUMERATE=1`) passes.
+- **Directories, on the 44-file tree before the npcstep re-derivation** (the integrator):
+  - lessons/__tests__: 126 files, 2,394 passed, 165 skipped;
+  - lessons/scenario/__tests__: 197 files, 4,819 passed, 4 failed, 1 skipped: the two npcstep reds above, and two 60 s timeouts in reviewed-text-manifest, which pass alone with `--testTimeout=500000` (49 of 49);
+  - components/sim: 96 files, 1,680 passed, 1 failed: shellClipAffordances «THE GENERAL FORM» timed out at 60 s on a 154 s tree scan; alone with `--testTimeout=500000`, 40 of 40;
+  - modules/sim: orchestrator 41 files, 528 passed; rules 98, 1,779; traffic 53, 675; runtime 48, 875; scene 47, 787; vehicle 21, 296; world 135, 2,409; hud 69, 1,367; traces 169, 2,286; each with 0 failed.
+- **The merge verifier, on the same 44-file tree** (ACCEPT_WITH_FIXES): lessons/scenario/__tests__ 197 files, 4,819 passed, the same two real reds and two timeouts (reviewed-text-manifest, scene-frame-grade), the timeouts passing alone (177 of 177); traffic, runtime, scene, traces, clips and modules/sim/__tests__ together 337 files, 4,929 passed (its V4: clips/ holds the touched `captureGhostFeed.ts`, and the sim root's tests cover `contracts.ts`). It re-ran the lane verifier's VR9_WAIT_RIGHT_TOO on the integrated tree: killed with the lane's text, «right, y −7, 2 m/s²: expected 11 to be +0».
+- **On the 46-file landing tree** (the fixer): lessons/scenario/__tests__ 197 files, 4,813 passed, 3 failed, 1 skipped (6,263 s). All three are 60 s timeouts with no failing assertion (reviewed-text-manifest ×1, scene-frame-grade.execution ×2); alone with `--testTimeout=500000` they pass, 49 of 49 and 128 of 128. The re-derivation changed only the two npcstep test files, which no other file imports, so the other directories were not re-run.
+- **tsc:** 21 errors, the Prisma/store environment baseline (11 files), none in a touched file (the integrator and the merge verifier, 44-file tree). Re-run on the 46-file landing tree by the docs composer (`npx tsc --noEmit --incremental false`, 2026-10-17, log `scratch/pc-land/final/tsc-46.log`): the same 21 errors in the same 11 files.
+- **tools/ gate** (`node platform/scripts/tools-tests.mjs` from the worktree root, uncapped, 44-file tree): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo, 1,514 s.
+  - The 8 are the standing deck-captions freeze (frozen 1,811 captions / 503 traces, tree now 1,822 / 503) and 7 environment failures of the worktree (no `.audit-frames`, no playwright): build-redrive §9 (a), (b), (d) and (e), finding-reader, count-agreement and lane-evidence. The merge verifier got the same 8.
+  - Re-run with the main repo as cwd (read only) and `KNIJKA_PLAYWRIGHT_ROOT` set: build-redrive, finding-reader and lane-evidence 86 of 86. count-agreement was cut by the 500 s cap.
+  - The patch touches no tools/ file. The tools/mobile tests that name the re-authored lessons (guidance, steer-bench, driveline, harness-h2) are not among the 8.
+- **The landing patch.** `D:/knijka-lanes/gate-pc.patch`: sha256 ee2b7eeb090b6420c11f3a06c36b9920d3cecd6dffd257e78b1c5e795e64a25c, 3,655,088 bytes, 46 files (the lane's 44, with the census test and the manifest as integrated, plus the two npcstep test files), +7,668/−203, 0 CR bytes. It is byte-identical to `git diff --cached --binary 1f1536d` in the worktree, and it differs from the earlier 44-file staging only by the two npcstep test files (the checker). That earlier staging (sha 101221e5…44cc, 3,638,910 bytes, +7,555/−173) is moved to `scratch/pc-land/attempts/gate-pc.101221e5.patch`. HEAD is `1f1536d`, with nothing unstaged or untracked and no probe file. The unstaged one-line `vehicles.ts` edit the docs verifier saw (its F22) is gone.
+
+**Owed.**
+- **The rig re-drive that decides both rows,** through `/dev/drive-rig` on PC and on the phone lens:
+  - the careful student crossing on the officer's «proceed», with the cross traffic in frame;
+  - the walkers at the officer's junction;
+  - a left-turn student waiting at and inside the junction (the stream must come).
+- **Clips to re-capture** (the integrator): sc-junction-rhr__m1, sc-junction-stop__m0, sc-jx-giveway-b1__m0 (its tape is re-authored), sc-jx-giveway-b1__m1, sc-jx-priority-confidence__m0, sc-signal-controller__m0 and sc-turn-left-oncoming__m0. By the builder, no clip's sheet changes.
+- **Ambient vehicles at dark and flashing junctions** still read the node's own phantom cycle, not the right-hand rule. This has been carried since round 3. The 12 flash-amber-ped tape rear-ends and the two R9-C2 cells are in it.
+- **The grading gap.** Driving into a priority car from his right that stands in his lane at an uncontrolled junction bills COLLISION but not FAILED_TO_YIELD. It is the rule engine's, not this lane's.
+- **The tools/ gate on the main tree.** The lane had no tools/ checkout. `tools/mobile/lib/guidance.mjs` and `steer-bench.mjs` read the shadow-correct tapes, and two of them changed: sc-junction-blind (sample times shifted, +5 s start; the builder, round 3) and sc-jx-giveway-b1. The worktree's run above passed the tools/mobile tests that name these lessons; count-agreement still needs a run on the main tree, where its corpus exists, before the merge.
+- **The new caption on screen.** The 120-character line `487183ee1d75` has never been laid out in a browser. It joins the deck-captions re-measurement the standing freeze already owes (frozen 1,811, tree 1,822) and the clip and caption review list.
+- **The NPC-contact census, three notes from its checker** (not defects of this landing):
+  - 15 census cells strike at step 3: a standing ambient car is billed at t 0.05 s (sc-jx-equal-left ×9, 3 of them shadow-correct; sc-jx-giveway-b1 L5 ×3; sc-turn-left-oncoming L5 ×3). It is the same spawn-overlap artefact on `1f1536d`. The floors count these cells, the vehicle floor has 2 cells of headroom, and correct demos are billed a collision at spawn. It should be a row of its own.
+  - The new cell's ambient identity is pinned only indirectly, through «billed by the ear» and the reports comparison; the file's teeth section does not cover that cell (its teeth were shown in the checker's probe).
+  - sc-ed-d2-city-run L5, the second zebra with an ambient walker on a committed path, was not swept.
+- **The two «question 7 … open» comments** (`traffic/vehicles.ts:1603`, `junction-box-clears.census.test.ts:1785`) are to cite the 2026-10-16 ruling, in a comment-only edit with no behavioural change.
+- **The residual walkers.** 7 pavement configurations put a walker on a carriageway for 1–5 samples at a joint boundary, identical at base. They are not at a junction, and this landing does not change them.
+- **The founder is told** at this landing: round-3 D1–D6, P1–P3, D1–D5 and E1–E17; the two changed sc-junction-blind caption lines (none → `487183ee1d75`, `1b95c586e00c` → `9cadbad8e2cd`, quoted above); the question-7 ruling made under his delegation; and that npcstep's NPC-contact census and its ear-only pedestrian cell were re-derived on the repaired traffic.

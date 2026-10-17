@@ -108,7 +108,20 @@ function scJunctionLeftMistakeCutScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Грешката „ще успея“: спирам, но завивам наляво пред приближаващата отдясно кола." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: LEFT_APPROACH, targetKmh: 25 },
+      // THE TAPE SETS OFF 5 s LATE AND APPROACHES AT 20 km/h, NOT 25 (sc-sig-controller-postures:5ee4301e round 3,
+      // integrator decision D4). This demo is told as a NEAR MISS — «Колата с предимство трябваше да намали заради
+      // теб» — and from an immediate start at 25 km/h, on the street the first two rungs compile to, it now drives
+      // into an ambient car instead: ambient car 1 comes out of the east arm with priority, turns for the stem, stops
+      // for the tape at (5.1, −5.1) and is hit at t = 17.0 s (live chain, L1/L2: FAILED_TO_YIELD + COLLISION, 20
+      // points). At base that car hopped the box and was never there. A demo that says «had to slow» must not crash.
+      // Swept through BOTH gates this tape has — the recorder's own (traces/__tests__/sc-ju3-traces.test.ts: exactly
+      // FAILED_TO_YIELD, no collision) and the live chain on every rung — over start delays 0/1/2/3/5 s × stops at
+      // the line of 0.9/1.5/2.2 s × approach 25/20 km/h: this is the one point of the 30 where the drive is exactly its
+      // own mistake in both (FAILED_TO_YIELD, 10 points, the full stop praised, no contact on any rung; closest
+      // ambient pass 3.0 m of boxes). The 0.9 s stop and the emerge — the mistake itself — are unchanged.
+      // lessons/scenario/__tests__/mistake-demos-tell-their-own-story.live.test.ts pins it.
+      { kind: "pause", sec: 5.0, brake: true },
+      { kind: "drive", points: LEFT_APPROACH, targetKmh: 20 },
       { kind: "indicator", setting: "left" },
       {
         kind: "drive",

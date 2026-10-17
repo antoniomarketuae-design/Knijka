@@ -184,6 +184,26 @@ export const DEFAULT_LESSON_TRAFFIC = {
 } as const;
 
 /**
+ * JU-18 регулировчик — the «внимание» window, s: through the last this-many
+ * seconds before a posted controller's authored flip his right arm is raised
+ * («дясна ръка, вдигната вертикално — „Внимание, спри!"», ППЗДвП чл. 29, ал. 3,
+ * quoted in lessons/scenario/templates-signals.ts) and the L1 card says
+ * «Спират ВСИЧКИ, никой не минава».
+ *
+ * ONE NUMBER, TWO READERS (sc-sig-controller-postures:5ee4301e). The officer
+ * figure raises the arm on it (`TrafficLayer.tsx`, the OFC rig) and the
+ * runtime's AMBIENT read (`SignalController.ambientPhase`) holds every ambient
+ * driver who can still stop on it — the arm a student is shown and the cars
+ * he watches obey the same window, never two hand-kept copies.
+ *
+ * Sized to the recorded narrations: the postures shadow's „ръката му се
+ * вдига" lands ≈ t 19 on the flip-30 drills (raise = 30 − 11), and the live
+ * drill's shadow crosses at ≈ t 13, safely before its own raise at 26 − 11 =
+ * 15. (Moved here unchanged from TrafficLayer's OFC_RAISE_LEAD_SEC.)
+ */
+export const CONTROLLER_ATTENTION_LEAD_SEC = 11;
+
+/**
  * One numbered briefing step, as the student reads it.
  *
  * Structurally identical to `ScenarioSpec.StepText` and deliberately NOT

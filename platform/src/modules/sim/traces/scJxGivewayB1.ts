@@ -54,6 +54,18 @@ export function scJxGivewayB1ShadowScript(): DriveScript {
         textBg: "Знак Б1 „Пропусни движението“ не значи „Спри!“. Намаляваш, оглеждаш се — и минаваш, ако е чисто.",
       },
       { kind: "glance", mirror: "rear" },
+      // sc-sig-controller-postures:5ee4301e round 4 — HE SETS OFF SIX SECONDS LATER.
+      // The tape is open-loop and the ambient fleet is not. Once ambient cars hold at their lines for the vehicles
+      // they must give way to (the junction-box protocol, traffic/vehicles.ts), one of them is queued at this
+      // drill's own Б1 line — in his lane, waiting for the junction's slot behind the priority car — at the second
+      // this tape used to roll up to it, on L3 and L4: COLLISION at 47.7 s on a drive the lesson calls correct (a
+      // student would have stopped behind it). MEASURED on every rung through the live chain: setting off 0–3 s late
+      // meets that car; 4–9 s late meets nobody on L1–L4; under 5 s late the densest rung also bills the pull-out
+      // (an ambient car on the priority road), which it does not at base. Six is clear of all three by a second.
+      // No sentence changes: the opening line is as true of a car standing at its spawn as of one pulling away.
+      // To stay inside the lesson's par (80 s; this drive: 78.7 s) the wait at the line below is 6.5 s instead of 9
+      // and the junction is left at 20 km/h instead of 16 — see the two notes there.
+      { kind: "pause", sec: 6, brake: true },
       // Approach mouth 1, easing onto the lane center.
       { kind: "drive", points: [[LANE, -115], [LANE, -42]], targetKmh: 22 },
       {
@@ -83,14 +95,18 @@ export function scJxGivewayB1ShadowScript(): DriveScript {
       { kind: "glance", mirror: "right" },
       { kind: "drive", points: [[LANE, 108], [LANE, 118]], targetKmh: 6 },
       { kind: "annotation", textBg: "Пълно спиране преди линията — тук е задължително, защото иначе бих я засякъл." },
-      { kind: "pause", sec: 9, brake: true },
+      // 6.5 s (it was 9): still the «real, deliberate hold» the trace gate asks for (> 6 s), and when the next line
+      // is spoken the priority car is 55 m past his lane and leaving at 41 km/h on every rung — it crosses his lane
+      // 1.5 s into this pause.
+      { kind: "pause", sec: 6.5, brake: true },
       { kind: "annotation", textBg: "Колата по главния премина. Пътят е чист — потеглям с нов оглед." },
       // Fresh scan after the wait (the approach glances are now stale), then
       // roll across the mouth-2 line and on through the junction to the exit.
       { kind: "glance", mirror: "left" },
       { kind: "drive", points: [[LANE, 118], [LANE, 120]], targetKmh: 6 },
       { kind: "glance", mirror: "right" },
-      { kind: "drive", points: [[LANE, 120], [LANE, 150], [LANE, 185]], targetKmh: 16 },
+      // 20 km/h (it was 16): 2.9 s back for the par, on a clear road, well inside the limit.
+      { kind: "drive", points: [[LANE, 120], [LANE, 150], [LANE, 185]], targetKmh: 20 },
       { kind: "pause", sec: 1.5, brake: true },
       {
         kind: "annotation",
@@ -141,12 +157,11 @@ export function scJxGivewayB1MistakeBargeScript(): DriveScript {
       // …then ROLL across the Б1 line WITHOUT stopping, straight in front of the
       // priority car (still within the mouth's conflict radius) — the „ще се
       // промъкна" that forces it to brake: FAILED_TO_YIELD (detail give-way).
-      {
-        kind: "drive",
-        points: [[LANE, 113], [LANE, 124], [LANE, 150], [LANE, 180]],
-        targetKmh: 22,
-        stopAtEnd: false,
-      },
+      { kind: "drive", points: [[LANE, 113], [LANE, 124]], targetKmh: 22, stopAtEnd: false },
+      // Over the line he does not linger: he presses on across the main road at 30 km/h (round 5 — at 22 km/h the
+      // L3 rung's ambient flow, which now keeps the junction slot it has the right to, met him 4 s after the staged
+      // priority car and the tape drove into its side: a crash the captions do not tell).
+      { kind: "drive", points: [[LANE, 124], [LANE, 150], [LANE, 180]], targetKmh: 30, stopAtEnd: false },
       { kind: "pause", sec: 2, brake: true },
       {
         kind: "annotation",

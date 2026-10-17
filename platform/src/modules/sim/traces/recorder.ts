@@ -862,9 +862,11 @@ export function recordScriptedDrive(
     runtime.update(SCRIPT_DT);
     traffic.update(SCRIPT_DT, {
       signalPhase: (id) => runtime.signalPhase(id),
+      ambientSignal: (id, bearing, from) => runtime.ambientSignalPhase(id, bearing, from),
       playerPos: { x: pose.x, y: pose.y },
       playerSpeedKmh: Math.abs(speedMps) * 3.6,
       playerHeadingDeg: pose.headingDeg,
+      playerIndicator: indicator,
     });
     const leadGap = traffic.leadGapMeters(pose.x, pose.y, pose.headingDeg);
     const vehicleSample: VehicleSample = {

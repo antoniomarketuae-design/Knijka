@@ -496,11 +496,19 @@ describe("THE AMBIENT FLEET — the hard clamps: speed his BODY takes off a car 
     expect(accountOf(traffic, target)).toBe(0);
   });
 
-  it("THE RADIAL CLAMP — the junction box: a car whose next pose hops the box onto a student standing in it has no following term for him at all (he is beside or behind its heading), and the step is refused — stopped dead in one step, on his account", () => {
-    // tj-occluded-v1, the pose `ambient-player-separation.test.ts` was written
-    // on: the lane graph trims both lanes back from the node, so a turning
-    // car's pose HOPS the box. The corridor law cannot see a student standing
-    // there; only the radial clamp refuses the step.
+  it("THE JUNCTION BOX — a car driving through the box toward a student standing in it has him in its following corridor before it reaches him: it is stopped dead short of him, on his account, and no stop comes from outside the corridor any more", () => {
+    // tj-occluded-v1, the pose `ambient-player-separation.test.ts` was written on.
+    //
+    // WHAT THIS USED TO PIN (2026-10-05): the lane graph cuts both lanes of a turn square at the node, so a turning
+    // car's pose HOPPED the box — onto a student its following law could not see (he was beside or behind its
+    // heading); only the radial clamp refused the step. Measured at 2e9268f over these 60 runs: 40 dead stops, 15 of
+    // them with him outside the corridor.
+    //
+    // sc-sig-controller-postures:5ee4301e round 2 removed the hop (graph.ts `laneConnector`: the car drives a curve
+    // through the box). On a path without a hop a step can only CLOSE on him while he is ahead of the car's heading
+    // (d|rel|²/dt = −2·rel·v), so he is in the corridor before it is near him and the stop is the CORRIDOR clamp's.
+    // The radial clamp stays in vehicles.ts as the backstop it was written as; on these runs it never has to be the
+    // one that stops the car. Measured on this tree: 3 dead stops, 0 from outside the corridor.
     const TJ = JSON.parse(
       readFileSync(path.resolve(HERE, "../../../../../content/world/tj-occluded-v1.json"), "utf-8"),
     ) as TrafficDistrict;
@@ -508,53 +516,58 @@ describe("THE AMBIENT FLEET — the hard clamps: speed his BODY takes off a car 
     const SPAWN = { x: 4.06, y: -115 };
     const BOX = { x: -1.14, y: -6.47 };
     let events = 0;
-    for (const [seed, n] of [
-      [3, 5],
-      [12, 4],
-      [4, 4],
-      [6, 4],
-    ]) {
-      const tr = createTrafficSystem(TJ, { seed, vehicleCount: n, pedestrianCount: 0, anchor: SPAWN, anchorRadiusM: 400 });
-      const prev = new Map<number, { speed: number; shed: number; x: number; y: number; dirX: number; dirY: number }>();
-      for (let i = 0; i < 60 * 30; i++) {
-        const inBox = i * HZ30 >= 20;
-        tr.update(HZ30, {
-          signalPhase: () => "green",
-          playerPos: inBox ? BOX : SPAWN,
-          playerSpeedKmh: 0,
-          playerHeadingDeg: 340,
-        });
-        for (const row of tr.circulatingTraffic(BOX.x, BOX.y, BOX.x, BOX.y, 0, 400).vehicles) {
-          const p = prev.get(row.id);
-          if (inBox && p !== undefined && p.speed > 1 && row.speedMps === 0) {
-            // Where he stood in the car's own frame on the frame before.
-            const relX = BOX.x - p.x;
-            const relY = BOX.y - p.y;
-            const along = relX * p.dirX + relY * p.dirY;
-            const lateral = Math.abs(relX * p.dirY - relY * p.dirX);
-            if (along <= -2 || lateral >= 5) {
-              // Outside the following corridor (ahead > −2 m, lateral < 5 m):
-              // no term of his was in its law. All of the stop is the clamp.
-              events++;
+    let outside = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      for (const n of [4, 5, 6]) {
+        const tr = createTrafficSystem(TJ, { seed, vehicleCount: n, pedestrianCount: 0, anchor: SPAWN, anchorRadiusM: 400 });
+        const prev = new Map<number, { speed: number; shed: number; x: number; y: number; dirX: number; dirY: number }>();
+        let inBox = false;
+        for (let i = 0; i < 60 * 30; i++) {
+          // He arrives in the box once no car is within two car lengths of the pose (he cannot materialise inside one
+          // that is driving through), and stays.
+          if (!inBox && i * HZ30 >= 20) {
+            inBox = tr.vehicles.every((v) => Math.hypot(v.x - BOX.x, v.y - BOX.y) >= 8.2);
+          }
+          tr.update(HZ30, {
+            signalPhase: () => "green",
+            playerPos: inBox ? BOX : SPAWN,
+            playerSpeedKmh: 0,
+            playerHeadingDeg: 340,
+          });
+          for (const row of tr.circulatingTraffic(BOX.x, BOX.y, BOX.x, BOX.y, 0, 400).vehicles) {
+            const p = prev.get(row.id);
+            if (inBox && p !== undefined && p.speed > 1 && row.speedMps === 0) {
+              // Where he stood in the car's own frame on the frame before.
+              const relX = BOX.x - p.x;
+              const relY = BOX.y - p.y;
+              const along = relX * p.dirX + relY * p.dirY;
+              const lateral = Math.abs(relX * p.dirY - relY * p.dirX);
               const where = `seed ${seed}, n ${n}, t ${(i * HZ30).toFixed(2)} s`;
-              // Its own law may have taken one step of braking first (≤ 5.5 m/s²).
+              events++;
+              // Outside the following corridor (ahead > −2 m, lateral < 5 m) no term of his is in its law.
+              if (along <= -2 || lateral >= 5) outside++;
+              // He was AHEAD of it, short of the corridor clamp's separation plus one step of travel…
+              expect(along, where).toBeGreaterThan(0);
+              expect(along, where).toBeLessThan(5.1 + p.speed * HZ30 + 1e-6);
+              // …and the whole stop is his: its own law may have taken one step of braking first (≤ 5.5 m/s²).
               expect(row.playerShedMps - p.shed, where).toBeGreaterThan(p.speed - 5.5 * HZ30 - 1e-9);
               expect(row.playerShedMps - p.shed, where).toBeLessThanOrEqual(p.speed + 1e-9);
             }
+            prev.set(row.id, {
+              speed: row.speedMps,
+              shed: row.playerShedMps,
+              x: row.x,
+              y: row.y,
+              dirX: row.dirX,
+              dirY: row.dirY,
+            });
           }
-          prev.set(row.id, {
-            speed: row.speedMps,
-            shed: row.playerShedMps,
-            x: row.x,
-            y: row.y,
-            dirX: row.dirX,
-            dirY: row.dirY,
-          });
         }
       }
     }
-    expect(events, "cars frozen against him from outside their following corridor").toBeGreaterThanOrEqual(3);
-  });
+    expect(events, "cars stopped dead against him in the box").toBeGreaterThanOrEqual(3);
+    expect(outside, "of them, from outside their following corridor").toBe(0);
+  }, 60_000);
 });
 
 describe("TrafficSystem.circulatingTraffic — the report the runtime's roundabout tracker is wired to", () => {

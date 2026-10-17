@@ -8,6 +8,7 @@
  * Integration (order matters, once per frame):
  *   1. runtime.update(dt)                      — signals advance
  *   2. traffic.update(dt, { signalPhase: id => runtime.signalPhase(id),
+ *        ambientSignal: (id, b, from) => runtime.ambientSignalPhase(id, b, from),
  *        playerPos, playerSpeedKmh, playerHeadingDeg })
  *   3. runtime.setPedestrianQuery(id => traffic.pedestrianOnCrossing(id))
  *      (once at setup) so SimTick crossing events see real pedestrians.
@@ -175,6 +176,7 @@ export type {
   PedestrianVariant,
   PlayerStepTrack,
   SignalPhaseFn,
+  AmbientSignalFn,
   StagedActorSpec,
   StagedActorView,
   StagedCommand,

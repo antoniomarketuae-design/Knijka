@@ -484,6 +484,18 @@ export interface CirculatingReport {
 /** Same signature as WorldRuntime.signalPhase (../contracts). */
 export type SignalPhaseFn = (signalNodeId: string) => SignalPhase;
 
+/**
+ * Same signature as DistrictWorldRuntime.ambientSignalPhase: the signal an
+ * ambient car obeys at `signalNodeId` on its OWN approach (travel bearing
+ * into the junction, 0 = north, cw; `fromNodeId` = where its lane starts).
+ * null = this approach has no stop line (a link inside one signal complex).
+ */
+export type AmbientSignalFn = (
+  signalNodeId: string,
+  approachBearingDeg: number,
+  fromNodeId: string,
+) => SignalPhase | null;
+
 export interface TrafficUpdateContext {
   /**
    * Phase lookup for signal node ids. The traffic system queries it with
@@ -493,12 +505,31 @@ export interface TrafficUpdateContext {
    * traffic flowing; "red" holds it).
    */
   signalPhase: SignalPhaseFn;
+  /**
+   * sc-sig-controller-postures:5ee4301e — what an ambient CAR stops for at a
+   * signalised lane end: its own approach's lamp, or the posted officer's
+   * permission (`runtime.ambientSignalPhase`). Every production caller passes
+   * it (gradeGrid, the recorder, the clip feed — pinned by
+   * traffic/__tests__/ambient-own-approach-signal.test.ts). Absent,
+   * cars read `signalPhase(node)` — the node's own axis-group for every
+   * approach, which is the defect, kept only for the bench tests that feed a
+   * constant phase.
+   */
+  ambientSignal?: AmbientSignalFn | null;
   /** Player vehicle position, district space. null = no player in world. */
   playerPos: { x: number; y: number } | null;
   /** Player speed; used by pedestrian gap logic. Missing = assume moving. */
   playerSpeedKmh?: number;
   /** Player heading (0 = north, cw). Lets agents follow a moving player. */
   playerHeadingDeg?: number;
+  /**
+   * sc-sig-controller-postures:5ee4301e round 4 — the student's turn signal. An ambient car that must give way to
+   * him at a junction box predicts him by what he can do next (vehicles.ts `studentHoldsBox`), and what he signals
+   * is part of that: an oncoming left-turner does not wait for a student who is signalling a left turn of his own
+   * that runs clear of its path. Every production caller passes it (pinned by
+   * traffic/__tests__/ambient-own-approach-signal.test.ts). Absent = "off": he is predicted straight on.
+   */
+  playerIndicator?: "off" | "left" | "right";
   /**
    * sc-roundabout-entry:7b747c15 round 2 — the student's car AS THE VEHICLE
    * SIMULATION INTEGRATED IT inside this frame (one sample per physics step,

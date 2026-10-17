@@ -172,6 +172,7 @@ export function makeVehicleEnv(
     reservations,
     crossingCounts,
     signalPhase: () => "green",
+    ambientSignal: null,
     timeSec: 0,
     hasPlayer: false,
     playerX: 0,

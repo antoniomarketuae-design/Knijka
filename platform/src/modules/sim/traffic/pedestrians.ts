@@ -19,8 +19,8 @@
  */
 
 import type { SignalPhase } from "../contracts";
-import { isMotorwayCarriageway } from "../world/builders/constants";
-import { edgeParkingWidthM } from "../world/builders/network";
+import { isMotorwayCarriageway, sidewalkEndInsetM } from "../world/builders/constants";
+import { edgeParkingWidthM, JUNCTION_TRIM_MAX_FRACTION, nodeOpenRadiusM } from "../world/builders/network";
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
 import { rngRange, type Rng } from "./rng";
 import type { VehicleAgent } from "./vehicles";
@@ -329,11 +329,222 @@ export function buildPedRoute(
 //     honest reading.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// WHERE THE PAVEMENT ENDS — sc-sig-controller-postures:4f446777.
+//
+// The block above promised «no carriageway span anywhere», and the route was
+// built from s = 0: the edge's centre line offset sideways FROM THE NODE. At a
+// junction the node is the middle of the crossing road, so the beat ran off
+// the kerb and across the other street's carriageway to its centre line and
+// back. Measured at base on sx-v1 (the регулировчик drill, live scene
+// config): walker 2 of sx-e-e stood on the N-S carriageway from t 97.7 to
+// 118.6, out to x = 0.03 beside the officer, through the northbound lane the
+// student was told to drive; walker 5 did the same on the west arm. Over the
+// catalogue's 158 distinct live traffic configs, 74 put a pavement walker on
+// a carriageway at base (traffic/__tests__/pavement-walker-junction.test.ts).
+// Where the world draws no pavement edge to edge — a divided road whose far
+// side is the other carriageway — the beat is also CHECKED clear of every
+// carriageway and cut to the clear stretch it stands on (clearStretch).
+//
+// THE NUMBER IS THE WORLD'S. The pavement a walker is drawn on is the strip
+// `world/builders/roads.ts` lays along the JUNCTION-TRIMMED centre line
+// (`analyzeNetwork`: the node's open radius `nodeOpenRadiusM` over every edge
+// touching it, clamped at JUNCTION_TRIM_MAX_FRACTION of the edge), pulled in
+// by `sidewalkEndInsetM` so the corner stays open. A walker's beat now stops
+// exactly there — where the kerb the student sees turns the corner — so it
+// cannot step off a drawn pavement into the junction. Only at JUNCTIONS
+// (three or more edges meet): a way-split joint or a dead end has no other
+// carriageway for the pavement to cross, and the beat keeps its old end.
+// ---------------------------------------------------------------------------
+
+/** roads.ts draws no pavement strip on a trimmed line this short or shorter. */
+const PAVEMENT_MIN_LINE_M = 6;
+
+/** The arc span `[fromS, toS]` of `edge` along which its pavement is drawn
+ *  at its junction ends (see the block above); `{0, totalM}` at an edge with
+ *  no junction end; null when the world draws no pavement between its two
+ *  junctions at all (the trimmed line is no longer than 6 m — roads.ts). */
+export interface PedPavementSpan {
+  fromS: number;
+  toS: number;
+}
+
+/** Edges touching each node — the world's `touching` map (analyzeNetwork). */
+export function pedEdgesAtNode(edges: readonly DistrictEdge[]): Map<string, DistrictEdge[]> {
+  const out = new Map<string, DistrictEdge[]>();
+  for (const e of edges) {
+    for (const id of [e.from, e.to]) {
+      let bucket = out.get(id);
+      if (!bucket) out.set(id, (bucket = []));
+      bucket.push(e);
+    }
+  }
+  return out;
+}
+
+/**
+ * What a walker's route is checked against, built ONCE per district by the
+ * traffic system: the node → edges map the junction cut is computed from, and
+ * every edge's carriageway (its kerb half width `pedCarriagewayHalfM`, the
+ * same number the crossing span is graded over) with the junction boxes their
+ * ends meet in — so «no carriageway span anywhere» is checked, not asserted.
+ */
+export interface PedPavementWorld {
+  edgesAtNode: ReadonlyMap<string, readonly DistrictEdge[]>;
+  bands: ReadonlyArray<{
+    edgeId: string;
+    geometry: readonly (readonly number[])[];
+    half: number;
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  }>;
+  /** Junction boxes: a node three or more edges meet at, the widest kerb half. */
+  boxes: ReadonlyArray<{ x: number; y: number; r: number }>;
+}
+
+export function pedPavementWorld(edges: readonly DistrictEdge[], laneWidthM: number): PedPavementWorld {
+  const edgesAtNode = pedEdgesAtNode(edges);
+  const bands: Array<PedPavementWorld["bands"][number]> = [];
+  const halfById = new Map<string, number>();
+  const nodeAt = new Map<string, readonly number[]>();
+  for (const e of edges) {
+    if (e.geometry.length < 2) continue;
+    const half = pedCarriagewayHalfM(e, laneWidthM);
+    halfById.set(e.id, half);
+    nodeAt.set(e.from, e.geometry[0]);
+    nodeAt.set(e.to, e.geometry[e.geometry.length - 1]);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of e.geometry) {
+      if (p[0] < minX) minX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] > maxY) maxY = p[1];
+    }
+    bands.push({
+      edgeId: e.id,
+      geometry: e.geometry,
+      half,
+      minX: minX - half,
+      minY: minY - half,
+      maxX: maxX + half,
+      maxY: maxY + half,
+    });
+  }
+  const boxes: Array<{ x: number; y: number; r: number }> = [];
+  for (const [id, touched] of edgesAtNode) {
+    const at = nodeAt.get(id);
+    if (touched.length < 3 || at === undefined) continue;
+    let r = 0;
+    for (const e of touched) r = Math.max(r, halfById.get(e.id) ?? 0);
+    boxes.push({ x: at[0], y: at[1], r });
+  }
+  return { edgesAtNode, bands, boxes };
+}
+
+/**
+ * Is (x, y) on a carriageway other than `ownEdgeId`'s — inside another edge's
+ * kerb band between its own end cross-sections, or inside a junction box?
+ * (A joint's end disc is not carriageway: the next edge's band carries it.)
+ */
+export function pedOnOtherCarriageway(
+  world: PedPavementWorld,
+  ownEdgeId: string,
+  x: number,
+  y: number,
+): boolean {
+  for (const b of world.boxes) {
+    const dx = b.x - x;
+    const dy = b.y - y;
+    if (dx * dx + dy * dy < b.r * b.r) return true;
+  }
+  for (const band of world.bands) {
+    if (band.edgeId === ownEdgeId) continue;
+    if (x < band.minX || x > band.maxX || y < band.minY || y > band.maxY) continue;
+    const g = band.geometry;
+    const last = g.length - 2;
+    for (let i = 0; i <= last; i++) {
+      const ax = g[i][0];
+      const ay = g[i][1];
+      const dx = g[i + 1][0] - ax;
+      const dy = g[i + 1][1] - ay;
+      const l2 = dx * dx + dy * dy;
+      if (!(l2 > 0)) continue;
+      let t = ((x - ax) * dx + (y - ay) * dy) / l2;
+      if ((i === 0 && t <= 0) || (i === last && t >= 1)) continue;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = ax + dx * t - x;
+      const ey = ay + dy * t - y;
+      if (ex * ex + ey * ey < band.half * band.half) return true;
+    }
+  }
+  return false;
+}
+
+/** Spacing of the clearance check along a walk line, m. */
+const PED_CLEARANCE_STEP_M = 0.5;
+
+/** Pavement trim of the world's junction cut at both ends of `edge` (`totalM`
+ *  = its centre-line length). */
+export function pedPavementSpan(
+  edge: DistrictEdge,
+  totalM: number,
+  edgesAtNode: ReadonlyMap<string, readonly DistrictEdge[]>,
+): PedPavementSpan | null {
+  const touchedFrom = edgesAtNode.get(edge.from) ?? [];
+  const touchedTo = edgesAtNode.get(edge.to) ?? [];
+  const junctionFrom = touchedFrom.length >= 3;
+  const junctionTo = touchedTo.length >= 3;
+  if (!junctionFrom && !junctionTo) return { fromS: 0, toS: totalM };
+  const sFrom = Math.min(nodeOpenRadiusM(touchedFrom, touchedFrom.length), totalM * JUNCTION_TRIM_MAX_FRACTION);
+  const sTo = Math.min(nodeOpenRadiusM(touchedTo, touchedTo.length), totalM * JUNCTION_TRIM_MAX_FRACTION);
+  const lineLen = totalM - sFrom - sTo;
+  if (!(lineLen > PAVEMENT_MIN_LINE_M)) return null;
+  const inset = sidewalkEndInsetM(lineLen);
+  return {
+    fromS: junctionFrom ? sFrom + inset : 0,
+    toS: junctionTo ? totalM - sTo - inset : totalM,
+  };
+}
+
 /** Shortest edge worth walking, m — below this the out-and-back is a pirouette. */
 export const SIDEWALK_MIN_EDGE_M = 60;
 /** Half-length band of one walker's out-and-back beat, m. */
 const SIDEWALK_BEAT_MIN_M = 55;
 const SIDEWALK_BEAT_MAX_M = 130;
+
+/**
+ * The arc interval [u0, u1] of `walk` around `anchorU` on which no sample lies
+ * on another carriageway (`pedOnOtherCarriageway`, every PED_CLEARANCE_STEP_M
+ * and at both ends); the whole line when it is all clear; null when the anchor
+ * itself is not clear.
+ */
+function clearStretch(
+  world: PedPavementWorld,
+  ownEdgeId: string,
+  walk: { px: Float64Array; py: Float64Array; cum: Float64Array; length: number },
+  anchorU: number,
+): [number, number] | null {
+  const n = Math.max(1, Math.ceil(walk.length / PED_CLEARANCE_STEP_M));
+  const at = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
+  const ok: boolean[] = [];
+  for (let i = 0; i <= n; i++) {
+    sampleLane(walk, (walk.length * i) / n, at.segHint, at);
+    ok.push(!pedOnOtherCarriageway(world, ownEdgeId, at.x, at.y));
+  }
+  if (ok.every(Boolean)) return [0, walk.length];
+  const a = Math.min(n, Math.max(0, Math.round((anchorU / walk.length) * n)));
+  if (!ok[a]) return null;
+  let i0 = a;
+  while (i0 > 0 && ok[i0 - 1]) i0--;
+  let i1 = a;
+  while (i1 < n && ok[i1 + 1]) i1++;
+  return [(walk.length * i0) / n, (walk.length * i1) / n];
+}
 
 /**
  * Build a PAVEMENT loop along `edge`: out along one side and back, no
@@ -344,6 +555,16 @@ const SIDEWALK_BEAT_MAX_M = 130;
  *
  * Returns null when the edge is too short or too degenerate to host a walk —
  * the same contract `buildPedRoute` has, so the caller's loop is unchanged.
+ *
+ * `world` (the district's `pedPavementWorld`, which the live system always
+ * passes) does two things, both «WHERE THE PAVEMENT ENDS»: it confines the beat
+ * to the drawn pavement at the edge's junction ends (`pedPavementSpan`), and it
+ * CHECKS the promise above — the walk line, every 0.5 m, against every other
+ * edge's carriageway and every junction box — keeping only the clear stretch
+ * the beat's anchor stands on (null when that is shorter than a beat may be).
+ * Omitted, the beat runs node to node, unchecked (the bench tests). The beat's
+ * one rng draw is taken first either way, so a trim never moves another
+ * walker's stream.
  */
 export function buildPedSidewalkRoute(
   edge: DistrictEdge,
@@ -351,20 +572,32 @@ export function buildPedSidewalkRoute(
   side: 1 | -1,
   anchorS: number,
   rng: Rng,
+  world?: PedPavementWorld,
 ): PedRoute | null {
   if (edge.geometry.length < 2) return null;
   const center = offsetPolyline(edge.geometry, 0);
   if (center.length < SIDEWALK_MIN_EDGE_M) return null;
 
-  const sC = Math.min(Math.max(anchorS, 0), center.length);
   const half = rngRange(rng, SIDEWALK_BEAT_MIN_M, SIDEWALK_BEAT_MAX_M);
-  const s0 = Math.max(0, sC - Math.min(half, sC));
-  const s1 = Math.min(center.length, sC + Math.min(half, center.length - sC));
+  const span = world
+    ? pedPavementSpan(edge, center.length, world.edgesAtNode)
+    : { fromS: 0, toS: center.length };
+  if (span === null) return null;
+  const sC = Math.min(Math.max(anchorS, span.fromS), span.toS);
+  const s0 = Math.max(span.fromS, sC - half);
+  const s1 = Math.min(span.toS, sC + half);
   if (s1 - s0 < SIDEWALK_MIN_EDGE_M * 0.5) return null;
 
   const sideOff = pedSidewalkOffsetM(edge, laneWidthM);
   const pts = subPolyline(center.px, center.py, center.cum, s0, s1);
-  const walk = offsetPolyline(pts, side * sideOff);
+  let walk = offsetPolyline(pts, side * sideOff);
+  if (world) {
+    const clear = clearStretch(world, edge.id, walk, ((sC - s0) / (s1 - s0)) * walk.length);
+    if (clear === null) return null;
+    if (clear[0] > 0 || clear[1] < walk.length) {
+      walk = offsetPolyline(subPolyline(walk.px, walk.py, walk.cum, clear[0], clear[1]), 0);
+    }
+  }
   if (!(walk.length > SIDEWALK_MIN_EDGE_M * 0.5)) return null;
 
   const out: number[][] = [];
