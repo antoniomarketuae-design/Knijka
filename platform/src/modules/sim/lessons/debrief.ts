@@ -244,9 +244,19 @@ const MAX_UNFINISHED_NAMED = 2;
  * round 1 printed «…и по-твърдо» over a drive that held the whole pedal from
  * 30 км/ч to the block. Earlier is true of every drive that touched it.
  */
-export const HALT_VOIDED_DEBRIEF_BG: Record<"touched", string> = {
+export const HALT_VOIDED_DEBRIEF_BG: Record<"touched" | "outOfLane" | "crashRest" | "passedUnhalted", string> = {
   touched:
     "не се отчете: колата удари препятствието — задачата е да спреш преди него. Спирай по-рано.",
+  // Lane lanegate (sc-hz-brake-dont-swerve:cb563b2d) — true of every drive that prints it: the car came to rest
+  // inside the approach ring (round 3), its body not wholly in the lane the task names, and the task stayed open.
+  outOfLane: "не се отчете: колата спря, без да е изцяло в своята лента — задачата е да спреш в нея. Спирай с прав волан.",
+  // Round 5 (L11) — true of every drive that prints it: the approach's graded rest, inside the ring with the body not
+  // wholly in the lane, was made motionless within CRASH_PIN_RADIUS_M of the car's own terminating collision, and the
+  // task stayed open. «По-рано» for the touch line's reason: earlier is true of every drive that crashed before stopping.
+  crashRest: "не се отчете: колата спря след удар, без да е изцяло в своята лента — задачата е да спреш в нея, без удар. Спирай по-рано, с прав волан.",
+  // Round 3 — true of every drive that prints it: the car went through the task's place without stopping in it
+  // (`lanePassedUnhalted`), and the task stayed open.
+  passedUnhalted: "не се отчете: колата мина през мястото, без да спре — задачата е да спреш там. Спирай напълно, преди да продължиш.",
 };
 /** Teach-moment rows listed by name in the „Учебни моменти" section before the count takes over. */
 const MAX_COACHED_NAMED = 2;

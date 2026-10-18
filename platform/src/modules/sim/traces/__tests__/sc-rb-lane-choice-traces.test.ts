@@ -168,8 +168,13 @@ describe("sc-rb-lane-choice — the shadow gate (doc 76 §5)", () => {
   });
 
   it("really STOPS at the yield line and really waits ~15 s there", () => {
+    // The line is the PAINTED give-way bar (y = −51.85): the car rests with its
+    // nose 0.8 m short of it, centre y = −54.67 (../scRbLaneChoice HOLD_Y; the
+    // paint is asserted against the world builder in ring-demos-drivable.test).
+    // Until 2026-10-12 this read y ≈ −35.5 — where the old demos waited, 16 m
+    // past the bar with the nose on the circulatory carriageway.
     const atRest = shadow.trace.samples.filter(
-      (s) => s.speedKmh < 0.5 && Math.abs(s.x - 4.06) < 0.5 && s.y > -36.5 && s.y < -35,
+      (s) => s.speedKmh < 0.5 && Math.abs(s.x - 4.06) < 0.5 && s.y > -55.2 && s.y < -54.2,
     );
     expect(atRest.length).toBeGreaterThan(250); // > 12.5 s of 20 Hz samples
     const waited = atRest[atRest.length - 1].tSec - atRest[0].tSec;
@@ -178,12 +183,13 @@ describe("sc-rb-lane-choice — the shadow gate (doc 76 §5)", () => {
   });
 
   it("holds the INNER lane past BOTH foreign mouths, under a LEFT indicator", () => {
-    // THE LESSON, as an assertion. The ring proper between the entry chord's
-    // landing (φ = 45) and the exit-announcement point (φ = 180) spans the east
+    // THE LESSON, as an assertion. The ring proper between the entry's
+    // landing (φ = 50) and the exit-announcement point (φ = 176, past the north
+    // arm's exit lanes — ../scRbLaneChoice SIGNAL_PHI_DEG) spans the east
     // mouth (φ = 90) — the first exit, which is not ours.
     const onRing = shadow.trace.samples.filter((s) => {
       const p = phiDeg(s.x, s.y);
-      return p >= 45 && p <= 178 && Math.hypot(s.x, s.y) < 40;
+      return p >= 50 && p <= 175 && Math.hypot(s.x, s.y) < 40;
     });
     expect(onRing.length).toBeGreaterThan(20);
     for (const s of onRing) {
@@ -300,11 +306,22 @@ describe("sc-rb-lane-choice — the crash is the engine's own (doc 76 §0 honest
     // are 3.06 m apart and the two footprints are already interpenetrating,
     // which is precisely the case a circle cannot express.
     expect(at.bodySep).toBeLessThanOrEqual(0);
-    const minSep = Math.min(...frames.filter((f) => f.tSec > 40).map((f) => f.sep));
-    expect(minSep).toBeLessThan(2.5);
+    // (A centre-distance bound, `sep < 2.5`, stood here until 2026-10-12. The
+    // drivable cut crosses the car's line at ~70° — nose into its flank — so
+    // the centres never come closer than 2.9 m while the bodies interpenetrate
+    // by more than half a metre: the circle's blind spot this comment's first
+    // paragraph describes. The bodies are measured below.)
     // …and it keeps getting worse after the bill: this is a crash, not a graze.
     const minBody = Math.min(...frames.filter((f) => f.tSec > 40).map((f) => f.bodySep));
-    expect(minBody).toBeLessThan(-0.5);
+    const overlapFrames = frames.filter((f) => f.tSec >= at.tSec && f.bodySep <= 0).length;
+    // Measured on the drivable cut (2026-10-12): from −0.005 m at the bill to
+    // −0.176 m, over 51 frames (0.85 s) of unbroken contact. The −0.5 m this
+    // read before was the old ghost driving straight through the car on its
+    // two-pivot line; the car now brakes first (FAILED_TO_YIELD lands before
+    // the contact) and the nose goes 0.18 m into its flank.
+    expect(minBody).toBeLessThan(-0.15);
+    expect(minBody).toBeLessThan(at.bodySep);
+    expect(overlapFrames).toBeGreaterThan(30);
     // …and the car is where the lesson says it is: the OUTER lane, at the mouth
     // the driver is cutting across.
     expect(at.car.r).toBeGreaterThan(LANE_OUTER_R - 1.5);

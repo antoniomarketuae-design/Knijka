@@ -274,6 +274,14 @@ export function serializeObjectiveParams(
           halfWidthM: p.stopShortOf.halfWidthM,
         };
       }
+      // …AND THE LANE THE BANNER NAMES (`restInLane` — lane lanegate,
+      // sc-hz-brake-dont-swerve:cb563b2d), on this whitelist for the same
+      // measured reason. NOT LADDERED and NOT widened with the disc: the lane is
+      // where the road's paint is, not a tolerance, and «did the car stop in its
+      // own lane» has the same answer at L1 as at L5. Copied field by field.
+      if (p.restInLane !== undefined) {
+        params.restInLane = { headingDeg: p.restInLane.headingDeg, halfWidthM: p.restInLane.halfWidthM };
+      }
       // …AND THE THIRD AUTHORED WITNESS TERM, on this whitelist for exactly the
       // reason the block above measured on `requireRailClear`: parsed, read and
       // gated at template level, a key that is not named HERE never reaches the

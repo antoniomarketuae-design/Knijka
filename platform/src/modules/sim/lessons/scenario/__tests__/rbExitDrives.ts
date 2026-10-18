@@ -25,6 +25,16 @@ import { SC_RB_LANE_CHOICE_GEOMETRY } from "../../../traces/scRbLaneChoice";
 const G = SC_RB_LANE_CHOICE_GEOMETRY;
 const D2R = Math.PI / 180;
 
+/**
+ * The capture's own approach: it stood where the authored demos of its day
+ * waited (y = −35.5) for 15 s. The demos have since moved back to the painted
+ * give-way bar (traces/scRbLaneChoice.ts, catalogue-demo-curvature:dae908c7);
+ * this drive keeps the capture's numbers, because what it witnesses is the
+ * capture.
+ */
+const JUDGE_HOLD_Y = -35.5;
+const JUDGE_WAIT_SEC = 15;
+
 /** Ring point at circulation angle φ (from the SOUTH node, CCW through east). */
 export const ring = (phiDeg: number, radius: number): [number, number] => [
   radius * Math.sin(phiDeg * D2R),
@@ -107,15 +117,15 @@ export function judgeDriveScript(opts: JudgeDriveOptions = {}): DriveScript {
       kind: "drive",
       points: [
         [G.ARM_INNER_X, -45],
-        [G.ARM_INNER_X, G.HOLD_Y],
+        [G.ARM_INNER_X, JUDGE_HOLD_Y],
       ],
       targetKmh: 14,
     },
     { kind: "glance", mirror: "left" },
-    { kind: "pause", sec: G.WAIT_SEC, brake: true },
+    { kind: "pause", sec: JUDGE_WAIT_SEC, brake: true },
     {
       kind: "drive",
-      points: [[G.ARM_INNER_X, G.HOLD_Y], [5.5, -30], [7.5, -26], ring(30, G.LANE_INNER_R), ring(40, G.LANE_INNER_R)],
+      points: [[G.ARM_INNER_X, JUDGE_HOLD_Y], [5.5, -30], [7.5, -26], ring(30, G.LANE_INNER_R), ring(40, G.LANE_INNER_R)],
       targetKmh: 15,
       stopAtEnd: false,
     },

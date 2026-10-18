@@ -93,6 +93,8 @@ import type { ScenarioSpec } from "./types";
 
 /** Northbound right-lane center of hz-obstacle-v1 (240 m two-way street, 1+1). */
 const LANE_X = 4.06;
+/** One drawn lane width on hz-obstacle-v1 (3.25 m × perceptual scale 2.5), m. */
+const HZ_LANE_WIDTH_M = 8.125;
 /** Where the child enters the carriageway — mid-block, no crossing anywhere. */
 const DART_Y = 150;
 /** The east kerb the child pushes off from (the lane is a wide 8.125 m: the
@@ -369,9 +371,29 @@ export const SC_HZ_EMERGENCY_STOP: ScenarioSpec = {
       titleBg: "Спри преди детето — с пълна спирачка, в лентата",
       // THE objective (the sc-acno-mark / pk-smooth-stop discipline): completable
       // ONLY at rest, and ONLY short of the child's line at y = 150. A driver who
-      // reacted late is still rolling here and can never satisfy it; a driver who
-      // swerved is not on x = 4.06 at all.
-      params: { kind: "reachZone", x: LANE_X, y: 146, radiusM: 4, maxSpeedKmh: 6 },
+      // reacted late is still rolling here and is never ticked.
+      //
+      // «в лентата» IS THE LANE ITSELF, NOT THE DISC (`restInLane` — lane
+      // lanegate, sc-hz-brake-dont-swerve:cb563b2d). The 4 m disc does not keep
+      // a swerved car out on its own: the grace capsule's axis is latched from
+      // wherever the car entered the 9 m ring, so a car that came in from beside
+      // the lane and stopped near its entry read 0 m sideways and was ticked
+      // anywhere around the mark — the triage's pure probe ticked every approach
+      // side 0 … 8.125 m off. The tick now needs the car HALTED with its whole
+      // body inside this lane (centre line x = LANE_X, heading 0, half the
+      // 8.125 m pitch; every corner of the footprint — a straight car's centre
+      // within 3.2125 m), inside the gate's own disc/capsule (never at a later
+      // halt down the lane); the approach's first halted rest inside the 9 m
+      // ring is the graded one, so a wide swerve there and a creep back does
+      // not tick.
+      params: {
+        kind: "reachZone",
+        x: LANE_X,
+        y: 146,
+        radiusM: 4,
+        maxSpeedKmh: 6,
+        restInLane: { headingDeg: 0, halfWidthM: HZ_LANE_WIDTH_M / 2 },
+      },
     },
     {
       id: "sc-hzes-finish",
@@ -750,10 +772,25 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
       id: "sc-hzbds-stop",
       titleBg: "Спри преди препятствието — с пълна спирачка, В своята лента",
       // THE objective (the sc-hzes-stop discipline): completable ONLY at rest,
-      // ONLY short of the debris, and ONLY from the player's own lane — the
-      // 4 m radius is half a lane pitch, so a car that swerved into lane 1
-      // (x = −4.06) can never satisfy it. Stopping is not enough; stopping
-      // WHERE YOU WERE is the graded claim.
+      // ONLY short of the debris, and ONLY in the player's own lane. Stopping
+      // is not enough; stopping WHERE YOU WERE is the graded claim.
+      //
+      // …AND THE LANE IS MEASURED, NOT IMPLIED BY THE RADIUS (`restInLane` —
+      // lane lanegate, sc-hz-brake-dont-swerve:cb563b2d). This comment used to
+      // say the 4 m radius, half a lane pitch, keeps a car that swerved into
+      // lane 1 (x = −4.06) from ever satisfying it. That was false: the grace
+      // capsule's axis is latched from wherever the car enters the 9 m ring,
+      // so a car that came in from beside the lane and rested near its entry
+      // read 0 m sideways. On the product's chassis this task ticked a car at
+      // rest off the carriageway (9.945, 177.47 — 0 points, «passed») and a
+      // car at rest in the escort's lane (−2.567, 179.05). The tick now needs
+      // the car HALTED with its whole body inside the player's lane: centre
+      // line x = 4.06, heading 0, half the 8.125 m lane pitch either side,
+      // every corner of the footprint (a car straddling the line, centre
+      // 4.0 m off, is out); the tick is given only inside the gate's own
+      // disc/capsule; and the approach's first halted rest inside the 9 m ring
+      // is the graded one — stopping out of lane (in the capsule or wide of
+      // it) and creeping back does not tick.
       //
       // …AND STOPPING BEFORE IT IS THE BANNER'S OWN WORD (`stopShortOf` — lane
       // hztick round 2, sc-hz-brake-dont-swerve:a7d0dd29). The disc says where
@@ -775,6 +812,7 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
         radiusM: 4,
         maxSpeedKmh: 6,
         stopShortOf: DEBRIS_BLOCK,
+        restInLane: { headingDeg: 0, halfWidthM: DEBRIS_LANE_SHIFT / 2 },
       },
     },
     // NO third „заобиколи и продължи" gate, deliberately. The drill's claim

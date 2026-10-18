@@ -1936,6 +1936,8 @@ export const SC_LN_BOULEVARD_DISCIPLINE: ScenarioSpec = {
  *  one of these against meta.scenario + the runtime's own lane fix). */
 const LNOM_OWN = 4.06;
 const LNOM_ONC = -4.06;
+/** One drawn lane width on ov-narrow-v1 (3.25 m × perceptual scale 2.5), m. */
+const LNOM_LANE_WIDTH_M = 8.125;
 const LNOM_LENGTH = 240;
 const LNOM_LIMIT = 40;
 
@@ -2093,10 +2095,30 @@ export const SC_LN_OBSTACLE_MEETING: ScenarioSpec = {
     {
       id: "sc-lnom-wait",
       titleBg: "Спри в своята лента пред препятствието",
-      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the own-lane
-      // centre, and maxSpeedKmh 6 makes it unsatisfiable in motion. The gate IS
-      // чл. 44: a car that rolled through here never waited for anybody.
-      params: { kind: "reachZone", x: LNOM_OWN, y: 130, radiusM: 4, maxSpeedKmh: 6 },
+      // maxSpeedKmh 6 makes it unsatisfiable in motion. The gate IS чл. 44: a
+      // car that rolled through here never waited for anybody.
+      //
+      // «в своята лента» IS MEASURED (`restInLane` — lane lanegate,
+      // sc-hz-brake-dont-swerve:cb563b2d). This comment used to say radius 4 <
+      // the 8.125 m lane pitch makes the gate satisfiable only from the
+      // own-lane centre. That was false: the grace capsule's axis is latched
+      // from wherever the car enters the ring, so a car that came in from the
+      // oncoming lane and stopped near its entry read 0 m sideways and was
+      // ticked (the triage's pure probe, every side 0 … 8.125 m off, L1 and
+      // L3). The tick now needs the car HALTED with its whole body inside the
+      // own lane: centre line x = LNOM_OWN, heading 0, half the lane pitch
+      // either side, every corner of the footprint; only inside the gate's own
+      // disc/capsule — a car that rolled through the disc and halted past the
+      // parked row is NOT ticked «пред препятствието»; and the approach's first
+      // halted rest inside the ring is the graded one.
+      params: {
+        kind: "reachZone",
+        x: LNOM_OWN,
+        y: 130,
+        radiusM: 4,
+        maxSpeedKmh: 6,
+        restInLane: { headingDeg: 0, halfWidthM: LNOM_LANE_WIDTH_M / 2 },
+      },
     },
     {
       id: "sc-lnom-round",

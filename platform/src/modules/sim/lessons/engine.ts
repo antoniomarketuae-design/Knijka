@@ -1358,6 +1358,77 @@ function objectiveNotice(
       peekBg: "Спирай по-рано и твърдо.",
     };
   }
+  // ── A STOP OUTSIDE THE LANE THE TASK NAMES DID NOT COUNT, AND THE STUDENT IS TOLD SO (lane lanegate,
+  //    sc-hz-brake-dont-swerve:cb563b2d — `objectives.ts reachZoneRestLaneOffsetM` carries the frame) ───────────
+  //
+  // `restInLane` withdraws a tick the capsule used to hand out — a car at rest off the carriageway or a lane over,
+  // credited «✓ … В своята лента» — so it owes the sentence THEO-4 demands: what was observed (a stop, and how far
+  // from the centre of its lane), what the task wants (the stop IN the lane) and what to do (stop straight, in the
+  // lane). Without it the student stands still where the tick used to come and nothing happens.
+  //
+  // ONE CARD PER APPROACH, ON THE VOIDING FRAME: `laneVoidedOffsetM` is written on the first frame of an approach on
+  // which the car stands HALTED inside the approach ring with its body not wholly in the lane (round 3: whether or
+  // not that rest honoured the arrival — a wide swerve inside the ring is the approach's graded standstill too, and
+  // «Задачата иска цялата кола да спре в твоята лента, затова това спиране не я отчита» is true of it: the task names
+  // a stop in the lane, and this one was not) — and is carried, unchanged, until a fresh approach (round 2: the first halted rest of an approach
+  // is the graded act). Moving on, or stopping again inside the ring, does not raise it a second time. A void raised
+  // on a rest the crash pin holds (`ObjectiveContext.restIsCrashPinned`; the eval state's `laneVoidedByCrash`, round 5,
+  // L11) is spoken by NO card here: that standstill is the crash's — its own COLLISION card speaks on that moment, and
+  // «Колата спря» would name the impact's standstill the student's stop. It still voids the approach, and the end row
+  // and debrief name it («crashRest», `buildLessonResult`).
+  //
+  // EVERY SENTENCE STAYS TRUE FOR THE CARD'S WHOLE LIFE: «спря», the distance and «не беше изцяло в нея» are about
+  // the stop already made (the distance is the car's CENTRE from the lane's centre line, `reachZoneRestLaneOffsetM`
+  // — round 2 judges the BODY, so a car whose centre is still inside the lane but whose corner is over the line
+  // stopped «на 3.5 м встрани … и не беше изцяло в нея», which is true; «извън нея», round 1's wording, would not
+  // have been); «това спиране не я отчита» is about that stop, so a student who comes at the mark again and earns
+  // the tick does not make it false; nothing says the task is STILL open. NO «върни се», for the haltVoided card's
+  // reason — this composer cannot know whether the road allows it; the corrective is the act the lesson teaches.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    after.laneVoidedOffsetM !== undefined &&
+    after.laneVoidedByCrash !== true &&
+    (before.type !== "reachZone" || before.laneVoidedOffsetM === undefined)
+  ) {
+    return {
+      kind: "lesson",
+      titleBg: "Спря, но не изцяло в своята лента",
+      explanationBg: `Колата спря на ${after.laneVoidedOffsetM.toFixed(1)} м встрани от средата на своята лента и не беше изцяло в нея. Задачата иска цялата кола да спре в твоята лента, затова това спиране не я отчита. Спирай право в своята лента, с прав волан.`,
+      // The phone card's one line: the act the paragraph closes on.
+      peekBg: "Спирай изцяло в лентата.",
+    };
+  }
+  // ── …AND A PASS THROUGH THE PLACE WITHOUT A STOP DID NOT COUNT EITHER (lane lanegate round 3 — `objectives.ts`
+  //    `lanePass` carries the frame) ───────────────────────────────────────────────────────────────────────────────
+  //
+  // On a task that names the student's lane the tick is a HALT made IN THE PLACE (round 2: a halted frame; round 3,
+  // L4: inside `inAcceptance || graceArmed`). A car that rolls through the place at or under the cap and never stops
+  // in it is therefore not ticked — the base ticked it on the moving frame, round 2 at its next halt anywhere down
+  // the lane — and THEO-4 owes it the reason, on the frame it is decided: the frame the car leaves the place past the
+  // mark having never halted in it (`lanePass` «in» → «passed»), having been in it within the cap with nothing struck
+  // (a pass over the cap has its own card, a strike its own bill and row) and no lane void on the approach. Once per approach.
+  //
+  // EVERY SENTENCE STAYS TRUE FOR THE CARD'S WHOLE LIFE: «мина … без да спре в него» is the pass already made (the
+  // car was in the place on the previous grid point and never halted there on this approach — «halted» is sticky,
+  // and the edge is only taken from «in»); «Задачата иска пълно спиране там» is the halt cap every `restInLane` gate
+  // carries; «това минаване не я отчита» is about this pass, so a student who comes back and stops there and earns
+  // the tick does not make it false. NO «върни се» — this composer cannot know whether the road allows it.
+  if (
+    params.kind === "reachZone" &&
+    after.type === "reachZone" &&
+    after.lanePass === "passed" &&
+    (before.type !== "reachZone" || before.lanePass !== "passed")
+  ) {
+    return {
+      kind: "lesson",
+      titleBg: "Мина, без да спреш",
+      explanationBg:
+        "Колата мина през мястото на задачата, без да спре в него. Задачата иска пълно спиране там, затова това минаване не я отчита. Спирай напълно, преди да продължиш.",
+      // The phone card's one line: the act the paragraph closes on.
+      peekBg: "Спри напълно на мястото.",
+    };
+  }
   // ── A FULL STOP SHORT OF THE LINE DID NOT COUNT, AND THE STUDENT IS TOLD SO
   //    (sc-merge-from-property:64fd365e — `objectives.ts FULL_STOP_AT_LINE_M`
   //    carries the founder ruling and the frame) ─────────────────────────────
@@ -4691,7 +4762,7 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
    */
   const struckAPerson = state.events.some(isPersonContact);
 
-  const objectives: ObjectiveOutcome[] = state.objectives.map((o) => {
+  const objectives: ObjectiveOutcome[] = state.objectives.map((o, i) => {
     /**
      * …AND THE THIRD CLAIM THE FOLD TAKES BACK: «СПРИ ПРЕДИ ПРЕПЯТСТВИЕТО»
      * (`ReachZoneParams.stopShortOf` — lane hztick round 2,
@@ -4722,15 +4793,36 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // never displaces a measurement the evaluator reported (`o.detail` wins; no
     // gate that names a body reports one today), and it is attached only where
     // the touch is the reason the task is open.
+    //
+    // …AND «outOfLane» (lane lanegate, sc-hz-brake-dont-swerve:cb563b2d): a task that names the student's lane
+    // (`ReachZoneParams.restInLane`), left OPEN, on a drive whose car came to rest where the tick would have come
+    // with its body not wholly in that lane — the eval state's `laneRestOffsetM`, written with every approach's void
+    // the in-drive card was spoken off, and never cleared (a later move does not unsay the stop).
+    // Read off the session's own record, never re-derived; the touch wins when both hold (it is billed, and graver).
+    // A drive that never stopped outside the lane folds to the result it always did.
+    const ev = state.evalStates[i];
+    const stoppedOutOfLane = ev !== undefined && ev.type === "reachZone" && ev.laneRestOffsetM !== undefined;
+    // …AND «crashRest» (round 5, L11): that graded rest was the crash's — the car motionless within CRASH_PIN_RADIUS_M
+    // of its own terminating collision (`laneRestByCrash`, the provenance written with the void). The same open task,
+    // the same void; the row names the crash instead of a stop, because no lane card was spoken on that rest.
+    const restWasTheCrash = stoppedOutOfLane && ev.type === "reachZone" && ev.laneRestByCrash === true;
+    // …AND «passedUnhalted» (round 3): the car went through the task's place without stopping in it (`lanePassedUnhalted`,
+    // the fact the in-drive «Мина, без да спреш» card was spoken off). A graded stop out of the lane wins over it.
+    const passedUnhalted = ev !== undefined && ev.type === "reachZone" && ev.lanePassedUnhalted === true;
+    const done = o.status === "done" && !revoked;
     const detail: ObjectiveDetail | undefined =
       o.detail ??
       (namedBodyTouchVoidsObjective(o.params, touchedNamedBody)
         ? { kind: "haltVoided", reason: "touched" }
-        : undefined);
+        : !done && stoppedOutOfLane
+          ? { kind: "haltVoided", reason: restWasTheCrash ? "crashRest" : "outOfLane" }
+          : !done && passedUnhalted
+            ? { kind: "haltVoided", reason: "passedUnhalted" }
+            : undefined);
     return {
       id: o.spec.id,
       titleBg: o.spec.titleBg,
-      done: o.status === "done" && !revoked,
+      done,
       // The clock is the certificate's other half — «✓ … 1:28» is one claim,
       // not two — so a withdrawn tick may not leave its timestamp standing.
       // `SessionEndScreen` only prints it under `o.done` today, and `wire.ts

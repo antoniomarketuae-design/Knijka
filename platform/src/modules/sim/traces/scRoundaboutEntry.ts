@@ -13,34 +13,50 @@
  *     the car brakes — founder ruling 2026-10-05, see BARGE_* below. It carries
  *     a right indicator so its ONLY graded fault is the priority);
  *   - „Излизане без десен мигач" grades EXACTLY TURN_WITHOUT_INDICATOR (the
- *     runtime's turn detector at the north exit joint — the honest existing
- *     code for RB-02; the L3 roundabout OBJECTIVE additionally voids such a
- *     traversal, proven in the bot suite).
+ *     runtime's turn detector at the north exit — the honest existing code for
+ *     RB-02; the L3 roundabout OBJECTIVE additionally voids such a traversal,
+ *     proven in the bot suite).
  *
  * Geometry pinned to content/world/rb-mini-v1.json: ring centerline R = 18
  * around (0, 0), CCW; arm right-lane centers x = ±4.06 / y = ±4.06; south
- * spawn (4.06, −93) heading north; ring limit 30, arms 40.
+ * spawn (4.06, −93) heading north; ring limit 30, arms 40; the give-way bar of
+ * the south mouth painted at y = −35.725.
  *
- * Two runtime windows must BOTH stay closed for the shadow, and they pull
- * opposite ways (worked out against the live circulator trajectory):
- *  · FAILED_TO_YIELD (roundabout tracker). HISTORY: it used to fire if a
- *    circulating car was on the driver's LEFT while he was still entering, and
- *    the BRISK flat-chord entry below (17 km/h, a nearly-straight NE line that
- *    sweeps 35° of azimuth with only ~40° of heading change) was authored to
- *    keep the 2.9 m/s car on his RIGHT until ring priority was held. Since the
- *    founder ruling of 2026-10-05 it fires only when a circulating car has to
- *    BRAKE because of the entry (or is touched) — and this drive enters behind
- *    the car it waited for, so nothing does. The chord is kept as authored.
- *  · COLLISION (rear-end): the driver circulates FASTER than the crawling
- *    car and would catch it at the north exit. Closed by MATCHED circulation
- *    (12 km/h ≈ the car's 2.9 m/s) after priority is won — the driver trails
- *    the car a constant arc and exits a full arc behind it.
- * Turn detector: turnStarted fires at |Σ heading deltas| > 55° over a sliding
- * 3 s window in a junction area. Circulation at 12 km/h on R = 18 is ~11°/s
- * (window ≈ 33° — never fires); the flat-chord entry's low heading change
- * never fires either; the no-signal EXIT demo deliberately swings ~70° at a
- * tight radius so the detector DOES fire — with no indicator, the graded
- * fault, and nothing else.
+ * EVERY PATH HERE IS ONE THE PRODUCT CAR CAN DRIVE
+ * (catalogue-demo-curvature:dae908c7). Until 2026-10-11 the three drives were
+ * typed in as waypoints: the ring as 10° chords, the entry and the exit as
+ * three or four corners. The recorder is kinematic — the ghost stands on the
+ * authored point, headed along the chord — so each corner was a pivot on the
+ * spot (23° at the mouth, 27° at the peel: 2.46 m of «radius» against a car
+ * whose tightest circle is 3.955 m), and between the entry chord and the ring
+ * step the ghost skipped 1.6 m of ring in one frame. The drives are now cut
+ * from one continuous line each, built with ./ringDrive and ./ringMini (the
+ * family's shared entry and exit): curvature only ever ramps, the tightest
+ * radius the correct drive asks for is 9 m (the mistake's snap exit: 6.5 m),
+ * and the drivability pins are in
+ * traces/__tests__/ring-demos-drivable.test.ts.
+ *
+ * WHERE THE CORRECT DRIVE WAITS. With its nose 0.8 m short of the painted
+ * give-way bar (centre y = −38.545) — where the product draws the student's own
+ * «Карай до линията за пропускане» gate and where the lesson's first task is
+ * cut («before the paint»). The old shadow rolled 11 m past the bar and waited
+ * 3.6 m from the ring's edge under «Спри и я пропусни».
+ *
+ * WHAT THE RUNTIME READS OF THESE DRIVES:
+ *  · FAILED_TO_YIELD (roundabout tracker) fires only when a circulating car
+ *    has to BRAKE because of the entry, or is touched (founder ruling
+ *    2026-10-05). The shadow enters behind the car it waited for, so nothing
+ *    does; the barge rolls on ahead of it, slower than it, and it brakes.
+ *  · COLLISION (rear-end): the driver circulates a little FASTER than the
+ *    crawling car (12 km/h against its 2.9 m/s) and enters most of a quarter
+ *    ring behind it — the gap narrows by under 6 m over the whole half ring,
+ *    never to less than 25 m (pinned).
+ *  · The turn detector calls a manoeuvre a turn at |Σ heading| > 55° over a
+ *    sliding 3 s inside a junction area (the whole ring is one). The entry is
+ *    44.5° of right turn, the ring ~32° per 3 s at 12 km/h: neither is a turn.
+ *    The correct exit is 49.5° under a right indicator. The no-signal demo's
+ *    snap exit (./ringMini miniSnapExit) is 64.8° in 2.4 s with the lever at
+ *    rest — the graded fault, and nothing else.
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -51,92 +67,114 @@ import {
   type RecordedDrive,
   type RecordScriptedDriveOptions,
 } from "./recorder";
+import { sideStepProgramme, type RingPath } from "./ringDrive";
+import {
+  MINI_BAR_STOP_Y,
+  MINI_ENTRY,
+  MINI_LANE_X,
+  MINI_SNAP_LAND_OFFSET_M,
+  miniExit,
+  miniPathFromSpawn,
+  miniSnapExit,
+} from "./ringMini";
 
 export const SC_ROUNDABOUT_ENTRY_ID = "sc-roundabout-entry";
 
-/** South-arm northbound lane center (2-lane arm, drawn lane 8.125 m). */
-const X_LANE = 4.06;
-/** Ring centerline radius (rb-mini-v1 meta.scenario). */
-const R = 18;
-
-/** Ring point at circulation angle φ (degrees from the SOUTH node, CCW
- * through EAST): (R sin φ, −R cos φ). */
-function ring(phiDeg: number): [number, number] {
-  const a = (phiDeg * Math.PI) / 180;
-  return [R * Math.sin(a), -R * Math.cos(a)];
-}
-
-/** Sampled ring run φ0 → φ1 (CCW, 10° steps). */
-function ringRun(phi0: number, phi1: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let p = phi0; p <= phi1; p += 10) out.push(ring(p));
-  return out;
-}
+/** Where the approach comes off the arm's pace (33 m into the 90 m arm). */
+const Y_SLOW = -60;
+/**
+ * Where the right indicator goes on: φ = 112°, the first metre of ring past
+ * the far kerb of the east mouth (the mouth's 16.25 m of carriageway spans
+ * φ 68°–112° at the ring's outer edge). Earlier, and the lever would tell the
+ * driver waiting on the east arm that this car is leaving by his road; the
+ * wheel starts to come off the ring 5.7 m later (φ = 130°).
+ */
+const SIGNAL_PHI_DEG = 112;
 
 // ---------------------------------------------------------------------------
 // The correct demonstration (shadow)
 // ---------------------------------------------------------------------------
 
-export function scRoundaboutEntryShadowScript(): DriveScript {
+/** Spawn → the stop before the bar → the family entry → the ring → the family
+ *  north exit → 52 m up the north arm. */
+function buildShadowPath(): RingPath {
+  return miniPathFromSpawn()
+    .straightToY(Y_SLOW)
+    .mark("slow")
+    .straightToY(MINI_BAR_STOP_Y)
+    .mark("line")
+    .enterRing(MINI_ENTRY)
+    .mark("ring")
+    .ringTo(SIGNAL_PHI_DEG)
+    .mark("signal")
+    .exitRing(miniExit("north"))
+    .mark("lane")
+    .straightToY(52)
+    .mark("end")
+    .build();
+}
+let shadowPath: RingPath | null = null;
+const SHADOW = (): RingPath => (shadowPath ??= buildShadowPath());
+
+/**
+ * The wait before the bar, s. The circulating car is met ~13 m short of the
+ * mouth as the driver comes to rest (the runner's own staging) and crosses the
+ * mouth 5.3 s later; at 9 s its tail is 30° of ring past the mouth — on the
+ * driver's right, going away — and the driver moves off «в нейния интервал».
+ * Measured on the live chain at every rung (the clean window is 7–26 s; before
+ * it the car is still short of the mouth, after it the ring has come round).
+ */
+const SHADOW_WAIT_SEC = 10;
+
+/** The dials a pin may sweep (absent = the authored drive). */
+export interface RoundaboutEntryDials {
+  /** Shadow / no-signal: the wait before the bar, s. */
+  waitSec?: number;
+  /** Barge: where the approach ends and the roll begins (district y). */
+  bargeBrakeY?: number;
+  /** Barge: the roll, км/ч. */
+  bargeRollKmh?: number;
+}
+
+export function scRoundaboutEntryShadowScript(dials: RoundaboutEntryDials = {}): DriveScript {
+  const p = SHADOW();
   return {
     steps: [
       { kind: "annotation", textBg: "Приближаваме кръговото — намали отрано и гледай наляво." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60]], targetKmh: 30, stopAtEnd: false },
+      { kind: "drive", points: p.between("start", "slow"), targetKmh: 30, stopAtEnd: false },
       {
-        // Ease to a stop at the yield line (just inside the decision zone).
+        // Ease to a stop with the nose 0.8 m short of the give-way bar.
         kind: "drive",
-        points: [[X_LANE, -60], [X_LANE, -40], [X_LANE, -27.5]],
+        points: p.between("slow", "line", { stop: true }),
         targetKmh: 16,
       },
       { kind: "annotation", textBg: "Кола се движи в кръга — тя е с предимство. Спри и я пропусни." },
       { kind: "glance", mirror: "left" },
-      // Wait the circulator fully PAST the mouth and onto the east arc (to the
-      // driver's RIGHT) before committing. With the car at cruise 3 m/s this
-      // is ~7.5 s — long enough that the ring joint's right-hand-rule watch
-      // no longer sees it crossing the mouth, and it sits on the east/SE arc
-      // (the driver's right, never a give-way conflict) for the whole entry.
-      { kind: "pause", sec: 9.0, brake: true },
+      { kind: "pause", sec: dials.waitSec ?? SHADOW_WAIT_SEC, brake: true },
       { kind: "annotation", textBg: "Тя премина — влизаме плътно след нея, в нейния интервал." },
       { kind: "glance", mirror: "left" },
       {
-        // FLAT-CHORD entry (the innocent-entry envelope): a nearly-straight
-        // NE line from the mouth to ~ring(48) rather than a tight ring-hugging
-        // arc. This sweeps the azimuth-from-centre past RB_ON_RING_DEG (35°)
-        // — the tracker's ring-priority stand-down — with only ~40° of TOTAL
-        // heading change (well under the 55° turn-detector window), so it is
-        // both quick to priority AND indicator-free-clean. Reaching stand-down
-        // in ~3 s closes the FAILED_TO_YIELD window before the slow circulator
-        // can loop onto the driver's left band.
+        // The family entry: over the bar, a 10 m-radius right turn, a short
+        // chord and onto the ring's centreline at φ = 55°.
         kind: "drive",
-        points: [
-          [X_LANE, -27.5],
-          [6.0, -23.0],
-          [8.5, -18.5],
-          [11.0, -15.0],
-          ring(48),
-          ring(55),
-        ],
+        points: p.between("line", "ring"),
         targetKmh: 17,
         stopAtEnd: false,
       },
       {
-        // Circulate the east side to φ = 120° at a MATCHED pace (12 km/h ≈
-        // the circulator's 2.9 m/s). The brisk entry above already bought ring
-        // priority; holding this speed keeps the driver a constant arc BEHIND
-        // the car for the whole loop, so it is never overtaken and rear-ended
-        // at the north exit — the collision a faster circulation caused.
+        // Circulate at 12 km/h past the east mouth — the first exit, not ours.
         kind: "drive",
-        points: ringRun(60, 120),
+        points: p.between("ring", "signal"),
         targetKmh: 12,
         stopAtEnd: false,
       },
       { kind: "annotation", textBg: "Преди твоя изход: десен мигач — обяви, че напускаш кръга." },
       { kind: "indicator", setting: "right" },
       {
-        // Ring to φ = 150°, then the gentle exit blend onto the north arm.
+        // Ring to φ = 130°, the family exit onto the north arm's lane, and on.
         kind: "drive",
-        points: [...ringRun(120, 150), [6.4, 20.5], [4.9, 25], [4.06, 30], [4.06, 40], [4.06, 52]],
+        points: p.between("signal", "end", { stop: true }),
         targetKmh: 12,
       },
       { kind: "indicator", setting: "off" },
@@ -171,29 +209,42 @@ export function scRoundaboutEntryShadowScript(): DriveScript {
  * dabs the brake, sees «enough room» and ROLLS over the give-way line without
  * stopping, in front of a car that is already there.
  *
+ * THE LINE is the correct drive's own entry (./ringMini MINI_ENTRY) — the two
+ * drives differ in the stop that is missing, not in where the wheels go.
+ *
  * THE TWO NUMBERS, both centred in MEASURED bands (the live chain, every rung
- * L1–L5, with the staged car's phase pushed ±3 m on top of its own seeded
- * jitter — 15 worlds per cell):
+ * L1–L5; re-measured 2026-10-11 on the drivable line — see BARGE_BANDS in
+ * traces/__tests__/ring-demos-drivable.test.ts for the sweep):
  *
- *   BARGE_BRAKE_Y   where the 26 км/ч approach ends and the roll begins.
- *                   −36 / −34 / −32 all work; −34 is the middle. It has to be
- *                   LATE: the runner syncs the car to the driver's ETA until
- *                   he is 14 m from the mouth, and a driver who slows early
- *                   lets it run past its station and sprint (a different,
- *                   unsteady choreography — measured, and avoided).
- *   BARGE_ROLL_KMH  the roll. 6–9 км/ч convicts on forced braking alone in
- *                   15 of 15 worlds; 5 and below the car arrives first and the
- *                   demo becomes a collision, 10 and above the driver gets
- *                   away ahead of it. 7.5 is the middle.
- *
- * Measured at these values: the nose is on the ring at t ≈ 13.7, the car has
- * shed the 0.3 m/s that convicts 1.0–2.7 s later and ~1.8 m/s by the time the
- * entry is over; nearest approach 6.1 m, no contact, no other fault.
+ *   BARGE_BRAKE_Y   where the 26 км/ч approach ends and the roll begins. It
+ *                   has to be LATE: the runner syncs the car to the driver's
+ *                   ETA until he is 14 m from the mouth, and a driver who
+ *                   slows early lets it run past its station and sprint (a
+ *                   different, unsteady choreography — measured, and avoided).
+ *   BARGE_ROLL_KMH  the roll. Too slow and the car arrives first (the demo
+ *                   becomes a collision); too fast and the driver gets away
+ *                   ahead of it and nothing is forced.
  */
 const BARGE_BRAKE_Y = -34;
-const BARGE_ROLL_KMH = 7.5;
+const BARGE_ROLL_KMH = 7;
+/** Where the barge demo freezes: on the early ring, 8° past the landing. */
+const BARGE_FREEZE_PHI_DEG = 63;
 
-export function scRoundaboutEntryMistakeBargeScript(): DriveScript {
+function buildBargePath(brakeY: number): RingPath {
+  return miniPathFromSpawn()
+    .straightToY(brakeY)
+    .mark("brake")
+    .enterRing(MINI_ENTRY)
+    .mark("ring")
+    .ringTo(BARGE_FREEZE_PHI_DEG)
+    .mark("end")
+    .build();
+}
+let bargePath: RingPath | null = null;
+const BARGE = (): RingPath => (bargePath ??= buildBargePath(BARGE_BRAKE_Y));
+
+export function scRoundaboutEntryMistakeBargeScript(dials: RoundaboutEntryDials = {}): DriveScript {
+  const p = dials.bargeBrakeY === undefined ? BARGE() : buildBargePath(dials.bargeBrakeY);
   return {
     steps: [
       {
@@ -207,27 +258,20 @@ export function scRoundaboutEntryMistakeBargeScript(): DriveScript {
       {
         // Up the arm at speed, and LATE on the brake (see BARGE_BRAKE_Y).
         kind: "drive",
-        points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, BARGE_BRAKE_Y]],
+        points: p.between("start", "brake"),
         targetKmh: 26,
         stopAtEnd: false,
       },
       { kind: "annotation", textBg: "Колата в кръга приближава отляво… но нашата не спира." },
       {
-        // The roll: over the give-way line without stopping and onto the ring
+        // The roll: over the give-way bar without stopping and onto the ring
         // right in front of the circulating car, slower than it — so the car
-        // HAS to brake (the graded moment, ~1–3 s after the nose is on the
-        // ring). The demo freezes on the early ring right after it: driving on
-        // with the cut-off car on the bumper would only stack unrelated noise
-        // on top of the ONE taught mistake.
+        // HAS to brake (the graded moment). The demo freezes on the early ring
+        // right after it: driving on with the cut-off car on the bumper would
+        // only stack unrelated noise on top of the ONE taught mistake.
         kind: "drive",
-        points: [
-          [X_LANE, BARGE_BRAKE_Y],
-          [X_LANE, -26],
-          [5.4, -21.5],
-          [7.4, -18.3],
-          ...ringRun(30, 40),
-        ],
-        targetKmh: BARGE_ROLL_KMH,
+        points: p.between("brake", "end", { stop: true }),
+        targetKmh: dials.bargeRollKmh ?? BARGE_ROLL_KMH,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.5, brake: true },
@@ -244,7 +288,32 @@ export function scRoundaboutEntryMistakeBargeScript(): DriveScript {
 // Mistake demo 2 — „Излизане без десен мигач" (TURN_WITHOUT_INDICATOR)
 // ---------------------------------------------------------------------------
 
-export function scRoundaboutEntryMistakeNoSignalScript(): DriveScript {
+/** The correct drive to the ring, then: no indicator, the ring held 20° longer,
+ *  the snap exit into the left half of the lane, and an easy drift back to the
+ *  lane's centre (a 2.46 m side-step on 40 m radii). */
+function buildNoSignalPath(): RingPath {
+  return miniPathFromSpawn()
+    .straightToY(Y_SLOW)
+    .mark("slow")
+    .straightToY(MINI_BAR_STOP_Y)
+    .mark("line")
+    .enterRing(MINI_ENTRY)
+    .mark("ring")
+    .ringTo(SIGNAL_PHI_DEG)
+    .mark("signal")
+    .exitRing(miniSnapExit("north"))
+    .mark("out")
+    .programme(sideStepProgramme(MINI_LANE_X - MINI_SNAP_LAND_OFFSET_M, 40, 4))
+    .mark("lane")
+    .straightToY(54)
+    .mark("end")
+    .build();
+}
+let noSignalPath: RingPath | null = null;
+const NO_SIGNAL = (): RingPath => (noSignalPath ??= buildNoSignalPath());
+
+export function scRoundaboutEntryMistakeNoSignalScript(dials: RoundaboutEntryDials = {}): DriveScript {
+  const p = NO_SIGNAL();
   return {
     steps: [
       {
@@ -252,49 +321,35 @@ export function scRoundaboutEntryMistakeNoSignalScript(): DriveScript {
         textBg: "Този път входът е правилен — гледай какво се обърква на изхода.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60]], targetKmh: 30, stopAtEnd: false },
-      {
-        kind: "drive",
-        points: [[X_LANE, -60], [X_LANE, -40], [X_LANE, -27.5]],
-        targetKmh: 16,
-      },
+      { kind: "drive", points: p.between("start", "slow"), targetKmh: 30, stopAtEnd: false },
+      { kind: "drive", points: p.between("slow", "line", { stop: true }), targetKmh: 16 },
       { kind: "glance", mirror: "left" },
-      { kind: "pause", sec: 9.0, brake: true },
+      { kind: "pause", sec: dials.waitSec ?? SHADOW_WAIT_SEC, brake: true },
       { kind: "glance", mirror: "left" },
       {
-        // The SAME clean brisk flat-chord entry as the shadow (the entry is
-        // not the fault here) — reaches ring priority while the circulator is
-        // still on the driver's right, so this demo carries NO entry violation…
+        // The SAME entry as the shadow, taken after the same wait (the entry is
+        // not the fault here)…
         kind: "drive",
-        points: [
-          [X_LANE, -27.5],
-          [6.0, -23.0],
-          [8.5, -18.5],
-          [11.0, -15.0],
-          ring(48),
-          ring(55),
-        ],
+        points: p.between("line", "ring"),
         targetKmh: 17,
         stopAtEnd: false,
       },
       {
-        // …then the SAME matched-pace (12 km/h) circulation as the shadow, so
-        // the driver stays a constant arc BEHIND the car and never rear-ends
-        // it — the only difference from the shadow is what happens at the exit.
+        // …and the SAME 12 km/h circulation, so the only difference from the
+        // shadow is what happens at the exit.
         kind: "drive",
-        points: ringRun(60, 120),
+        points: p.between("ring", "signal"),
         targetKmh: 12,
         stopAtEnd: false,
       },
       { kind: "annotation", textBg: "Изходът идва — но мигач няма, и завоят е рязък…" },
       {
-        // The SNAP exit: unlike the shadow's wide, indicator-announced blend,
-        // a TIGHT ~70° right sweep off φ ≈ 150° onto the north arm (small
-        // radius → the turn detector's 3 s window clears 55°) with NO
-        // indicator — TURN_WITHOUT_INDICATOR, and nothing else (the circulator
-        // is a full arc ahead, on the far/NW side).
+        // The SNAP exit (./ringMini miniSnapExit): the ring held to φ = 150°,
+        // then 64.8° of right turn on a 6.5 m radius in 2.4 s with NO indicator
+        // — TURN_WITHOUT_INDICATOR, and nothing else (the circulator is most of
+        // a quarter ring ahead).
         kind: "drive",
-        points: [ring(130), ring(145), ring(155), [5.0, 19.5], [4.06, 23], [4.06, 28], [4.06, 40], [4.06, 54]],
+        points: p.between("signal", "end", { stop: true }),
         targetKmh: 14,
       },
       { kind: "pause", sec: 1.5, brake: true },

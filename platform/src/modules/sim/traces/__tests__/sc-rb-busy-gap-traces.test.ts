@@ -180,17 +180,22 @@ describe("sc-rb-busy-gap — the shadow gate (doc 76 §5)", () => {
     }
   });
 
-  it("really STOPS at the yield line and really waits ~10 s there", () => {
+  it("really STOPS at the yield line and really waits ~14 s there", () => {
     // The drill's own gate demands ≤ 6 km/h at (4.06, −26); the shadow does the
     // honest thing and comes to rest. A rolling „yield" would be one 0.9 s
     // sustain away from a conviction with the platoon on the left.
+    //
+    // 14 s, not the 10 s this pinned until 2026-10-12 (catalogue-demo-curvature:
+    // dae908c7): one recording is shown on every rung, and on L5 a THIRD car
+    // runs 2.8 s behind the follower — the 10 s shadow drove into its side
+    // there (measured). ../scRbBusyGap SHADOW_WAIT_SEC carries the window.
     const atRest = shadow.trace.samples.filter(
       (s) => s.speedKmh < 0.5 && Math.abs(s.x - 4.06) < 0.5 && s.y > -28 && s.y < -27,
     );
-    expect(atRest.length).toBeGreaterThan(150); // > 7.5 s of 20 Hz samples
+    expect(atRest.length).toBeGreaterThan(230); // > 11.5 s of 20 Hz samples
     const waited = atRest[atRest.length - 1].tSec - atRest[0].tSec;
-    expect(waited).toBeGreaterThan(9);
-    expect(waited).toBeLessThan(12);
+    expect(waited).toBeGreaterThan(13);
+    expect(waited).toBeLessThan(16);
   });
 
   it("holds ONE ring line past the east mouth at station-keeping pace", () => {

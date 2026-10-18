@@ -120,6 +120,25 @@ function lessonAt(level: 1 | 3 | 5, withoutTheKey = false): LessonSpec {
   };
 }
 
+/**
+ * THE LESSON THE BASE SHIPPED, exactly — `stopShortOf` struck AND `restInLane` (lane lanegate round 2,
+ * sc-hz-brake-dont-swerve:cb563b2d), the later key on the same gate. §1's `was` is «the base's sheet», and with
+ * `restInLane` left in it is not: that key ticks only a HALTED car wholly in its lane, so LATE50's bounce off the
+ * block — read ≤ 6 km/h on a MOVING grid point, 907, the measured base tick — would be ticked at the first halted
+ * frame instead (1071). The sweeps (§2) keep `lessonAt(…, true)`: they isolate THIS key's effect with the other one
+ * present on both arms, which is what «no other drive changes» means.
+ */
+function baseLessonAt(level: 1 | 3 | 5): LessonSpec {
+  const lesson = lessonAt(level, true);
+  return {
+    ...lesson,
+    objectives: lesson.objectives.map((o) => {
+      const { restInLane: _laneStruck, ...params } = o.params as Record<string, unknown>;
+      return { ...o, params };
+    }),
+  };
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // The drives — the verifier's own controllers (hztick-verify), decided per
 // physics step from the car after the previous one (ADR-017's rule for the rig)
@@ -459,7 +478,7 @@ describe("sc-hz-brake-dont-swerve — a car that has TOUCHED the block has not s
         const lesson = lessonAt(level);
         beforeAll(() => {
           o = drive(lesson, c.control(), { maxSteps: c.maxSteps });
-          was = drive(lessonAt(level, true), c.control(), { maxSteps: c.maxSteps });
+          was = drive(baseLessonAt(level), c.control(), { maxSteps: c.maxSteps });
         });
         const task = (i: number) => o.result.objectives[i];
 
@@ -524,13 +543,13 @@ describe("sc-hz-brake-dont-swerve — a car that has TOUCHED the block has not s
             expect(was.result.objectives[1].done).toBe(true);
             expect(Math.round(was.result.objectives[1].completedAtSec! * 60)).toBe(c.baseTickStep);
             expect(was.result.completedAll).toBe(true);
-            expect(debriefOf(was, lessonAt(level, true))).toContain(ROUTE_DONE);
+            expect(debriefOf(was, baseLessonAt(level))).toContain(ROUTE_DONE);
             expect(was.result.objectives[1].detail).toBeUndefined();
           });
         } else {
           it("(without the key task 2 is not ticked either: task 1 was refused over its ceiling and the chain never reached it)", () => {
             expect(was.result.objectives[1].done).toBe(false);
-            expect(debriefOf(was, lessonAt(level, true))).not.toContain(ROUTE_DONE);
+            expect(debriefOf(was, baseLessonAt(level))).not.toContain(ROUTE_DONE);
           });
         }
       });

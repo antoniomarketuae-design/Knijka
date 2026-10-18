@@ -699,9 +699,18 @@ describe("the order — a tick given before the touch", () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 describe("the row and the debrief are one sentence, and say only what is true of every drive that shows them", () => {
-  it("one reason, on both tables", () => {
-    expect(Object.keys(HALT_VOIDED_ROW_BG)).toEqual(["touched"]);
-    expect(Object.keys(HALT_VOIDED_DEBRIEF_BG)).toEqual(["touched"]);
+  // TWO reasons since lane lanegate (sc-hz-brake-dont-swerve:cb563b2d): «outOfLane», the car came to rest where
+  // the tick would have come but outside the lane the task names. Its own drives and sentences are pinned in
+  // scenario/__tests__/halt-gate-rests-in-its-lane.test.ts; here only the shape the two tables share.
+  it("four reasons, on both tables, each row the head of its debrief line", () => {
+    expect(Object.keys(HALT_VOIDED_ROW_BG)).toEqual(["touched", "outOfLane", "crashRest", "passedUnhalted"]);
+    expect(Object.keys(HALT_VOIDED_DEBRIEF_BG)).toEqual(["touched", "outOfLane", "crashRest", "passedUnhalted"]);
+    const crashRow = HALT_VOIDED_ROW_BG.crashRest;
+    expect(HALT_VOIDED_DEBRIEF_BG.crashRest.startsWith(crashRow[0].toLowerCase() + crashRow.slice(1))).toBe(true);
+    const outRow = HALT_VOIDED_ROW_BG.outOfLane;
+    expect(HALT_VOIDED_DEBRIEF_BG.outOfLane.startsWith(outRow[0].toLowerCase() + outRow.slice(1))).toBe(true);
+    const passRow = HALT_VOIDED_ROW_BG.passedUnhalted;
+    expect(HALT_VOIDED_DEBRIEF_BG.passedUnhalted.startsWith(passRow[0].toLowerCase() + passRow.slice(1))).toBe(true);
     expect(HALT_VOIDED_ROW_BG.touched).toBe(VOID_ROW);
     expect(`Задачата «${STOP_TASK}» ${HALT_VOIDED_DEBRIEF_BG.touched}`).toBe(VOID_DEBRIEF);
     // The debrief's first sentence IS the row, lower-cased after «Задачата «…»».

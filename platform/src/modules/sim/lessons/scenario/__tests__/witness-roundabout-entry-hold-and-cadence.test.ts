@@ -116,9 +116,18 @@ const NOSE_ON_WALL_Y = -Math.sqrt(ISLAND_WALL_R ** 2 - X_LANE ** 2) - PLAYER_HAL
 
 /** The authored approach + yield wait, then w69 mobile-right's act: straight on into the island. */
 function neverTurnsScript(): DriveScript {
+  // The shadow's yield wait is its first braked pause; the act rolls on from
+  // where that wait stood. (Until 2026-10-12 the wait was 9 s at y = −27.5,
+  // 11 m past the give-way bar; since catalogue-demo-curvature:dae908c7 the
+  // demo waits with its nose 0.8 m short of the bar — traces/ringMini
+  // MINI_BAR_STOP_Y — so the act's run to the wall starts there.)
   const shadow = scRoundaboutEntryShadowScript().steps;
-  const waitIdx = shadow.findIndex((s) => s.kind === "pause" && s.sec === 9.0);
-  if (waitIdx < 0) throw new Error("neverTurnsScript: the shadow's 9 s yield wait moved");
+  const waitIdx = shadow.findIndex((s) => s.kind === "pause" && s.brake === true && s.sec >= 5);
+  if (waitIdx < 0) throw new Error("neverTurnsScript: the shadow's yield wait moved");
+  const stopStep = shadow.slice(0, waitIdx).reverse().find((s) => s.kind === "drive");
+  if (stopStep === undefined || stopStep.kind !== "drive") throw new Error("neverTurnsScript: no drive before the wait");
+  const stop = stopStep.points[stopStep.points.length - 1];
+  if (Math.abs(stop[0] - X_LANE) > 1e-6) throw new Error("neverTurnsScript: the shadow does not wait on X_LANE");
   return {
     steps: [
       ...shadow.slice(0, waitIdx + 1),
@@ -126,7 +135,7 @@ function neverTurnsScript(): DriveScript {
       {
         kind: "drive",
         points: [
-          [X_LANE, -27.5],
+          [X_LANE, stop[1]],
           [X_LANE, NOSE_ON_WALL_Y],
         ],
         targetKmh: 14,

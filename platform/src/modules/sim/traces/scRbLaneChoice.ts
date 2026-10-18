@@ -14,83 +14,90 @@
  * Geometry pinned to content/world/rb-2lane-v1.json: ring centerline R = 26
  * around (0, 0), CCW (s → e → n → w); ring LANE centres r = 30.06 (laneId 0,
  * outer) and r = 21.94 (laneId 1, inner); south-arm inbound lane centres
- * x = 12.19 (curb) and x = 4.06 (inner); ring limit 30, arms 50. This drill
- * takes the THIRD (west) exit — the one the arrows reserve for the inner lane.
+ * x = 12.19 (curb) and x = 4.06 (inner); the give-way bar of the south mouth
+ * painted at y = −51.85; ring limit 30, arms 50. This drill takes the THIRD
+ * (west) exit — the one the arrows reserve for the inner lane.
+ *
+ * EVERY PATH HERE IS ONE THE PRODUCT CAR CAN DRIVE
+ * (catalogue-demo-curvature:dae908c7). Until 2026-10-11 the three drives were
+ * typed in as waypoints — the ring as 10° chords, the entry as four corners,
+ * the exit as a pivot: the shadow and mistake 1 left the outer lane at φ 245
+ * already ON the west arm's kerb-lane line and turned the remaining 65° in one
+ * vertex (1.11 m of «radius» against a car whose tightest body-centre circle
+ * is 3.955 m), and mistake 2 cut out of the inner lane on two corners (+52°,
+ * +10°; 1.96 m). Where two drive steps met the ghost skipped up to 2.6 m of
+ * ring in one frame. The drives are now cut from one continuous line each,
+ * built with ./ringDrive: curvature only ever ramps, the tightest radius the
+ * correct drive and mistake 1 ask for is the exit's 9 m, and the tightest any
+ * of the three asks for is mistake 2's 6 m cut (the product car's limit is
+ * 3.955 m kinematic, ≈ 4.17 m physics; the family floor is 4.6 m —
+ * traces/drivablePath.ts DRIVABLE_MIN_CENTRE_RADIUS_M). Pins:
+ * traces/__tests__/ring-demos-drivable.test.ts.
  *
  * FIVE ENVELOPES DECIDE EVERY NUMBER BELOW — all five MEASURED on this
- * district, none guessed:
+ * district through the live rung chain, none guessed (the sweeps are pinned in
+ * the drivability test):
  *
  *  · THE LEFT INDICATOR IS NOT DECORATION, IT IS THE ONLY WAY THE INNER LANE
  *    IS LEGAL — twice over. чл. 25 demands the far-exit lane be announced; and
  *    NOT_KEEPING_RIGHT (the engine's чл. 15 detector) grades ANY sustained
  *    non-rightmost lane, exempting exactly one thing: `indicator === "left"`.
- *    Measured: a silent inner-lane lap convicts NOT_KEEPING_RIGHT at t = 12.6
- *    (keepRightSustainSec = 12). Law and detector agree; the shadow signals.
+ *    Law and detector agree; the shadow signals.
  *
- *  · THE YIELD LINE IS AT y = −35.5, AND BOTH WALLS ARE MEASURED. It must sit
- *    INSIDE the roundabout tracker's decision zone (R + ROUNDABOUT_ENTRY_
- *    MARGIN_M = 38 m from the centre) or the wait earns nothing — and far
- *    enough out that the circulator sweeping the mouth at r = 30.06 does not
- *    trip STANDSTILL_GAP_TOO_CLOSE on a car standing at the line. On this
- *    R = 26 ring those two walls are ~7 m apart, and the sweep found the
- *    window exactly: y = −34 convicts STANDSTILL_GAP_TOO_CLOSE (measured, min
- *    separation 4.41 m); y = −37 needs a longer wait to stay innocent;
- *    y = −35.5 is clean across the whole wait band with 5.94 m of clearance.
+ *  · WHERE THE CAR WAITS: with its nose 0.8 m short of the painted give-way
+ *    bar (centre y = −54.67) — where the product draws the student's own
+ *    «Карай до линията за пропускане» gate (./ringMini STOP_NOSE_BEFORE_BAR_M)
+ *    and inside the give-way watch, which since B15 is armed at the paint. The
+ *    old demos waited at y = −35.5: 16 m past the bar, the nose half a metre
+ *    inside the circulatory carriageway, 5.9 m from the outer-lane car
+ *    sweeping by — a stance the lesson's own instruction 3 does not teach.
  *
- *  · THE WAIT IS 15 s AND IT IS CENTRED IN A MEASURED WINDOW. At y = −35.5 the
- *    sweep graded: wait 13 ⇒ FAILED_TO_YIELD (the car is still in the left
- *    half-plane as the chord commits), wait 14/15/16 ⇒ ZERO violations +
- *    YIELDED_TO_PRIORITY. 15 is the centre — ~1 s of margin either way.
- *    (RE-MEASURED 2026-10-05, after the founder ruling «bill forced braking»
- *    took presence out of the entry conviction: the ENTRY is no longer billed
- *    at any wait unless the outer-lane car has to brake for it or is touched.
- *    A wait of 11–13 s still fails the drive — he comes in ahead of that car
- *    and then crosses its lane at the exit, which the lane-change grading
- *    bills — and still earns no yield commendation. 14–16 s is unchanged.)
+ *  · THE WAITS. The shadow's 15 s sits in a measured clean window of 10 s
+ *    and up (WAIT_WINDOW); mistake 1's and mistake 2's are their own
+ *    (M1_WAIT_SEC, M2_WAIT_SEC — each says what decides it).
  *
- *  · THE CAR PACE 4.0 m/s IS AN ANGULAR CHOICE, NOT A SPEED ONE. The sibling
- *    rb-mini drills all run 2.9 m/s; this ring is bigger and, more to the
- *    point, this is the only drill where the player must OVERTAKE the staged
- *    car and then cross its lane. 4.0 m/s on r = 30.06 is 7.63 °/s; the player
- *    at 12 km/h on r = 21.94 is 8.70 °/s. The 1.07 °/s the inner lane buys is
- *    what carries the driver clear of the outer lane before the spiral — which
- *    is precisely why the inner lane IS the far-exit lane. Measured: the
- *    shadow's closest approach to the car after the mouth is 5.94 m.
+ *  · THE CAR PACE 4.0 m/s IS AN ANGULAR CHOICE, NOT A SPEED ONE (the
+ *    template). 4.0 m/s on r = 30.06 is 7.63 °/s; the driver at 12 km/h on
+ *    r = 21.94 is 8.70 °/s. The 1.07 °/s the inner lane buys is what carries
+ *    the driver clear of the outer lane before the lane change — which is
+ *    precisely why the inner lane IS the far-exit lane.
  *
  *  · THE RING PACE IS 12 km/h AND THE TURN DETECTOR IS SLACK HERE. It fires at
  *    |Σ heading deltas| > 55° over a sliding 3 s window inside a junction area,
- *    and the whole ring is junction area (four mouths, ≤ 20 m from every ring
- *    point). At 12 km/h on r = 21.94 the window carries 26° — half the wall.
- *    That slack is what lets the EXIT's deliberate ~62° break register as one
- *    clean turnStarted instead of drowning in the ring's own curvature.
+ *    and the whole ring is junction area. At 12 km/h on r = 21.94 the window
+ *    carries 26°. The entries turn 45.7° (curb) and 47.8° (inner) to the right
+ *    and are not turns; the correct exit is a signalled turn; mistake 2's cut
+ *    is the only unsignalled one (see M2_PEEL_PHI_DEG).
  *
- * WHY MISTAKE 2 GRADES FIVE CODES AND NOT THE TWO THE BACKLOG GUESSED. The
- * brief predicted „COLLISION + TURN_WITHOUT_INDICATOR". The production stack
- * disagrees, and doc 72 RB-04 predicted the disagreement verbatim — „grading
- * then falls to existing lane-change + priority vocabulary". Cutting straight
- * out of the inner lane across a circulating car is not one fault, it is чл. 25
- * broken four ways in one movement of the wheel, and the engine bills each:
- * the maneuver is unannounced (TURN_WITHOUT_INDICATOR + LANE_CHANGE_WITHOUT_
- * INDICATOR), unchecked (LANE_CHANGE_WITHOUT_MIRROR_CHECK), and taken across a
- * vehicle with priority (FAILED_TO_YIELD, from the uncontrolled-junction
- * tracker at the west mouth) — and then the two cars touch (COLLISION, emitted
- * by the RoundaboutEntryRunner's OWN contact branch at a measured 1.82 m, not
- * an authored beat). Every code is earned; none is authored; the card copy
- * carries all five as the one act they are. Attempts to suppress the
- * lane-change pair were measured and rejected: slowing the peel under
- * laneChangeMinSpeedKmh (10) also drops the collision AND the turn (measured at
- * 9 km/h: only FAILED_TO_YIELD survives, separation 4.17 m), which would buy
- * the backlog's code list by deleting the crash the lesson exists to show.
+ * WHY MISTAKE 2 GRADES FIVE CODES. Cutting straight out of the inner lane
+ * across a circulating car is not one fault, it is чл. 25 broken four ways in
+ * one movement of the wheel, and the engine bills each: the manoeuvre is
+ * unannounced (TURN_WITHOUT_INDICATOR + LANE_CHANGE_WITHOUT_INDICATOR),
+ * unchecked (LANE_CHANGE_WITHOUT_MIRROR_CHECK), and taken across a vehicle with
+ * priority (FAILED_TO_YIELD, from the uncontrolled-junction tracker at the west
+ * mouth) — and then the two cars touch (COLLISION, emitted by the
+ * RoundaboutEntryRunner's OWN contact branch, not an authored beat). Every code
+ * is earned; none is authored; the card copy carries all five as the one act
+ * they are.
  */
 
 import type { StagedEventSpec } from "../contracts";
 import { SC_RB_LANE_CHOICE } from "../lessons/scenario/templates-roundabout";
+import { CHASSIS_HALF_EXTENTS } from "../vehicle";
 import {
   recordScriptedDrive,
   type DriveScript,
   type RecordedDrive,
   type RecordScriptedDriveOptions,
 } from "./recorder";
+import {
+  ringPose,
+  RingPathBuilder,
+  type CurvatureStretch,
+  type RingExitOptions,
+  type RingPath,
+} from "./ringDrive";
+import { STOP_NOSE_BEFORE_BAR_M } from "./ringMini";
 
 export const SC_RB_LANE_CHOICE_ID = "sc-rb-lane-choice";
 
@@ -106,59 +113,122 @@ const ARM_INNER_X = 4.06;
  *  so the curb lane is y = +12.19 and the inner one y = +4.06. */
 const WEST_CURB_Y = 12.19;
 const WEST_INNER_Y = 4.06;
+/** The south spawns (rb2-spawn-south-inner / -outer). */
+const SPAWN_Y = -101;
+/** Where the approach comes off the arm's pace. */
+const Y_SLOW = -75;
 
-/** The yield line — see the header's two-wall measurement. */
-const HOLD_Y = -35.5;
-/** The wait at the line, seconds — the centre of the measured clean window. */
+/** The М8 give-way bar across the south arm — the district's own paint
+ *  (asserted against the painter in the drivability test). */
+const GIVE_WAY_BAR_Y = -51.85;
+/** Where a yielding demo's centre rests: nose 0.8 m short of the bar. */
+const HOLD_Y = GIVE_WAY_BAR_Y - STOP_NOSE_BEFORE_BAR_M - CHASSIS_HALF_EXTENTS.z;
+/**
+ * The wait at the line, s. From rest at the bar the outer-lane car is met
+ * coming round from the west node; the driver lets it cross the mouth and
+ * moves off behind it. Centre of the measured clean window
+ * (WAIT_WINDOW in traces/__tests__/ring-demos-drivable.test.ts).
+ */
 const WAIT_SEC = 15;
 /** Ring pace, km/h (the shadow + mistake 1). */
 const RING_KMH = 12;
+/** Entry pace, km/h: from rest at the bar, across the outer ring lane, onto the ring. */
+const ENTRY_KMH = 15;
 
-/** Ring point at circulation angle φ (degrees from the SOUTH node, CCW through
- * EAST — φ 90 = east, 180 = north, 270 = west) on a given lane radius. */
-function ring(phiDeg: number, radius: number): [number, number] {
-  const a = (phiDeg * Math.PI) / 180;
-  return [radius * Math.sin(a), -radius * Math.cos(a)];
-}
-
-/** Sampled ring run φ0 → φ1 (CCW) at a fixed lane radius. */
-function ringRun(phi0: number, phi1: number, radius: number, stepDeg = 10): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let p = phi0; p <= phi1 + 1e-9; p += stepDeg) out.push(ring(p, radius));
-  return out;
-}
-
-/**
- * A SMOOTH radius ramp r0 → r1 across φ0 → φ1 (smoothstep easing, 5° samples) —
- * the lane change, on a circle. It is not a nicety: a naive two-point cross
- * (ring lane → ring lane) puts a ~50° heading break in the middle of the arc,
- * and the turn detector reads that as a spurious LEFT turn under the right
- * indicator (measured: TURN_WITHOUT_INDICATOR at the spiral joint). The
- * smoothstep keeps every per-waypoint delta under 12° so the only turnStarted
- * of the whole drill is the exit.
- */
-function spiral(phi0: number, phi1: number, r0: number, r1: number, stepDeg = 5): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let p = phi0; p <= phi1 + 1e-9; p += stepDeg) {
-    const u = (p - phi0) / (phi1 - phi0);
-    const s = u * u * (3 - 2 * u);
-    out.push(ring(p, r0 + (r1 - r0) * s));
-  }
-  return out;
+/** The dials a pin may sweep (absent = the authored drive). */
+export interface RbLaneChoiceDials {
+  /** Every demo: the wait at the line, s. */
+  waitSec?: number;
+  /** Shadow / mistake 1: the ring pace, км/ч. */
+  ringKmh?: number;
+  /** Mistake 2: the ring pace, км/ч. */
+  m2RingKmh?: number;
+  /** Mistake 2: the cut's pace, км/ч. */
+  m2PeelKmh?: number;
+  /** Mistake 2: the cut's shape (see M2_PEEL_PHI_DEG). */
+  m2PeelPhiDeg?: number;
+  m2CutHeadingDeg?: number;
+  m2CutChordM?: number;
 }
 
 /**
- * The shared approach down the south arm to REST on the yield line. `laneX`
- * picks the approach lane — and that single argument is the whole difference
- * between the shadow and mistake 1: the arrows say the third exit belongs to
- * the inner lane (x = 4.06), and mistake 1 takes the curb lane (x = 12.19)
- * anyway. Arriving at rest is what keeps the wait innocent (see the header).
+ * The entry onto a ring lane from the arm lane that feeds it: straight on from
+ * the bar, a right turn on a 12 m radius (wound over 4 m), a short chord and
+ * the wheel wound left over 6 m onto the lane's own circle, ON it at φ = 50°.
+ * 47.8° of right turn onto the inner lane, 45.7° onto the outer: under the
+ * turn detector's 55°, so neither is a turn.
  */
-function approachSteps(laneX: number): DriveScript["steps"] {
+const ENTRY_SHAPE = { landPhiDeg: 50, turnRadiusM: 12, rampInM: 4, rampOutM: 4, joinRampM: 6 } as const;
+
+/**
+ * The exit from the OUTER ring lane onto the west arm's curb lane: the wheel
+ * comes off the ring at φ = 232° (38° of ring before the west arm's axis), a
+ * chord, and a right turn on a 9 m radius (wound over 2 m) that ends on the
+ * lane's centre, y = +12.19, headed west — 2.7 m inside the mouth's kerb at
+ * its closest (pinned). The pivot it replaces turned the same 65° at φ 245.
+ * The wheel goes from the ring's left lock to the exit's right one over 4 m
+ * of road (1.2 s at the ring pace): the swing the rig's careful drive made
+ * here in one arc (rbExitDrives.ts: φ 233, ρ 14.8 m, no easing at all).
+ */
+const EXIT_PEEL_PHI_DEG = 232;
+const EXIT_SHAPE: Omit<RingExitOptions, "ringR"> = {
+  peelPhiDeg: EXIT_PEEL_PHI_DEG,
+  exitHeadingDeg: 270,
+  laneOffsetM: WEST_CURB_Y,
+  turnRadiusM: 9,
+  rampInM: 2,
+  rampOutM: 2,
+  joinRampM: 2,
+};
+
+/**
+ * THE LANE CHANGE, on a circle: inner → outer across φ 186° → 232° — the
+ * quintic radius ramp of ./ringDrive (`ringShiftTo`), so the car leaves the
+ * inner circle and joins the outer one with heading AND curvature continuous,
+ * and the wheel comes off the ring the moment it is on the outer lane.
+ * 46° of ring for 8.12 m of lateral travel; the car straddles the lane line
+ * (|laneOffsetM| > 3.25) for under a second (pinned) — far under
+ * laneKeepSustainSec (3 s).
+ *
+ * WHY IT STARTS AT φ 186° AND NOT AT THE AXIS. The engine grades a lane change
+ * only when the lane id flips ≥ laneChangeJointGraceSec (1.5 s) after the
+ * locator has handed the car from one ring edge to the next, and the ring's
+ * edges meet at the north node: a car on the inner lane is handed from
+ * rb2-e-ring-en to rb2-e-ring-nw ≈ 16° past it (EDGE_SWITCH_MARGIN_M is 4 m
+ * and the inner lane rides 4.06 m off the edge's line). A change begun at
+ * φ 178° flipped 1.5 s after that hand-over and its praise was dropped as a
+ * joint artefact (measured); begun at 186° the flip lands ≈ 2 s after it.
+ *
+ * WHERE THE RIGHT INDICATOR GOES ON: φ = 176°, as the car passes the north
+ * arm's OUTBOUND lanes (they leave the ring between φ 152° and 171°): the exit
+ * before ours is behind us, so the lever can no longer be read as «I am
+ * leaving here». The mirror look goes with it; the radius starts to open
+ * 10° (1.2 s) later.
+ */
+const SIGNAL_PHI_DEG = 176;
+const CHANGE_FROM_PHI_DEG = 186;
+
+/** Spawn → REST before the bar, in the lane `laneX`. */
+function toLine(laneX: number): RingPathBuilder {
+  return new RingPathBuilder({ x: laneX, y: SPAWN_Y, headingDeg: 0 })
+    .straightToY(Y_SLOW)
+    .mark("slow")
+    .straightToY(HOLD_Y)
+    .mark("line");
+}
+
+/**
+ * The shared approach down the south arm to REST before the bar. The lane is
+ * the whole difference between the shadow and mistake 1: the arrows say the
+ * third exit belongs to the inner lane (x = 4.06), and mistake 1 takes the
+ * curb lane (x = 12.19) anyway. Arriving at rest is what keeps the wait
+ * innocent.
+ */
+function approachSteps(p: RingPath): DriveScript["steps"] {
   return [
     { kind: "glance", mirror: "rear" },
-    { kind: "drive", points: [[laneX, -101], [laneX, -70], [laneX, -45]], targetKmh: 45, stopAtEnd: false },
-    { kind: "drive", points: [[laneX, -45], [laneX, HOLD_Y]], targetKmh: 14 },
+    { kind: "drive", points: p.between("start", "slow"), targetKmh: 45, stopAtEnd: false },
+    { kind: "drive", points: p.between("slow", "line", { stop: true }), targetKmh: 16 },
   ];
 }
 
@@ -166,7 +236,26 @@ function approachSteps(laneX: number): DriveScript["steps"] {
 // The correct demonstration (shadow)
 // ---------------------------------------------------------------------------
 
-export function scRbLaneChoiceShadowScript(): DriveScript {
+function buildShadowPath(): RingPath {
+  return toLine(ARM_INNER_X)
+    .enterRing({ ...ENTRY_SHAPE, ringR: LANE_INNER_R })
+    .mark("ring")
+    .ringTo(SIGNAL_PHI_DEG)
+    .mark("signal")
+    .ringTo(CHANGE_FROM_PHI_DEG)
+    .ringShiftTo(EXIT_PEEL_PHI_DEG, LANE_OUTER_R)
+    .exitRing(EXIT_SHAPE)
+    .mark("lane")
+    .straightToX(-72)
+    .mark("end")
+    .build();
+}
+let shadowPath: RingPath | null = null;
+const SHADOW = (): RingPath => (shadowPath ??= buildShadowPath());
+
+export function scRbLaneChoiceShadowScript(dials: RbLaneChoiceDials = {}): DriveScript {
+  const p = SHADOW();
+  const ringKmh = dials.ringKmh ?? RING_KMH;
   return {
     steps: [
       {
@@ -177,7 +266,7 @@ export function scRbLaneChoiceShadowScript(): DriveScript {
       { kind: "glance", mirror: "left" },
       // The far-exit announcement — and the чл. 15 exemption (see the header).
       { kind: "indicator", setting: "left" },
-      ...approachSteps(ARM_INNER_X),
+      ...approachSteps(p),
       {
         kind: "annotation",
         textBg: "Ляв мигач за далечния изход. На линията спираме: в кръга има кола по външната лента и тя е с предимство.",
@@ -185,55 +274,49 @@ export function scRbLaneChoiceShadowScript(): DriveScript {
       { kind: "glance", mirror: "left" },
       {
         // The wait: the circulator sweeps the mouth and out onto the east arc.
-        // Stopped, so the left half-plane is irrelevant (the tracker needs
-        // > RHR_MOVING_KMH = 3) — and at rest the drill's own yield is honest.
+        // Stopped, so the left half-plane is irrelevant — and at rest the
+        // drill's own yield is honest.
         kind: "pause",
-        sec: WAIT_SEC,
+        sec: dials.waitSec ?? WAIT_SEC,
         brake: true,
       },
       { kind: "annotation", textBg: "Мина. Влизаме след нея — но във ВЪТРЕШНАТА лента, не след нея по външната." },
+      { kind: "glance", mirror: "left" },
       {
-        // The entry chord onto the INNER lane: a flat NE line from the mouth to
-        // ring(40), sweeping the azimuth past the tracker's RB_ON_RING_DEG (35°)
-        // stand-down with ~40° of total heading change — under the 55° turn wall,
-        // so it is both quick to ring priority AND turnStarted-free.
+        // The entry onto the INNER lane: over the bar, across the outer ring
+        // lane the car has just left, and onto r = 21.94 at φ = 50°.
         kind: "drive",
-        points: [[ARM_INNER_X, HOLD_Y], [5.5, -30], [7.5, -26], ring(30, LANE_INNER_R), ring(40, LANE_INNER_R)],
-        targetKmh: 15,
+        points: p.between("line", "ring"),
+        targetKmh: ENTRY_KMH,
         stopAtEnd: false,
       },
       {
         // The ring PROPER, on the inner lane, past the first exit (east, φ = 90)
-        // and up to the second (north, φ = 180) — neither is ours, and the left
+        // and the second (north, φ = 180) — neither is ours, and the left
         // indicator says so the whole way.
         kind: "drive",
-        points: ringRun(40, 180, LANE_INNER_R),
-        targetKmh: RING_KMH,
+        points: p.between("ring", "signal"),
+        targetKmh: ringKmh,
         stopAtEnd: false,
       },
       {
         kind: "annotation",
-        textBg: "Северният подход остана зад нас — последният преди нашия. Сега огледало, десен мигач и плавно навън.",
+        // WAS «Северният подход остана зад нас…», shown at the north axis: the
+        // north ARM's entry lanes (φ 189°–208°) are still ahead of the car
+        // there. Its EXIT lanes (φ 152°–171°) are behind it — and the exit is
+        // what the sentence is about.
+        textBg: "Северният изход остана зад нас — последният преди нашия. Сега огледало, десен мигач и плавно навън.",
       },
       // The exit is a LANE CHANGE first and a turn second. Announced and checked
       // in that order, it earns SAFE_LANE_CHANGE instead of mistake 2's cascade.
       { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "right" },
       {
-        // Inner → outer across φ 185…235 (the smoothstep spiral), then the outer
-        // lane to the peel at φ = 245 and out onto the west arm's CURB lane.
-        // 50° of ring for 8.13 m of lateral travel keeps the straddle band
-        // (|laneOffsetM| > 3.25) under laneKeepSustainSec (3 s) — measured 2.8 s
-        // at the joint, the drill's tightest innocence margin.
+        // Inner → outer across φ 186…232, then off the ring and onto the west
+        // arm's CURB lane.
         kind: "drive",
-        points: [
-          ...spiral(185, 235, LANE_INNER_R, LANE_OUTER_R),
-          ...ringRun(240, 245, LANE_OUTER_R, 5),
-          [-40, WEST_CURB_Y],
-          [-56, WEST_CURB_Y],
-          [-72, WEST_CURB_Y],
-        ],
-        targetKmh: RING_KMH,
+        points: p.between("signal", "end", { stop: true }),
+        targetKmh: ringKmh,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 1.5, brake: true },
@@ -258,55 +341,86 @@ export function scRbLaneChoiceShadowScript(): DriveScript {
  * staying 0.65 m clear of the laneId flip (the locator's hysteresis hands the
  * car to lane 1 below r ≈ 25.65). So it is a car RIDING THE LINE: graded
  * POOR_LANE_KEEPING, never mistaken for a lane change, and with the hero's own
- * half-width (0.95 m) its left side is genuinely in the other lane.
+ * half-width (0.85 m) its left side is genuinely in the other lane.
  *
  * That is what „обикаляне по външната до далечния изход" looks like from
  * inside the cabin, and it is why it is the graded fault rather than a
  * bookkeeping one: a driver in the exit lane who is not exiting spends the
  * whole ring fighting a lane that peels away at every mouth, and the line is
- * where that fight shows. Held from φ = 70 to φ = 190 — across BOTH mouths the
- * driver should not be at — the episode grades ONCE (measured t = 33.6).
+ * where that fight shows. Held across BOTH mouths the driver should not be at,
+ * the episode grades ONCE.
  */
 const DRAG_R = 26.3;
+/**
+ * Mistake 1's wait at the line, s. From the CURB lane the outer-lane car
+ * passes the mouth 25.97 m from the driver — on the edge of the 26 m reach
+ * at which the product counts a circulating car as a conflict for the driver
+ * at all (traffic/system.ts CIRCULATING_REACH_M) — so the entry is read as a
+ * yield only when he follows it in promptly: measured, the commendation is
+ * earned for waits of 11–12 s and not for 10 or ≥ 12.5 (M1_WAIT_WINDOW in the
+ * drivability test). 11.5 puts him 17 m (4 s) behind the car he let by.
+ */
+const M1_WAIT_SEC = 11.5;
+/**
+ * The sag onto the line: φ 62° → 107° (the quintic ramp — 3.76 m in over 45°
+ * of ring), the hold to φ 200°, and back out to the lane's centre by the
+ * exit's peel (φ 232°). It starts 12° after the entry lands: the entry is
+ * itself 45.7° of RIGHT sweep, and the inward drift is not started inside the
+ * same 3 s window. The hold runs 20° past the north mouth's axis so that the
+ * line is ridden for the 15 s the lesson's pins read
+ * (lessons/scenario/__tests__/rb-lane-choice-exit-handover.test.ts) — measured
+ * on the live chain, every rung: 14.57 s with the hold to φ 190°, 15.73 s to φ 200°.
+ */
+const DRAG_FROM_PHI_DEG = 62;
+const DRAG_BY_PHI_DEG = 107;
+const DRAG_HOLD_TO_PHI_DEG = 200;
 
-export function scRbLaneChoiceMistakeOuterLaneScript(): DriveScript {
+function buildOuterLanePath(): RingPath {
+  return toLine(ARM_CURB_X)
+    .enterRing({ ...ENTRY_SHAPE, ringR: LANE_OUTER_R })
+    .mark("ring")
+    .ringTo(DRAG_FROM_PHI_DEG)
+    .mark("sag")
+    .ringShiftTo(DRAG_BY_PHI_DEG, DRAG_R)
+    .ringTo(DRAG_HOLD_TO_PHI_DEG)
+    .mark("signal")
+    .ringShiftTo(EXIT_PEEL_PHI_DEG, LANE_OUTER_R)
+    .exitRing(EXIT_SHAPE)
+    .mark("lane")
+    .straightToX(-72)
+    .mark("end")
+    .build();
+}
+let outerLanePath: RingPath | null = null;
+const OUTER_LANE = (): RingPath => (outerLanePath ??= buildOuterLanePath());
+
+export function scRbLaneChoiceMistakeOuterLaneScript(dials: RbLaneChoiceDials = {}): DriveScript {
+  const p = OUTER_LANE();
+  const ringKmh = dials.ringKmh ?? RING_KMH;
   return {
     steps: [
       {
         kind: "annotation",
         textBg: "Грешката започва преди кръга: изходът е третият, а колата заема ВЪНШНАТА лента — лентата на първите изходи.",
       },
-      ...approachSteps(ARM_CURB_X),
+      ...approachSteps(p),
       // No left indicator: the outer lane is laneId 0, so чл. 15 has nothing to
       // say — this driver's fault is the CHOICE, and the line it produces.
       { kind: "glance", mirror: "left" },
-      { kind: "pause", sec: WAIT_SEC, brake: true },
+      { kind: "pause", sec: dials.waitSec ?? M1_WAIT_SEC, brake: true },
       { kind: "annotation", textBg: "Входът е изряден — пропуска циркулиращата и влиза чисто. По външната лента." },
       {
-        // The curb lane's entry chord, and its waypoints are MONOTONE by
-        // measurement, not by eye: the outer ring lane passes within a metre of
-        // this arm lane (r = 30.06 vs x = 12.19), so a chord borrowed from the
-        // inner-lane drives overshoots ring(30) and swings back — a −52°/+81°
-        // zigzag the turn detector reads as a real turn (measured: spurious
-        // turnStarted at t = 29.4, φ = 50, indicator off). These four points
-        // rise smoothly onto the arc: Σ = +46° over the whole chord, under the
-        // 55° wall.
+        // The curb lane's entry, onto the OUTER ring lane at φ = 50°.
         kind: "drive",
-        points: [[ARM_CURB_X, HOLD_Y], [12.8, -31.5], [13.6, -28.5], ring(30, LANE_OUTER_R), ring(40, LANE_OUTER_R)],
-        targetKmh: 15,
+        points: p.between("line", "ring"),
+        targetKmh: ENTRY_KMH,
         stopAtEnd: false,
       },
       {
-        // Settle on the outer lane proper for ~20° first. This is not padding:
-        // the entry chord is itself ~40° of RIGHT sweep, and starting the
-        // inward drift on top of it stacks the two inside the turn detector's
-        // 3 s window and fires a spurious turnStarted (measured: t = 29.4,
-        // φ = 50, indicator off ⇒ a TURN_WITHOUT_INDICATOR that has nothing to
-        // do with the taught fault). 20° at 12 km/h is ~3.1 s — exactly long
-        // enough for the chord to age out of the window.
+        // Settle on the outer lane proper first (see DRAG_FROM_PHI_DEG).
         kind: "drive",
-        points: ringRun(40, 60, LANE_OUTER_R, 10),
-        targetKmh: RING_KMH,
+        points: p.between("ring", "sag"),
+        targetKmh: ringKmh,
         stopAtEnd: false,
       },
       {
@@ -318,8 +432,8 @@ export function scRbLaneChoiceMistakeOuterLaneScript(): DriveScript {
         // (east φ = 90, north φ = 180) — the two exits this driver is not
         // taking, in the lane that exists to take them.
         kind: "drive",
-        points: [...spiral(65, 85, LANE_OUTER_R, DRAG_R, 5), ...ringRun(90, 190, DRAG_R)],
-        targetKmh: RING_KMH,
+        points: p.between("sag", "signal"),
+        targetKmh: ringKmh,
         stopAtEnd: false,
       },
       // The exit itself is done correctly — announced and checked. The ONE
@@ -328,14 +442,8 @@ export function scRbLaneChoiceMistakeOuterLaneScript(): DriveScript {
       { kind: "glance", mirror: "right" },
       {
         kind: "drive",
-        points: [
-          ...spiral(195, 225, DRAG_R, LANE_OUTER_R, 10),
-          ...ringRun(230, 245, LANE_OUTER_R, 5),
-          [-40, WEST_CURB_Y],
-          [-56, WEST_CURB_Y],
-          [-72, WEST_CURB_Y],
-        ],
-        targetKmh: RING_KMH,
+        points: p.between("signal", "end", { stop: true }),
+        targetKmh: ringKmh,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 1.5, brake: true },
@@ -353,35 +461,114 @@ export function scRbLaneChoiceMistakeOuterLaneScript(): DriveScript {
 // ---------------------------------------------------------------------------
 
 /**
- * THE RING PACE THAT PUTS THE CAR THERE. 13.3 km/h, not the shadow's 12, and
- * the 1.3 is the whole encounter: the staged circulator is a metronome from the
- * moment the player arms it (the sync is pinned out — see the template), so the
- * ONLY dial that decides where it stands when the driver reaches the west mouth
- * is how fast the driver got there. Measured at the same wait (15 s): 12.5 km/h
- * ⇒ the car is 5° past the exit and untouched (separation 5.94 m); 13.4 ⇒ the
- * driver arrives ahead of it and the uncontrolled-junction tracker convicts on
- * the wrong geometry; 13.3 ⇒ the car is 3° ahead in the outer lane at the peel,
- * exactly where a driver cutting straight out drives into its flank —
- * separation 1.82 m, the RoundaboutEntryRunner's own contact branch fires, and
- * the crash is the traffic system's, not a scripted beat.
+ * THE WAIT AND THE RING PACE THAT PUT THE CAR THERE. The staged circulator is
+ * a metronome from the moment the player arms it (the sync is pinned out — see
+ * the template), so the only dials that decide where it stands when the driver
+ * reaches the west mouth are when he moved off and how fast he went round.
+ * Two facts have to come out in this order, and both are the product's own:
+ *
+ *   1. the uncontrolled-junction tracker of the west mouth convicts
+ *      (FAILED_TO_YIELD, right-hand-rule) — he has been crossing the line of a
+ *      car coming from his right for 0.9 s and has not stopped;
+ *   2. then the two bodies touch (COLLISION — the car brakes, and is still
+ *      struck: it lost its whole 4 m/s to him, pinned).
+ *
+ * The window in which both land in that order is NARROW, and it is narrow in
+ * the product, not in the script: arrive 0.1 s earlier and the circulator
+ * (its own player guard) stops 3–4 m short of him — a forced stop, billed,
+ * but no crash; arrive 0.1 s later and he strikes it before the tracker's
+ * 0.9 s have run, and the crash comes first. Measured (wait × ring pace, the
+ * cut fixed): at a 10 s wait, 13.4–13.5 km/h — and 13.3 / 13.6 already fall
+ * out on either side (M2_RING_BAND in traces/__tests__/ring-demos-drivable
+ * .test.ts). The old demo's 13.3 (at a 15 s wait from y = −35.5) was the same
+ * knife-edge, measured the same way.
  */
-const M2_RING_KMH = 13.3;
+const M2_RING_KMH = 13.45;
+/** Mistake 2's wait at the line, s (see M2_RING_KMH). */
+const M2_WAIT_SEC = 10;
 
 /**
- * THE PEEL — a deliberate ~62° break out of the ring at φ = 252, and its shape
- * is arithmetic on the turn detector. The detector sums heading deltas over a
- * sliding 3 s window, and the ring is CONSTANTLY feeding it LEFT (negative)
- * deltas — at 13.3 km/h on r = 21.94 the window carries ≈ −29° of circulation
- * at any moment. So a single sharp break cannot clear the +55° wall; it takes
- * two consecutive RIGHT deltas (+52 then +10) close enough together to land in
- * one window. 14 km/h across the 6.9 m between them puts both inside 3 s:
- * turnStarted fires at t = 53.6 with the LEFT indicator still on ⇒
- * TURN_WITHOUT_INDICATOR. Slower and the turn never registers (measured 9 km/h:
- * no turnStarted at all).
+ * THE CUT — straight out of the inner lane, across the outer one, in the shape
+ * a driver who «just goes» actually drives: the wheel comes off the inner
+ * circle at φ = 238° (M2_PEEL_PHI_DEG), a firm right turn on a 6 m radius
+ * points the car WEST-SOUTH-WEST (heading 254°, M2_CUT_HEADING_DEG), it runs
+ * straight across the outer lane on that line for M2_CUT_CHORD_M, and only
+ * on the arm does it straighten up west (a 10 m radius). ≈ 60° of right turn
+ * inside 3 s with the LEFT indicator still on — what the turn detector calls a
+ * turn and the engine bills as TURN_WITHOUT_INDICATOR.
+ *
+ * WHY A STRAIGHT IN THE MIDDLE. The car it cuts across is graded by the
+ * uncontrolled-junction tracker of the west mouth (FAILED_TO_YIELD,
+ * right-hand-rule), which convicts once a car crossing his line from the right
+ * has been in view for 0.9 s (YIELD_CONVICT_SUSTAIN_SEC) while he keeps
+ * moving. A single arc from the ring to the arm (the first re-authoring:
+ * ringExitProgramme, 7 m) only points him across the car's line at the very
+ * end of the turn, so the contact came 0.5 s after the car came into view and
+ * the conviction — when it came at all — landed after the crash (measured).
+ * The straight is the stretch on which he is visibly crossing a lane with a
+ * car in it and does not stop: the conviction, then the contact. The old demo
+ * got the same order from two pivots (+52°, +10°) on a line no car can follow
+ * (1.96 m of «radius»).
  */
 const M2_PEEL_KMH = 14;
+const M2_PEEL_PHI_DEG = 238;
+const M2_CUT_HEADING_DEG = 254;
+const M2_CUT_CHORD_M = 3;
+const M2_CUT_RADIUS_M = 6;
+const M2_STRAIGHTEN_RADIUS_M = 10;
+const M2_CUT_RAMP_M = 1.5;
+const M2_JOIN_RAMP_M = 2;
+/** Where mistake 2's mid-ring caption is shown: past the north mouth. */
+const M2_PAST_NORTH_PHI_DEG = 185;
 
-export function scRbLaneChoiceMistakeExitAcrossScript(): DriveScript {
+/** The cut's curvature programme from the inner circle at `peelPhiDeg`. */
+function cutProgramme(peelPhiDeg: number, cutHeadingDeg: number, chordM: number): CurvatureStretch[] {
+  const ringHeadingDeg = ringPose(peelPhiDeg, LANE_INNER_R).headingDeg;
+  // The join ramp unwinds the ring's left curvature: half its length × 1/r.
+  const offRingDeg = ringHeadingDeg - ((M2_JOIN_RAMP_M / (2 * LANE_INNER_R)) * 180) / Math.PI;
+  const turn = (deltaDeg: number, radiusM: number): CurvatureStretch[] => {
+    const k = 1 / radiusM;
+    const holdM = (((((deltaDeg % 360) + 360) % 360) * Math.PI) / 180) / k - M2_CUT_RAMP_M;
+    if (!(holdM >= 0)) throw new Error(`sc-rb-lane-choice cut: ${deltaDeg}° on ${radiusM} m is less than its ramps`);
+    return [
+      { lenM: M2_CUT_RAMP_M, k0: 0, k1: k },
+      { lenM: holdM, k0: k, k1: k },
+      { lenM: M2_CUT_RAMP_M, k0: k, k1: 0 },
+    ];
+  };
+  return [
+    { lenM: M2_JOIN_RAMP_M, k0: -1 / LANE_INNER_R, k1: 0 },
+    ...turn(cutHeadingDeg - offRingDeg, M2_CUT_RADIUS_M),
+    { lenM: chordM, k0: 0, k1: 0 },
+    ...turn(270 - cutHeadingDeg, M2_STRAIGHTEN_RADIUS_M),
+  ];
+}
+
+function buildExitAcrossPath(
+  peelPhiDeg = M2_PEEL_PHI_DEG,
+  cutHeadingDeg = M2_CUT_HEADING_DEG,
+  chordM = M2_CUT_CHORD_M,
+): RingPath {
+  return toLine(ARM_INNER_X)
+    .enterRing({ ...ENTRY_SHAPE, ringR: LANE_INNER_R })
+    .mark("ring")
+    .ringTo(peelPhiDeg, { north: M2_PAST_NORTH_PHI_DEG })
+    .mark("peel")
+    .programme(cutProgramme(peelPhiDeg, cutHeadingDeg, chordM))
+    .mark("lane")
+    .straightToX(-40)
+    .mark("end")
+    .build();
+}
+let exitAcrossPath: RingPath | null = null;
+const EXIT_ACROSS = (): RingPath => (exitAcrossPath ??= buildExitAcrossPath());
+
+export function scRbLaneChoiceMistakeExitAcrossScript(dials: RbLaneChoiceDials = {}): DriveScript {
+  const p =
+    dials.m2PeelPhiDeg === undefined && dials.m2CutHeadingDeg === undefined && dials.m2CutChordM === undefined
+      ? EXIT_ACROSS()
+      : buildExitAcrossPath(dials.m2PeelPhiDeg, dials.m2CutHeadingDeg, dials.m2CutChordM);
+  const ringKmh = dials.m2RingKmh ?? M2_RING_KMH;
   return {
     steps: [
       {
@@ -390,32 +577,41 @@ export function scRbLaneChoiceMistakeExitAcrossScript(): DriveScript {
       },
       { kind: "glance", mirror: "left" },
       { kind: "indicator", setting: "left" },
-      ...approachSteps(ARM_INNER_X),
+      ...approachSteps(p),
       { kind: "glance", mirror: "left" },
-      { kind: "pause", sec: WAIT_SEC, brake: true },
+      { kind: "pause", sec: dials.waitSec ?? M2_WAIT_SEC, brake: true },
       {
         kind: "drive",
-        points: [[ARM_INNER_X, HOLD_Y], [5.5, -30], [7.5, -26], ring(30, LANE_INNER_R), ring(40, LANE_INNER_R)],
-        targetKmh: 15,
+        points: p.between("line", "ring"),
+        targetKmh: ENTRY_KMH,
         stopAtEnd: false,
       },
       {
+        // The inner lane past the east and the north mouths.
+        kind: "drive",
+        points: p.between("ring", "north"),
+        targetKmh: ringKmh,
+        stopAtEnd: false,
+      },
+      {
+        // Shown once both exits ARE behind the car (until 2026-10-11 it was
+        // shown on the ring's first metres, before either).
         kind: "annotation",
         textBg: "Вътрешната лента, два подминати изхода — дотук учебникарски. А отдясно, по външната, върви кола.",
       },
       {
-        // The ring on the inner lane, all the way to the third exit — no
-        // repositioning, no mirror, no right indicator. The left one is still on.
+        // On to the third exit — no repositioning, no mirror, no right
+        // indicator. The left one is still on.
         kind: "drive",
-        points: ringRun(40, 252, LANE_INNER_R, 8),
-        targetKmh: M2_RING_KMH,
+        points: p.between("north", "peel"),
+        targetKmh: ringKmh,
         stopAtEnd: false,
       },
       {
         // Straight out. Across the outer lane, across the car in it.
         kind: "drive",
-        points: [ring(252, LANE_INNER_R), [-26.2, 5.3], [-30.5, WEST_INNER_Y], [-40, WEST_INNER_Y]],
-        targetKmh: M2_PEEL_KMH,
+        points: p.between("peel", "end"),
+        targetKmh: dials.m2PeelKmh ?? M2_PEEL_KMH,
         stopAtEnd: false,
       },
       { kind: "pause", sec: 0.6, brake: true },
@@ -472,6 +668,7 @@ export const SC_RB_LANE_CHOICE_GEOMETRY = {
   ARM_INNER_X,
   WEST_CURB_Y,
   WEST_INNER_Y,
+  GIVE_WAY_BAR_Y,
   HOLD_Y,
   WAIT_SEC,
   DRAG_R,

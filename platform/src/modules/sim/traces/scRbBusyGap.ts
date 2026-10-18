@@ -102,111 +102,92 @@ import {
   type RecordedDrive,
   type RecordScriptedDriveOptions,
 } from "./recorder";
+import type { RingPath, RingPathBuilder } from "./ringDrive";
+import { MINI_ENTRY, MINI_ENTRY_FROM_MOUTH, miniExit, miniPathFromSpawn } from "./ringMini";
 
 export const SC_RB_BUSY_GAP_ID = "sc-rb-busy-gap";
 
-/** South-arm northbound lane center (2-lane arm, drawn lane 8.125 m). */
-const X_LANE = 4.06;
-/** Ring centerline radius (rb-mini-v1 meta.scenario). */
-const R = 18;
+/** Where the approach comes off the arm's pace. */
+const Y_SLOW = -60;
 /**
- * The ring pace — a STATION-KEEPING speed, and the one number this drill does not
- * share with its siblings. sc-roundabout-entry and sc-rb-circulate-priority both
- * circulate at 12 km/h; this one cannot, and the reason is that it is the only
- * ring drill that deliberately sits ~2.5 s BEHIND a car.
+ * Where this drill's car waits: centre y = −27.5, inside the mouth. NOT before
+ * the painted give-way bar (y = −35.725), where the family's other drills now
+ * wait — because this lesson grades its halt in a 3 m disc at (4.06, −26),
+ * capped at 6 km/h («Спри на линията за пропускане преди входа»,
+ * sc-rbg-yield-line), and a car that stops before the paint is 9.7 m outside
+ * that disc and can never collect it. The demo stops where the lesson's own
+ * task says «the line» is; the 9.7 m between that task and the paint is the
+ * lesson's, and is reported as such (doc 88, the curvring landing).
+ */
+const Y_LINE = -27.5;
+/**
+ * The ring pace — a STATION-KEEPING speed behind the platoon.
  *
  * Measured on rb-mini-v1: a staged circulator rides r ≈ 17.9 at cruise 2.9 m/s =
  * 9.27 °/s. The driver holds the ring centreline at r = 18, so 12 km/h is
- * 10.61 °/s — 1.34 °/s FASTER than the platoon. Over the ~10 s from the chord's
- * landing to the north exit that reels in ~13° of ring, and the driver rear-ends
- * the very car it correctly gave way to (COLLISION at t ≈ 32, measured, for every
- * launch phase up to φ = 32°). The siblings get away with 12 because their single
- * circulator is most of a lap ahead; here the whole point is to be right behind
- * it. 9.5 km/h = 8.40 °/s trails just under the platoon's own rate, so the gap
- * opens gently instead of closing — which is simply what following the car ahead
- * at ITS pace means. Both figures sit far under the 20.7 km/h turn-detector
- * ceiling: the ceiling is not what picks this number.
+ * 10.61 °/s — 1.34 °/s FASTER than the platoon — and he enters right behind
+ * its last car. 9.5 km/h = 8.40 °/s trails just under the platoon's own rate,
+ * so the gap opens gently instead of closing — which is simply what following
+ * the car ahead at ITS pace means. Both figures sit far under the 20.7 km/h
+ * turn-detector ceiling: the ceiling is not what picks this number.
  */
 const RING_KMH = 9.5;
+/**
+ * Where the right indicator goes on: φ = 112°, the first metre of ring past
+ * the far kerb of the east mouth (it spans φ 68°–112° at the ring's outer
+ * edge) — the first exit, which is not ours.
+ */
+const SIGNAL_PHI_DEG = 112;
 
-/** Ring point at circulation angle φ (degrees from the SOUTH node, CCW through
- * EAST — φ 90 = east, 180 = north, 270 = west): (R sin φ, −R cos φ). */
-function ring(phiDeg: number): [number, number] {
-  const a = (phiDeg * Math.PI) / 180;
-  return [R * Math.sin(a), -R * Math.cos(a)];
+/** The dials a pin may sweep (absent = the authored drive). */
+export interface RbBusyGapDials {
+  /** Shadow: the wait at the line, s. */
+  waitSec?: number;
+  /** Shadow: the ring pace, км/ч. */
+  ringKmh?: number;
+  /** Barge: its one speed, км/ч. */
+  bargeKmh?: number;
+  /** Short gap: the wait at the line, s. */
+  shortGapWaitSec?: number;
+  /** Short gap: how far into the entry the drive is cut, m (the contact). */
+  shortGapCutM?: number;
 }
 
-/** Sampled ring run φ0 → φ1 (CCW, 10° steps). */
-function ringRun(phi0: number, phi1: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let p = phi0; p <= phi1; p += 10) out.push(ring(p));
-  return out;
+/** Spawn → REST at the line in the mouth. */
+function toLine(): RingPathBuilder {
+  return miniPathFromSpawn().straightToY(Y_SLOW).mark("slow").straightToY(Y_LINE).mark("line");
 }
-
-/** The north-arm outbound lane (heading north, so the right-hand lane center is
- *  x = +4.06 — the same lane rbm-spawn-finish sits in at (4.06, 58)). */
-const EXIT_NORTH: Array<[number, number]> = [
-  [7.5, 19.0],
-  [5.5, 22.0],
-  [X_LANE, 26.0],
-  [X_LANE, 40.0],
-  [X_LANE, 58.0],
-];
 
 /**
- * The shared approach: roll down the south arm and come to REST on the yield
- * line at (4.06, −27.5). Arriving at rest is what the drill's own „изчакай на
- * линията" gate (≤ 6 km/h at y = −26) demands. (It used to be what kept the
- * wait innocent, too: under the presence grader any approach still rolling
- * above 3 км/ч inside 30 m of the ring was one 0.9 s sustain away from a
- * conviction. Since 2026-10-05 no approach is billed, rolling or not — only an
- * entry that makes a circulating car brake.)
+ * The correct drive's line: from the line, the family entry as it is taken
+ * from inside the mouth (./ringMini MINI_ENTRY_FROM_MOUTH — 8 m radius), the
+ * ring past the east mouth, the family north exit, and on to the finish.
  */
-function approachToLineSteps(): DriveScript["steps"] {
+function buildShadowPath(): RingPath {
+  return toLine()
+    .enterRing(MINI_ENTRY_FROM_MOUTH)
+    .mark("ring")
+    .ringTo(SIGNAL_PHI_DEG)
+    .mark("signal")
+    .exitRing(miniExit("north"))
+    .mark("lane")
+    .straightToY(58)
+    .mark("end")
+    .build();
+}
+let shadowPath: RingPath | null = null;
+const SHADOW = (): RingPath => (shadowPath ??= buildShadowPath());
+
+/**
+ * The shared approach: roll down the south arm and come to REST on the line at
+ * (4.06, −27.5). Arriving at rest is what the drill's own „спри на линията"
+ * gate (≤ 6 km/h within 3 m of y = −26) demands.
+ */
+function approachToLineSteps(p: RingPath): DriveScript["steps"] {
   return [
     { kind: "glance", mirror: "rear" },
-    { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60]], targetKmh: 40, stopAtEnd: false },
-    { kind: "drive", points: [[X_LANE, -60], [X_LANE, -40], [X_LANE, -27.5]], targetKmh: 16 },
-  ];
-}
-
-/**
- * The entry chord + the ring + the signalled north exit — the half of the drive
- * that is IDENTICAL in the shadow and in the barge demo, so that each demo
- * carries exactly ONE taught fault and never stacks a second on top.
- */
-function ringAndExitSteps(): DriveScript["steps"] {
-  return [
-    { kind: "glance", mirror: "left" },
-    {
-      // FLAT-CHORD entry (the innocent-entry envelope — see the header).
-      kind: "drive",
-      points: [[X_LANE, -27.5], [6.0, -23.0], [8.5, -18.5], [11.0, -15.0], ring(48), ring(55)],
-      targetKmh: 17,
-      stopAtEnd: false,
-    },
-    {
-      // The ring, flat and quiet, from the chord's landing past the east mouth
-      // (φ = 90) — the first exit, which is not ours.
-      kind: "drive",
-      points: ringRun(60, 100),
-      targetKmh: RING_KMH,
-      stopAtEnd: false,
-    },
-    { kind: "indicator", setting: "right" },
-    { kind: "glance", mirror: "right" },
-    {
-      // Ring to φ = 150° (the north peel-off point), then the gentle
-      // indicator-announced blend onto the north arm's outbound lane. The step
-      // opens at φ = 110, one ringRun stride past the previous step's φ = 100
-      // end, so the path stays C¹-smooth and no spurious turnStarted fires at
-      // the joint.
-      kind: "drive",
-      points: [...ringRun(110, 150), ...EXIT_NORTH],
-      targetKmh: RING_KMH,
-    },
-    { kind: "indicator", setting: "off" },
-    { kind: "pause", sec: 1.5, brake: true },
+    { kind: "drive", points: p.between("start", "slow"), targetKmh: 40, stopAtEnd: false },
+    { kind: "drive", points: p.between("slow", "line", { stop: true }), targetKmh: 16 },
   ];
 }
 
@@ -216,68 +197,84 @@ function ringAndExitSteps(): DriveScript["steps"] {
 
 /**
  * The wait at the line, in seconds, from the moment the car comes to rest there
- * (t = 12.25). THE dial of this template, and it is centred in a MEASURED window,
- * not guessed. The drive clock: the platoon arms at t ≈ 5.75 (the player passes
- * 60 m from the ring centre) and metronomes from there, so the lead crosses the
- * player's mouth at t = 15.8 and the follower at t = 18.6. Launching at
- * 12.25 + 10 = 22.25 puts the follower at φ = 33° and the lead at φ = 59°, and
- * the two walls sit at:
+ * (t = 12.25). THE dial of this template, and it is centred in a MEASURED
+ * window. The drive clock: the platoon arms at t ≈ 5.75 (the player passes
+ * 60 m from the ring centre) and metronomes from there, so the lead crosses
+ * the player's mouth at t = 15.8, the follower at t = 18.6 — and on the L5
+ * rung a THIRD car, 2.8 s behind the follower, at t = 21.4.
  *
- *   · φ_follower < 28° ⇒ COLLISION. The entry chord is a chord — it cuts ~6° of
- *     corner off the arc the follower rides — so the driver arrives on the ring
- *     having GAINED on it, and below 28° what is left is under the 3 m contact
- *     radius. (The wall moves with RING_KMH, which is the other half of the same
- *     closing-rate story: at 12 km/h it sits at 32°.)
- *   · φ_lead > 65° ⇒ FAILED_TO_YIELD, i.e. φ_follower > 38° at this platoon
- *     offset — a wall that NO LONGER EXISTS (2026-10-04). Nothing to do with the
- *     follower: it was the LEAD, 60° up the ring and long gone, swinging into
- *     the driver's ROTATING left half-plane as the chord turns north-east — and
- *     convicting before the azimuth sweep reaches the 35° ring-priority
- *     stand-down. It billed a driver who waited 11–15 s, merged BEHIND the whole
- *     platoon and forced nobody to slow (sc-rb-busy-gap:a6f83f6b / 8f50287b,
- *     «the scoring punishes patience»). `circulatingConflictFor` clause (R)
- *     DEPARTING AND CLEAR now drops a car that has already passed his entry, so
- *     the clean L1 window runs from the 10 s wait to the platoon's next lap
- *     (measured 10–32.5 s on the live chain; 33 s+ is the ring coming round
- *     again, honestly billed).
- *
- * The 10 s wait sits at the bottom of that window — the collision wall above is
- * the one still standing — and it stays short enough to be a decision rather
- * than a vigil: the „без вечно колебание" half of the objective, coached by
- * parTimeSec 60.
+ * One recording serves every rung, so the wait has to be right for the longest
+ * platoon: the car moves off once the LAST car of it is past the mouth. See
+ * SHADOW_WAIT_WINDOW in traces/__tests__/ring-demos-drivable.test.ts for the
+ * measured window on every rung (the old 10 s was clean on L1–L4 and drove
+ * into the side of the third car on L5).
  */
-const SHADOW_WAIT_SEC = 10;
+const SHADOW_WAIT_SEC = 14;
 
-export function scRbBusyGapShadowScript(): DriveScript {
+export function scRbBusyGapShadowScript(dials: RbBusyGapDials = {}): DriveScript {
+  const p = SHADOW();
+  const ringKmh = dials.ringKmh ?? RING_KMH;
   return {
     steps: [
       {
+        // ONE RECORDING IS SHOWN ON EVERY RUNG, and the rungs differ in how
+        // many cars the ring carries: two on L1–L4, three on L5. Until
+        // 2026-10-12 these captions counted two («две коли», «зад втората»,
+        // «и двете») and were false on L5, where the car the shadow enters
+        // behind is the third. They now say what is true on all five.
         kind: "annotation",
-        textBg: "В кръга има две коли, една след друга. И двете са с предимство — намаляваме отрано.",
+        textBg: "В кръга колите вървят една след друга. Всички са с предимство — намаляваме отрано.",
       },
-      ...approachToLineSteps(),
+      ...approachToLineSteps(p),
       {
         kind: "annotation",
-        textBg: "Спираме на линията и гледаме наляво. Първата минава… но зад нея идва втора.",
+        // WAS «Спираме на линията…»: the car rests where the lesson's own
+        // «Спри на линията» task is graded (a 3 m disc at y = −26), which is
+        // 8 m PAST the give-way bar painted at y = −35.7 — the caption may not
+        // call that spot the line. It is before the ring, 3.8 m from its edge.
+        textBg: "Спираме преди кръга и гледаме наляво. Първата минава… но зад нея идва втора.",
       },
       { kind: "glance", mirror: "left" },
       {
-        // The wait: both cars of the pair sweep through the mouth and out onto
-        // the east arc. Stopped, so the left band is irrelevant (the tracker
-        // needs > 3 km/h) — and the pause is what the „изчакай пролука" gate
-        // reads. Braked: the ledger stays honest about why the car is still.
+        // The wait: the platoon sweeps through the mouth and out onto the east
+        // arc. Braked: the ledger stays honest about why the car is still.
         kind: "pause",
-        sec: SHADOW_WAIT_SEC,
+        sec: dials.waitSec ?? SHADOW_WAIT_SEC,
         brake: true,
       },
       {
         kind: "annotation",
-        textBg: "Пролуката между двете беше твърде къса. Тази ЗАД втората е истинската — влизаме решително.",
+        textBg: "Пролуките между тях бяха твърде къси. Тази ЗАД последната е истинската — влизаме решително.",
       },
-      ...ringAndExitSteps(),
+      { kind: "glance", mirror: "left" },
+      {
+        // The family entry, from inside the mouth.
+        kind: "drive",
+        points: p.between("line", "ring"),
+        targetKmh: 17,
+        stopAtEnd: false,
+      },
+      {
+        // The ring, flat and quiet, from the landing past the east mouth
+        // (φ = 90) — the first exit, which is not ours.
+        kind: "drive",
+        points: p.between("ring", "signal"),
+        targetKmh: ringKmh,
+        stopAtEnd: false,
+      },
+      { kind: "indicator", setting: "right" },
+      { kind: "glance", mirror: "right" },
+      {
+        // Ring to φ = 130°, the family exit onto the north arm's lane, and on.
+        kind: "drive",
+        points: p.between("signal", "end", { stop: true }),
+        targetKmh: ringKmh,
+      },
+      { kind: "indicator", setting: "off" },
+      { kind: "pause", sec: 1.5, brake: true },
       {
         kind: "annotation",
-        textBg: "Пропуснахме и двете, влязохме в реален интервал и излязохме с мигач — никой в кръга не намали заради нас.",
+        textBg: "Пропуснахме всички, влязохме в реален интервал и излязохме с мигач — никой в кръга не намали заради нас.",
       },
     ],
   };
@@ -301,22 +298,33 @@ export function scRbBusyGapShadowScript(): DriveScript {
  *
  * The platoon is a metronome from the moment the driver passes 60 m from the
  * ring centre (the sync is pinned out — see the template), so WHEN he reaches
- * the ring is set by this speed alone, on every rung and under every seed.
- * MEASURED on the live chain, identical at L1–L5:
- *
- *   12 км/ч  the lead is in the mouth as he arrives — COLLISION (0.1 m)
- *   14       he merges ~7 m ahead of it; the lead sheds 2.47 m/s
- *   15       ~8 m ahead; the lead sheds 1.08 m/s (2.90 → 1.82)   ← authored
- *   16       ~9 m ahead; the lead sheds 0.60 m/s
- *   17 +     he is clear ahead of it: nothing is forced, nothing is billed
- *
- * 15 is the middle of the band in which the lead really has to brake and the
- * two cars never touch (nearest 6.2 m). The conviction lands 0.4 s after his
- * nose is on the ring, on the lead's own braking.
+ * the ring is set by this speed alone, on every rung and under every seed. The
+ * band in which the lead really has to brake and the two cars never touch is
+ * measured on the live chain at every rung and pinned (BARGE_BAND in
+ * traces/__tests__/ring-demos-drivable.test.ts); this is its middle.
  */
-const BARGE_KMH = 15;
+const BARGE_KMH = 14;
+/** Where the barge demo freezes: on the early ring, 8° past the landing. */
+const BARGE_FREEZE_PHI_DEG = 63;
 
-export function scRbBusyGapMistakeBargeScript(): DriveScript {
+/** The barge's line is the family entry taken at a roll (./ringMini
+ *  MINI_ENTRY): straight through the mouth and onto the ring. */
+function buildBargePath(): RingPath {
+  return miniPathFromSpawn()
+    .straightToY(-40)
+    .mark("arm")
+    .enterRing(MINI_ENTRY)
+    .mark("ring")
+    .ringTo(BARGE_FREEZE_PHI_DEG)
+    .mark("end")
+    .build();
+}
+let bargePath: RingPath | null = null;
+const BARGE = (): RingPath => (bargePath ??= buildBargePath());
+
+export function scRbBusyGapMistakeBargeScript(dials: RbBusyGapDials = {}): DriveScript {
+  const p = BARGE();
+  const bargeKmh = dials.bargeKmh ?? BARGE_KMH;
   return {
     steps: [
       {
@@ -329,8 +337,8 @@ export function scRbBusyGapMistakeBargeScript(): DriveScript {
       { kind: "indicator", setting: "right" },
       {
         kind: "drive",
-        points: [[X_LANE, -93], [X_LANE, -60], [X_LANE, -40]],
-        targetKmh: BARGE_KMH,
+        points: p.between("start", "arm"),
+        targetKmh: bargeKmh,
         stopAtEnd: false,
       },
       { kind: "annotation", textBg: "Първата кола в кръга приближава отляво… но нашата не спира." },
@@ -341,8 +349,8 @@ export function scRbBusyGapMistakeBargeScript(): DriveScript {
         // the bumper would only stack unrelated noise on top of the ONE taught
         // mistake).
         kind: "drive",
-        points: [[X_LANE, -40], [X_LANE, -26], [5.4, -21.5], [7.4, -18.3], ...ringRun(30, 60)],
-        targetKmh: BARGE_KMH,
+        points: p.between("arm", "end", { stop: true }),
+        targetKmh: bargeKmh,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.5, brake: true },
@@ -362,66 +370,66 @@ export function scRbBusyGapMistakeBargeScript(): DriveScript {
 /**
  * The wait that ends one car too early: long enough to let the LEAD pass (t =
  * 15.8, so the demo is visibly NOT the barge — this driver did look and did give
- * way once), short enough that the launch at t = 17.85 lands in the platoon's
- * 2.8 s gap IN FRONT of the follower.
- *
- * RE-STAGED 2026-10-06 (founder ruling 2026-10-05, round 4), 6.5 s → 5.6 s. With
- * 6.5 s his nose came onto the ring at t = 20.90 with the follower's body
- * already ACROSS his mouth (its tail 1.3 m short of it); the follower went by
- * without lifting and he drove into its rear quarter at 21.78, 0.4 s after its
- * tail had cleared the mouth. Judged at the mouth, that is running into a car
- * that has gone by — a collision, not «влезе пред кола» — and the demo no
- * longer committed the fault its card names. A second less at the line puts
- * him where the lesson says he is. Measured (live chain, L1–L5):
- *
- *   t 20.00  his nose is on the ring: the lead's tail 4.2 m PAST his mouth,
- *            the follower's tail 3.9 m SHORT of it (its nose at the mouth)
- *   t 20.87  the follower has lost 0.3 m/s to him, 1.4 m short of clearing the
- *            mouth — FAILED_TO_YIELD — and brakes on to a stop
- *   t 20.88  the two bodies overlap — COLLISION
- *
- * The window, on this chord: 5.5–5.7 s gives this picture on every rung. At
- * 5.4 s the follower has stopped by the time they meet and the live chain bills
- * the fault without the crash; from 5.8 s the touch comes within half a metre
- * of the follower clearing the mouth.
+ * way once), short enough that the launch lands in the platoon's 2.8 s gap IN
+ * FRONT of the follower: he comes onto the ring ahead of it, it has to brake
+ * for him (FAILED_TO_YIELD) and still cannot avoid him (COLLISION). Measured
+ * at the cut below: from 5.02 s to 5.18 s every rung shows exactly that AND
+ * the follower ends stopped against him with the bodies unbroken in contact to
+ * the end of the demo; at 5.0 the crash is only the authored beat (the bodies
+ * never meet: a crash the ghost did not have), and from 5.2 the follower's own
+ * turn at its path vertex opens the contact for a frame or more. 5.1 is the
+ * middle (SHORT_GAP_WINDOW in traces/__tests__/ring-demos-drivable.test.ts).
  */
-const SHORT_GAP_WAIT_SEC = 5.6;
+const SHORT_GAP_WAIT_SEC = 5.1;
 
 /**
- * The contact point, and it is MEASURED, not staged for effect: replaying this
- * script through the live chain (and through the trace gate's own traffic twin)
- * the driver's body and the follower's first overlap at t = 20.88 with the
- * driver at (8.27, −18.91), on the chord between (6, −23) and (8.5, −18.5). The
- * chord is cut there and the authored `collision` beat below sits exactly on
- * it, so the ghost's crash depicts geometry rather than asserting it.
+ * Where the short-gap drive is cut: this many metres into the entry. At the
+ * 5.1 s wait the two bodies first overlap ≈ 7.5 m in (t = 20.00, the frame
+ * both FAILED_TO_YIELD and COLLISION are billed); the ghost carries on and
+ * stops with its nose ACROSS the follower's lane, so the follower brakes all
+ * the way to a stop against it and the contact is unbroken to the end of the
+ * demo — ONE accident, the authored `collision` beat landing inside it.
+ * Measured at that wait: a cut of 7.4 m or less stops the ghost 0.1–0.5 m
+ * short of the follower (the «crash» would be the authored beat alone); from
+ * 7.7 m to beyond 11 m the follower is blocked and stays in contact. 8.85 m
+ * keeps 1.2 m of margin on the short side. (The first re-authoring cut at the
+ * overlap itself, 7.7 m at a 5.2 s wait: a corner the follower grazed for ten
+ * frames and then drove on past — «нямаше къде да отиде» false.)
  */
-const SHORT_GAP_CONTACT: [number, number] = [8.27, -18.91];
+const SHORT_GAP_CUT_M = 8.85;
 
-export function scRbBusyGapMistakeShortGapScript(): DriveScript {
+function buildShortGapPath(cutM: number): RingPath {
+  return toLine().enterRing(MINI_ENTRY_FROM_MOUTH, { contact: cutM }).mark("ring").build();
+}
+let shortGapPath: RingPath | null = null;
+const SHORT_GAP = (): RingPath => (shortGapPath ??= buildShortGapPath(SHORT_GAP_CUT_M));
+
+export function scRbBusyGapMistakeShortGapScript(dials: RbBusyGapDials = {}): DriveScript {
+  const p = dials.shortGapCutM === undefined ? SHORT_GAP() : buildShortGapPath(dials.shortGapCutM);
   return {
     steps: [
       {
         kind: "annotation",
         textBg: "Този път входът започва правилно — колата спира и пропуска първата. Гледай КОЯ пролука взима после.",
       },
-      ...approachToLineSteps(),
+      ...approachToLineSteps(p),
       { kind: "glance", mirror: "left" },
       {
         // Only the LEAD is waited out. That single act of patience is what makes
         // this the harder, more honest mistake: the driver знае правилото и все
         // пак не го е приложил докрай.
         kind: "pause",
-        sec: SHORT_GAP_WAIT_SEC,
+        sec: dials.shortGapWaitSec ?? SHORT_GAP_WAIT_SEC,
         brake: true,
       },
       { kind: "annotation", textBg: "Първата отмина — и кракът тръгва. Но на три секунди зад нея идва втора…" },
       {
-        // The SAME flat chord as the shadow, taken one car too early: he comes
-        // onto the ring in front of the follower, which has to brake for him
-        // (FAILED_TO_YIELD) and still cannot avoid him (COLLISION, one frame
-        // later). The chord is truncated at the measured contact point.
+        // The SAME entry as the shadow, taken one car too early: he comes onto
+        // the ring in front of the follower, which has to brake for him
+        // (FAILED_TO_YIELD) and still cannot avoid him (COLLISION). The entry
+        // is cut at the measured contact point.
         kind: "drive",
-        points: [[X_LANE, -27.5], [6.0, -23.0], SHORT_GAP_CONTACT],
+        points: p.between("line", "contact"),
         targetKmh: 17,
         stopAtEnd: false,
       },
@@ -429,10 +437,10 @@ export function scRbBusyGapMistakeShortGapScript(): DriveScript {
         // The AUTHORED consequence (the S1 mistake-demo seam). HISTORY: it had
         // to be authored when contact was a branch of the runner's own step() and
         // a resolved runner stopped stepping. The director's ContactSentinel has
-        // billed the crash from the geometry since B81 (t = 20.88), so this beat
-        // is redundant — it lands inside the same unbroken overlap and folds
-        // into the same accident. Kept because the annotation copy is timed
-        // against it; the trace gate proves the geometry independently.
+        // billed the crash from the geometry since B81, so this beat is
+        // redundant — it lands inside the same unbroken overlap and folds into
+        // the same accident. Kept because the annotation copy is timed against
+        // it; the trace gate proves the geometry independently.
         kind: "collision",
         withWhat: "vehicle",
       },

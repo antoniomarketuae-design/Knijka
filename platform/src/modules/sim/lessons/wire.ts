@@ -590,8 +590,15 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
       // malformed detail. It selects a sentence the server composes itself
       // (ADR-002) and never reaches `done` — that is `w.done`, reconciled
       // below.
-      if (d.reason !== "touched") return null;
-      return { kind: "haltVoided", reason: "touched" };
+      // Two reasons since lane lanegate (sc-hz-brake-dont-swerve:cb563b2d):
+      // «outOfLane», the car came to rest outside the lane the task names.
+      if (d.reason === "touched") return { kind: "haltVoided", reason: "touched" };
+      if (d.reason === "outOfLane") return { kind: "haltVoided", reason: "outOfLane" };
+      // …and «crashRest» (round 5): that rest was the car's own crash's (the crash pin held it).
+      if (d.reason === "crashRest") return { kind: "haltVoided", reason: "crashRest" };
+      // …and «passedUnhalted» (round 3): the car went through the place without stopping in it.
+      if (d.reason === "passedUnhalted") return { kind: "haltVoided", reason: "passedUnhalted" };
+      return null;
     }
     default:
       return null;

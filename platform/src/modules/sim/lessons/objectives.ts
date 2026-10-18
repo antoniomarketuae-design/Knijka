@@ -29,6 +29,7 @@ import { obbSeparationM, playerObb, SWEEP_RESOLUTION_M } from "../collision";
 import type { LessonObjective, ParkingBaySpec, StagedEventOutcome } from "../contracts";
 import { DEFAULT_RULE_CONFIG, type SimTick, type Vec2 } from "../rules";
 import type {
+  LaneStrip,
   NamedBodyRect,
   ObjectiveDetail,
   ObjectiveEvalState,
@@ -299,6 +300,13 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       // преди препятствието» this key exists to end.
       if (p.stopShortOf !== undefined) {
         out.stopShortOf = parseNamedBodyRect(objective, p.stopShortOf);
+      }
+      // THE LANE THE BANNER SAYS THE STOP IS MADE IN (ReachZoneParams.restInLane
+      // — lessons/types.ts carries the drive). AUTHORED ONLY, and a malformed
+      // strip throws for `stopShortOf`'s reason: a silently dropped key is the
+      // false «✓ … В своята лента» it exists to end.
+      if (p.restInLane !== undefined) {
+        out.restInLane = parseLaneStrip(objective, p.restInLane);
       }
       // THE CEILING HELD OVER THE WHOLE STRETCH (see `ReachZoneWitnessDemands
       // .requireSpeedClean` for the two demonstration drives it closes, the
@@ -3734,6 +3742,79 @@ function parseNamedBodyRect(objective: LessonObjective, raw: unknown): NamedBody
   };
 }
 
+/** Parse an authored `restInLane` strip, or throw (see its parse site). */
+function parseLaneStrip(objective: LessonObjective, raw: unknown): LaneStrip {
+  const r = raw as Partial<Record<keyof LaneStrip, unknown>> | null;
+  const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+  if (typeof r !== "object" || r === null || !fin(r.headingDeg) || !fin(r.halfWidthM) || r.halfWidthM <= 0) {
+    throw new ObjectiveSpecError(objective.id, "reachZone restInLane needs headingDeg and halfWidthM > 0");
+  }
+  return { headingDeg: r.headingDeg, halfWidthM: r.halfWidthM };
+}
+
+/**
+ * HOW FAR THE CAR'S CENTRE IS FROM THE CENTRE LINE OF THE LANE THE TASK NAMES — the geometry of
+ * `ReachZoneParams.restInLane` (sc-hz-brake-dont-swerve:cb563b2d, lane lanegate). Metres, unsigned, measured ACROSS
+ * THE AUTHORED LANE HEADING through the zone's own mark — never across the approach axis `reachZoneApproachAxis`
+ * latches, which is exactly the axis that read a car resting off the carriageway as 0 m sideways (the axis is
+ * latched from wherever the car entered the ring, so a car that came in from beside the lane carried its own
+ * «lane» with it). Undefined on a gate that names no lane. This is the distance the out-of-lane card PRINTS
+ * («Колата спря на … м встрани от средата на своята лента») — the car's position, read the way a driver reads it;
+ * whether the car is IN the lane is the body's question, `reachZoneRestLaneBodyOffsetM` below.
+ */
+export function reachZoneRestLaneOffsetM(
+  params: Pick<ReachZoneParams, "x" | "y" | "restInLane">,
+  pos: Vec2,
+): number | undefined {
+  const lane = params.restInLane;
+  if (lane === undefined) return undefined;
+  const h = (lane.headingDeg * Math.PI) / 180;
+  // District heading: 0 = +y, clockwise positive ⇒ the lane runs along (sin h, cos h).
+  return Math.abs((pos.x - params.x) * Math.cos(h) - (pos.y - params.y) * Math.sin(h));
+}
+
+/**
+ * HOW FAR THE CAR'S BODY REACHES FROM THE CENTRE LINE OF THE LANE THE TASK NAMES — the in-lane test of
+ * `ReachZoneParams.restInLane` (lane lanegate round 2, sc-hz-brake-dont-swerve:cb563b2d). Metres, unsigned: the
+ * largest distance of any of the four corners of the product's own footprint at this pose (`collision playerObb` —
+ * the rapier chassis collider's half extents, PLAYER_HALF_LENGTH_M × PLAYER_HALF_WIDTH_M) from the lane's centre
+ * line, measured across the AUTHORED lane heading through the mark, never across the latched approach axis.
+ *
+ * WHY THE BODY AND NOT THE CENTRE (round 1 was refuted on it). «В своята лента» is a claim about the car, and the
+ * car is 1.70 m wide: a centre test at half the lane pitch (4.0625 m) ticked cars with up to 0.85 m of their body in
+ * the escort's lane or past the carriageway edge — a band the product's own lane-keeping rule calls straddling
+ * (`rules laneKeepMaxOffsetM` = 3.25 m). With the corners, a straight car is in the lane up to a centre offset of
+ * 4.0625 − 0.85 = 3.2125 m — inside that band, so no rest ticked «в своята лента» is one the lane-keeping rule calls
+ * straddling — and a car that swerved and stands askew is judged by the corner that sticks out.
+ */
+export function reachZoneRestLaneBodyOffsetM(
+  params: Pick<ReachZoneParams, "x" | "y" | "restInLane">,
+  pos: Vec2,
+  headingDeg: number,
+): number | undefined {
+  const lane = params.restInLane;
+  if (lane === undefined) return undefined;
+  const h = (lane.headingDeg * Math.PI) / 180;
+  const nx = Math.cos(h);
+  const ny = -Math.sin(h);
+  const body = playerObb(pos.x, pos.y, headingDeg);
+  const b = (body.headingDeg * Math.PI) / 180;
+  // The body's length axis (sin b, cos b) and width axis (cos b, −sin b), in the same district convention.
+  const fx = Math.sin(b) * body.halfLengthM;
+  const fy = Math.cos(b) * body.halfLengthM;
+  const rx = Math.cos(b) * body.halfWidthM;
+  const ry = -Math.sin(b) * body.halfWidthM;
+  let worst = 0;
+  for (const sf of [1, -1]) {
+    for (const sr of [1, -1]) {
+      const cx = body.x + sf * fx + sr * rx - params.x;
+      const cy = body.y + sf * fy + sr * ry - params.y;
+      worst = Math.max(worst, Math.abs(cx * nx + cy * ny));
+    }
+  }
+  return worst;
+}
+
 /**
  * …AND THE SAME QUESTION FOR THE RAISED ARM, which is the one where it is not
  * optional: `sc-rxg-finish` and `sc-rxd-finish` are both the LAST objective of
@@ -5621,7 +5702,131 @@ function stepReachZone(
     !halted &&
     alongMark !== null &&
     alongMark < -REACH_ZONE_GRACE_M;
-  const done = arrivalHonoured && !shortOfMark;
+  // ── …AND THE CAR STANDS IN THE LANE THE BANNER NAMES (ReachZoneParams.restInLane — lane lanegate,
+  //    sc-hz-brake-dont-swerve:cb563b2d) ──────────────────────────────────────────────────────────────────────
+  //
+  // WHAT WAS BROKEN. The capsule above is «extra room along the road, none at all across it» — but «across» is read
+  // off `approachFrom`, the position the car entered the ring from, so the capsule's road is wherever the car came
+  // from. A car that entered the ring from BESIDE the lane and rested near its entry read `lateral` ≈ 0: on the
+  // product's chassis «Спри преди препятствието — с пълна спирачка, В своята лента» ticked a car at rest 5.9 m right
+  // of the lane centre, off the carriageway, with no contact and «passed» (shift-x10-l140-b168), and a car resting
+  // in the escort's lane (shift-x-4.06-l160-b171). The template comments that «a car one lane over can never satisfy
+  // it» were false.
+  //
+  // THE TERM (round 2 — round 1 tested the car's centre and let a moving car be ticked; both were refuted). On a
+  // gate that authors the lane its title claims, the tick is issued only on a frame on which
+  //   · the car is HALTED by this gate's own halt definition (`halted`, the standstill the halt cap grades), and
+  //   · its WHOLE BODY is inside that lane — every corner of the product's footprint within `halfWidthM` of the
+  //     lane's centre line, across the AUTHORED lane heading through the mark (`reachZoneRestLaneBodyOffsetM`), and
+  //   · the approach has not already spent its graded rest outside the lane (`laneVoidedOffsetM`, below), and
+  //   · (round 3) the car is inside the gate's own place, `inAcceptance || graceArmed` — the tick is AT THE MARK.
+  // The capsule, its axis, the re-latch, the B18 boundary and every other reader of `approachFrom` are untouched —
+  // they serve 60 other halt gates whose banners claim a PLACE, not a lane, and on parking and manoeuvre setups
+  // whose approach is not a lane at all; a lane is claimed by three titles and is checked on those three.
+  //
+  // THE FIRST HALTED REST OF AN APPROACH IS THE GRADED ACT — the shipped precedent `haltVoided` «impact» above («on
+  // a halt cap the standstill IS the graded act, which is the whole of why its provenance has to be named»). The
+  // first halted rest inside the approach ring with the body outside the lane (round 3: whether or not it honours
+  // the arrival — round 2 required that, and a wide swerve inside the ring escaped) spends this approach: creeping back and stopping again inside the ring does not tick «Спри … в своята лента», because the
+  // stop the task grades was made outside it. It is carried for the approach and cleared ONLY by `freshApproach`,
+  // the same ring-entry edge, by the same expression, that clears `haltVoided` and `approachCap` — so a student who
+  // drives out of the ring and comes at the mark again earns the tick with a halted in-lane rest exactly as before.
+  //
+  // IT CREDITS NOBODY NEW: a conjunction on top of the shipped expression. Absent the key `done` is the shipped
+  // expression, bit for bit, and no new state is written. The grid point's own pose (ADR-014): `tick` is the grade
+  // grid's tick, so the answer is one answer on every display.
+  const namedLane = params.restInLane;
+  const laneOffsetM = reachZoneRestLaneOffsetM(params, here);
+  const laneBodyOffsetM = reachZoneRestLaneBodyOffsetM(params, here, tick.headingDeg);
+  const bodyInNamedLane = namedLane === undefined || laneBodyOffsetM! <= namedLane.halfWidthM;
+  // A halted rest of this approach INSIDE THE APPROACH RING, made with the body outside the named lane (round 3,
+  // L5). Round 2 raised the void only on a rest that also honoured the arrival — the stop the base ticked — so a
+  // student who swerved WIDE inside the ring (≥ ~4.1 m off, outside the disc and the capsule) and stood there, then
+  // crept back and stopped at the mark, was ticked «… В своята лента» on the approach whose graded standstill was
+  // the swerve: the «brake, don't swerve» lesson's core error. The ring is the approach's own extent — the
+  // `radiusM + REACH_ZONE_GRACE_M` ring whose ENTRY EDGE is `freshApproach`, the edge that clears this void — so
+  // «the first halted rest of the approach» and «the approach» are measured on one object. A halted rest inside
+  // the ring with the body IN the lane (a queue stop short of the mark) raises nothing.
+  //
+  // A CRASH'S REST VOIDS THE APPROACH TOO, AND IS NAMED AS THE CRASH'S (round 5, L11 — replacing round 4's L6
+  // exemption). `ctx.restIsCrashPinned` — the very fact `haltVoided` «impact» above reads: the car is motionless
+  // within CRASH_PIN_RADIUS_M of its own terminating collision. Round 4 exempted that rest from the void, so a car
+  // that crashed, stood pinned out of its lane inside the ring, then crept back and halted at the mark on the SAME
+  // approach was ticked «… В своята лента» (measured: sc-hzbds-stop / sc-hzes-stop at the mark, sc-lnom-wait L1 after
+  // mistake-pull-out's head-on rest), and the façade bounce's open row lost its only reason. So the crash's rest
+  // raises the void exactly as any first out-of-lane halted rest of the approach does — carried, cleared only by
+  // `freshApproach` (the haltVoided «impact» precedent, which also voids on the crash's rest) — and the void records
+  // its PROVENANCE (`laneVoidedByCrash`), carried with it: the first rest is the graded act, so a later non-crash
+  // out-of-lane rest on the same approach changes neither the void nor its reason. The provenance decides what is
+  // SAID, not what is graded: `lessons/engine.ts` speaks no «Спря, но не изцяло в своята лента» card on a crash's
+  // void (the crash's own COLLISION card speaks on that frame — «Колата спря» would name the impact's standstill the
+  // student's stop), and the fold prints the «crashRest» row instead of «outOfLane». Absent the fact (fixtures, the
+  // pure census) the provenance is «unknown», never «crash»: the void is raised and named out-of-lane.
+  const outOfLaneRestHere = namedLane !== undefined && inGraceRing && halted && !bodyInNamedLane;
+  const laneVoidedCarried = freshApproach ? undefined : st.laneVoidedOffsetM;
+  const laneVoidedOffsetM = laneVoidedCarried ?? (outOfLaneRestHere ? laneOffsetM : undefined);
+  const laneVoidedByCrash: true | undefined =
+    laneVoidedCarried !== undefined
+      ? st.laneVoidedByCrash
+      : outOfLaneRestHere && ctx.restIsCrashPinned === true
+        ? true
+        : undefined;
+  // THE TICK IS AT THE MARK (round 3, L4). `reached` (`st.reached || sweptAcceptance || …`), `capMet` (`st.capMet &&
+  // !spent || contractEarned`) and `approachCap` («honoured», carried) all LATCH on a roll through the disc at or
+  // under the cap, and nothing withdraws them once the car is past the disc (`capSpent` needs `onApproachSide ||
+  // sweptAcceptance`). Round 2 read `halted && bodyInNamedLane` on the AUTHORED strip, which is unbounded along the
+  // lane, so a car that rolled through the disc without halting was ticked «Спри в своята лента пред препятствието»
+  // at its next halt anywhere on the lane line — 58.85 m past the mark, 27 m past the parked row (round-2 verifier,
+  // sc-lnom-wait L2–L5). So the halted, body-in-lane tick is given only on a frame that is ALSO inside the gate's own
+  // place, `inAcceptance || graceArmed` — the identical locality the capsule grants a halt cap's own standstill
+  // (`reached`'s `graceArmed && halted && isHaltDemand`, `capArmGeo`). It is a POINT test on this frame's own
+  // position, so no latch above can carry the tick to a later frame outside the place.
+  const inPlace = inAcceptance || graceArmed;
+  const done =
+    arrivalHonoured &&
+    !shortOfMark &&
+    (namedLane === undefined ||
+      (halted && bodyInNamedLane && laneVoidedOffsetM === undefined && inPlace));
+  // The fold's fact (the row's and the debrief's reason): a graded rest of this drive was made outside the lane.
+  // Written with each approach's void and never cleared — a fresh approach clears the VOID, not the fact that the
+  // stop happened; on a task that ends done the fold attaches nothing (`lessons/engine.ts buildLessonResult`).
+  const laneRestOffsetM = laneVoidedOffsetM ?? st.laneRestOffsetM;
+  // …and its provenance (round 5, L11): the latest void's, beside the latest void's offset — so the row names the
+  // graded rest the offset is of («crashRest» when the crash pin held it, «outOfLane» otherwise).
+  const laneRestByCrash: true | undefined = laneVoidedOffsetM !== undefined ? laneVoidedByCrash : st.laneRestByCrash;
+  // THE PASS THROUGH THE PLACE WITHOUT A STOP, SAID (round 3 — THEO-4 for L4). L4 (and round 2's halted-frame tick)
+  // leave a car that rolls through the place at or under the cap, never halting in it, with its task OPEN — the base
+  // ticked it on a moving frame («Спри …» false), round 2 at its next halt anywhere down the lane (false again), and
+  // round 3 ticks nothing; but an open row with no reason is a bare verdict. So this approach's passage is followed
+  // through the place on the grid: «in» while the car is in the place, moving, within the cap and with nothing struck
+  // (`capMet`, and the strike demands `vruOk`, `contactOk`, `shortOfOk` — a pass over the cap has its own card,
+  // `overCapNoted`, and a strike its own bill and row); «halted» once it halts there (the tick, the lane void, or
+  // another demand's own refusal — each says its own why); «passed» on the frame it leaves the place PAST THE MARK
+  // (`alongMark > 0`, the approach's own axis) from «in», with no lane void on the approach. NOT `arrivalHonoured`:
+  // on the two gates that also demand a full stop (sc-hzes-stop, sc-hzbds-stop compile `requireFullStop`) the
+  // arrival is never honoured on a moving frame, which is the very pass this names.
+  // Carried and cleared exactly as the void is (`freshApproach`). Its rising edge is the one frame
+  // `lessons/engine.ts` speaks «Мина, без да спреш» on; the fold's fact (`lanePassedUnhalted`) is never cleared.
+  // State only — it is no term of `done`, so it credits and refuses nobody.
+  const lanePassCarried = freshApproach ? undefined : st.lanePass;
+  const lanePass: "in" | "halted" | "passed" | undefined =
+    namedLane === undefined
+      ? undefined
+      : lanePassCarried === "halted" || lanePassCarried === "passed"
+        ? lanePassCarried
+        : inPlace
+          ? halted
+            ? "halted"
+            : capMet && vruOk && contactOk && shortOfOk
+              ? "in"
+              : undefined
+          : lanePassCarried === "in" &&
+              laneVoidedOffsetM === undefined &&
+              alongMark !== null &&
+              alongMark > 0
+            ? "passed"
+            : undefined;
+  const lanePassedUnhalted = lanePass === "passed" || st.lanePassedUnhalted === true ? true : undefined;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   //
@@ -5696,6 +5901,13 @@ function stepReachZone(
     everOutside,
     ...(approachCap !== undefined ? { approachCap } : {}),
     ...(haltVoided !== undefined ? { haltVoided } : {}),
+    // `restInLane` gates only — every other gate's state is unchanged.
+    ...(laneVoidedOffsetM !== undefined ? { laneVoidedOffsetM } : {}),
+    ...(laneVoidedByCrash !== undefined ? { laneVoidedByCrash } : {}),
+    ...(laneRestOffsetM !== undefined ? { laneRestOffsetM } : {}),
+    ...(laneRestByCrash !== undefined ? { laneRestByCrash } : {}),
+    ...(lanePass !== undefined ? { lanePass } : {}),
+    ...(lanePassedUnhalted !== undefined ? { lanePassedUnhalted } : {}),
     // `requireStopAtLine` gates only — every other gate's state is unchanged.
     ...(lineRestSinceSec !== undefined ? { lineRestSinceSec } : {}),
     ...(shortRestSinceSec !== undefined ? { shortRestSinceSec } : {}),

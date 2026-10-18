@@ -506,7 +506,13 @@ describe("THE LESSON CENSUS — every committed capped objective through the rea
     // ladder rungs, so the objective is credited and its mark arrives on the crediting frame with no stretch to stamp;
     // and a crossing latch whose objective then completes is released with it. The stretch is still stamped in full
     // wherever the mark is crossed over the gate too — the hold and grace plans below.
-    expect(T.stampedFrames).toBeGreaterThan(7000);
+    // 7,428 → 5,514 (catalogue-demo-curvature:dae908c7, family curvring), measured over this plan with the six roundabout
+    // recorders of 2e9268f and of the re-authored demos: the WHOLE difference (−1,914) is sc-roundabout-entry L2/L3/L5
+    // sc-rb-approach (786/751/751 → 144/115/115); every other row is unchanged and all 521 rows still show 0 differences.
+    // The old shadow rolled 11 m past the М8 bar and waited ~10 s there, where `acceptBeforeMarkM` does not credit the
+    // approach, so the blown latch rode the whole wait; the re-authored shadow waits with its nose 0.8 m short of the
+    // bar, inside the credited disc, and the objective is credited at the line — the stretch ends where the task ends.
+    expect(T.stampedFrames).toBeGreaterThan(5200);
     expect(T.reversingFrames).toBeGreaterThan(3000);
     expect(T.nightFrames).toBeGreaterThan(50_000);
     expect(T.snowFrames).toBeGreaterThan(10_000);

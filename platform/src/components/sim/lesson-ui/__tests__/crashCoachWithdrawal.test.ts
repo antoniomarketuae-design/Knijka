@@ -57,8 +57,18 @@ function ringAt(phiDeg: number, r: number): [number, number] {
 
 /** The shadow up to and including its ring entry, then drive b's act. */
 function islandScript(): DriveScript {
+  // The shadow's entry is the drive step that lands ON the ring's centreline at
+  // φ = 55° (traces/ringMini MINI_ENTRY). Until 2026-10-12 it was a six-point
+  // waypoint chord; since catalogue-demo-curvature:dae908c7 it is one
+  // continuous curvature programme sampled every 2 mm, so it is found by where
+  // it ENDS rather than by how many points it has.
   const shadow = scRoundaboutEntryShadowScript().steps;
-  const entryIdx = shadow.findIndex((s) => s.kind === "drive" && s.points.length === 6 && s.targetKmh === 17);
+  const landing = ringAt(55, 18);
+  const entryIdx = shadow.findIndex((s) => {
+    if (s.kind !== "drive" || s.targetKmh !== 17) return false;
+    const last = s.points[s.points.length - 1];
+    return Math.hypot(last[0] - landing[0], last[1] - landing[1]) < 0.01;
+  });
   if (entryIdx < 0) throw new Error("islandScript: the shadow's flat-chord entry moved");
   return {
     steps: [

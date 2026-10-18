@@ -30,6 +30,9 @@
  * his mouth — its tail 0.8 m past it — and into the back of it (a collision,
  * honestly billed), so at L5 the PATIENT act is to wait the third car
  * out too: 25 s, the middle of the measured clean window (18–32.5 s).
+ * (Since catalogue-demo-curvature:dae908c7 the authored shadow waits 14 s, which
+ * is clean on L5 as well — measured 12–32 s on every rung; this witness keeps
+ * 25 s on L5 as its patient wait, which is still inside that window.)
  *
  * ── PRODUCT DEFECT FOUND by witness-a, REPAIRED (rbgap lane; see the last blocks) ──
  * THE REPAIR THAT HELD is the founder ruling of 2026-10-05, «BILL FORCED
@@ -80,23 +83,23 @@ const RAW: unknown = JSON.parse(
   readFileSync(path.join(REPO_ROOT, "content", "world", "rb-mini-v1.json"), "utf-8"),
 );
 const LEVELS: readonly ScenarioLevel[] = [1, 2, 3, 4, 5];
-/** The shadow's authored wait at the line (traces/scRbBusyGap.ts SHADOW_WAIT_SEC). */
-const SHADOW_WAIT_SEC = 10;
+/** The shadow's authored wait at the line (traces/scRbBusyGap.ts SHADOW_WAIT_SEC):
+ *  14 s since catalogue-demo-curvature:dae908c7 re-authored the demo on a line
+ *  the car can drive (10 s before — the wait that hit the third car on L5). */
+const SHADOW_WAIT_SEC = 14;
 /** L5's patient wait: the middle of the measured clean window behind the third car. */
 const L5_PATIENT_WAIT_SEC = 25;
 
 /** The authored shadow with its wait at the line set to `sec` (nothing else moves). */
 function shadowWaiting(sec: number): DriveScript {
-  const base = scRbBusyGapShadowScript();
-  let replaced = 0;
-  const steps = base.steps.map((st) => {
-    if (st.kind === "pause" && st.sec === SHADOW_WAIT_SEC) {
-      replaced++;
-      return { ...st, sec };
-    }
-    return st;
-  });
-  if (replaced !== 1) throw new Error(`shadowWaiting: expected one ${SHADOW_WAIT_SEC} s wait, found ${replaced}`);
+  // The script's own dial (traces/scRbBusyGap.ts) — the one step it sets is
+  // the wait at the line; asserted, so a dial that stops reaching it is red.
+  const authored = scRbBusyGapShadowScript().steps;
+  const steps = scRbBusyGapShadowScript({ waitSec: sec }).steps;
+  const moved = steps.filter((st, i) => JSON.stringify(st) !== JSON.stringify(authored[i]));
+  if (sec !== SHADOW_WAIT_SEC && (moved.length !== 1 || moved[0].kind !== "pause" || moved[0].sec !== sec)) {
+    throw new Error(`shadowWaiting: the waitSec dial moved ${moved.length} steps, not the one wait at the line`);
+  }
   return { steps };
 }
 
@@ -189,6 +192,10 @@ describe("sc-rb-busy-gap — waiting LONGER is not priced (8f50287b's causal cla
   // brake for him — that is a real failure to yield (pinned in the next block),
   // not a price on patience. 33–38 s — the band rounds 0 and 1 billed with every
   // car 12–25 m away — is inside the clean window now.
+  // (Re-measured on the re-authored, drivable shadow — catalogue-demo-curvature:
+  // dae908c7 — at L1: 33–38 s clean; at 38.5 s the returning lead now slows to
+  // 2.42 m/s and the drive is neither billed nor commended — the window's upper
+  // edge moved ~0.5 s earlier with the gentler entry. Not a cell pinned here.)
   const LONG: Array<[ScenarioLevel, number]> = [
     [1, 16],
     [1, 20],
@@ -237,13 +244,20 @@ describe("sc-rb-busy-gap — where the long wait DOES become an offence, it is o
     return { out, slowest, nearest };
   };
 
-  it("waits 33–38 s (the band billed until now with nobody affected): the lead never drops below its 2.90 m/s, never comes within 11 m — and the drive is 0 т., ИЗДЪРЖАН, commended", () => {
+  it("waits 33–38 s (the band billed until now with nobody affected): the lead never drops below its 2.90 m/s, never comes within its own guard's braking distance — and the drive is 0 т., ИЗДЪРЖАН, commended", () => {
     for (const level of [1, 3, 5] as const) {
       for (const w of [33, 35, 37, 38]) {
         const { out, slowest, nearest } = watch(level, w);
         const label = `L${level} wait ${w}s`;
         expect(slowest, label).toBe(2.9);
-        expect(nearest, label).toBeGreaterThan(11);
+        // Never inside the distance at which its own guard would start braking
+        // for him: GUARD_STOP_SHORT_M + 2.90 m/s ÷ GUARD_APPROACH_GAIN = 6 + 3.625 =
+        // 9.625 m (traffic/staged.ts). This read 11 m until the demo was re-authored
+        // on a line the car can drive (catalogue-demo-curvature:dae908c7): its entry
+        // from the mouth is now a continuous 8 m-radius turn instead of a pivot, and
+        // at a 38 s wait the returning lead now passes 10.24 m from him on L1
+        // (33 s: 22.48, 35 s: 17.54, 37 s: 12.62 — measured) without slowing.
+        expect(nearest, label).toBeGreaterThan(6 + 2.9 / 0.8);
         expect(out.violationCodes, label).toEqual([]);
         expect(out.result.score, label).toBe(0);
         expect(out.result.passed, label).toBe(true);

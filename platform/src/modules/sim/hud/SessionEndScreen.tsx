@@ -1065,6 +1065,17 @@ export function objectiveDetailText(detail: ObjectiveDetail | undefined): string
  */
 export const HALT_VOIDED_ROW_BG: Record<Extract<ObjectiveDetail, { kind: "haltVoided" }>["reason"], string> = {
   touched: "Не се отчете: колата удари препятствието — задачата е да спреш преди него.",
+  // Lane lanegate (sc-hz-brake-dont-swerve:cb563b2d): attached only to a task that names the student's lane, left
+  // open, on a drive whose car came to rest inside the approach ring (round 3) with its body not wholly in that lane
+  // (round 2: «без да е изцяло» is true of a car a lane over AND of one straddling the line).
+  outOfLane: "Не се отчете: колата спря, без да е изцяло в своята лента — задачата е да спреш в нея.",
+  // Round 5 (L11): attached instead of «outOfLane» when that rest was the crash's — the car motionless within
+  // CRASH_PIN_RADIUS_M of its own terminating collision. «след удар», not «от удара, а не от спирачката»: SimTick has
+  // no brake channel and a pin also arms on a slow terminating contact after braking (the touch row's own lesson above).
+  crashRest: "Не се отчете: колата спря след удар, без да е изцяло в своята лента — задачата е да спреш в нея, без удар.",
+  // Round 3: attached only to such a task left open, on a drive whose car went through the task's place without
+  // stopping in it (`lanePassedUnhalted`) — and only when neither reason above holds.
+  passedUnhalted: "Не се отчете: колата мина през мястото, без да спре — задачата е да спреш там.",
 };
 
 /**

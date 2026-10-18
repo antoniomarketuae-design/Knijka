@@ -85,8 +85,15 @@ interface Cell {
 }
 
 const CELLS: readonly Cell[] = [
-  // The row's own family: a car circulating in the ring, struck in the mouth.
-  { what: "a car crossing in the roundabout", id: "sc-rb-busy-gap", file: "mistake-short-gap.trace.json", level: 1, kind: "vehicle", moving: true },
+  // The row's own family: a car circulating in the ring, struck by a student who cuts across its lane. RE-POINTED AT
+  // THE curvring LANDING (2026-10-18, catalogue-demo-curvature:dae908c7): this cell was sc-rb-busy-gap
+  // mistake-short-gap L1, which the lane re-authored on a drivable line. Followed on the product chassis here, the
+  // re-recorded demo reaches no road user on any rung (firstNpcStep −1 on L1–L5; the 219ac1e recording struck the
+  // circulating car at point 1261, ear, 8.0 км/ч), while the kinematic live chain still bills its COLLISION — the
+  // chassis is not the ghost. Every re-authored family demo was driven here at L1: the only one that meets a road
+  // user is sc-rb-lane-choice mistake-exit-across-outer (the car circulating in the OUTER lane, point 3184, moving
+  // 4.8 км/ч, the sentinel first) — the same class: a moving car in the ring.
+  { what: "a car circulating in the roundabout's outer lane", id: "sc-rb-lane-choice", file: "mistake-exit-across-outer.trace.json", level: 1, kind: "vehicle", moving: true },
   { what: "a car crossing from the right", id: "sc-junction-rhr", file: "mistake-no-look.trace.json", level: 1, kind: "vehicle", moving: true },
   { what: "a moving lead car", id: "sc-follow-distance", file: "mistake-tailgate.trace.json", level: 1, kind: "vehicle", moving: true },
   { what: "a standing car", id: "sc-follow-brake", file: "mistake-no-reaction.trace.json", level: 1, kind: "vehicle", moving: false },
@@ -161,11 +168,20 @@ describe("a contact with a road user — one drive, one body, one step, on every
  * lane's report carries the sweep) and are the three kinds of contact that
  * sweep meets on this lesson:
  *
- *   go 2300 — the circulating car, crossing: the director's sentinel reports
- *             it first (point 2913), the rig's ear a step later; the car is
+ * RE-POINTED AT THE curvring LANDING (2026-10-18): the lesson's shadow-correct
+ * path was re-authored on a drivable line, so the same hold and cruise meet
+ * the circulating car on a shifted band. Re-swept (go 1900–2700 every 20
+ * steps, 41 drives, 60 Hz): contacts only at go 2280 (sentinel, no static),
+ * 2300 (sentinel, no static), 2320 (sentinel, then the island — static) and
+ * 2340 (ear alone, no static); every other go reaches no road user. So the
+ * crossing-then-island cell is now go 2320 and the rapier-alone cell go 2340
+ * (the classes below are unchanged; the steps were 2300 / 2320):
+ *
+ *   go 2320 — the circulating car, crossing: the director's sentinel reports
+ *             it first, the rig's ear later; the car is
  *             then carried into the island — a second, static-object bill
  *             (the class of the row's (ii): a fault LIST that moved by lens);
- *   go 2320 — the circulating car again, but touched by rapier alone at the
+ *   go 2340 — the circulating car again, but touched by rapier alone at the
  *             bill's point (the sentinel's boxes do not overlap there) — the
  *             class of the row's (i), the stamp that moved with the display;
  *   go 1600 — an AMBIENT pedestrian on the arm: no runner casts him, so the
@@ -203,8 +219,8 @@ interface RbEntryCell {
   where?: { id: string; file: string; level: ScenarioLevel };
 }
 const RB_ENTRY_CELLS: ReadonlyArray<RbEntryCell> = [
-  { what: "the circulating car, crossing (the sentinel first)", cell: { holdAtY: -50, goStep: 2300, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "sentinel", staticToo: true },
-  { what: "the circulating car, touched by rapier alone", cell: { holdAtY: -50, goStep: 2320, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "ear", staticToo: false },
+  { what: "the circulating car, crossing (the sentinel first)", cell: { holdAtY: -50, goStep: 2320, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "sentinel", staticToo: true },
+  { what: "the circulating car, touched by rapier alone", cell: { holdAtY: -50, goStep: 2340, cruiseKmh: 12, runSteps: 1500 }, kind: "vehicle", billedBy: "ear", staticToo: false },
   {
     what: "an ambient pedestrian on a marked crossing (the ear's only)",
     cell: { holdAtY: 252, goStep: 2300, cruiseKmh: 12, runSteps: 1500 },

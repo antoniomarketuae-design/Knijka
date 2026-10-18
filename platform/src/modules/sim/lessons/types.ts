@@ -229,6 +229,39 @@ export interface ReachZoneParams {
    */
   stopShortOf?: NamedBodyRect;
   /**
+   * THE LANE THE BANNER SAYS THE STOP IS MADE IN — sc-hz-brake-dont-swerve:cb563b2d (lane lanegate).
+   *
+   * WHAT WAS BROKEN. «Спри преди препятствието — с пълна спирачка, В своята лента» ticked a car at rest OFF THE
+   * CARRIAGEWAY (5.9 m right of the lane centre, no contact, 0 points, «passed») and a car a lane over, in the
+   * escort's lane. The grace capsule's axis is latched from wherever the car first enters the radius +
+   * `REACH_ZONE_GRACE_M` ring (`objectives.ts reachZoneApproachAxis`), and its lateral offset is measured across
+   * THAT axis — so a car that enters the ring from beside the lane and rests near its entry reads 0 m sideways.
+   * Nothing compared the rest with the lane, and a pure probe ticked 216 of 216 approach sides on the three gates
+   * whose titles claim the student's own lane.
+   *
+   * WHAT IT MEANS. The lane whose CENTRE LINE RUNS THROUGH THE MARK at `headingDeg` (district convention: 0 = +y,
+   * clockwise positive; a lane is a line, so ±180° is the same lane), `halfWidthM` either side of it — half the lane
+   * pitch the built road draws (`runtime/spatial LANE_WIDTH_M`), the same width the locator numbers lanes by. The
+   * task is ticked only on a frame on which the car is HALTED, inside the gate’s own place (`inAcceptance ||
+   * graceArmed` — round 3: the tick is AT THE MARK, never at a later halt down the lane), with its WHOLE BODY inside that strip — every corner
+   * of the product's own footprint (`collision playerObb`) measured across the AUTHORED heading, never across the
+   * latched approach axis (`objectives.ts reachZoneRestLaneBodyOffsetM`) — and only if the approach has not
+   * already spent its graded rest outside it (eval state `laneVoidedOffsetM`, cleared by a fresh approach exactly as
+   * `haltVoided` is). The body and not the centre (round 1 tested the centre and was refuted): «в своята лента» is
+   * a claim about the car, and a centre test at half the pitch ticked cars with 0.85 m of body over the line — the
+   * band the lane-keeping rule (`laneKeepMaxOffsetM` 3.25 m) calls straddling. A straight car is in up to a centre
+   * offset of 4.0625 − 0.85 = 3.2125 m; an askew one is judged by the corner that sticks out.
+   *
+   * IT CREDITS NOBODY NEW. It is a conjunction on top of the shipped arrival; the capsule, its axis and every
+   * other term are untouched, and a gate without the key is bit-identical to shipped.
+   *
+   * AUTHORED ONLY, like `stopShortOf`: a banner can say «в своята лента», but only the template knows which way the
+   * lane runs at the mark. Carried by exactly the halt gates whose title claims the student's OWN lane —
+   * `sc-hzbds-stop`, `sc-hzes-stop`, `sc-lnom-wait` (`halt-gate-rests-in-its-lane.test.ts` §0 holds both directions
+   * and checks each against the built road on every rung).
+   */
+  restInLane?: LaneStrip;
+  /**
    * THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS — sc-rx-guarded:deb92207,
    * wave 2, and the second term this file's own templates routed here.
    *
@@ -1346,6 +1379,58 @@ export type ObjectiveEvalState =
        */
       haltVoided?: "impact";
       /**
+       * `ReachZoneParams.restInLane` ONLY (sc-hz-brake-dont-swerve:cb563b2d, lane lanegate round 2) — THIS
+       * APPROACH'S GRADED REST WAS MADE OUTSIDE THE LANE: how far the car's centre stood from the centre line of the
+       * lane the task names (m, across the authored lane heading) on the first frame of the approach on which the
+       * car stood halted inside the approach ring (radius + REACH_ZONE_GRACE_M — round 3: whether or not that rest honoured the
+       * arrival) with its body not wholly inside the lane — a rest `ObjectiveContext.restIsCrashPinned` names the
+       * crash's included (round 5, L11: its provenance is `laneVoidedByCrash`). Carried for the approach
+       * and cleared ONLY on `freshApproach` — the very expression that clears `haltVoided` — because on a halt cap the
+       * first standstill of an approach is the graded act: while it is set the task is not ticked, so creeping back
+       * into the lane inside the ring does not earn «… в своята лента». Its rising edge is the one frame
+       * `lessons/engine.ts` speaks the «Спря, но не изцяло в своята лента» card on — unless the crash pin held it.
+       */
+      laneVoidedOffsetM?: number;
+      /**
+       * `ReachZoneParams.restInLane` ONLY (lane lanegate round 5, L11) — THE VOID'S PROVENANCE: `true` when the rest
+       * that raised `laneVoidedOffsetM` was one `ObjectiveContext.restIsCrashPinned` names the crash's (the car
+       * motionless within CRASH_PIN_RADIUS_M of its own terminating collision). Set with the void and carried with it
+       * — the first rest is the graded act, so a later non-crash rest on the same approach does not change it; cleared
+       * with it on `freshApproach`. It decides what is SAID, not what is graded: no lane card on a crash's void, and the
+       * fold names it «crashRest».
+       */
+      laneVoidedByCrash?: true;
+      /**
+       * `ReachZoneParams.restInLane` ONLY — THE FOLD'S FACT: a graded rest of this drive was made outside the named
+       * lane (the latest such rest's centre offset, m). Written with each approach's `laneVoidedOffsetM` and never
+       * cleared — a fresh approach clears the void, not the fact that the stop happened. The fold reads it for the
+       * row's reason (`ObjectiveDetail` `haltVoided` «outOfLane», or «crashRest» under `laneRestByCrash`) on a task
+       * that stayed OPEN only.
+       *
+       * None of these fields is written on any other gate, so every other eval state is byte-identical to shipped.
+       */
+      laneRestOffsetM?: number;
+      /**
+       * `ReachZoneParams.restInLane` ONLY (round 5, L11) — the provenance of the void `laneRestOffsetM` was last
+       * written with (`laneVoidedByCrash`), never cleared: the fold prints «crashRest» instead of «outOfLane» for it.
+       */
+      laneRestByCrash?: true;
+      /**
+       * `ReachZoneParams.restInLane` ONLY (lane lanegate round 3) — THIS APPROACH'S PASSAGE THROUGH THE GATE'S PLACE
+       * (`inAcceptance || graceArmed`): «in» while the car is in the place, moving, within the cap, with nothing
+       * struck; «halted» once it has halted there; «passed» on the frame it left the place past the mark from «in» with
+       * no lane void — it went through without stopping. Carried and cleared exactly as `laneVoidedOffsetM` is
+       * (`freshApproach`); its rising edge to «passed» is the one frame `lessons/engine.ts` speaks «Мина, без да
+       * спреш» on. State only: no term of `done`.
+       */
+      lanePass?: "in" | "halted" | "passed";
+      /**
+       * `ReachZoneParams.restInLane` ONLY — THE FOLD'S FACT for `lanePass` «passed»: on some approach of this drive the
+       * car went through the place without stopping in it. Never cleared. The fold reads it for the row's reason
+       * (`ObjectiveDetail` `haltVoided` «passedUnhalted») on a task that stayed OPEN only.
+       */
+      lanePassedUnhalted?: true;
+      /**
        * `requireStopAtLine` ONLY (sc-merge-from-property:64fd365e) — the
        * session second the car's CURRENT standstill began, while it stands
        * inside the line window (the disc, not past the paint, within
@@ -1659,9 +1744,25 @@ export type ObjectiveDetail =
        * (`lessons/debrief.ts`), on the client's result and on the server's
        * (`wire.ts` validates it). It grades nothing: `done` is decided before
        * this is attached.
+       *
+       * „outOfLane" (lane lanegate, sc-hz-brake-dont-swerve:cb563b2d) = the
+       * car came to rest where the task would have been ticked, but outside
+       * the lane the task names (`ReachZoneParams.restInLane`; the eval
+       * state's `laneRestOffsetM`). „touched" wins when both hold: a contact
+       * with the named body is the graver fact and is billed.
+       *
+       * „crashRest" (lane lanegate round 5) = as „outOfLane", but the rest
+       * that voided the approach was the car's own crash's (the eval state's
+       * `laneRestByCrash`: motionless within CRASH_PIN_RADIUS_M of a
+       * terminating collision) — the row says the car stopped after a crash.
+       *
+       * „passedUnhalted" (lane lanegate round 3) = on a task that names the
+       * student's lane, the car went through the task's place without stopping
+       * in it (the eval state's `lanePassedUnhalted`), and the task stayed open.
+       * „touched" and then „outOfLane" win when they also hold.
        */
       kind: "haltVoided";
-      reason: "touched";
+      reason: "touched" | "outOfLane" | "crashRest" | "passedUnhalted";
     };
 
 /**
@@ -1675,6 +1776,15 @@ export interface NamedBodyRect {
   y: number;
   headingDeg: number;
   halfLengthM: number;
+  halfWidthM: number;
+}
+
+/**
+ * The lane a task names — `ReachZoneParams.restInLane`. Its centre line runs through the zone's own mark (x, y) at
+ * `headingDeg` (0 = +y, clockwise positive, read modulo 180°); `halfWidthM` either side of it is the lane.
+ */
+export interface LaneStrip {
+  headingDeg: number;
   halfWidthM: number;
 }
 

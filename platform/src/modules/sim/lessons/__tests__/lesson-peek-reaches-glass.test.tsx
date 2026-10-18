@@ -688,9 +688,11 @@ describe("census — every lesson card engine.ts writes either carries a summary
       })
       .filter((x): x is { line: number; peek: string; title: string | undefined } => x !== null);
 
-    // EIGHT since «Спря, но преди линията» (requireStopAtLine, sc-merge-from-property:64fd365e).
-    it("finds all eight objective cards", () => {
-      expect(authored).toHaveLength(8);
+    // EIGHT since «Спря, но преди линията» (requireStopAtLine, sc-merge-from-property:64fd365e); NINE since «Спря, но не
+    // изцяло в своята лента» (restInLane, lane lanegate, sc-hz-brake-dont-swerve:cb563b2d); TEN since «Мина, без да
+    // спреш» (the pass through the place without a stop, lane lanegate round 3).
+    it("finds all ten objective cards", () => {
+      expect(authored).toHaveLength(10);
       for (const a of authored) expect(a.title, `engine.ts:${a.line}`).toBeDefined();
     });
 

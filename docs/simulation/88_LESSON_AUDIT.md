@@ -14442,3 +14442,530 @@ The census does not depend on them (the verifier). Owed: unit rows that kill eac
   - The phone's un-paused L3 exam peek for FAILED_TO_YIELD (filed with «↓ ОЩЕ 7 РЕДА»), which rig-w3h did not judge.
 - **Founder question 8** (condition 5): the 818 / 880 floor, and options (a) and (b).
 - **Triage:** «wcbannercap» (condition 6).
+
+## Wave C verdicts — 2026-10-18
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`219ac1ebacf5`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 9 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 22 |
+
+**Open list: 32 → 31**, out of 1559 filed across the whole programme (1527 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3j: the first drives of the pc and ic landings at `219ac1e` — `l0-free-drive:ee9d9374` CLOSED; `sc-sig-controller-postures:5ee4301e`, `:4f446777` and `sc-roundabout-entry:fe081cf1` PARTIAL (integrator note, 2026-10-18)
+
+Two runs of workflow `rig-wave-w3j`, both at `219ac1e` with health attesting `219ac1e`: the first (wf_1c24d836-b9b) drove and judged `5ee4301e` and `4f446777` and was stopped at the 2026-10-18 account switch during the `ee9d9374` capture; the rest wave (wf_db1da37a-ef2, the same tag, so the capture continued from its own PROGRESS.md and kept its four PC cells) drove and judged `ee9d9374` and `fe081cf1`. One capture and one judge per row, and an adversarial verifier on the proposed closure. Frames and sidecars are under `.audit-frames/rig-w3j/<lesson>/<id8>/`; the journals are `handoff-2026-10-08/reports/rig-w3j-journal.jsonl` and `rig-w3j-rest-journal.jsonl`. **Open list 32 → 31 (4 critical, 25 major, 2 minor).**
+
+- **`ee9d9374` (critical) CLOSED, and its verifier could not refute it.** Nine kept cells: L0 façade at 50 km/h on PC ×2 and the phone, the exam façade (`lex-exam-1`) on PC and the phone, the hazard block (`sc-hz-brake-dont-swerve` L3) on PC and the phone, the park wall (`sc-park-wall` L3) and a 10 km/h nudge.
+  - The product's impact reading now equals the speed at the step before the contact within 0.03 km/h on every cell (49.55 → 49.55; 49.63 → 49.65; 19.63 → 19.64; 9.64 → 9.63). The filing measured 50.1 read as 5.50.
+  - A 50 km/h crash bills COLLISION 10 опасна at the contact step; L0 ends by itself «Край на упражнението след удара», НЕИЗДЪРЖАН 13; the exam terminates with the protocol line «Изпитът се прекратява: настъпи пътнотранспортно произшествие — Наредба № 38, чл. 48, ал. 3», НЕИЗДЪРЖАН 13, the same points on PC and the phone. The park wall cuts to the chase view at +203 ms. The 9.63 km/h nudge stays unbilled, as the unchanged 10 km/h tolerance says.
+  - Presentation on PC matches the formulas at 49.6 km/h (thump k = 1, haptic [159,40,64], shake call 2.28°); the nudge is distinct (k 0.343, a 20 ms tap, no shake, no cut).
+  - **What the closure does NOT show:** thump and haptic on the phone (WebKit has no AudioContext and no `navigator.vibrate`; they read the same lens-independent impact figure); a displayed shake on the phone exam cell (one render fell in the 420 ms window — the per-render standard of 2026-10-13 governs, and that standard belongs to `f0023997`); speeds inside the row's 30–70 km/h band other than 50 (the reading now tracks the approach linearly). Catalogue-wide exposure (C7) is answered by mechanism: the one shared chassis contact path changed, and l0 and lex-exam-1 stand for the curriculum and the exam.
+  - **Seen, not filed (triage candidate «examresulttap»):** on the phone, after the exam was terminated by the crash, two taps on the «РЕЗУЛТАТ» card did not open the result screen; МЕНЮ → «Виж разбора» did (`cells/EXAM-FACADE-50/lex-exam-1-phone-FACADE50-r2-05/06-*.png`, `diag-result/exam-phone-abort.json`). On L0 one tap opened it.
+- **`5ee4301e` (critical) PARTIAL.** C1 answered live (each approach's ambient signal phase follows the officer by axis; 0 unresolved reads; the N-S queue held on the halt, E-W crossed only on green). C2 not reproduced (0 E-W crossings in 150 s side-on). C3 «no E-W car enters while the officer halts E-W» met only vacuously: after about 22 s no ambient car is on the E-W lanes within 80 m — every agent queues N-S. C4: the careful crossings on PC L1 ×2, L3 ×2 and the phone L1 / L3 have 0 contacts, 0 points, ИЗДЪРЖАН — but no cross car stood at its line at any GO. C5 (other single-node signalised junctions) unjudged. **Next:** a cell that PRESENTS an E-W ambient car at its line under the officer's halt (or a staged / in-process measurement), and another single-node signalised lesson with ambient E-W traffic.
+- **`4f446777` PARTIAL.** Clauses 1–5 answered on the live build (PC L1 / L3, phone L1 / L3: 0 ambient walker samples on any carriageway or in the box; the walkers keep to their pavements through the filing's windows; the beats end at the trimmed pavement, 28.325 m; 0 pedestrian rule events). Clause 6 — every district whose pavement beat touches a node end — is catalogue-wide and needs a judge-RUN in-process check across the live traffic configs, not a device drive.
+- **`fe081cf1` PARTIAL; what is open waits on founder question 8.** Closed on these frames: the filed frame's own form, the phone's un-paused L3 FAILED_TO_YIELD exam peek (the one-liner whole, body scrollHeight 30 = clientHeight 30; «ЗАЩО» opens the whole paragraph and the chip «ЗДвП чл. 50, ал. 1» on one page), and two judged cards on PC at and above the measured both-whole floor (FS-1920 Chromium φ70 and MODE-P, WebKit φ60: older and newer parts out on 0 rAFs; no advisor card while both stand). LB-1440 (655 px, below the 818 floor) was recorded clean (out 0/0 over 67–68 rAFs, against 4 cut at rig-w3h); nothing is closed on it. **Still on the glass:** FS-1280x720 (stage 619.5 px), the rig-w3h STILL cell, unchanged — the older FAILED_TO_YIELD card loses its one-liner and law chip on 60 of 60 overlap rAFs behind the fold row. The cardstay2 landing's own measurement puts this pair's both-whole floor at 650 px and shows two summaries cannot fit there (235.8 px needed, 214.6 px window). Whether a 1280×720 screen must show both cards whole is founder question 8 (the minimum supported screen); the cure options (a) the recall pill yields and (b) a one-line banner are unbuilt and his call. The judge carried it as that question, not as a new defect.
+
+## Landed: on the three halt gates whose title claims the student's own lane, the ✓ now needs the whole car halted inside that lane at the mark. A rest out of the lane inside the approach ring voids the approach, whether it is the student's own stop or a crash's. A roll-through without a stop gets its own card and voids nothing. On an open task the row names which of those three happened. Measured in process only. `sc-hz-brake-dont-swerve:cb563b2d` (critical) (2026-10-18)
+
+Lane `lanegate`, five rounds, built on `1f1536d`.
+- Rounds 1, 2 and 4 were REFUTED. Round 3 was BLOCKED on the integrator's stop rule. Round 5 was SIGNED OFF WITH CONDITIONS by the adversarial verifier. The rounds and their rulings come first below, then the conditions.
+- **The patch.** `lanegate-result-r5.patch`: sha256 7709406f…, 25 files, +2587/−33, 0 CR bytes. No touched file is CRLF in base (the builder).
+  - The verifier returned its lane to tag `base`, applied the patch and tagged the result r5. `git diff base` hashes to the patch's own sha256.
+  - The patch is cumulative against `1f1536d`, not against HEAD. This landing applies it 3-way onto `219ac1e`, which carries `e58f388` (ambient traffic, ADR-018) and the ic landing (impact speed, ADR-014 «Amendment 2026-10-18»). PROVEN ON 219ac1e records the apply.
+  - It shares only the reviewed-text manifest files with `curvring-result-r1.patch`, which lands in the same gate. The manifest is to be re-recorded once, after both patches (PROVEN ON 219ac1e).
+- **Product files (9).**
+  - `lessons/objectives.ts`: the repair.
+  - `lessons/engine.ts`: the lane card, the pass card and the row's reason.
+  - `lessons/types.ts`, `lessons/wire.ts` and `lessons/scenario/params.ts`: the new fields, the reasons on the wire and the params whitelist.
+  - `lessons/debrief.ts` and `hud/SessionEndScreen.tsx`: the debrief lines and the end-card rows.
+  - `templates-hazards2.ts` and `templates-lanes2.ts`: the authored `restInLane` strip on the three gates.
+- **Test-side files (16).**
+  - New: `halt-gate-rests-in-its-lane.test.ts` and `halt-gate-own-lane.census.test.ts`, 83 tests between them.
+  - Changed:
+    - `stop-short-of-named-body`: the «three reasons» pin becomes «four reasons», with a check that the crashRest row heads its debrief line;
+    - `lesson-peek-reaches-glass`;
+    - `hz-stop-before-contact`;
+    - 11 reviewed-text-manifest files.
+- **What did not change** (the builder).
+  - Bills, rules, points values and graded clocks.
+  - The protected thresholds: 2.40 m; 3.25 m / 3.0 s; 15°/100 m; 16.25 m; 45°; 0.1; ROUTE_RUNOUT_ARRIVE_M 2.5; and the 35 km/h floor.
+  - The verifier's live census found score and violations identical in every changed cell.
+  - The other 60 halt-capped gates carry no `restInLane`.
+
+**The row is NOT closed by this landing.** `sc-hz-brake-dont-swerve:cb563b2d` stays OPEN.
+- Every number below was measured in process, with three instruments: the product chassis, the live lesson chain and the pure evaluator.
+- Neither the builder nor the verifier drove anything in a browser or saw anything on a device.
+- A rig re-drive on PC and on the phone lens is owed (below). Whether its frames close the row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong** (the row, from triage round 3 at `1f1536d`).
+- Three halt gates claim the student's own lane in their titles:
+  - sc-hzbds-stop «Спри преди препятствието — с пълна спирачка, В своята лента»;
+  - sc-hzes-stop «…в лентата»;
+  - sc-lnom-wait «Спри в своята лента…».
+- Each gave its ✓ to a car resting outside that lane: off the carriageway, or in the escort's lane.
+- **The cause** (the builder, base `objectives.ts`):
+  - `reachZoneApproachAxis` (~4601) sets `entryFrom = prevPos ?? here` when the car first enters the radius+5 ring. Any later entry within 90° re-sets it.
+  - `stepReachZone` measures `lateral` across that latched axis.
+  - `done = arrivalHonoured && !shortOfMark` never compares the rest with the lane or the road.
+  - So a car that enters the ring from beside the lane and stops near where it entered reads about 0 m sideways and is ticked.
+- **Measured on base** (the row):
+  - 17 of 360 façade-bounce drives tick. Example: bounce-y170-s-0.7-b0.5-release, ticked at step 1066 at (12.563, 181.741) after a façade COLLISION at step 903.
+  - 19 of 60 lane-shift drives tick with no contact at all. Example: shift-x10-l140-b168 rests at (9.945, 177.47), 5.9 m right of the lane centre and off the road, with 0 points and the verdict passed.
+  - In the pure stepObjective probe, 108 of 108 cells tick on the three gates at L1 and L3. The triage's own caveat: the cells at dx = 0 are lawful in-lane stops, so only the dx ≥ 4.5 cells show the defect.
+- The round-1 verifier confirmed that the repair removed all 17 base bounce ticks; the collision lists were identical up to the base tick. The repair also removed 13 of the finding's 19 shift ticks. The other 6 still ticked, which refuted round 1.
+
+**The rounds, and the integrator's rulings.** The rulings were made under the 2026-10-08 delegation. They are not founder rulings, and the founder is to be told at this landing (Owed). Each ruling is quoted from the integrator's running note; L6 and L7 are quoted in part.
+- **Round 1, REFUTED** (`R/lanegate-r1.json`). The lane test read the car's CENTRE against the half-lane, so a car straddling the line was still ticked:
+  - 6 of the 19 shift drives that tick on base still ticked, with 0.26–0.83 m of body in the escort lane;
+  - 48 of 66 straddle drives ticked;
+  - a car creeping back at 3 km/h after the card was ticked while moving.
+- **Rulings, 2026-10-17 23:00:**
+  - **L1, the body:** «every corner of playerObb inside the authored strip (= 3.2125 m straight, inside laneKeepMaxOffsetM 3.25)».
+  - **L2:** «a halted frame only».
+  - **L3:** «the first arrival-honouring rest of an approach is the graded act (the haltVoided «impact» precedent: carried for the approach, cleared only by freshApproach) — no tick by creeping back inside the ring».
+- **Round 2, REFUTED** (`R/lanegate-r2.json`).
+  - On sc-lnom-wait the authored strip was unbounded along the lane, and reached/capMet stayed latched.
+  - So a roll-through at or under the cap was ticked at a later halt:
+    - on the live chain, L2–L5, at 0.85 km/h, 27 m past the obstacle (58.85 m past the mark);
+    - in the pure evaluator, at halts 16.76–121.76 m past the mark, on every rung.
+- **Rulings, 2026-10-18 01:25:**
+  - **L4:** «the tick is at the mark (inAcceptance || graceArmed, the capsule's locality)».
+  - **L5:** «the first halted rest INSIDE THE APPROACH RING with the body out of the lane voids the approach (widens L3; the brake-don't-swerve core error)».
+- **Round 3, BLOCKED on the stop rule** (`R/lanegate-r3.json`; no verifier ran).
+  - L4 and L5 worked, and the builder added the roll-through card.
+  - But L5 voided two sc-ln-obstacle-meeting MISTAKE demos:
+    - mistake-pull-out@L1, whose first ring rest is the rest after the head-on;
+    - mistake-squeeze@L1–L5, whose tape ends at rest wholly in the oncoming lane.
+- **Rulings, 2026-10-18 03:45:**
+  - **L6:** «a crash-pinned rest neither voids nor prints the lane card/row». Superseded by L11.
+  - **L7:** «squeeze ACCEPTED as «stopped out of the lane»».
+  - **L8:** «P2-wide8 ACCEPTED as recorded (rest 9.12 m, outside the 9 m ring = fresh approach)».
+  - **L9:** «roll-through card IN SCOPE».
+  - **L10:** «observations recorded».
+- **Round 4.**
+  - Attempt 1 was BLOCKED for an operational reason only: its mutant runner outlived it (`R/lanegate-r4a.json`).
+  - The resumed round 4 was REFUTED (`R/lanegate-r4.json`). Under L6, the façade-bounce drive kept an OPEN row with NO reason, and so did the 16 other bounce drives that had carried outOfLane. `detail` was null on all 360 bounce drives, because the product had no row text for a crash rest.
+  - The builder also measured that a crash rest inside the ring, followed by a halt at the mark, still ticked.
+  - Mutant W3 (the void cleared on leaving the ring) survived.
+- **Ruling L11, 2026-10-18 06:08** (replaces L6): «a crash-pinned out-of-lane rest inside the ring VOIDS the approach (haltVoided «impact» precedent — also removes the crash-rest-then-return residual tick), prints NO lane card (the COLLISION card speaks), and the row/debrief get a NEW crash reason worded from the product's card «Колата спря от удара, а не от спирачката»; pull-out@L1 becomes the expected class «crash rest out of the lane»».
+- **Round 5, SIGNED OFF WITH CONDITIONS** (`R/lanegate-r5.json`).
+
+**The wording L11 asked for, and what was built.**
+- The builder did not use «от удара, а не от спирачката». It used «спря след удар».
+- The reason: the product cannot know what stopped the car. SimTick has no brake channel, and a pin also arms on a slow terminating contact after braking. SessionEndScreen's own comment records that this sentence was false for exactly that reason (SessionEndScreen.tsx :1063).
+- The verifier agrees. The crashRest row is attached only to an open task whose void was raised on a halted frame (≤ 1 km/h) inside the ring, with the body out of the lane and the crash pin holding the car.
+- The pin is armed only by COLLISION, the catalogue's only terminating code (`rules/catalog.ts:1114` and `:1649`). So «спря след удар» and «без да е изцяло в своята лента» are true wherever the row can appear.
+- The existing haltVoided «impact» card is unchanged.
+
+**What landed.** This is the builder's description; the verifier's measurements are under the next heading.
+- **The strip.** sc-hzbds-stop, sc-hzes-stop and sc-lnom-wait each carry an authored `restInLane {headingDeg, halfWidthM}`. halfWidthM is 4.0625 m, half of the template's 8.125 m lane constant (HZ_LANE_WIDTH_M, DEBRIS_LANE_SHIFT, LNOM_LANE_WIDTH_M). It is checked against the built road on every rung (§0).
+- **The tick (L1, L2, L4).** On those three gates the task ticks only when all of these hold:
+  - the frame is halted;
+  - the car is at the mark (`inAcceptance || graceArmed`);
+  - the approach carries no lane void;
+  - every corner of `playerObb` lies inside the strip across the authored heading. For a straight car that means a centre offset of at most 3.2125 m.
+- With no `restInLane`, `done` is the shipped expression bit for bit.
+- **The void (L3, L5, L11).** The first halted rest inside the approach ring with the body out of the lane voids the approach, whether or not the crash pin holds it.
+  - It is carried for the approach and cleared only by `freshApproach`. Leaving through the far side of the ring does not clear it.
+  - An out-of-lane rest OUTSIDE the ring raises no void (observation (a)).
+- **The roll-through (L9).** A pass through the place at or under the cap without halting there is followed as state (`lanePass`). It speaks the pass card and gives the passedUnhalted row. It is no term of `done`: it voids nothing and credits nothing.
+- **The provenance.**
+  - The eval state `laneVoidedByCrash` is set together with the void and carried with it.
+  - The fold fact `laneRestByCrash` is the provenance of the void that `laneRestOffsetM` was last written with.
+  - A later non-crash rest on the same approach changes neither the void nor its reason.
+- **The lane card**, spoken only when the void is not a crash's:
+  - title «Спря, но не изцяло в своята лента»;
+  - body «Колата спря на {d} м встрани от средата на своята лента и не беше изцяло в нея. Задачата иска цялата кола да спре в твоята лента, затова това спиране не я отчита. Спирай право в своята лента, с прав волан.»;
+  - peek «Спирай изцяло в лентата.»
+- **The pass card (L9):**
+  - title «Мина, без да спреш»;
+  - body «Колата мина през мястото на задачата, без да спре в него. Задачата иска пълно спиране там, затова това минаване не я отчита. Спирай напълно, преди да продължиш.»;
+  - peek «Спри напълно на мястото.»
+- **The row reasons**, on an OPEN task only (`touched` still wins):
+  - outOfLane: «Не се отчете: колата спря, без да е изцяло в своята лента — задачата е да спреш в нея.»
+  - passedUnhalted: «Не се отчете: колата мина през мястото, без да спре — задачата е да спреш там.»
+  - crashRest: «Не се отчете: колата спря след удар, без да е изцяло в своята лента — задачата е да спреш в нея, без удар.»
+- **The debrief lines** repeat each row and add an act:
+  - outOfLane: «Спирай с прав волан.»
+  - passedUnhalted: «Спирай напълно, преди да продължиш.»
+  - crashRest: «Спирай по-рано, с прав волан.»
+- The wire accepts the three reasons and still drops a forged one. No law citation is involved.
+
+**What the verifier reproduced.** It worked on its own lane, base + the r5 patch, sha matched. Log: `D:/knijka-lanes/scratch/lanegate-verify/PROGRESS.md`; files under `r5/`.
+- **Lane files:** 83 of 83.
+- **Bounce set:** 360 product-chassis drives at L3, using its own oracle for the first ring rest and the crash pin.
+  - 0 ticks.
+  - 34 drives had their first halted rest in the ring out of the lane. All 34 were crash-pinned, and all 34 end with reason crashRest and 0 lane cards.
+  - 0 drives whose first ring rest was out of the lane end with a reasonless row.
+  - All 17 drives that carried outOfLane in rounds 1–3 now carry crashRest.
+  - The other 326 never halted inside the ring, so their row is null (observation (a)).
+- **The named drive**, bounce-y170-s-0.7-b0.5-release:
+  - COLLISION 10 at step 903;
+  - the void at step 1066, at (12.563, 181.741), −0.99 km/h, crash-pinned;
+  - the crashRest row and debrief line, and no lane card;
+  - the ending «Край на упражнението след удара» at 1666;
+  - verdict failed.
+- **Shift set**, 60 drives: 0 ticks. 39 drives get outOfLane and exactly one lane card. 21 have no rest inside the ring (observation (a)).
+- **Straddle set**, 66 drives: 15 ticks.
+  - None is on a moving frame.
+  - None has a corner over the line: the largest corner offset is 4.0497 m against the 4.0625 m half-lane.
+  - None comes after an out-of-lane first rest.
+- **Live census:** the three lessons × every committed demo × L1–L5, struck twin against the tree. 11 of 45 cells change, exactly as the builder lists:
+  - 5 cells: the lnom shadow's tick moves from step 920 to 941, because it now waits for the halt;
+  - 5 cells: mistake-squeeze gets the lane card and the outOfLane row (L7);
+  - mistake-pull-out@L1 gets the crashRest row, with the HUD unchanged (L11).
+  - Score and violations are identical in every cell, and no correct demo loses its tick.
+- **Its own pure probe:** 3 gates × L1–L5 × both sides × 9 crash-provenance scenarios = 270 runs, all as expected.
+  - After a crash rest out of the lane, none of these ticks:
+    - a creep back to the mark, pinned or not;
+    - leaving through the far side of the ring and halting at the mark;
+    - a crash rest only just out of the lane (body out, the car angled about 15°) and then the mark.
+  - Two cases tick, and the ruling allows both:
+    - a fresh approach followed by an in-lane halt at the mark;
+    - an in-lane crash rest short of the mark followed by the mark.
+  - When the first rest is not crash-pinned, a later crash-pinned rest keeps the outOfLane reason.
+- **Residual probe** (its copy of the builder's live probe): 29 cases, 0 ticks after a crash rest on the same approach.
+  - Every crash case is crashRest with 0 lane cards.
+  - Every no-crash control gets one lane card plus outOfLane.
+  - The builder reported 30 cases; the verifier counts 29 rows.
+- **Reviewed-text manifest:** from r4 to r5, exactly 2 strings were added, the crashRest row and its debrief line (13,281 → 13,283).
+- **Targeted regression:** 21 files, 624 of 624. These include:
+  - the lane files and the manifest;
+  - caption-truth and both keep-right tests;
+  - hz-stop-before-contact and the four grid-cadence censuses;
+  - stop-short-of-named-body, lesson-peek-reaches-glass and halt-credit-names-an-act;
+  - objective-detail-red-met, five debrief tests and b5-crash-pin-rescue.
+- **tsc:** 22 errors, the baseline Prisma store files.
+- **Mutants:** 8, one at a time, each restored and sha256-checked.
+  - Killed on assertion text:
+    - W3, the void cleared on leaving the ring (round 4's survivor): 3 red;
+    - X10, an unknown pin treated as a crash: 37;
+    - X5, the crash row printed with the outOfLane text: 4;
+    - X7, the wire turning crashRest into outOfLane: 1;
+    - X8, every void named crashRest: 31;
+    - X6, the crash debrief line losing its act: 4.
+  - Survived: X1 and X4 (conditions 1 and 2).
+- **Tools.**
+  - Round 5 changed only the tables `HALT_VOIDED_ROW_BG` and `HALT_VOIDED_DEBRIEF_BG` (+crashRest).
+  - Cumulatively, the landed patch also adds the outOfLane and passedUnhalted keys and the engine.ts objectiveNotice literals of the lane and pass cards.
+  - At round 5 the verifier grepped `tools/` (excluding node_modules) for haltVoided, HALT_VOIDED, outOfLane, crashRest and passedUnhalted, and found nothing.
+  - The gate must still run the tools tests.
+- **Builder only, not re-measured by a verifier:**
+  - **The pure census:** 63 halt-capped gates × every committed demo × every rung = 927 cells, empty context.
+    - 15 ticks changed against base, all «waited for the halt, body in lane» on the three lane shadows: hzbds 318→320, hzes 263→265, lnom 307→314.
+    - The other 60 gates: 0 changes.
+    - Voids only on squeeze@L1–L5 and pull-out@L1. No shadow is voided or passed.
+  - **Its 24 mutants**, all killed on assertion text.
+  - **Its directory runs:**
+    - lessons: 126 files, 2,393 passed, 1 failure. The failure was the pin that legitimately moved, and it was updated.
+    - scenario: 195 files, 4,847 passed.
+    - hud + lesson-ui: 2,182 passed, 2 environment failures (touchHintLifetime ENOENT; a shellClipAffordances timeout that passes alone).
+
+**The conditions, and how each stands.**
+
+**1. C1: the provenance follows the LATEST void, and nothing pins it.**
+- Mutant X1 makes the fold keep a crash provenance across a later void. It leaves all 83 lane tests green (`r5/mut/X1-provenance-sticky-across-voids.log`).
+- The verifier's pure S1 tape: a crash rest at ±6 m, a reverse out of the ring, a re-entry, and an unpinned halt at ±4.5 m.
+  - On all 30 cells the shipped code gives voids [true, false] with `laneRestByCrash` unset, so the fold would name outOfLane.
+  - X1 gives `laneRestByCrash` true, so the row would read crashRest: «колата спря след удар» about a rest that was the student's own stop (`r5/pure-X1.jsonl`).
+- No committed demo has two approaches, so this is an uncommitted input.
+- Owed: a pin that S1 ends with the outOfLane provenance and row, killing X1 on assertion text.
+- PINNED AT INTEGRATION: `lessons/scenario/__tests__/halt-gate-rests-in-its-lane.test.ts` §11 «lanegate C1/C2», the pure S1 tape on all three gates × L1–L5 × both sides: a crash rest at ±6 m with the pin held, a reverse out of the ring, a re-entry, then an unpinned halt at ±4.5 m. It asserts voids [true, false], `laneVoidedByCrash` false, `laneRestByCrash` false, and the fold's offset equal to approach 2's rest. The reverse order (S2) gives [false, true] and the crash's provenance. Mutant X1 turns 4 tests red, every failure an AssertionError: pure «sc-hzbds-stop@L1 1 S1 the fold names the LATEST void, the student's — «outOfLane» (C1): expected true to be false», and live «the row names the student's stop (C1): expected { kind: 'haltVoided', …(1) } to deeply equal …». The merge verifier applied X1 itself and it was killed the same way.
+
+**2. C2: a fresh approach must clear the void's provenance together with the void, and nothing pins it.**
+- Mutant X4 keeps the provenance from the previous state when the void is not carried. It leaves 83 of 83 green (`r5/mut/X4-fresh-does-not-clear-provenance.log`).
+- On S1, X4 gives voids [true, true] with `laneRestByCrash` true. So the lane card would not be spoken on approach 2, and the row would read crashRest.
+- Owed: the S1 tape run live, asserting one lane card on approach 2 and the outOfLane row, killing X4 on assertion text.
+- PINNED AT INTEGRATION: the live S1 test in the same §11, on sc-hzbds-stop and sc-hzes-stop at L1/L3/L5 × both sides. It injects a static contact on approach 1, then puts approach 2's own halt out of the lane 10.5 m from the impact, beyond CRASH_PIN_RADIUS_M (6 m). It asserts one COLLISION, no tick, one lane card on approach 2's halted rest, the outOfLane row and its debrief line, and not the crash's line; the pure S1 tests assert the voids [true, false]. Mutant X4 turns 4 tests red, every failure an AssertionError: pure «sc-hzbds-stop@L1 1 S1 voids: the crash's, then the student's own (C2: a fresh approach clears the provenance): expected [ true, true ] to deeply equal [ true, false ]», and live «sc-hzbds-stop@L1 1 one lane card — approach 2's (C2): expected +0 to be 1». The merge verifier killed X4 by its own apply too. On the landed tree the lane files are 87/87: the lane's 83 plus these 4.
+
+**3. RECORDED: observations the lane did not repair** (L10; all pre-existing).
+- (a) An out-of-lane rest OUTSIDE the approach ring leaves an open row with no reason. This was measured on 326 bounce drives and 21 shift drives, and holds for every halt gate.
+- (b) Over-cap passes get the overCap card but no row reason.
+- (c) `objectiveNotice` speaks one notice per frame, so a lane or pass card that falls on the same edge frame as another notice is not spoken. No drive showed it (the builder, round 3).
+- (d) Still open:
+  - the far-side «преди» residue;
+  - sc-hzbp-stop's named emergency lane, which is outside this key's own-lane scope;
+  - driving on the pavement bills nothing;
+  - the other 60 halt gates' haltVoided «impact» has no row text.
+- (e) The pass card has no live cadence test. Only the lane card has one (§4). It is per grid point by construction (the builder, rounds 3–4).
+- The builder recorded one more point. A rest the student makes by reversing up to 6 m from the impact is still crash-pinned by the product's own definition (CRASH_PIN_RADIUS_M 6), so it is named crashRest (lnom residual L2/L3/L5). The sentence stays true there. Whether that is right depends on how the pin is defined, which is not this lane's call.
+
+**4. RECORDED: the verifier's notes.**
+- N1. The carried stop-rule clause from L6 contradicts L11. The verifier judged by L11, which replaces it, and under that reading no clause is violated.
+- N2 (theoretical, not observed). `restIsCrashPinned` reads the pin from the previous step.
+  - If a terminating collision ever left the car at ≤ 1 km/h on its own contact frame, out of the lane and inside the ring, the void would be named outOfLane and the lane card would speak.
+  - In all 34 crash voids the first halted frame came well after the contact.
+  - haltVoided «impact» rests on the same assumption.
+
+**PROVEN ON 219ac1e:** the integrator's landing proof in the worktree integ-cl (`gate-cl.patch`, sha256 db8298f1…db42, 83 files, +5669/−1057, 0 CR bytes: both lane patches, the integration pins, one test-only re-point and the re-recorded manifest). The merge verifier ACCEPTED it and re-killed every pin by its own apply.
+- **The apply.** Both lane patches matched their stated sha256 (lanegate 7709406f…cb9b, curvring dbfe5156…e1c4), and the worktree was clean at `219ac1e`. Both were applied with `git -c core.autocrlf=false apply --3way --index --binary`, lanegate first.
+  - Three of lanegate's 25 files had moved on HEAD since `1f1536d`: `manifest.json`, `strings.4.txt` and `units.source.txt`. The last two merged cleanly. The two new test files were added directly.
+  - The one conflicted file, in both applies, was `reviewed-text-manifest/manifest.json`. In this apply the conflict was the «source» block's fingerprint and string count only (HEAD 167fe0df…/13271, the lane 076e3f5b…/13283). The integrator took the lane's side provisionally and settled it with the re-record after both patches.
+- **The manifest, re-recorded once after both patches.**
+  - Before the record, the manifest test reported «0 student-facing strings differ» on caption and on source. Its 4 reds were the fingerprint values left by the conflicts.
+  - RECORD_REVIEWED_TEXT_MANIFEST=1 rewrote only `manifest.json`: caption fingerprint 6f10ec6a…, source fingerprint 5c227168…, source strings 13284. That is HEAD's 13271 plus the 13 strings lanegate adds since its own base (13270 → 13283). No strings.*/units.* file changed in the record.
+  - The moved entries are exactly the patches' own: lanegate's lane card, pass card, and outOfLane, passedUnhalted and crashRest row and debrief lines; and curvring's 5 caption swaps.
+  - The manifest test is 49/49.
+- **Conditions C1 and C2 pinned:** §11 of `halt-gate-rests-in-its-lane.test.ts` (above). X1 and X4 each turn 4 tests red on assertion text, in the integrator's run and in the merge verifier's own apply. `objectives.ts` was restored after each (sha 28d4fb44… checked).
+- **The lane's tests on HEAD**, which carries `e58f388`'s ambient-traffic change and the ic landing:
+  - the lane files, 87/87 (the integrator);
+  - the merge verifier: `halt-gate-rests-in-its-lane`, `halt-gate-own-lane.census` and `stop-short-of-named-body`, 3 files, 137/137;
+  - the lane verifier's mutant X10 (an unknown pin treated as a crash) is still killed: 41 red, all AssertionError. The lane saw 37; the extra 4 are the §11 pins (the merge verifier).
+  - The probe sets under «What the verifier reproduced» (bounce, shift, straddle, residual, the live census) are the lane verifier's, at `1f1536d` + the r5 patch. Neither the integrator nor the merge verifier records a re-run of them on `219ac1e`.
+- **The product files are the two lane patches' and nothing more** (the merge verifier). On a temporary index it read `219ac1e` and applied lanegate, then curvring, 3-way with `manifest.json` excluded: no unmerged entries. That tree differs from the gate's index tree in four files only:
+  - `halt-gate-rests-in-its-lane.test.ts`: +91, the §11 pins;
+  - `ring-demos-drivable.test.ts`: +130, the curvring C1/C2 pins and FAMILY_FLOOR_M imported from DRIVABLE_MIN_CENTRE_RADIUS_M;
+  - `npc-contact-cadence.test.ts`: re-pointed cells, test-only (the curvring section);
+  - `manifest.json`: the fingerprints, and the source string count 13271 → 13284.
+- **Directory runs on the integrated tree.** Where both ran a directory, the merge verifier's figure is given. They differ only on lessons/scenario: the integrator's run (4913 passed, 1 skipped, 4 failed, all in `npc-contact-cadence.test.ts`) came before the re-point, and the merge verifier's run on the staged tree wins.
+  - The merge verifier, one vitest at a time with --maxWorkers=1, all green: lessons/scenario 200 files, 4917 passed, 1 skipped, 0 failed; lessons 126 files, 2394 passed, 165 skipped; hud 69 files, 1388; traces 170 files, 2372; clips 19 files, 302.
+  - The integrator only: components/sim 97 files, 1684; orchestrator 41 files, 528; traffic 53 files, 675; runtime 48 files, 875; scene 47 files, 787; vehicle 22 files, 299; world 135 files, 2409.
+  - rules (the integrator): 98 files, 1778 passed and 1 failed. The failure was act-copy-control «is checking something» on «Test timed out in 60000ms» with no assertion; run alone it is 41/41 in 5 s. A timeout, not a kill.
+- **tsc** (the integrator): 21 errors, all in the Prisma/db store files, the baseline. None is in a touched file.
+- **The tools/ tests are owed to the main-tree gate** (merge verifier N3).
+  - The merge verifier did not run them, as its brief instructs. `gate-cl.patch` touches no file under `tools/`.
+  - The integrator ran `node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4/4 does. The worktree lacks the main tree's gitignored `.audit-frames` corpus and playwright. A first run, killed by the integrator's 590 s cap, had 10 fails, from that missing data, the cap and the freeze.
+  - The second run, with a temporary junction to the main corpus and KNIJKA_PLAYWRIGHT_ROOT set: 2057 tests, 2048 pass, 4 fail, 1 skipped. The 4 are the standing deck-captions freeze (frozen 1811 captions / 503 traces, the tree now 1822 / 503) and 3 canary-pills cases that are an artefact of the junction. With a real copy of the 22 wave-scripts files, canary-pills is 39/39. No tools test needed teaching.
+  - The main-tree gate is expected to show the freeze ×1 and canary-pills passing. The junction and the copy were moved to `scratch/cl-land/`; neither is in the worktree or the patch.
+- **The merge verifier: ACCEPT.** The gate patch equals the staged diff: `git diff --cached --binary 219ac1e` hashes to db8298f1…db42, 83 files, 0 CR bytes, with nothing unstaged or untracked. The worktree was left as found. Its three notes, with the integrator's decisions of 2026-10-18:
+  - N1, the `npc-contact-cadence.test.ts` re-point: RATIFIED as test-only (the curvring section);
+  - N2, the curvring C1 pin's ±5 cm tolerance (the curvring section);
+  - N3, the tools/ tests owed to the main-tree gate (above).
+
+**Owed.**
+- **The rig re-drive**, through `/dev/drive-rig` on PC and on the phone lens, of:
+  - the triage drives shift-x10 and shift-x-4.06;
+  - the façade bounce, bounce-y170-s-0.7-b0.5-release;
+  - the lnom roll-through.
+  It must show no ✓ on any of them; the lane card or the pass card where the product speaks one; and the row's reason on the end card and in the debrief.
+- **The founder is to be told** the rulings L1–L11 and the crashRest wording.
+- **Triage:** observations (a)–(e) and N2 (conditions 3 and 4).
+- **The tools/ tests on the main tree**, unless PROVEN ON 219ac1e records them.
+
+## Landed: the six roundabout lessons' demos now turn no tighter than a 5.99 m radius over any 1 m (7.99 m on the correct demos). The yielding demos of sc-roundabout-entry, sc-rb-exit-signal and sc-rb-ped-exit stop with the nose 0.8 m short of the painted bar. Measured in process only. `catalogue-demo-curvature:dae908c7` (critical), family curvring (2026-10-18)
+
+Lane `curvring`, one round, built on `2e9268f`.
+- Round 1 was SIGNED OFF WITH CONDITIONS by the adversarial verifier. The conditions are below.
+- **The patch.** `curvring-result-r1.patch`: sha256 dbfe5156…, 66 files, +2843/−1018, all LF, 0 CR bytes in tree and base (the builder).
+  - The verifier's lane was base `2e9268f` + the patch. `git diff base` hashes to the builder's patch sha.
+  - The patch is cumulative against `2e9268f`, not against HEAD. This landing applies it 3-way onto `219ac1e`, after `lanegate-result-r5.patch`.
+  - HEAD carries curvdepth (`1f1536d`): the parking drills' demos, `traces/drivablePath.ts`, and its own edits to `demo-curvature-census.json` and `.test.ts`. The reviewed-text manifest has also moved since the lane's base.
+  - So the census JSON and the manifest are not taken on trust from the merge: the census JSON is checked against a fresh WRITE_CURVATURE_CENSUS=1 regeneration on HEAD, and the manifest is re-recorded once after both patches. PROVEN ON 219ac1e records it.
+- **New modules.**
+  - `traces/ringDrive.ts`, a generic kit:
+    - straights, and linearly ramped curvature programmes integrated every 2 mm;
+    - the exact ring circle, and quintic lane changes on the ring;
+    - closed-form ring entry and exit constructions that solve the joining straights;
+    - the recorder's 5 cm stop run-out.
+  - `traces/ringMini.ts`, the shared rb-mini and rb-ped lines:
+    - `MINI_BAR_STOP_Y`: the nose rests 0.8 m short of the М8 bar at y −35.725. That 0.8 m is the product's own THROUGH_GATE_BEFORE_LINE_M.
+    - `MINI_ENTRY`: a 10 m right turn landing on R18 at φ55.
+    - `miniExit` and `miniSnapExit`.
+- **Re-authored builders (6):** sc-roundabout-entry, sc-rb-exit-signal, sc-rb-circulate-priority, sc-rb-busy-gap, sc-rb-lane-choice and sc-rb-ped-exit. The recorder signatures are unchanged.
+- **Traces.**
+  - 17 of the family's 18 demos were re-recorded through RECORD_TRACES: 34 files across content and public, byte-pinned by each trace test.
+  - The 18th, sc-rb-ped-exit/mistake-panic-brake (a straight line), is byte-identical.
+  - Committed traces outside the family are byte-identical (the verifier).
+- **Test-side files.**
+  - New: `traces/__tests__/ring-demos-drivable.test.ts` (66 tests) and its support `ringProduct.ts`.
+  - Re-pinned, each explained in its file:
+    - `demo-curvature-census.test.ts`, which gains «PINNED: every demo of the six roundabout lessons…»;
+    - the busy-gap and lane-choice trace tests;
+    - `rbExitDrives.ts` and `crashCoachWithdrawal`;
+    - `task-cap-lesson-census`, whose «late» floor moves 7000 → 5200;
+    - the busy-gap and roundabout-entry witnesses.
+  - `clipPlan.generated.ts` is regenerated: `sc-roundabout-entry__m0` faultTimeSec 16.15 → 15.83.
+- **What did not change** (the builder; confirmed by the verifier): no template, task zone, staged actor, rule or threshold. No protected threshold moved.
+
+**The row is NOT closed by this landing.** `catalogue-demo-curvature:dae908c7` stays OPEN.
+- It is a FAMILY row. curvdepth landed the parking family and this lane lands the roundabout family. The catalogue census still lists offenders in other families.
+- Every number below was measured in process. Nobody saw the new demos in a browser or on a device.
+- The clip re-captures and the rig frames of the re-recorded demos are owed (below).
+- This landing does not change the open-row count.
+
+**What was wrong** (the builder, at `2e9268f`).
+- The six builders typed every demo in as a few waypoints, and the kinematic recorder turns on the spot at each corner:
+  - the ring was a polygon of 10° chords (`scRoundaboutEntry.ts:71`, `ringRun`, `p += 10`);
+  - the entries and exits were 3–4 corner points.
+- Each corner was a 23–60° pivot in one frame: a 1.1–2.5 m «radius» over 1 m. The car's limit is 3.955 m kinematic, ≈ 4.17 m physics.
+- Where two drive steps met, the ghost also skipped 1.5–3.2 m of ring between frames.
+- The yielding demos waited about 11 m past the painted give-way bar: at y −27.5 on rb-mini, and at −35.5 on rb-2lane with the nose in the ring.
+- **Worst 1 m radius, base → tree.** The builder's table, reproduced by the verifier on both sides:
+  - roundabout-entry: shadow 2.461 → 8.991, barge 2.49 → 9.996, no-signal 2.476 → 6.499;
+  - exit-signal: shadow 2.16 → 8.997, no-signal 2.476 → 6.499, barge 2.49 → 9.996;
+  - circulate-priority: shadow 2.133 → 8.989, panic-brake 2.136 → 8.989, wandering 1.108 → 6.337;
+  - busy-gap: shadow 1.928 → 7.994, barge-lead 2.417 → 9.993, short-gap 2.473 → 7.994;
+  - lane-choice: shadow 1.112 → 8.992, outer-lane 1.11 → 8.992, exit-across 1.961 → 5.995;
+  - ped-exit: shadow and through-ped 2.128 → 8.991.
+
+**What landed.** This is the builder's description; the verifier's measurements are under the next heading.
+- **The floor.** The family floor is 4.6 m, curvdepth's DRIVABLE_MIN_CENTRE_RADIUS_M. Correct demos sit at or above 7.99 m and the re-authored mistakes at or above 5.995 m.
+- **What the correct demos now show:**
+  - **roundabout-entry and exit-signal:** a stop with the nose 0.8 m before the bar, a 10 s wait, and a 10 m entry;
+  - **circulate-priority:** no stop on an empty ring;
+  - **busy-gap:** a stop in the graded disc at y −27.5 and a 14 s wait for every platoon car, including L5's third. Its graded task sits 9.7 m past the paint, so this demo does not stop at the bar;
+  - **lane-choice:** a stop at the painted bar (y −54.67), a 15 s wait, the inner lane held, and a SAFE_LANE_CHANGE out;
+  - **ped-exit:** a stop at the bar, then a stop in the exit pocket for the pedestrian.
+- **Two mistake demos re-authored rather than loosening a pin:**
+  - Wandering failed roundabout-family-exit-census (offband 3.88 s against > 4.5 s). It was re-paced to crawl at 5 km/h at r 21.5.
+    - A first attempt held the drift to φ124. It swung the rear 0.80 m over the kerb, past the drivability pin's 0.7 m, and was reverted.
+  - Lane-choice outer-lane (m1) failed rb-lane-choice-exit-handover (offband 14.57 s against > 15 s). It now holds the drag radius to φ200 (was φ190), so the line is ridden for 15.73 s.
+- **A separate change, for event order:** lane-choice exit-across now cuts R6 → chord → R10, so FAILED_TO_YIELD at 52.87 s lands before the contact at 53.07 s.
+- **Shown text.** Five annotations changed, each fixing a base falsehood.
+  - busy-gap shadow:
+    - «В кръга има две коли…» → «В кръга колите вървят една след друга. Всички са с предимство — намаляваме отрано.» L5 stages three cars, so «две» was false there.
+    - «Спираме на линията…» → «Спираме преди кръга…». The old shadow stopped 11 m past the paint.
+    - «Пролуката между двете… ЗАД втората…» → «Пролуките между тях бяха твърде къси. Тази ЗАД последната е истинската — влизаме решително.»
+    - «Пропуснахме и двете…» → «Пропуснахме всички…»
+  - lane-choice shadow: «Северният подход остана зад нас…» → «Северният изход остана зад нас…». What the car has just passed is the north exit.
+  - The manifest was re-recorded in the lane: 5 strings swapped, unit and string counts unchanged.
+- **The task-cap census «late» floor, 7000 → 5200.**
+  - Measured over the full late plan: base 7428 stamped frames, tree 5514.
+  - The whole −1914 is sc-roundabout-entry's sc-rb-approach at L2/L3/L5: 786/751/751 → 144/115/115.
+  - The cause: the old shadow sat about 10 s past the bar, where acceptBeforeMarkM does not credit the approach. Now the objective is credited at the line.
+
+**What the verifier reproduced.** It worked on its own lane, `2e9268f` + the patch, sha matched. Log: `D:/knijka-lanes/scratch/curvring-verify/PROGRESS.md`; probes and outputs (geom-out.json, chain-out*.json, actors-*.json) are in that folder.
+- **Curvature, its own measure**, on all 18 demos, base and tree. It used the heading over 1 m windows (the product's measure) and a course derived from position.
+  - Its base and tree minima equal the builder's table above, digit for digit.
+  - Correct demos are at least 7.994 m; every re-authored demo is at least 5.995 m.
+  - Heading steps are at most 1.85° per sample, with no gear change.
+  - The course measure dips only at 1–6 mm backward snaps when the car restarts from a stop. That is the recorder's 5 cm run-out convention, and it appears in 13 non-family traces, including the recipe's sc-park-bay-exit-rev.
+- **Clearance, its own separating-axis box test** against the product colliders (buildLessonWorldCore + splitDriveOverSurface), in the recorded pose and in a no-slip trailing-axle pose:
+  - solid bodies (the island wall and buildings): at least 3.31 m;
+  - kerb: at least 1.49 m, except the wandering-line mistake (condition 4).
+- **Live rung chain**, every demo at every rung, base vs tree. It reproduces the builder's four sheet differences exactly:
+  - busy-gap shadow L5: COLLISION:vehicle, 10 т., fail → 0 т., PASS, YIELDED. This is the repair. It answers in process «sc-rb-busy-gap shadow L5 COLLISION (pre-existing)» from the Owed list of the 2026-10-09 lane-choice landing.
+  - busy-gap short-gap L4 gains COLLISION, one of its own codeRefs.
+  - The near-miss counts of lane-choice exit-across and ped-exit through-ped change; their codes are identical.
+  - Every correct demo is 0 т., ИЗДЪРЖАН and completedAll at every rung, and every mistake names only its own codeRefs.
+- **ADR-014 cadence.** At 30 Hz and at a jittered phone cadence, all 174 rows equal the 60 Hz sheets.
+- **Shown text.** It replayed the staged actors' positions at every annotation time, on every rung. Every annotation is true for the re-recorded drive.
+- **Tools.** Running `tools/audit/inprocess-drive.mjs` recorderIndex over the lane finds 175 claims, 0 ambiguous and 0 unknown shapes. No family lesson has a file in `tools/mobile/path-refs`.
+- **Regression** (it matches the builder's figures):
+  - traces: 169 files, 2,213 passed;
+  - lessons/scenario: 181 files, 4,349 passed;
+  - lessons: 124 files, 2,336 passed, 165 skipped;
+  - lesson-ui: 716 passed, 1 environment failure (touchHintLifetime needs tools/);
+  - clips: 287 passed, 1 environment failure (whyPanel needs docs/);
+  - marketing: 100 passed;
+  - tsc: 22 errors, the Prisma baseline.
+- **Mutants.** 8, one at a time, each restored and sha256-checked.
+  - Killed:
+    - M2, the lane-choice signal moved earlier;
+    - M4, the wandering line pushed further over the kerb (the 0.7 m cap);
+    - M5, a faster ring pace (through COLLISION).
+  - Refused by the kit's own construction: M6 and M8.
+  - Survived: M1, M7 and M3 (conditions 1–3).
+- **Builder only, not re-measured by a verifier:**
+  - its eight mutation checks, all red on assertion text;
+  - 6a and 6b, the barge and through-ped indicators off. They survive because neither is a graded behaviour change.
+  - the task-cap census numbers. The verifier reviewed the re-pin as explained but did not re-measure it.
+
+**The conditions, and how each stands.**
+
+**1. C1: the bar stop is unpinned.**
+- Mutant M1 moved `MINI_BAR_STOP_Y` so the nose rests 0.7 m OVER the bar, and re-recorded sc-roundabout-entry. It survived the trace test, ring-demos-drivable and the hold witness (85 green).
+- ring-demos-drivable checks only the constant `MINI_GIVE_WAY_BAR_Y` against the world paint. On rb-mini, nothing checks a committed rest pose against the bar. sc-roundabout-entry's committed rest is at y −38.545, with the bar at −35.725.
+- Owed: a pin that each yielding demo of rb-mini and rb-ped has its committed rest pose with the nose at or before the bar minus 0.8 m.
+  - That covers sc-roundabout-entry, sc-rb-exit-signal, sc-rb-ped-exit, and any other demo that stops at the bar.
+  - busy-gap is the exception, because it stops in its graded disc.
+- PINNED AT INTEGRATION: `traces/__tests__/ring-demos-drivable.test.ts`, «rb-mini-v1 / rb-ped-v1: every yielding demo rests with its nose 0.8 m short of the painted give-way bar, and never noses over it first».
+  - It reads the committed traces against the district's own paint (southBarY) and `scene/guidanceRoute.ts` THROUGH_GATE_BEFORE_LINE_M.
+  - It holds the nose 0.8 m short of the bar within ±5 cm, the recorder's stop resolution (`traces/drivablePath.ts` RECORDER_STOP_SHORT_M); the measured gap is 0.7954 m. So it is not the strict «at or before the bar minus 0.8 m» the condition asked for: a rest up to 5 cm further forward would survive it. The merge verifier (N2) asks for no change, and notes that THROUGH_GATE_BEFORE_LINE_M is the setback of a guidance marker, not a grading limit.
+  - The set of yielding demos is a census, not a list taken on trust: the demos whose approach rest puts the nose within 3 m of the paint must equal YIELD_AT_BAR exactly. Those are the shadow and the no-signal mistake of sc-roundabout-entry and of sc-rb-exit-signal, and the shadow and the through-ped mistake of sc-rb-ped-exit.
+  - Mutant M1 (`MINI_BAR_STOP_Y = MINI_GIVE_WAY_BAR_Y + 0.7 - CHASSIS_HALF_EXTENTS.z`, the nose 0.7 m over the bar, with sc-roundabout-entry re-recorded through RECORD_TRACES) turns 1 test red on assertion text: «sc-roundabout-entry/shadow-correct nose short of the painted bar at 11.2s: expected -0.7025820450355411 to be greater than or equal to 0.75». The merge verifier applied M1 itself: ring-demos-drivable 1 failed, 84 passed, on the same assertion.
+
+**2. C2: curvature continuity is unpinned.**
+- Mutant M7 set MINI_ENTRY's rampIn/rampOut from 4 m to 0.05 m, so the road wheel snaps from 0 to about 14° within 5 cm at 17 km/h.
+- It re-recorded and passed the trace test, ring-demos-drivable and the census (83 green). It survives because the radius stays 10 m and the heading step stays under 2.5° per sample.
+- Owed: a d(curvature)/ds bound in ring-demos-drivable that turns a 5 cm ramp red on assertion text.
+- PINNED AT INTEGRATION: `ring-demos-drivable.test.ts`, «every committed ring demo winds the wheel on and off — curvature changes no faster than the car can steer», one case per family demo.
+  - It requires dκ/ds ≤ STEER_SPEED / (WHEELBASE_M · v) all along the path, with κ read from the recorded heading over 0.2 m windows. The bound is the product car's own steering rate, STEER_SPEED 3.2 rad/s (`vehicle/tuning.ts`).
+  - On the committed family the steepest is 1.23 rad/s (the circulate wandering mistake), and the correct demos are at most 0.77 rad/s.
+  - Mutant M7 (MINI_ENTRY rampInM/rampOutM 4 → 0.05, with sc-roundabout-entry re-recorded) turns 2 tests red on assertion text: «sc-roundabout-entry/shadow-correct: dκ/ds 0.397 /m² at 16.9 км/ч, 75.0 m along — the wheel would turn at 4.77 rad/s: expected 4.77418735352666 to be less than or equal to 3.2», and the same on mistake-exit-no-signal. Under M7 the barge demo reads 2.2 rad/s at 7.1 km/h and passes, because that is steerable at that speed. The merge verifier's own apply: 2 failed, 83 passed.
+
+**3. C3. RECORDED: caption timing against staged actors is unpinned.**
+- Mutant M3 showed «Тази ЗАД последната е истинската — влизаме решително» 9 s early, with the same total wait.
+- It survived the busy-gap traces test, ring-demos-drivable, caption-truth and the manifest (193 green). The only red was the witness's guard on the script's shape, which is structural.
+- The caption-truth harness does not read actor positions. The gap predates the lane. Future re-authoring of these demos must not rely on caption-truth for timing.
+
+**4. C4, INTEGRATOR DECISION K1 (2026-10-18): the wandering line rides over the outer kerb, ACCEPTED as part of the mistake shown («криволичене»).**
+- sc-rb-circulate-priority/mistake-wandering-line rides r 21.5 with the body over the outer kerb:
+  - the verifier's corner measure: 0.71 m in the tree, against 1.21 m at base;
+  - the builder's measure: up to 0.65 m, under the drivability pin's 0.7 m cap, its one exception.
+- The verifier confirmed the geometry:
+  - the island wall is at r ≈ 13.75 and the outer pavement starts at r ≈ 21.91;
+  - POOR_LANE_KEEPING (|offset| > 3.25 m from r 18 for 3 s) cannot be committed with 0.25 m clearance on either side: inward needs r < 14.75, while 0.25 m of wall clearance needs r ≥ 14.85.
+- This is a demo. No rule changed. The founder is to be told (Owed).
+
+**5. RECORDED: wording points the verifier judged not false (N3), and pre-existing text outside the lane (N4).**
+- busy-gap «Пролуките между тях» is plural on L1–L4, where only one gap exists.
+- short-gap «Първата отмина» appears when the lead is about 1° past the ego's lane line (base 6°).
+- lane-choice outer-lane «…увисва на разделителната» is shown about 2–5 s before the drift (base about 1–3 s).
+- lane-choice shadow: at «Северният изход остана зад нас» the rear still overlaps the outbound half of the north carriageway by about 2 m.
+- The sc-rb-busy-gap template brief (step 1) says «в кръга има ДВЕ коли», which is false on L5. The lane did not touch that template text.
+- A comment in sc-rb-lane-choice-traces says the bodies interpenetrate «by more than half a metre». The pin and its own measurement say −0.176 m. That file is in this patch.
+- The 2026-10-09 lane-choice landing's other Owed item, the stale comment «measured 2.8 s at the join» in `traces/scRbLaneChoice.ts`, is gone from the re-authored file.
+
+**Integration items** (the lane's base predates curvdepth).
+- **Census JSON.** To be re-derived on HEAD with WRITE_CURVATURE_CENSUS=1. On the lane's base it went 108 → 91; HEAD had 82 after curvdepth. Offenders on HEAD after this landing: 65.
+  - The integrator's 3-way merge of `demo-curvature-census.json` was clean, and the merged file is byte-identical to a fresh `WRITE_CURVATURE_CENSUS=1` regeneration on the landed tree (sha b70fddb4…).
+  - Offenders 82 at `219ac1e` → 65; the roundabout family 17 → 0; 503 measured, 0 unreadable. The lane's «108 → 91» was measured at its own base.
+  - The census test keeps curvdepth's PINNED parking test and curvring's PINNED roundabout test side by side. The merge verifier's traces run includes the census test that checks the committed JSON against a fresh measurement.
+- **Duplicated definitions.**
+  - In the patch, `ringDrive.ts` declares its own `CurvatureStretch` (:51) and `RECORDER_STOP_SHORT_M = 0.05` (:81), and ring-demos-drivable held a local `FAMILY_FLOOR_M = 4.6`.
+  - HEAD's `traces/drivablePath.ts` exports `DRIVABLE_MIN_CENTRE_RADIUS_M = 4.6` (:31), `CurvatureStretch` (:36) and `RECORDER_STOP_SHORT_M = 0.05` (:119).
+  - Which definition the landing uses: `traces/drivablePath.ts` defines drivability. `ring-demos-drivable.test.ts`'s FAMILY_FLOOR_M now imports DRIVABLE_MIN_CENTRE_RADIUS_M (4.6) instead of the local literal 4.6, and the test imports RECORDER_STOP_SHORT_M from there too. `ringDrive.ts` keeps its own `CurvatureStretch` and `RECORDER_STOP_SHORT_M = 0.05`: its integrator is its own (2 mm steps with a symmetric half-turn, against drivablePath's 1 mm), and switching it would change the recorded bytes, which is a product change. So the integrator left the kit as it is.
+- **Task-cap census «late» floor.** The lane moved it 7000 → 5200. Re-measured on HEAD: stampedFrames 5514 over 521 drives on the landed tree, the same as the lane's 5514, so the 5200 floor holds. The census file is 15/15 green (the integrator).
+- **Manifest.** To be re-recorded once, after both patches.
+
+**PROVEN ON 219ac1e:** the same landing proof (the lanegate section's PROVEN ON 219ac1e: the gate patch, the product-file check, the directory runs, tsc, the tools/ tests and the merge verifier's ACCEPT).
+- **The apply.** curvring was applied 3-way after lanegate.
+  - Fourteen of its 66 files had moved on HEAD since `2e9268f`: `manifest.json`, `strings.{1,4,5,6,8,a,b,e,f}.txt`, `units.caption.txt`, `units.source.txt`, `demo-curvature-census.json` and `demo-curvature-census.test.ts`. All of them merged cleanly except `manifest.json`.
+  - `manifest.json` conflicted on fingerprint lines only (caption 0af2781e vs 392ab311, source 076e3f5b vs 2867b8b3; the counts agreed). The integrator took HEAD's side provisionally, and the one re-record after both patches settled it: 0 student-facing strings differ, source strings 13284, 49/49.
+  - The two patches together touch 82 files, because nine manifest files are shared. With `npc-contact-cadence.test.ts` the gate patch has 83.
+- **Conditions C1 and C2 pinned** in `ring-demos-drivable.test.ts` (above). Each is red on assertion text under its mutant, in the integrator's run and in the merge verifier's own apply. `ringMini.ts` and the re-recorded trace files were restored and sha-checked after each.
+- **Every trace test** (the merge verifier): traces 170 files, 2372 passed. That run includes ring-demos-drivable with the C1/C2 pins, the curvature census against a fresh measurement and the six byte-pinned family trace tests. clips (whose `clipPlan.generated.ts` curvring's patch regenerates): 19 files, 302 passed.
+- The merge verifier also re-killed the lane verifier's M2 (lane-choice SIGNAL_PHI 176 → 160, re-recorded): sc-rb-lane-choice-traces 2 red, «expected 'right' to be 'left'» and «expected 159.94 to be greater than 175».
+- **The curvature census and the task-cap census:** under Integration items above.
+- **The manifest:** re-recorded once after both patches (the lanegate section's PROVEN ON 219ac1e). curvring's 5 caption swaps are among its moved entries.
+- **One test file changed at integration, outside the brief: `lessons/scenario/__tests__/npc-contact-cadence.test.ts`, test-only. RATIFIED by integrator decision N1 (2026-10-18); it stays in the patch.**
+  - Why: the file landed at `1f1536d`, after curvring's base, and its cells drive curvring's re-recorded traces. On the merged tree it went 4 red. The first: «a car crossing in the roundabout: the drive touched no road user — the cell proves nothing: expected -1 to be greater than 0». Then «the circulating car, crossing (the sentinel first): a static-object bill after the first contact: expected false to be true», and the two teeth tests missing that cell.
+  - The busy-gap cell: the integrator drove every re-authored family demo at L1 on the product chassis. The only one that meets a road user is sc-rb-lane-choice mistake-exit-across-outer (the car circulating in the outer lane, point 3184, 4.8 km/h, the sentinel first). It replaces short-gap, in the same class: a moving car in the ring.
+  - The sc-roundabout-entry cells: on the re-authored shadow path, a sweep of go 1900–2700 every 20 steps (41 drives) gives contacts only at go 2280 and 2300 (sentinel, no static), 2320 (sentinel, then the island static) and 2340 (the ear alone). So the crossing-then-island cell moves from go 2300 to 2320, and the rapier-alone cell from 2320 to 2340. Both keep their classes.
+  - The file is 19/19, including both teeth tests, which require the new cell to split under each removed half of the `1f1536d` repair. Its diff is cell data and comments only, and it passes inside the merge verifier's green scenario run. The probe was moved to `scratch/cl-land/probe`.
+  - **Recorded, not ruled: the ghost and the chassis disagree on sc-rb-busy-gap mistake-short-gap.** On the product chassis at 60 Hz the re-recorded demo reaches no road user on L1–L5 (firstNpcStep −1). HEAD's recording struck the circulating car (the ear contact at point 1261, 8.0 km/h). The kinematic live chain still bills its COLLISION; «busy-gap short-gap L4 gains COLLISION» above is that chain's.
+- **The tools/ tests** are owed to the main-tree gate (the lanegate section's PROVEN ON 219ac1e). The deck-captions freeze is expected there ×1, and curvring's 5 caption swaps still owe the browser re-freeze (Owed).
+
+**Owed.**
+- **Clips.**
+  - Re-capture `sc-roundabout-entry__m0`: the barge mistake, featured on the marketing landing page, with faultTimeSec now 15.83.
+  - Re-capture `__m1`: exit without signal.
+  - Re-capture their strips under `tools/clips/headless/sheets/`.
+  - ADR-011's «clip `sc-roundabout-entry__m0` must be re-captured» is still owed, now on the new trace.
+  - Any rig frames or clips cut from the 17 re-recorded demos are owed too.
+- **deck-captions.** The browser re-freeze `deck-captions.mjs --prod --freeze` for the 5 changed captions. The builder found the frozen file already stale at the lane's base `2e9268f` (computed 1aa8bd3e… against frozen 011bf2ed…).
+- **The rig instruments.** route-fidelity and lesson-audit read the family shadows, so their next re-drives see the new lines.
+- **The row's text** in doc 88 and the Product Map: its offender count, as re-derived on HEAD.
+- **The founder is to be told** K1, and that the busy-gap disc sits 9.7 m past the paint (a lesson-design question).
+- **Triage:**
+  - the candidates in condition 5;
+  - lane-choice outer-lane: the circulating car passes 25.97 m away, just inside CIRCULATING_REACH_M 26, so YIELDED_TO_PRIORITY is credited only for 11–12 s waits. At a 15 s wait, ambient pedestrian 0 walks into the ring and the near-miss clearance is 0;
+  - ped-exit L5: the through-ped mistake also hits the sprinting second crosser, COLLISION:pedestrian. This is identical at base;
+  - busy-gap witness at L1: a 38.5 s wait is neither billed nor commended, while 39–41 s waits are billed. This is a possible forced-braking threshold gap.

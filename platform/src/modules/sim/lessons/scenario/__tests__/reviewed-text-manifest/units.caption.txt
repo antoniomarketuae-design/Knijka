@@ -349,7 +349,7 @@ sc-pk-stop-vs-park/mistake-permission-past-seam	e26fb342f6fa 38014b9af087 d17caf
 sc-pk-stop-vs-park/shadow-correct	67d93b1903a2 beefc601dbd1 54c213dd27ec d6ee3aa41e98 8f7c7d985539 1211348eb789 f9e28254df10
 sc-rb-busy-gap/mistake-barge-lead	374f7e7539ec d229f878d2b5 874dabce128e 17e8591f17e8
 sc-rb-busy-gap/mistake-short-gap	d51f2d1fb857 9bf5ff5ff6a6 45ceefdec01b bdb8113d25dc 5772b0edf016
-sc-rb-busy-gap/shadow-correct	e25ae67ce215 b0c594a437db 11a7afe6d2ca 52857941d44d f1ce4c97b031
+sc-rb-busy-gap/shadow-correct	e25ae67ce215 17806e6db199 a5b2ec15c0b2 4f1481380f9d e0d23e0770d8
 sc-rb-circulate-priority/mistake-panic-brake	6e058214f9db 8c3d58ee845d 36cce90c1552 d587232adc2a cbb3356845aa
 sc-rb-circulate-priority/mistake-wandering-line	d8e5e36e1448 21f16ca70ce9 ae77ed9dea83 b811a608436d
 sc-rb-circulate-priority/shadow-correct	a2a3c8c3bd53 4a9139f63a43 1fa651473e65 85ef9fd60e0c cd874d5ddff5
@@ -358,7 +358,7 @@ sc-rb-exit-signal/mistake-exit-no-signal	ad4349933ccc c0cb041af016 db70c7d6dfc2 
 sc-rb-exit-signal/shadow-correct	6de8ca60b58a fc03fab6585d db70c7d6dfc2 2abb54610a13 242aa40e1a21 9c9fb302a800
 sc-rb-lane-choice/mistake-exit-across-outer	3524b332ea27 f0fe6512e3e8 da89a39fcc34 3197b14a05ad
 sc-rb-lane-choice/mistake-outer-lane-far-exit	a2a3c8c3bd53 86f8d0763790 b65ec31f972f 92396e9b148b 28183e722376
-sc-rb-lane-choice/shadow-correct	1ac3d4c23a6e 7e20a38a4ab2 ffe594049048 6764e4496c99 8bd5e392f2f8 10c104f6d7e9
+sc-rb-lane-choice/shadow-correct	a50d2d0f06a8 7e20a38a4ab2 ffe594049048 6764e4496c99 62b51f3a1580 10c104f6d7e9
 sc-rb-ped-exit/mistake-exit-through-ped	3bf5d6165f83 d45af2adfc78 db70c7d6dfc2 2abb54610a13 a6332ef5c253 32e3c59722e3
 sc-rb-ped-exit/mistake-panic-brake	e26fb342f6fa b3d6f3aafe91 9ecb07601d11 4231919bcabb
 sc-rb-ped-exit/shadow-correct	f0fcc0c49464 d2aad19b4d08 db70c7d6dfc2 2abb54610a13 d5322f0119b0 d59b7b3a7151 a1cbb21ba6e9 049d78895a50 7f67bd7282b0

@@ -121,6 +121,29 @@ describe("demo curvature census — every committed demo against the product car
     expect(census.measured).toBeGreaterThanOrEqual(SCENARIO_TEMPLATES.length);
   });
 
+  it("PINNED: every demo of the six roundabout lessons re-authored on lines the car can drive (catalogue-demo-curvature:dae908c7, family curvring)", () => {
+    // traces/ringDrive.ts + ringMini.ts and the six scripts cut from them; the
+    // full drivability proof (steering, clearance, the live rung chain, the
+    // measured windows) is traces/__tests__/ring-demos-drivable.test.ts.
+    const FAMILY = [
+      "sc-roundabout-entry",
+      "sc-rb-exit-signal",
+      "sc-rb-circulate-priority",
+      "sc-rb-busy-gap",
+      "sc-rb-lane-choice",
+      "sc-rb-ped-exit",
+    ];
+    for (const lesson of FAMILY) {
+      const rows = all.filter((r) => r.lesson === lesson);
+      expect(rows, lesson).toHaveLength(3);
+      for (const r of rows) {
+        expect(r.reverses, `${lesson} ${r.demo}`).toBe(false);
+        expect(r.worstRadiusM, `${lesson} ${r.demo}`).toBeGreaterThanOrEqual(KINEMATIC_CENTRE_RADIUS_M);
+      }
+    }
+    expect(census.offenders.filter((r) => FAMILY.includes(r.lesson))).toEqual([]);
+  });
+
   it("PINNED: every sc-park-bay-exit-rev demo turns no tighter than the car can", () => {
     const rows = all.filter((r) => r.lesson === "sc-park-bay-exit-rev");
     expect(rows.map((r) => r.demo)).toEqual([

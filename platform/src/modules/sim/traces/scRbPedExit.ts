@@ -18,11 +18,26 @@
  *
  * Geometry pinned to content/world/rb-ped-v1.json: ring centerline R = 18
  * around (0, 0), CCW (s → e → n → w); arm right-lane centers ±4.06; south spawn
- * (4.06, −93) heading north; ring limit 30, arms 40; the exit zebra rbp-x-n at
- * (0, 30) on the north arm, leaving a 7.94 m stop pocket between the
- * circulatory carriageway's outer edge (r = 22.06) and the crossing. This drill
- * takes the SECOND (north) exit, peeling off the ring arc at φ ≈ 150° — the
- * peel sc-rb-circulate-priority proved on the identical ring.
+ * (4.06, −93) heading north; ring limit 30, arms 40; the give-way bar of the
+ * south mouth painted at y = −35.725; the exit zebra rbp-x-n at (0, 30) on the
+ * north arm, leaving a 7.94 m stop pocket between the circulatory
+ * carriageway's outer edge (r = 22.06) and the crossing. This drill takes the
+ * SECOND (north) exit.
+ *
+ * EVERY PATH HERE IS ONE THE PRODUCT CAR CAN DRIVE
+ * (catalogue-demo-curvature:dae908c7). Until 2026-10-11 the two ring drives
+ * were typed in as waypoints — the ring as 10° chords, the entry and the exit
+ * as corners (31° at the peel: 2.13 m of «radius» against a car whose tightest
+ * circle is 3.955 m) — with 3.2 m of ring skipped where two ring steps met.
+ * They are now cut from one continuous line each, built with ./ringDrive and
+ * ./ringMini (the family's shared entry and exit): the tightest radius either
+ * asks for is the exit's 9 m. Pins:
+ * traces/__tests__/ring-demos-drivable.test.ts. (The third drive, the phantom
+ * brake on the approach arm, never turns; it is untouched, byte for byte.)
+ *
+ * WHERE THE CORRECT DRIVE WAITS AT THE MOUTH: with its nose 0.8 m short of the
+ * painted give-way bar (centre y = −38.545), which is what its caption says —
+ * «Спри на линията и я пропусни». The old shadow rolled 11 m past the bar.
  *
  * FOUR ENVELOPES DECIDE EVERY NUMBER BELOW — all four measured, not guessed:
  *
@@ -33,18 +48,18 @@
  *    deg/s ⇒ a 3 s window of 9.55·v: 12 km/h ⇒ 32° (safe), 20.7 km/h ⇒ 55°
  *    (the hard wall). Inherited from sc-rb-circulate-priority, same ring.
  *
- *  · THE ENTRY is the brisk flat NE chord the other rb-* drills proved: it
- *    sweeps the azimuth-from-centre past RB_ON_RING_DEG (35° — the roundabout
- *    tracker's ring-priority stand-down) fast, with only ~40° of TOTAL heading
- *    change (under the 55° turn window), so it is both quick to priority AND
+ *  · THE ENTRY is the family's (./ringMini MINI_ENTRY): a 10 m-radius right
+ *    turn, a short chord and onto the ring's centreline at φ = 55° — 44.5° of
+ *    heading change in all (under the 55° turn window), so it is
  *    indicator-free-clean. It is taken only after the circulator is fully past
- *    the mouth (the 9 s wait), which is what YIELDED_TO_PRIORITY reads.
+ *    the mouth (the wait before the bar), which is what YIELDED_TO_PRIORITY
+ *    reads.
  *
  *  · THE POCKET is 7.94 m of tarmac and the stop has to land IN it. The shadow
- *    stops at (4.06, 27) — nose ~2 m short of the zebra, tail ~1.9 m clear of
- *    the ring band. The exit blend must therefore be COMPLETE by y ≈ 26, which
- *    is why EXIT_NORTH reaches the lane center at y = 26.0 and not later:
- *    stopping mid-blend would put the car across the pocket diagonally.
+ *    stops at (4.06, 27) — nose ~1 m short of the zebra, tail ~2.9 m clear of
+ *    the ring band. The exit must therefore be COMPLETE before it, and the
+ *    family's is: the wheel is straight at y = 25.97, a metre before the car
+ *    comes to rest, so it stands along the lane and not across the pocket.
  *
  *  · HARSH_BRAKING_NO_CAUSE CANNOT FIRE INSIDE THE RING, so the phantom-brake
  *    demo is staged on the APPROACH ARM. The detector's cause ledger clears only
@@ -66,73 +81,106 @@ import {
   type RecordedDrive,
   type RecordScriptedDriveOptions,
 } from "./recorder";
+import type { RingPath, RingPathBuilder } from "./ringDrive";
+import { MINI_BAR_STOP_Y, MINI_ENTRY, miniExit, miniPathFromSpawn } from "./ringMini";
 
 export const SC_RB_PED_EXIT_ID = "sc-rb-ped-exit";
 
 /** South-arm northbound / north-arm outbound lane center (2-lane arms). */
 const X_LANE = 4.06;
-/** Ring centerline radius (rb-ped-v1 meta.scenario). */
-const R = 18;
-/** The exit zebra rbp-x-n on the north arm's centerline. */
-const Y_CROSSING = 30;
+/** Where the approach comes off the arm's pace. */
+const Y_SLOW = -60;
 /** The ring pace — the turn-detector ceiling, see the header. */
 const RING_KMH = 12;
 /** The stop in the pocket: nose short of the zebra, tail clear of the ring. */
 const Y_POCKET = 27;
+/**
+ * Where the right indicator goes on: φ = 112°, the first metre of ring past
+ * the far kerb of the east mouth (it spans φ 68°–112° at the ring's outer
+ * edge) — «Първият изход е зад нас». A right lever any earlier would tell the
+ * driver waiting at the east mouth that this car is leaving by his road.
+ */
+const SIGNAL_PHI_DEG = 112;
 
-/** Ring point at circulation angle φ (degrees from the SOUTH node, CCW through
- * EAST — φ 90 = east, 180 = north, 270 = west): (R sin φ, −R cos φ). */
-function ring(phiDeg: number): [number, number] {
-  const a = (phiDeg * Math.PI) / 180;
-  return [R * Math.sin(a), -R * Math.cos(a)];
+/** The wait before the bar, s — see sc-roundabout-entry (same ring, same car,
+ *  same staging). Re-measured for THIS lesson's rungs: clean from 7 s to 14 s
+ *  (at 6 s the car is struck on L1, L2 and L4; at 16 s a near miss is logged) —
+ *  ENTRY_WAIT_WINDOW in traces/__tests__/ring-demos-drivable.test.ts. */
+const ENTRY_WAIT_SEC = 10;
+/**
+ * The wait in the pocket, s. The crosser is released as the car comes within
+ * 30 m of her and walks 16.25 m of carriageway at 1.2 m/s; the car comes to
+ * rest in the pocket mid-walk and moves off once she is off the tarmac.
+ * Measured on the live chain: she steps onto the far kerb 7.5 s after the car
+ * comes to rest (L1–L4; 6.5 s on L5, where the second crosser is a sprinter),
+ * so the 9.5 s wait leaves ≥ 2 s between her last step on the tarmac and the
+ * wheels turning — «Освободи цялото платно — чак сега тръгваме» is true on
+ * every rung. (The grader itself is indifferent from 6 s to 16 s.)
+ */
+const POCKET_WAIT_SEC = 9.5;
+
+/** The dials a pin may sweep (absent = the authored drive). */
+export interface RbPedExitDials {
+  waitSec?: number;
+  pocketWaitSec?: number;
 }
 
-/** Sampled ring run φ0 → φ1 (CCW, 10° steps). */
-function ringRun(phi0: number, phi1: number): Array<[number, number]> {
-  const out: Array<[number, number]> = [];
-  for (let p = phi0; p <= phi1; p += 10) out.push(ring(p));
-  return out;
+/** Spawn → the stop before the bar → the family entry → the ring to the
+ *  signal point → the family north exit, straight in the lane at y = 25.97. */
+function toExitLane(): RingPathBuilder {
+  return miniPathFromSpawn()
+    .straightToY(Y_SLOW)
+    .mark("slow")
+    .straightToY(MINI_BAR_STOP_Y)
+    .mark("line")
+    .enterRing(MINI_ENTRY)
+    .mark("ring")
+    .ringTo(SIGNAL_PHI_DEG)
+    .mark("signal")
+    .exitRing(miniExit("north"))
+    .mark("lane");
 }
 
-/**
- * The north-arm exit blend, from the φ = 150° peel onto the outbound lane
- * (x = +4.06 — heading north, the right-hand lane; the lane rbp-spawn-finish
- * sits in). It is COMPLETE at y = 26, which is what leaves the pocket a
- * straight-line stop rather than a diagonal one (the third envelope).
- */
-const EXIT_BLEND: Array<[number, number]> = [
-  [7.5, 19.0],
-  [5.5, 22.0],
-  [X_LANE, 26.0],
-];
+/** The correct drive: into the pocket, and — after the wait — over the zebra. */
+function buildShadowPath(): RingPath {
+  return toExitLane().straightToY(Y_POCKET).mark("pocket").straightToY(55).mark("end").build();
+}
+let shadowPath: RingPath | null = null;
+const SHADOW = (): RingPath => (shadowPath ??= buildShadowPath());
+
+/** The mistake: the same line, driven through the pocket without a stop. */
+function buildThroughPath(): RingPath {
+  return toExitLane().straightToY(55).mark("end").build();
+}
+let throughPath: RingPath | null = null;
+const THROUGH = (): RingPath => (throughPath ??= buildThroughPath());
 
 /**
- * The shared yield-and-enter opening: approach, wait the circulator past the
- * mouth, then take the brisk flat-chord entry that wins ring priority. Every
- * drive whose fault is NOT the entry reuses it verbatim.
+ * The shared yield-and-enter opening: approach, stop before the bar, wait the
+ * circulator past the mouth, then the family entry. Every drive whose fault is
+ * NOT the entry reuses it verbatim.
  */
-function cleanEntrySteps(): DriveScript["steps"] {
+function cleanEntrySteps(p: RingPath, waitSec: number): DriveScript["steps"] {
   return [
     { kind: "glance", mirror: "rear" },
-    { kind: "drive", points: [[X_LANE, -93], [X_LANE, -60]], targetKmh: 30, stopAtEnd: false },
+    { kind: "drive", points: p.between("start", "slow"), targetKmh: 30, stopAtEnd: false },
     {
-      // Ease to a stop at the yield line (just inside the decision zone —
-      // ring 18 + entry margin 12 = 30 m from the centre).
+      // Ease to a stop with the nose 0.8 m short of the give-way bar.
       kind: "drive",
-      points: [[X_LANE, -60], [X_LANE, -40], [X_LANE, -27.5]],
+      points: p.between("slow", "line", { stop: true }),
       targetKmh: 16,
     },
     { kind: "annotation", textBg: "Кола се движи в кръга — тя е с предимство. Спри на линията и я пропусни." },
     { kind: "glance", mirror: "left" },
     // Wait the circulator fully PAST the mouth and onto the east arc (to the
     // driver's RIGHT) before committing — the yield the commendation reads.
-    { kind: "pause", sec: 9.0, brake: true },
+    { kind: "pause", sec: waitSec, brake: true },
     { kind: "annotation", textBg: "Тя премина — влизаме плътно след нея, в нейния интервал." },
     { kind: "glance", mirror: "left" },
     {
-      // FLAT-CHORD entry — see the header's second envelope.
+      // The family entry — see the header's second envelope.
       kind: "drive",
-      points: [[X_LANE, -27.5], [6.0, -23.0], [8.5, -18.5], [11.0, -15.0], ring(48), ring(55)],
+      points: p.between("line", "ring"),
       targetKmh: 17,
       stopAtEnd: false,
     },
@@ -143,20 +191,21 @@ function cleanEntrySteps(): DriveScript["steps"] {
 // The correct demonstration (shadow)
 // ---------------------------------------------------------------------------
 
-export function scRbPedExitShadowScript(): DriveScript {
+export function scRbPedExitShadowScript(dials: RbPedExitDials = {}): DriveScript {
+  const p = SHADOW();
   return {
     steps: [
       {
         kind: "annotation",
         textBg: "Днес кръговото е само половината. Другата половина е това, което те чака НА изхода.",
       },
-      ...cleanEntrySteps(),
+      ...cleanEntrySteps(p, dials.waitSec ?? ENTRY_WAIT_SEC),
       {
         // Circulate the east arc past the FIRST exit (east, φ = 90) at the ring
         // ceiling. No indicator yet: a right lever here would tell the driver
         // waiting at the east mouth that this car is leaving.
         kind: "drive",
-        points: ringRun(60, 100),
+        points: p.between("ring", "signal"),
         targetKmh: RING_KMH,
         stopAtEnd: false,
       },
@@ -171,13 +220,11 @@ export function scRbPedExitShadowScript(): DriveScript {
         textBg: "И сега най-важното: вдигни очи от колата в кръга и погледни НАПРЕД — на пътеката слиза човек.",
       },
       {
-        // Ring to the φ = 150° peel, then the indicator-announced blend onto the
-        // north arm — and STOP IN THE POCKET at y = 27: nose ~3 m short of the
-        // zebra, tail ~1.9 m clear of the ring band. The step opens at φ = 110,
-        // one ringRun stride past the previous step's φ = 100 end, so the path
-        // stays C¹-smooth and no spurious turnStarted fires at the joint.
+        // Ring to φ = 130°, the family exit onto the north arm — and STOP IN
+        // THE POCKET at y = 27: nose ~1 m short of the zebra, tail ~2.9 m clear
+        // of the ring band, the car straight along the lane.
         kind: "drive",
-        points: [...ringRun(110, 150), ...EXIT_BLEND, [X_LANE, Y_POCKET]],
+        points: p.between("signal", "pocket", { stop: true }),
         targetKmh: RING_KMH,
       },
       {
@@ -188,13 +235,13 @@ export function scRbPedExitShadowScript(): DriveScript {
       // Wait the crosser fully off the carriageway. She is released at ~30 m
       // (ring φ ≈ 105), walks 1.2 m/s across 16.25 m of tarmac + a stand-off:
       // clear ~15 s after release, and the pocket stop lands mid-walk.
-      { kind: "pause", sec: 9.5, brake: true },
+      { kind: "pause", sec: dials.pocketWaitSec ?? POCKET_WAIT_SEC, brake: true },
       { kind: "glance", mirror: "right" },
       { kind: "annotation", textBg: "Освободи цялото платно — чак сега тръгваме." },
       {
         // Over the now-clear zebra and out to the finish reference.
         kind: "drive",
-        points: [[X_LANE, Y_POCKET], [X_LANE, 40], [X_LANE, 55]],
+        points: p.between("pocket", "end", { stop: true }),
         targetKmh: 22,
       },
       { kind: "indicator", setting: "off" },
@@ -212,17 +259,18 @@ export function scRbPedExitShadowScript(): DriveScript {
 // Mistake demo 1 — „Изход през пешеходеца“ (PEDESTRIAN_NOT_YIELDED)
 // ---------------------------------------------------------------------------
 
-export function scRbPedExitMistakeThroughPedScript(): DriveScript {
+export function scRbPedExitMistakeThroughPedScript(dials: RbPedExitDials = {}): DriveScript {
+  const p = THROUGH();
   return {
     steps: [
       {
         kind: "annotation",
         textBg: "Входът, обиколката и мигачът са изрядни — и точно затова грешката се гледа трудно.",
       },
-      ...cleanEntrySteps(),
+      ...cleanEntrySteps(p, dials.waitSec ?? ENTRY_WAIT_SEC),
       {
         kind: "drive",
-        points: ringRun(60, 100),
+        points: p.between("ring", "signal"),
         targetKmh: RING_KMH,
         stopAtEnd: false,
       },
@@ -232,12 +280,12 @@ export function scRbPedExitMistakeThroughPedScript(): DriveScript {
       { kind: "glance", mirror: "right" },
       { kind: "annotation", textBg: "Очите още са върху колата в кръга. Пътеката отпред просто не е погледната…" },
       {
-        // The SAME peel and blend as the shadow — and then straight THROUGH the
-        // pocket and over the occupied crossing without a pause. She is still on
-        // the western half (~4 m away, far outside the 1.5 m contact radius):
-        // pure „непропускане", no collision to muddy the card.
+        // The SAME exit as the shadow — and then straight THROUGH the pocket
+        // and over the occupied crossing without a pause. She is still on the
+        // western half (metres away, outside the 1.5 m contact radius): pure
+        // „непропускане", no collision to muddy the card.
         kind: "drive",
-        points: [...ringRun(110, 150), ...EXIT_BLEND, [X_LANE, 40], [X_LANE, 55]],
+        points: p.between("signal", "end", { stop: true }),
         targetKmh: RING_KMH,
       },
       { kind: "indicator", setting: "off" },
