@@ -94,10 +94,13 @@ export interface PhysicsStepSource {
  * that step's own grid point (scene/gradeGrid.ts) — the same step, the same
  * speed and the same grid point on every display.
  *
- * `impactKmh` is |v_chassis − v_other| after step `step`: at 60 Hz exactly the
- * number VehicleRig's `onCollisionEnter` read (r3r drained right after that
- * step). A pair holding several manifolds is recorded once per manifold, as
- * r3r called the handler once per manifold.
+ * `impactKmh` is the speed the contact was STRUCK at: |v_chassis − v_other|
+ * with the chassis' velocity as step `step`'s solve received it, before that
+ * solve stopped the car and bounced it back (VehicleSim.forEachChassisContact
+ * — l0-free-drive:ee9d9374; through 1f1536d it was read after the solve, the
+ * number VehicleRig's old `onCollisionEnter` read, so a 50 km/h head-on
+ * into a façade read 5.5). A pair holding several manifolds is recorded once
+ * per manifold, as r3r called the handler once per manifold.
  */
 export interface StepContact {
   /** The physics step — the session grid point — the contact began at. */
@@ -105,7 +108,8 @@ export interface StepContact {
   /** The struck rigid body's `userData` (the classification and threshold
    *  read it; undefined for an untagged or bodiless collider). */
   readonly otherUserData: unknown;
-  /** Relative speed of the two bodies after that step, km/h. */
+  /** The impact speed, km/h: the two bodies' relative speed as that step's
+   *  solve received it (before the rebound). */
   readonly impactKmh: number;
 }
 

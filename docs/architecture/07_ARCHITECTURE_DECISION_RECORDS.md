@@ -548,6 +548,58 @@ the trace's samples, looks and indicator edges. LessonScene owns the grid's life
   - the with-flow rider's authored `extraRightOffsetM` −2.6 (its comment intended +2.6; it rides at y ≈ −1.46, not the south curb line −6.66) is carried to triage «vru2offset» — a content question, unchanged here.
 - **Still frame-timed after this amendment.** The cabin's channels and pedals for a frame's last point and for every point at ≤ 1 step per frame; the cabin clocks and the stall timer on the render delta (now seen by the frame's last point only; A13 still owed) — and so how many looks a HELD mirror yields (round 6, measured: on the controls drive the cabin hands out left, right, rear, shoulder, rear — 5 looks at 1, 3 and 7 steps per frame, 6 on the mixed run, 7 at 30 steps per frame, a held mirror refreshed once more on a long frame; every one heard); the moment a look is sampled (and a look made during a pause is not heard); the pre-drive steps, a manual finish and an abort; reverseAssist and the two stuck watches; the lee; the thump, haptics and impact cut; everything drawn.
 
+**Amendment 2026-10-18 — a contact's impact speed is the closing speed the contact step's solve receives, not what the solve leaves.** Lane `impactspeed`, round 1, row `l0-free-drive:ee9d9374`; SIGNED OFF WITH CONDITIONS; landed with the commit that carries this paragraph (doc 88). Not a founder ruling. It closes no row: the evidence is in process only, and the device re-drive below is owed.
+
+- **What it corrects.** Three passages of the 2026-10-11 amendment:
+  - in «What is true now», «Recorded per step», the words «and the relative speed after that step» now read «and the impact speed defined in the 2026-10-18 amendment»;
+  - under «Two things this amendment does not settle», the item «The impact speed is read after the contact step's solve, on base and tree alike. That is a latent defect that needs its own lane or a ruling (doc 88).» is closed by this amendment;
+  - in «No rule or threshold changes», the sentence «At 60 Hz the impact speed is the number base read; the verifier reproduced that for static obstacles only.» is superseded. The rest of that bullet stands.
+
+  The 2026-10-11 item «so the other body's share of the judged impact speed is the frame's too» was already superseded by the 2026-10-13 amendment.
+- **Why.**
+  - Base read the chassis `linvel()` after `world.step`, at the contact step. That is the velocity the solve left behind: the stop and the bounce.
+  - A head-on façade crash at 50.1 km/h read 5.50, and the hz block at 41.8 / 51.4 / 70.0 km/h read 4.86 / 6.01 / 8.51.
+  - So at the 10 km/h street tolerance (the curriculum, the полигон, lex-exam-1 and the exam bank) none of these crashes was graded or billed, and none ended an exam. The thump, the haptic, the shake and the impact cut played at rebound strength everywhere.
+- **Decision.**
+  - The impact speed of a contact begun at step k is |v_chassis − v_other| × 3.6 km/h.
+  - v_chassis is the chassis velocity as `update()` hands it to step k's solve. It is `VehicleSim.solveStartVel`, written at the end of every `update()` as a pure read: after `updateVehicle` (the wheel impulses), before `world.step`. `reset()` zeroes it. The forces `update()` accumulates (aero drag, crosswind) integrate inside `world.step` itself; the verifier judged that negligible.
+  - v_other is the struck body's velocity over the step: zero for a fixed body, and for a kinematic shell its agent's one-step velocity (Amendment 2026-10-13). The chassis is the product's only dynamic body, so the solve does not change v_other.
+  - The magnitude is kept, not the share along the contact normal.
+  - A collider with no body reads |v_chassis along the car's forward axis|. The product has no such collider.
+  - **The stated tolerance is 0.541 km/h** between the reading and the car's speed in the step record after step k−1 (the approach). It is derived from one step of the full service brake: BRAKE_FORCE_N / CHASSIS_MASS / 60 × 3.6 = 11000 / 1220 / 60 × 3.6. It is the tolerance the new test holds façade, block and touch readings to, not a bound on every input; a held parking brake is 13,000 N. Against an independent pre-solve read, the hz STARTED audit holds the reading exactly.
+  - **Unchanged; they now receive this number:** `hearChassisContact`, `gradedContactMinKmh`, the `>=` comparison, `COLLISION_MIN_KMH` (10), every `collisionMinKmh`, the district-surface tolerance, and the thump, haptic, shake and cut curves. No rule, point value, copy table or shown sentence changes.
+- **Alternatives rejected.**
+  1. The speed projected on the contact normal. It reads sideswipes below what base read, which de-convicts scrapes, and the trimesh's first-step normal is edge-noisy.
+  2. The car's own forward speed at step k−1. It ignores the other body, so a moving road user striking a standing car reads 0.
+  3. Keeping base's number. That was the 2026-10-11 amendment's choice, made so as not to move 60 Hz sheets, but it measures the rebound.
+- **Boundaries.**
+  - VehicleSim owns the snapshot and the read (`forEachChassisContact`).
+  - Nothing between `update()` and `world.step` writes the chassis velocity. Outside tests, every impulse and force write (the aero and crosswind forces, the roll torque, the road-roughness and anti-roll impulses, `updateVehicle`) is made inside `update()` before the snapshot, and `reset()` is the only other writer. This was checked by the verifier's grep at `1f1536d` and by the integration reader on `e58f388` + the patches.
+  - `traffic/playerTrack.ts` still owns the contact record. `StepContact.impactKmh` is documented as this speed.
+- **Reproduced by the verifier**, in process at 60 Hz:
+  - **Through rapier → VehicleSim → the step record → GradeGrid → VehicleRig's ear → LessonScene's own `handleCollision`:**
+    - a head-on façade crash at 49.986 km/h reads 50.003 on l0-free-drive, lex-exam-1 and EX-A-D1-0000 (base 5.54). It is graded, billed COLLISION and ends the session;
+    - l0-free-drive at 18.68 / 18.78 km/h reads 18.70 / 18.80 (base 1.87 / 2.13);
+    - oblique ±15° at 40 km/h reads 40.01 / 40.03.
+  - **Moving shells, in raw rapier + VehicleSim** (a kinematic shell on a flat world), reading the closing speed: a standing car rear-ended at 30 → 30.00; head-on 40 against 20 → 61.78; a car at 9.7 km/h and a 30 km/h crossing shell → 31.53.
+  - **A same-direction closing speed, in a census cell the verifier re-drove:** sc-sig-green-wave/shadow-correct, 49.86 into a 33.4 km/h car → 16.53 (base 1.89).
+  - **Census, recomputed from the builder's files, with four street cells re-driven:**
+    - every tape × every rung (2,434 cells): 0 bill or sheet changes;
+    - at the street tolerance (503 tapes): 18 COLLISION bills gained and none lost. Each is a physical crash at 11–62 km/h closing speed (the builder).
+- **Consequences.**
+  - **A standing student struck by a moving body now reads that body's speed.** At the street tolerance, a strike at 10 km/h or more bills COLLISION (опасна), with no attribution of fault.
+    - On `1f1536d` the verifier read a post-integration clamp in `traffic/vehicles.ts` that keeps ambient traffic from closing on him, and its spawn census of 21 lessons found no contact.
+    - Since `e58f388` that clamp is gated by `!studentBows`. At a signalised junction box, a car across his bows, or committed past his waiting point, is refused only a step that would overlap the two bodies. That case is unmeasured.
+    - Scenario rungs bill any contact, as before.
+    - See doc 88, condition F4.
+  - **What the student hears and sees of a crash plays at crash strength.** At 50 km/h: thump 1.0, haptic [160, 40, 64], shake 0.04 rad, and the chase cut in both modes. These are the builder's numbers, in process; the new test, which the verifier ran green, asserts them. The mutants that feed the old number to the cut, the haptic or the thump are each killed on assertion text.
+- **Pins.**
+  - `impact-speed-before-solve.test.ts`: 14 tests, 13 red on base on assertion text.
+  - The hz STARTED audit's exact, independent pre-solve read. It alone kills a snapshot taken before the wheel impulses, because that mutant sits inside the tolerance.
+  - The v_other half (F3): `vehicle/impact-closing-speed.test.ts` (pinned at integration), three moving-shell cases read through `recordPhysicsStep` → `PlayerStepTrackRecorder.contactsAtStep`, each held to the closing speed within 0.541 + 0.1 km/h; dropping the struck body's velocity turns all three red.
+  - Unpinned, and unreachable in the product: the body-less branch and the reset zeroing (verifier V4, V10).
+- **D6 stands.** Nothing here was driven in a browser. The device re-drive on PC and the phone lens of a 50 km/h façade crash on l0-free-drive and lex-exam-1 is owed (doc 88).
+
 ## ADR-015: A pass is judged by what the overtaken vehicle really had to do
 
 **Status.** Accepted by the integrator under the founder's delegation of 2026-10-08 (doc 88, «Founder delegation», item 2: restage the truck-pass

@@ -106,6 +106,10 @@ export function AdvisorCard({
     <div
       role="status"
       aria-label="Съветник — следващо действие"
+      // W10 (lane `cardstay2`): the one column child the stand's first step takes
+      // off the glass — `useToastReader` reads it (`TOAST_ADVISOR_ATTR`) only to ask
+      // whether two judged cards would both be whole while this card waits.
+      data-hud-advisor=""
       // `relative isolate` is what the shade below hangs on, and `isolate` is
       // not decoration: a `z-index: -1` child in a box that is NOT a stacking
       // context paints behind the nearest ancestor that is, which in this tree

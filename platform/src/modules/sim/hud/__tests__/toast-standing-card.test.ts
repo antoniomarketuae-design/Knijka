@@ -44,7 +44,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bannerOneLineWhileReading, measureToastColumnFold } from "../../../../components/sim/lesson-ui/LessonPlayShell";
 import * as Hud from "../HudToasts";
 import { TOAST_MORE_SELECTOR, toastCardInWindow } from "../HudToasts";
@@ -262,7 +262,11 @@ function column(start: { bannerPx: number; advisorPrompt: boolean; cards: ModelC
   const toasts = () => s.cards.map((c) => ({ ...c, event: { kind: c.kind } }));
   const standing = () => s.reader?.standing ?? null;
   const painted = () => vis(toasts(), false, s.reader?.reading ?? null, standing());
-  const above = () => bannerNow() + RIG.gap + (advisorMounted() ? RIG.advisor + RIG.gap : 0) + RIG.pill + RIG.gap;
+  // the advisor's card is a column child (`data-hud-advisor`, W10) — taken out of flow, it takes no room
+  const advisorEl = new El();
+  advisorEl.attrs["data-hud-advisor"] = "";
+  const above = () =>
+    bannerNow() + RIG.gap + (advisorMounted() && advisorEl.style.position !== "absolute" ? RIG.advisor + RIG.gap : 0) + RIG.pill + RIG.gap;
   const natural = () => {
     const c = painted();
     return c.reduce((a, x) => a + laidOut(x, false), 0) + RIG.stackGap * Math.max(0, c.length - 1);
@@ -292,13 +296,15 @@ function column(start: { bannerPx: number; advisorPrompt: boolean; cards: ModelC
   /** Lay the committed tree out — what React's commit does to the DOM. */
   const commit = () => {
     stack.children = [];
-    columnEl.children = s.rowUp ? [scroller, row] : [scroller];
+    columnEl.children = [...(advisorMounted() ? [advisorEl] : []), ...(s.rowUp ? [scroller, row] : [scroller])];
     row.parentElement = s.rowUp ? columnEl : null;
     const cards = painted();
     cards.forEach((c, i) => {
       const el = stack.add(new El());
       el.offsetParent = columnEl;
-      el.topFn = () => above() + cards.slice(0, i).reduce((a, x) => a + laidOut(x, rowInFlow()) + RIG.stackGap, 0);
+      // each card stands under the cards above it AS THEY ARE LAID OUT NOW — so a body squeezed for one read (W10's
+      // two-card probe) moves the cards under it, as flexbox does (equal to the summed lengths when nothing is squeezed)
+      el.topFn = () => above() + stack.children.slice(0, i).reduce((a, x) => a + x.heightFn() + RIG.stackGap, 0);
       el.heightFn = () => laidOut(c, rowInFlow());
       el.rectTopFn = () => RIG.columnTop + el.topFn() - scroller.scrollTop;
       if (c.paragraph !== undefined) {
@@ -1620,6 +1626,418 @@ describe("§6 integration pin (verifier mutant R8): a stand's `above` follows th
       "the older card, last seen whole under exactly the judged card above it now and cut by the advisor's card, was not stood for — the latch kept a stale `above`",
     ).toBe(1);
     expect(model.advisorMounted(), "the advisor's card did not wait for the older card stood for").toBe(false);
+    r.m.unmount();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// §7  W10 (integrator, 2026-10-17; lane `cardstay2`) — WHERE BOTH FIT, BOTH
+//     STAY WHOLE. Two judged cards on the glass: the paragraph that would push
+//     the older one out of view is asked for its summary before paint (the newer
+//     card first, the older card's own paragraph next); only where even the two
+//     summaries cannot fit does the older card wait behind the fold row (X2).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** The probe, asked structurally: on a tree without it a row fails on its assertion. */
+function pairAsk(scroller: unknown, newer: unknown, older: unknown, newerPeek?: string, olderPeek?: string): string | null {
+  const f = (Hud as unknown as { toastPairSummaryAsk?: (...a: unknown[]) => string | null }).toastPairSummaryAsk;
+  expect(typeof f, "nothing asks which of two judged cards should take its summary").toBe("function");
+  return f!(scroller, newer, older, newerPeek, olderPeek);
+}
+
+/** The card answers the ask in its layout effect (`toastBodyChoiceOnAsk`): the asked paragraph becomes its summary. */
+function answer(model: ReturnType<typeof column>) {
+  const asked = model.s.reader?.summarise ?? null;
+  model.s.cards = model.s.cards.map((c) =>
+    c.id === asked && c.paragraph !== undefined ? { id: c.id, px: c.paragraph.summaryPx, kind: c.kind } : c,
+  );
+}
+
+/**
+ * THE FILED FRAME — rig-w3h TWO-FAULT, full screen 1280 × 720 (stage 1264 ×
+ * 619.5), `1f1536d`: «Удар в неподвижно препятствие» (116.5 px SUMMARY) over
+ * «Влизане без пропускане» (111.3 px SUMMARY), window 185.1 px with the fold row
+ * and 214.6 without it (185.1 + 23.5 + 6). Cap = 214.6 + task banner 48.7 + 6 +
+ * pill 23.5 + 6.
+ */
+const W3H_FS1280_CAP = 298.8;
+/** A roomier stage for the arithmetic: 360 − 84.2 = 275.8 px without the row. */
+const ROOMY_CAP = 360;
+const PARA = (id: number, px: number, summaryPx: number): ModelCard => ({
+  id,
+  px,
+  kind: "violation",
+  paragraph: { bodyPx: px - 60, summaryPx, peek: "Кратко." },
+});
+
+describe("§7 W10 toastPairSummaryAsk — which card to ask so that BOTH judged cards are whole", () => {
+  beforeEach(() => {
+    vi.stubGlobal("HTMLElement", El);
+    vi.stubGlobal("document", { createElement: () => new El() });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const cards = (m: ReturnType<typeof column>) => m.scroller.querySelector('[data-hud="toasts"]')!.children;
+
+  it("THE FILED FRAME: two SUMMARIES (116.5 over 111.3) need 235.8 px of a 214.6 px window — nothing shorter to show: no ask, the older card waits behind the fold row (X2)", () => {
+    const m = column({
+      bannerPx: RIG.bannerTask,
+      advisorPrompt: false,
+      capPx: W3H_FS1280_CAP,
+      cards: [{ id: 2, px: 116.5, kind: "violation" }, { id: 1, px: 111.3, kind: "violation" }],
+    });
+    m.s.rowUp = true;
+    m.commit();
+    expect(m.windowPx(false)).toBeCloseTo(214.6, 1);
+    expect(m.windowPx(true)).toBeCloseTo(185.1, 1);
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1])).toBeNull();
+  });
+
+  it("a newer PARAGRAPH pushes the older card out, and the two summaries fit (241 in 275.8): the NEWER card is asked", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 116.5), { id: 1, px: 116.5, kind: "violation" }] });
+    m.commit();
+    expect(m.cardAt(1)!.fit, "the stand-in does not start with the older card cut").toBe("cut");
+    expect(
+      pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", undefined),
+      "the newer paragraph that pushes the older judged card out was not asked for its summary",
+    ).toBe("newer");
+  });
+
+  it("the newer paragraph FITS beside the older card (324.5 in a 335.8 px window): nothing is asked — the student keeps the paragraph", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: 420, cards: [PARA(2, 200, 116.5), { id: 1, px: 116.5, kind: "violation" }] });
+    m.commit();
+    expect(m.cardAt(1)!.fit).toBe("whole");
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", undefined), "a paragraph was asked for its summary though both cards were whole").toBeNull();
+  });
+
+  it("the newer card is a SUMMARY and the older one a PARAGRAPH cut by it (279 px; summary 116.5): the OLDER card is asked", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [{ id: 2, px: 116.5, kind: "violation" }, PARA(1, 279, 116.5)] });
+    m.commit();
+    expect(
+      pairAsk(m.scroller, cards(m)[0], cards(m)[1], undefined, "Кратко."),
+      "the older paragraph whose summary makes both cards whole was not asked",
+    ).toBe("older");
+  });
+
+  it("BOTH paragraphs: the newer card is asked first", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 116.5), PARA(1, 279, 116.5)] });
+    m.commit();
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", "Кратко.")).toBe("newer");
+  });
+
+  it("even the two summaries do not fit (167.5 + 8 + 152.5 = 328 in 275.8): nothing is asked (X2 as built)", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 260, 167.5), { id: 1, px: 152.5, kind: "violation" }] });
+    m.commit();
+    expect(
+      pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", undefined),
+      "a paragraph was asked for a summary that leaves the older card cut anyway",
+    ).toBeNull();
+  });
+
+  it("a body still PENDING is its own arrival measurement's: nothing is asked — not even the older paragraph whose summary would fit beside it (200 + 8 + 60 in 275.8)", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 116.5), PARA(1, 200, 60)] });
+    m.commit();
+    cards(m)[0]!.children[0]!.attrs["data-hud-toast-body"] = "pending";
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", "Кратко."), "a card was asked while the newer card's body is not laid out yet").toBeNull();
+  });
+
+  it("the probe leaves nothing behind: the bodies' inline styles, the fold row's position and the scroll are as they were", () => {
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 116.5), PARA(1, 279, 116.5)] });
+    m.s.rowUp = true;
+    m.commit();
+    m.scroller.scrollTop = 12;
+    const bodies = [cards(m)[0]!.children[0]!, cards(m)[1]!.children[0]!];
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", "Кратко.")).toBe("newer");
+    expect(bodies.map((b) => [b.style.height ?? "", b.style.overflow ?? ""])).toEqual([
+      ["", ""],
+      ["", ""],
+    ]);
+    expect([m.row.style.position, m.scroller.scrollTop]).toEqual(["", 12]);
+  });
+});
+
+describe("§7 W10, run: where the two summaries fit, both judged cards are whole on every layout once the asked card has answered", () => {
+  it("a newer PARAGRAPH arrives over an older summary: it is asked for its summary, nothing stands, the banner keeps its sentence, both cards whole", () => {
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [{ id: 1, px: 116.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [PARA(2, 200, 116.5), ...model.s.cards];
+    r.frame();
+    expect(
+      model.s.reader!.summarise ?? null,
+      "the newer paragraph that pushes the older judged card under the window was not asked for its summary",
+    ).toBe(2);
+    answer(model);
+    const frames = Array.from({ length: 30 }, () => ({ ...r.frame(), top: model.cardAt(2)!.fit, older: model.cardAt(1)!.fit }));
+    expect(frames.filter((f) => f.older !== "whole").length, "the older judged card was left below the window where the two summaries fit").toBe(0);
+    expect(frames.every((f) => f.top === "whole")).toBe(true);
+    expect(frames.every((f) => !f.rowUp), "the fold row stayed up over two whole cards").toBe(true);
+    expect(model.s.reader!.standing ?? null).toBeNull();
+    expect(model.s.reader!.bannerYields).toBe(false);
+    r.m.unmount();
+  });
+
+  it("a newer SUMMARY arrives over an older PARAGRAPH it pushes out: the older card is asked, and both are whole", () => {
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(1, 260, 116.5)] });
+    const r = mountReader(model);
+    r.settle();
+    expect(model.cardAt(1)!.fit, "the stand-in does not start with the older paragraph whole").toBe("whole");
+    model.s.cards = [{ id: 2, px: 116.5, kind: "violation" }, ...model.s.cards];
+    r.frame();
+    expect(model.s.reader!.summarise ?? null, "the older paragraph whose summary makes both cards whole was not asked").toBe(1);
+    answer(model);
+    const frames = Array.from({ length: 20 }, () => ({ ...r.frame(), older: model.cardAt(1)!.fit }));
+    expect(frames.every((f) => f.older === "whole"), "the older judged card was left below the window where the two summaries fit").toBe(true);
+    r.m.unmount();
+  });
+
+  it("INSIDE A STAND: a newer summary cut on arrival is stood for (the advisor's card waits) and is then whole; the older PARAGRAPH it pushed out is asked once the stand has its card whole — its summary makes both whole", () => {
+    // cap 440 under the crash pin with the advisor's card: 224 px without the row; the older 180 px paragraph
+    // (summary 80) is whole alone; a 230 px summary arrives on top, cut; with the advisor waiting the window is
+    // 328.3 — the paragraph needs 418, its summary 318
+    const model = column({ bannerPx: RIG.bannerPinned, advisorPrompt: true, hold: true, capPx: 440, cards: [PARA(1, 180, 80)] });
+    const r = mountReader(model);
+    r.settle();
+    expect(model.cardAt(1)!.fit, "the stand-in does not start with the older paragraph whole").toBe("whole");
+    model.s.cards = [{ id: 2, px: 230, kind: "violation" }, ...model.s.cards];
+    let asked: number | null = null;
+    for (let i = 0; i < 8 && asked === null; i += 1) {
+      r.frame();
+      asked = model.s.reader!.summarise ?? null;
+    }
+    expect(model.s.reader!.standing, "the stand-in does not stand for the newer card cut on arrival").toEqual({ id: 2 });
+    expect(asked, "the older paragraph whose summary makes both cards whole was not asked once the stand had its card whole").toBe(1);
+    answer(model);
+    const frames = Array.from({ length: 30 }, () => ({ ...r.frame(), top: model.cardAt(2)!.fit, older: model.cardAt(1)!.fit, banner: model.bannerNow() }));
+    expect(frames.every((f) => f.top === "whole" && f.older === "whole"), "a judged card was cut").toBe(true);
+    expect(frames.every((f) => f.banner === RIG.bannerPinned), "the banner was folded where the asked summary was enough").toBe(true);
+    expect(frames.every((f) => !f.advisor), "the advisor's card came back over a judged card it cuts").toBe(true);
+    r.m.unmount();
+  });
+
+  it("THE FILED FRAME, run (full screen 1280 × 720): the two summaries cannot fit — nothing is asked, nothing stands for the older card, and the fold row announces it", () => {
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: W3H_FS1280_CAP, cards: [{ id: 1, px: 111.3, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [{ id: 2, px: 116.5, kind: "violation" }, ...model.s.cards];
+    const frames = Array.from({ length: 20 }, () => ({ ...r.frame(), asked: model.s.reader!.summarise ?? null, top: model.cardAt(2)!.fit }));
+    expect(frames.every((f) => f.asked === null)).toBe(true);
+    expect(frames.every((f) => f.top === "whole")).toBe(true);
+    expect(model.s.rowUp, "the older card is not announced").toBe(true);
+    expect(model.s.reader!.standing ?? null).toBeNull();
+    r.m.unmount();
+  });
+});
+
+describe("§7 W10, the advisor's card: where the two summaries fit only once it waits, it waits — the column stands for the older card at the first step", () => {
+  it("unit: `toastPairFitsWithoutAdvisor` — 160 + 8 + 116.5 = 284.5 does not fit 251.5 with the advisor's card, fits 355.8 without it; the card's position is put back", () => {
+    vi.stubGlobal("HTMLElement", El);
+    vi.stubGlobal("document", { createElement: () => new El() });
+    try {
+      const f = (Hud as unknown as { toastPairFitsWithoutAdvisor?: (...a: unknown[]) => boolean }).toastPairFitsWithoutAdvisor;
+      expect(typeof f, "nothing asks whether the two judged cards fit once the advisor's card waits").toBe("function");
+      const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 440, cards: [{ id: 2, px: 160, kind: "violation" }, { id: 1, px: 116.5, kind: "violation" }] });
+      m.commit();
+      const cards = m.scroller.querySelector('[data-hud="toasts"]')!.children;
+      expect(m.windowPx(false)).toBeCloseTo(251.5, 1);
+      expect(m.cardAt(1)!.fit).toBe("cut");
+      expect(pairAsk(m.scroller, cards[0], cards[1]), "summaries with nothing shorter to show were asked").toBeNull();
+      expect(f!(m.scroller, cards[0], cards[1], undefined, undefined), "the two cards fit once the advisor's card waits, and the probe said no").toBe(true);
+      const adv = (m.scroller.parentElement as El).children.find((c) => c.getAttribute("data-hud-advisor") !== null)!;
+      expect(adv.style.position, "the probe left the advisor's card out of flow").toBe("");
+      // even without it the two do not fit (cap 360: 275.8 for 167.5 + 8 + 152.5 = 328)
+      const n = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 360, cards: [{ id: 2, px: 167.5, kind: "violation" }, { id: 1, px: 152.5, kind: "violation" }] });
+      n.commit();
+      const nc = n.scroller.querySelector('[data-hud="toasts"]')!.children;
+      expect(f!(n.scroller, nc[0], nc[1], undefined, undefined), "the probe called two cards whole that the column cannot hold even without the advisor's card").toBe(false);
+      // no advisor's card on the glass: nothing to take away
+      const o = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: 300, cards: [{ id: 2, px: 160, kind: "violation" }, { id: 1, px: 116.5, kind: "violation" }] });
+      o.commit();
+      const oc = o.scroller.querySelector('[data-hud="toasts"]')!.children;
+      expect(f!(o.scroller, oc[0], oc[1], undefined, undefined)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("run: the advisor's card is up and the older summary whole; a newer summary arrives and pushes it out — the advisor's card waits, both cards are whole, the banner keeps its sentence", () => {
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 440, cards: [{ id: 1, px: 116.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    expect([model.cardAt(1)!.fit, model.advisorMounted()], "the stand-in does not start with the older card whole beside the advisor's card").toEqual(["whole", true]);
+    model.s.cards = [{ id: 2, px: 160, kind: "violation" }, ...model.s.cards];
+    const frames = Array.from({ length: 30 }, () => ({ ...r.frame(), top: model.cardAt(2)!.fit, older: model.cardAt(1)!.fit }));
+    expect(frames.filter((f) => f.older !== "whole").length, "the older judged card was left below the window where the two fit once the advisor's card waits").toBe(0);
+    expect(frames.every((f) => f.top === "whole")).toBe(true);
+    expect(frames.every((f) => !f.advisor), "the advisor's card stayed over a judged card it pushes out").toBe(true);
+    expect(model.s.reader!.standing, "the column does not stand for the older card").toEqual({ id: 1 });
+    expect(model.s.reader!.bannerYields).toBe(false);
+    // the newer card leaves: the older card is the top card, whole, and the advisor's card comes back
+    model.s.cards = model.s.cards.filter((c) => c.id !== 2);
+    for (let i = 0; i < 6; i += 1) r.frame();
+    expect(model.s.reader!.standing ?? null).toBeNull();
+    expect(model.advisorMounted(), "the advisor's card did not come back once nothing needed its room").toBe(true);
+    expect(model.cardAt(1)!.fit).toBe("whole");
+    r.m.unmount();
+  });
+
+  it("run: even without the advisor's card the two cannot fit (328 in 315.8) — nothing waits, the advisor's card stays, the older card is announced (X2)", () => {
+    // cap 400: 211.5 px beside the advisor's card (the newer 167.5 px card whole even under the fold row, 182), 315.8 without it
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 400, cards: [{ id: 1, px: 152.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [{ id: 2, px: 167.5, kind: "violation" }, ...model.s.cards];
+    const frames = Array.from({ length: 20 }, () => ({ ...r.frame() }));
+    expect(frames.every((f) => f.advisor), "the advisor's card was taken away for an older card it could not make whole").toBe(true);
+    expect(model.s.reader!.standing ?? null).toBeNull();
+    expect(model.s.rowUp, "the older card is not announced").toBe(true);
+    r.m.unmount();
+  });
+
+  it("run: under a stand KEPT for the older card no step past the first is taken — the crash pin's banner keeps its sentence (X2: those are the top card's)", () => {
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 440, cards: [{ id: 1, px: 116.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [{ id: 2, px: 225, kind: "violation" }, ...model.s.cards];
+    for (let i = 0; i < 8; i += 1) r.frame();
+    expect(model.s.reader!.standing).toEqual({ id: 1 });
+    // 225 + 8 + 116.5 = 349.5 in 355.8 once the advisor's card waits; the crash pin's banner (27.5 px more, 328.3) cuts the older card again — its one line would give the room back
+    model.s.bannerPx = RIG.bannerPinned;
+    model.s.hold = true;
+    const frames = Array.from({ length: 20 }, () => ({ ...r.frame(), banner: model.bannerNow(), top: model.cardAt(2)!.fit }));
+    expect(frames.every((f) => f.banner === RIG.bannerPinned), "the banner was set on one line for an older card under a newer judged card").toBe(true);
+    expect(frames.every((f) => f.top === "whole")).toBe(true);
+    r.m.unmount();
+  });
+});
+
+describe("§7 W10, the advisor's card: a stand kept for the older card holds only under the judged card it was kept for", () => {
+  it("run: the newer card is replaced by another one with which the two no longer fit, even without the advisor's card — the stand is let go and the advisor's card comes back", () => {
+    // cap 440: 251.5 beside the advisor's card, 355.8 without it. Kept: 160 + 8 + 152.5 = 320.5. Then 200 + 8 + 152.5 = 360.5
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 440, cards: [{ id: 1, px: 152.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [{ id: 2, px: 160, kind: "violation" }, ...model.s.cards];
+    for (let i = 0; i < 8; i += 1) r.frame();
+    expect(model.s.reader!.standing, "the stand-in does not keep the older card's stand").toEqual({ id: 1 });
+    model.s.cards = [{ id: 3, px: 200, kind: "violation" }, ...model.s.cards.filter((c) => c.id !== 2)];
+    for (let i = 0; i < 8; i += 1) r.frame();
+    expect(model.s.reader!.standing ?? null, "a stand kept under one newer card held under another the two cannot fit beside").toBeNull();
+    expect(model.advisorMounted(), "the advisor's card waited for an older card it can no longer help").toBe(true);
+    r.m.unmount();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// §8  INTEGRATION PINS (lane `cardstay2` verifier, findings F7 and F8): the
+//     mutants V2, V3, V5 and V7 survived the toast set; each row below fails on
+//     its assertion under one of them.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The browser clamps a scroll position the content no longer reaches: while
+ * the probe squeezes the bodies, a scroller scrolled further than the squeezed
+ * content allows is pulled back at the next layout read. The stand-in's
+ * `scrollTop` is a plain field; this gives ONE scroller that behaviour — the
+ * clamp is applied on every read of its `clientHeight` (a forced layout) and of
+ * `scrollTop` itself, against the cards' LIVE heights.
+ */
+function clampScroll(model: ReturnType<typeof column>) {
+  const sc = model.scroller;
+  const stack = sc.querySelector('[data-hud="toasts"]')!;
+  let top = 0;
+  const maxTop = (clientPx: number) => {
+    const kids = stack.children;
+    const content = kids.reduce((a, k) => a + k.heightFn(), 0) + RIG.stackGap * Math.max(0, kids.length - 1);
+    return Math.max(0, Math.round(content) - clientPx);
+  };
+  const client = sc.clientFn;
+  sc.clientFn = () => {
+    const c = client();
+    top = Math.min(top, maxTop(Math.round(c)));
+    return c;
+  };
+  Object.defineProperty(sc, "scrollTop", {
+    configurable: true,
+    get: () => {
+      top = Math.min(top, maxTop(sc.clientHeight));
+      return top;
+    },
+    set: (v: number) => {
+      top = Math.max(0, Math.min(v, maxTop(sc.clientHeight)));
+    },
+  });
+}
+
+describe("§8 W10 integration pins — the probe's restore and guards (verifier mutants V2, V5, V7)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("HTMLElement", El);
+    vi.stubGlobal("document", { createElement: () => new El() });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const cards = (m: ReturnType<typeof column>) => m.scroller.querySelector('[data-hud="toasts"]')!.children;
+
+  it("V2: a column scrolled 120 px whose squeezed content (241 px) fits its window is clamped to 0 during the probe — the probe puts the 120 back", () => {
+    // 200 + 8 + 279 = 487 px of paragraphs under a 246 px window (fold row up): scrollable 241 px; squeezed to
+    // their summaries 116.5 + 8 + 116.5 = 241 px they fit — the browser pulls the scroll back to 0 for the read
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 116.5), PARA(1, 279, 116.5)] });
+    m.s.rowUp = true;
+    m.commit();
+    clampScroll(m);
+    m.scroller.scrollTop = 120;
+    expect(m.scroller.scrollTop, "the stand-in does not hold a 120 px scroll").toBe(120);
+    expect(pairAsk(m.scroller, cards(m)[0], cards(m)[1], "Кратко.", "Кратко.")).toBe("newer");
+    expect(m.scroller.scrollTop, "the probe left the column scrolled where its squeeze clamped it, not where the student had it").toBe(120);
+  });
+
+  it("V5: a card whose squeezed body takes it BELOW its summary's height (a layout the probe does not understand) is no read — nothing is asked", () => {
+    // newer 200 px paragraph, summary 160: 160 + 8 + 116.5 = 284.5 does not fit 275.8. This card answers a body
+    // squeeze twice over, so the probe's squeeze lands it at 120 px (40 short of 160) and the pair would look whole
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 200, 160), { id: 1, px: 116.5, kind: "violation" }] });
+    m.commit();
+    const newer = cards(m)[0]!;
+    const body = newer.children[0]!;
+    newer.heightFn = () => 200 - 2 * (140 - body.heightFn());
+    expect(m.cardAt(1)!.fit, "the stand-in does not start with the older card cut").toBe("cut");
+    expect(
+      pairAsk(m.scroller, newer, cards(m)[1], "Кратко.", undefined),
+      "a squeeze that did not come out at the summary's height was trusted, and a paragraph was asked on it",
+    ).toBeNull();
+    expect(body.style.height ?? "", "the probe left the body squeezed").toBe("");
+  });
+
+  it("V7: an older card whose foot is 1 px past the window — inside TOAST_FIT_SLACK_PX — is not cut: nothing is asked", () => {
+    // above 84.2 · newer 150 + 8 · older 119: its foot at 277 against a 276 px window (275.8 rounded)
+    const m = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, capPx: ROOMY_CAP, cards: [PARA(2, 150, 100), { id: 1, px: 119, kind: "violation" }] });
+    m.commit();
+    const older = cards(m)[1]!;
+    expect(older.offsetTop - m.scroller.offsetTop + older.offsetHeight - m.scroller.clientHeight, "the stand-in does not put the older card's foot 1 px past the window").toBe(1);
+    expect(Hud.TOAST_FIT_SLACK_PX).toBe(1);
+    expect(
+      pairAsk(m.scroller, cards(m)[0], older, "Кратко.", undefined),
+      "an older card inside the rounding slack of the window was read as cut, and the newer paragraph was asked for its summary",
+    ).toBeNull();
+  });
+});
+
+describe("§8 W10 integration pin — a kept stand is RE-KEPT under a new newer card the two still fit beside (verifier mutant V3)", () => {
+  it("run: card 2 is replaced by card 3 (170 px) — 170 + 8 + 152.5 = 330.5 still fits 355.8 once the advisor's card waits: the stand is kept under card 3, the advisor waits, both cards whole", () => {
+    // cap 440: 251.5 beside the advisor's card, 355.8 without it. Kept under 2: 160 + 8 + 152.5 = 320.5
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: true, capPx: 440, cards: [{ id: 1, px: 152.5, kind: "violation" }] });
+    const r = mountReader(model);
+    r.settle();
+    model.s.cards = [{ id: 2, px: 160, kind: "violation" }, ...model.s.cards];
+    for (let i = 0; i < 8; i += 1) r.frame();
+    expect(model.s.reader!.standing, "the stand-in does not keep the older card's stand under card 2").toEqual({ id: 1 });
+    model.s.cards = [{ id: 3, px: 170, kind: "violation" }, ...model.s.cards.filter((c) => c.id !== 2)];
+    for (let i = 0; i < 4; i += 1) r.frame();
+    const frames = Array.from({ length: 20 }, () => ({ ...r.frame(), older: model.cardAt(1)!.fit, top: model.cardAt(3)!.fit }));
+    expect(
+      model.s.reader!.standing ?? null,
+      "the stand re-taken for the older card under card 3 differs from the old one only in the judged card it is kept under, and was not taken",
+    ).toEqual({ id: 1 });
+    expect(frames.filter((f) => f.older !== "whole").length, "the older judged card was left below the window where the two fit once the advisor's card waits").toBe(0);
+    expect(frames.every((f) => f.top === "whole")).toBe(true);
+    expect(frames.every((f) => !f.advisor), "the advisor's card came back over two judged cards it pushes apart").toBe(true);
     r.m.unmount();
   });
 });

@@ -80,7 +80,10 @@ export interface ChassisContactReading {
   manifolds: number;
   /** The struck rigid body's `userData` (undefined: no body, or untagged). */
   otherUserData: unknown;
-  /** |v_chassis − v_other| after the step, km/h (own |forward speed| with no body). */
+  /** The IMPACT speed, km/h: |v_chassis − v_other| with the chassis' velocity
+   *  as the solver RECEIVED it for this step, before the contact's solve
+   *  pushed it back (`VehicleSim.forEachChassisContact`); the car's own
+   *  |forward speed| at that moment when the collider has no body. */
   impactKmh: number;
 }
 
@@ -290,6 +293,12 @@ export class VehicleSim {
   private aLatGripSmooth = 0;
   private aLongGripSmooth = 0;
   private readonly prevVel: Vec3 = { x: 0, y: 0, z: 0 };
+  /** l0-free-drive:ee9d9374 — the chassis' velocity as `update()` hands it to
+   *  the coming `world.step()`: after the wheel impulses, before the solve.
+   *  The impact speed of a contact that step begins is read from it
+   *  (`forEachChassisContact`). Written at the end of every `update()`,
+   *  zeroed by `reset()`; read by nothing that touches rapier. */
+  private readonly solveStartVel: Vec3 = { x: 0, y: 0, z: 0 };
   private readonly spawnRotation: Quat;
   private readonly spawnTranslation: Vec3;
   private disposed = false;
@@ -304,6 +313,9 @@ export class VehicleSim {
    *  from the RENDER loop, not from `step()`, so it may never borrow a
    *  scratch the integrator is mid-way through using. */
   private readonly tmpV4: Vec3 = { x: 0, y: 0, z: 0 };
+  /** Fifth scratch, owned by `forEachChassisContact` ALONE (read after the
+   *  step, outside `update()`). */
+  private readonly tmpV5: Vec3 = { x: 0, y: 0, z: 0 };
 
   /**
    * @param world The rapier world (raw `World` — from `useRapier()` in R3F).
@@ -592,6 +604,15 @@ export class VehicleSim {
 
     // --- Suspension raycasts + wheel impulses (skip our own chassis) --------
     c.updateVehicle(dt, undefined, undefined, (col) => col.handle !== this.chassisColliderHandle);
+
+    // --- What the solver receives (l0-free-drive:ee9d9374) -------------------
+    // The velocity the coming `world.step()` starts from. A contact that step
+    // begins is judged at THIS speed, not at the rebound its solve leaves (see
+    // `forEachChassisContact`). A pure read: no rapier state changes.
+    const v0 = this.body.linvel();
+    this.solveStartVel.x = v0.x;
+    this.solveStartVel.y = v0.y;
+    this.solveStartVel.z = v0.z;
   }
 
   /**
@@ -713,6 +734,12 @@ export class VehicleSim {
     this.prevVel.x = 0;
     this.prevVel.y = 0;
     this.prevVel.z = 0;
+    // A respawn made between this step's `update()` and its `world.step()`
+    // (none is today: the grade that respawns runs first in the before-step
+    // callback) must not judge a contact at the speed the car had before.
+    this.solveStartVel.x = 0;
+    this.solveStartVel.y = 0;
+    this.solveStartVel.z = 0;
   }
 
   /**
@@ -923,11 +950,28 @@ export class VehicleSim {
    * pair holds now (@react-three/rapier called a body's `onCollisionEnter`
    * once per manifold — the count is kept so a contact is heard exactly as
    * often as it was at 60 Hz); the struck rigid body's `userData` (the tag the
-   * contact threshold and the classification read); and the IMPACT speed — the
-   * relative speed |v_chassis − v_other| after this step, km/h, or the car's
-   * own |forward speed| when the collider has no body: the same expression
-   * VehicleRig's `onCollisionEnter` evaluated at r3r's drain, which at 60 Hz
-   * is this very moment.
+   * contact threshold and the classification read); and the IMPACT speed.
+   *
+   * THE IMPACT SPEED IS THE CLOSING SPEED THE SOLVER RECEIVED, NOT WHAT IT
+   * LEFT — l0-free-drive:ee9d9374. Through 1f1536d this read `linvel()` here,
+   * after the step: after the contact's own solve had stopped the car and
+   * bounced it back. A 50 km/h head-on into a façade read 5.50 km/h, a 70 km/h
+   * one 6.43, the hz block at 70 km/h 8.51 — under the street tolerance
+   * (VehicleRig COLLISION_MIN_KMH, 10), so the curriculum, the poligon,
+   * lex-exam-1 and every exam-bank variant billed no COLLISION, and the thump,
+   * the haptic pattern, the shake and the chase cut played a nudge.
+   *
+   * Now it is |v_chassis − v_other|, km/h, with v_chassis the velocity
+   * `update()` handed THIS step (`solveStartVel`: after the wheel impulses,
+   * before the solve) and v_other the struck body's velocity over the step.
+   * That is the speed the contact was struck at, whatever the solve then did:
+   * every body the chassis can strike is fixed or kinematic (buildings, kerbs,
+   * props, parked cars, NpcColliders' shells) — the chassis is the one dynamic
+   * body — so the solve never changes v_other. With no body: the car's own
+   * |forward speed| at that same moment. The magnitude, not its share along
+   * the contact normal: a sideswipe reads what it always read (the solve
+   * barely changes a speed along the wall), and only a contact the solve
+   * STOPPED reads differently — at the speed it was struck at.
    */
   forEachChassisContact(f: (reading: ChassisContactReading) => void): void {
     if (this.disposed) return;
@@ -944,12 +988,13 @@ export class VehicleSim {
       if (!active) return;
       const otherBody = other.parent();
       let impactKmh: number;
+      const pv = this.solveStartVel;
       if (otherBody) {
-        const pv = this.body.linvel();
         const ov = otherBody.linvel();
         impactKmh = Math.hypot(pv.x - ov.x, pv.y - ov.y, pv.z - ov.z) * 3.6;
       } else {
-        impactKmh = Math.abs(this.speedKmh);
+        const fwd = rotateInto(this.body.rotation(), 0, 0, 1, this.tmpV5);
+        impactKmh = Math.abs(fwd.x * pv.x + fwd.y * pv.y + fwd.z * pv.z) * 3.6;
       }
       f({ otherHandle: other.handle, manifolds, otherUserData: otherBody?.userData, impactKmh });
     });

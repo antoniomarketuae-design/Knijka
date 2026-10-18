@@ -136,8 +136,16 @@ export function gradedContactMinKmh(otherUserData: unknown, collisionMinKmh: num
  * Now the step record holds each contact at the step it began, with that
  * step's speed (traffic/playerTrack.ts `StepContact`), and the session grid
  * hands it here at that step's own grid point (scene/gradeGrid.ts
- * `stepContact`) — one step, one speed, one grid point on every display, and
- * at 60 Hz exactly what `onCollisionEnter` saw.
+ * `stepContact`) — one step, one speed, one grid point on every display.
+ *
+ * THE SPEED IS THE IMPACT (l0-free-drive:ee9d9374). `onCollisionEnter` read
+ * `linvel()` after the contact step's solve — the rebound: a 50 км/ч head-on
+ * into a façade read 5.5, under COLLISION_MIN_KMH, so the curriculum and the
+ * exam billed nothing and every channel below played a nudge. The step record
+ * now holds the closing speed the solve RECEIVED (VehicleSim
+ * `forEachChassisContact`), so the threshold, the thump, the haptic pattern
+ * and — through LessonScene's `handleCollision` — the shake and the chase cut
+ * all take the speed the car struck at. No number in this function changed.
  *
  * Returns whether the contact was graded.
  */

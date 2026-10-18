@@ -566,9 +566,16 @@ export interface ContactDriveOptions {
    * AUDIT the step record against rapier itself: give the chassis collider
    * COLLISION_EVENTS (as r3r did while the rig had an onCollisionEnter) and,
    * at every drain, list what r3r would have handed the old handler — one
-   * entry per manifold of each STARTED pair, with `linvel` read then. At one
-   * step per frame that is exactly what base judged; the outcome compares it
-   * with every contact the step record began, in order.
+   * entry per manifold of each STARTED pair. At one step per frame those are
+   * exactly the contacts base judged; the outcome compares them with every
+   * contact the step record began, in order.
+   *
+   * THE SPEED ON EACH LINE (l0-free-drive:ee9d9374) is this instrument's OWN
+   * read of the impact: the chassis' `linvel()` taken by the harness right
+   * before the step's `world.step` (after the sim's `update`), minus the
+   * struck body's velocity — not `linvel()` at the drain, which is the
+   * rebound the old handler read (a 50 km/h façade crash read 5.5). So the
+   * audit also holds the product's reading to the speed the solve received.
    */
   auditStartedEvents?: boolean;
   /**
@@ -636,6 +643,19 @@ export interface ContactDriveOptions {
    * coach's cards and the car's speed at the grid point a card was raised on.
    */
   onStep?: (tick: SimTick, step: LessonStepResult) => void;
+  /**
+   * l0-free-drive:ee9d9374 — WHAT THE STUDENT HEARS AND SEES OF A CONTACT, as
+   * the chain hands it on: `contact` gets every contact the grid hands the
+   * rig's ear (the step record's own object), `thump` the volume the rig's
+   * judge (`hearChassisContact`) plays, `impactCut` the speed LessonScene's
+   * own `handleCollision` hands its impact cut (the flash, the shake and the
+   * chase cut read it). Default: none (the chain's presentation is dropped).
+   */
+  presentation?: {
+    contact?(c: unknown): void;
+    thump?(volume01: number): void;
+    impactCut?(impactKmh: number): void;
+  };
 }
 
 /** One contact the rig JUDGED (thumped): how it reached the judge, when, how
@@ -837,6 +857,8 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
   const stepRecordStarted: string[] = [];
   let startedWithIdleManifold = 0;
   const contactLine = (step: number, userData: unknown, kmh: number) => `${step} ${JSON.stringify(userData ?? null)} ${kmh}`;
+  /** The chassis velocity the harness read right before the last `world.step`. */
+  const preSolveVel = { x: 0, y: 0, z: 0 };
   const eventQueue = new RAPIER.EventQueue(false);
 
   // ── the repair: the rig's judge, reached from the grid's hook ───────────
@@ -848,7 +870,7 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
   // the scene's initial `[]`); the impact cut is presentation, not mounted.
   const sceneCollision: SceneCollisionHandler | null = hear
     ? sceneHandleCollision().bind({
-        impactCutRef: { current: null },
+        impactCutRef: { current: opts.presentation?.impactCut ? { impact: (kmh: number) => opts.presentation!.impactCut!(kmh) } : null },
         runtime,
         nameLiveContact,
         playerObb,
@@ -867,8 +889,9 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
           let graded = false;
           let impact = NaN;
           let what = "";
+          opts.presentation?.contact?.(contact);
           hear(contact, collisionMinKmh, {
-            thump: () => {},
+            thump: (v: number) => opts.presentation?.thump?.(v),
             graded: (impactKmh: number, withWhat: string) => {
               graded = true;
               impact = impactKmh;
@@ -992,6 +1015,12 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
       // …then the drive's decision from the car after the previous step.
       const input = { ...IDLE_INPUT, ...opts.control(drive) };
       sim.update(input, H, READY_DRIVELINE);
+      // The instrument's own read of what the solve receives (see
+      // `auditStartedEvents`): the chassis velocity right before the step.
+      const lv0 = body.linvel();
+      preSolveVel.x = lv0.x;
+      preSolveVel.y = lv0.y;
+      preSolveVel.z = lv0.z;
       world.step(eventQueue);
       if (shellPool && opts.respawnAtPoint !== undefined) {
         for (const rb of shellPool.veh) {
@@ -1029,10 +1058,10 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
           world.contactPair(chassis, oc, (m) => {
             held++;
             if (m.numSolverContacts() > 0) inSolverContact++;
-            const lv = body.linvel();
+            const lv = preSolveVel;
             const ob = oc.parent();
             const ov = ob?.linvel();
-            const kmh = ov ? Math.hypot(lv.x - ov.x, lv.y - ov.y, lv.z - ov.z) * 3.6 : Math.abs(sim.speedKmh);
+            const kmh = ov ? Math.hypot(lv.x - ov.x, lv.y - ov.y, lv.z - ov.z) * 3.6 : NaN;
             rapierStarted.push(contactLine(steps.stepCount, ob?.userData, kmh));
           });
           if (held > inSolverContact) startedWithIdleManifold++;

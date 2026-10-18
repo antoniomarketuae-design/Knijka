@@ -14080,3 +14080,365 @@ None of these is a founder ruling. Founder question 7 is answered below.
 - **The two «question 7 … open» comments** (`traffic/vehicles.ts:1603`, `junction-box-clears.census.test.ts:1785`) are to cite the 2026-10-16 ruling, in a comment-only edit with no behavioural change.
 - **The residual walkers.** 7 pavement configurations put a walker on a carriageway for 1–5 samples at a joint boundary, identical at base. They are not at a junction, and this landing does not change them.
 - **The founder is told** at this landing: round-3 D1–D6, P1–P3, D1–D5 and E1–E17; the two changed sc-junction-blind caption lines (none → `487183ee1d75`, `1b95c586e00c` → `9cadbad8e2cd`, quoted above); the question-7 ruling made under his delegation; and that npcstep's NPC-contact census and its ear-only pedestrian cell were re-derived on the repaired traffic.
+
+## Landed: a crash's impact speed is the speed the car struck at, not its rebound, so a façade or block crash at the street tolerance is graded, billed COLLISION and ends an exam. Measured in process only. `l0-free-drive:ee9d9374` (critical) (2026-10-18)
+
+Lane `impactspeed`, one round, built on `1f1536d`.
+- Round 1 was SIGNED OFF WITH CONDITIONS by the adversarial verifier. The conditions are below.
+- **The patch.** `impactspeed-result-r1.patch`: sha256 67fc909c…, 5 files, +457/−22, 0 CR bytes, all five files LF in base (the builder).
+  - The verifier applied it to `1f1536d`. Its lane equalled base plus the patch: sha match, reverse apply clean, `git status` showing only the patch's 5 files.
+  - It is cumulative against the lane's base `1f1536d`, not against HEAD, and it lands applied 3-way onto `e58f388`.
+  - None of its five files changed between `1f1536d` and `e58f388`, and it shares no file with `cardstay2-result-r1.patch`, which lands in the same gate.
+- **Product file (1).** `vehicle/VehicleSim.ts`, the repair.
+- **Comment or doc only (2).**
+  - `traffic/playerTrack.ts`: `StepContact.impactKmh` is now documented as the speed the step's solve received. It used to say «Relative speed of the two bodies after that step».
+  - `components/sim/VehicleRig.tsx`: the false sentence «at 60 Hz exactly what onCollisionEnter saw» is replaced. No code or number in `hearChassisContact`, the ear effect, the thump formula or the threshold changed, and the `hearChassisContact(` count stays 2.
+- **Test-side files (2).**
+  - New: `lessons/scenario/__tests__/impact-speed-before-solve.test.ts` (14 tests).
+  - The harness `rapierContactDrive.ts`. Its STARTED audit now prints the instrument's own pre-solve read (the chassis `linvel()` taken after `sim.update` and before `world.step`, minus the struck body's velocity) instead of the post-solve `linvel()`. A line with no body reads NaN, which counts as unreadable and so red. It also gains optional presentation taps (`contact`, `thump`, `impactCut`).
+- What lands is that patch plus the integrator's F3 pin (condition 1), in test files only.
+- **What did not change** (the builder; the verifier checked the thresholds, the rules and the shown text):
+  - `COLLISION_MIN_KMH` (10), every `collisionMinKmh`, `gradedContactMinKmh` and the district-surface tolerance;
+  - the `>=` comparison;
+  - every bill, rule and copy table;
+  - the thump, haptic, shake and cut curves.
+  - No shown sentence was added or changed. The reviewed-text manifest is green with no re-record. No protected threshold moved.
+- **ADR-014 gains «Amendment 2026-10-18»:** the impact speed's definition and its tolerance. It closes the «LATENT DEFECT» item of the 2026-10-11 amendment.
+
+**The row is NOT closed by this landing.** `l0-free-drive:ee9d9374` stays OPEN.
+- Every number below was measured in process at 60 Hz, plus the hz cadence suite.
+- Neither the builder nor the verifier drove anything in a browser or saw anything on a device.
+- A rig re-drive on PC and on the phone lens is owed (below). Whether its frames close the row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong.** A contact's speed was read after the contact step's solve. So it measured the stop and the bounce, not the impact.
+- **The exposure** (the row): every lesson that compiles `collisionMinKmh` as undefined, so the 10 km/h street tolerance applies:
+  - the curriculum (l0–l7);
+  - the полигон lessons (l0p, l8);
+  - lex-exam-1 and the 18,396 exam-bank variants.
+  The 808 scenario rungs compile 0, so they were exposed only through what the student hears and sees: the thump, the haptic, the shake and the cut.
+- **The builder's base probe**, through the product's chain: rapier → VehicleSim → the step record → GradeGrid → `VehicleRig.hearChassisContact` → LessonScene's own `handleCollision`.
+  - l0-free-drive, façade at 50.085 km/h: read 5.499 on 4 manifolds. Not graded, collisions [], passed true, score 6. The 6 points are two OFF_CARRIAGEWAY bills.
+  - lex-exam-1 and EX-A-D1-0000, same drive: 5.499, not graded, not terminated.
+  - The l0 façade at 69.85 km/h read 6.429.
+  - The hz block at street tolerance: 41.799 read 4.861, 51.403 read 6.008 and 69.995 read 8.507. None was billed.
+  - Parking-speed touches: 3.017 read 0.600, 5.020 read 0.963 and 7.019 read 1.005.
+- **The cause** (the builder, at base file:line).
+  - `VehicleSim.ts:946–953`, `forEachChassisContact`, read `this.body.linvel()` at :948, or `|speedKmh|` at :952 for a collider with no body.
+  - That read is reached from `playerTrack.ts:290–293` (`recordPhysicsStep` → `watchContacts`). VehicleRig calls it in `useAfterPhysicsStep`, after `world.step`.
+- The 2026-10-13 verdicts' triage candidate «impactspeed» (the shake fed 6.19 km/h for a 49.6 km/h strike, so 0.81° instead of 2.29°) is the presentation half of this same defect.
+
+**What landed.** This is the builder's description. The verifier's measurements are under the next heading.
+- **The snapshot.** VehicleSim keeps `solveStartVel`, the chassis velocity written at the end of every `update()`, right after `updateVehicle` (the wheel impulses), as a pure read. That is the velocity `update()` hands to the step's solve; the forces accumulated in `update()` (aero drag, crosswind) integrate inside `world.step` itself. `reset()` zeroes it.
+- **The read.** `forEachChassisContact` reads |solveStartVel − v_other| × 3.6, where v_other is the struck body's velocity. With no body it reads |solveStartVel along the car's forward axis| × 3.6.
+  - The magnitude is kept, not the share along the contact normal.
+  - The struck body's velocity is not changed by the solve, because the chassis is the product's only dynamic body. The builder's grep: NpcColliders' shells are kinematicPosition; buildings, kerbs and obstacles are fixed; TestTrack's default-dynamic cones are imported nowhere.
+- **Rejected.**
+  - The normal-projected speed. It would read sideswipes below what base read, which de-convicts scrapes, and the trimesh's first-step normal is edge-noisy.
+  - The car's own |forward speed| at step k−1. It ignores the other body, so a moving road user striking a stopped car would read 0.
+- **The tolerance: 0.541 km/h**, between the reading and the step record's speed after step k−1 (the approach). It is derived from one step of the full service brake: BRAKE_FORCE_N / CHASSIS_MASS / 60 × 3.6 = 11000 / 1220 / 60 × 3.6. The builder measured 0.024–0.033 km/h, and 0.54 under a full brake (its mutant M2c). It is the new test's tolerance, not a bound on every input: a held parking brake puts 13,000 N on the rear axle (`driveline.ts:162`).
+
+**What the verifier reproduced.** It worked on its own lane, `1f1536d` + the patch, sha matched. Log: `D:/knijka-lanes/scratch/impactspeed-verify/PROGRESS.md`. The files named below are in that folder.
+- **Red first.**
+  - The new test: 13 of 14 red on base, every one on assertion text (`new-test-base.log`).
+  - 14 of 14 green on the tree (`new-test-tree.log`).
+  - The 14th is the designed presentation curve, which reads product functions only.
+- **Its own façade probe** (`probe-base.jsonl`, `probe-tree.jsonl`), through the lesson's runtime.
+  - **l0-free-drive, head-on at 49.986, 18.682 and 18.777 km/h.**
+    - Base read 5.54 / 1.872 / 2.131: not graded, nothing billed, passed.
+    - The tree reads 50.003 / 18.704 / 18.798: graded staticObject, one COLLISION (10 points), terminated, failed.
+  - **lex-exam-1 and EX-A-D1-0000, head-on at 49.986 km/h.** Base read 5.54: unbilled, not terminated. The tree reads 50.003: COLLISION, terminated.
+  - **The two slower drives on these two exams record no chassis contact** (judged []): each sheet carries FAILED_TO_YIELD, not terminated, on base and tree alike. So «façade crashes at 18.7–50 km/h on all three lessons» holds for l0-free-drive only. On the exams the reproduced crash is the 50 km/h one.
+  - **Oblique ±15° at 40 km/h.** Base read 10.76 / 11.41, already billed. The tree reads 40.01 / 40.03. On EX-A-D1-0000 the +15° drive judges no chassis contact; its sheet carries a vehicle COLLISION at t 9.517, terminated, on base and tree alike. The verifier did not attribute it; it is consistent with a staged actor billed by the director's sentinel.
+  - Every façade reading on the tree is within 0.03 km/h of the approach. The stated tolerance is 0.541.
+- **Nothing between update() and world.step writes the chassis velocity** (F2).
+  - A git grep for setLinvel / applyImpulse / addForce / applyTorque outside tests hits only `VehicleSim.ts` (base line numbers):
+    - inside `update()`: 559–578 (resetForces / addForce) and 1029 (roll torque);
+    - in `applyRoadRoughness` and `applyAntiRollAxle`, called from `update()` before the snapshot: 1064, 1094 and 1100 (applyImpulseAtPoint). The verifier's list omitted these three; this reader confirmed them;
+    - in `reset`: 698–700.
+  - The addForce writes integrate inside `world.step` itself; the verifier judged that negligible.
+  - The same grep on the integration tree (`e58f388` + the patches) finds no writer outside `VehicleSim.ts`.
+  - VehicleRig's `useBeforePhysicsStep` body ends with `sim.update`.
+- **Moving shells** (raw rapier + VehicleSim on a flat world, a kinematic NPC-tagged shell; not through the lesson chain), base → tree:
+  - a car at 32.7 into a standing shell: 3.81 → 32.71;
+  - a car at 44.07 into a shell that had not yet started: 4.90 → 44.28. This is the probe's «50 behind a 33.4 km/h car». The shell starts only once the car is within 0.5 km/h of 50, and the car struck it at 44.07, so it measures a standing shell, not a closing speed;
+  - 40 head-on to a 20 km/h car: 6.07 → 61.78;
+  - a car creeping at 9.7 km/h (target 8) and a 30 km/h crossing shell: 2.93 → 31.53;
+  - a standing car rear-ended at 30 / 15 / 9: 2.59 / 1.06 / 1.13 → 30.00 / 15.01 / 9.01;
+  - a standing car T-boned at 30: 2.88 → 30.00.
+  - A same-direction closing speed is reproduced by the census cell re-driven below: sc-sig-green-wave/shadow-correct, 49.86 into a 33.4 km/h car, 1.891 → 16.529.
+- **Spawn census.** 21 lessons (l0–l7, l0p, l8, lex-exam-1, and one variant of each exam shell A–I) idle 3 s, then creep at 12 km/h. There is no chassis contact anywhere, on base or tree, and nothing is judged or billed.
+- **The builder's census, recomputed from its files.**
+  - Every tape × every rung: 2,434 cells, 0 bill or sheet differences.
+  - Every tape at its first rung, re-judged at the street tolerance: 503 cells, 18 new COLLISION bills, 0 lost.
+  - The verifier re-drove four street cells on base and tree, and each reproduced exactly:
+    - sc-sig-green-wave/shadow-correct: 1.891 → 16.529, bill at t 25.017;
+    - sc-jx-priority-confidence/shadow-correct: 2.314 → 42.193, t 13.117;
+    - sc-follow-distance/mistake-tailgate: 2.468 → 23.093;
+    - sc-junction-stop/shadow-correct: billed on both.
+  - The three shadow-correct street bills (sc-signal-flashing, sc-jx-priority-confidence, sc-sig-green-wave) each already carry the same COLLISION at the same time at their own rung on base (`base.jsonl`). The harness's physical follower strikes a road user there; the tape does not. So 0 correct demos are newly convicted.
+- **What the student hears and sees is fed the same number as the grade.** `handleCollision` and the ear take the `StepContact.impactKmh` the grade uses. Mutants V6, V7 and V8 are killed (below).
+- **Mutants.** 9 runs of 8 distinct mutations (V2 run twice), each restored and sha256-checked. The verifier's summary says 10 runs of 9; its log and PROGRESS.md list nine runs: V1, V2, V2b, V3, V4, V6, V7, V8 and V10.
+  - Killed on assertion text:
+    - V1, the post-solve read restored: 19 red.
+    - V3, the snapshot moved before the wheel impulses: 6 red, from the hz exact audit only, e.g. «858 null 31.83» against «858 null 31.29».
+    - V6, the impact cut fed ×0.11: «the impact cut was handed 5.509 km/h».
+    - V7, the haptic fed ×0.11: «the rig's ear vibrated for 5.509 km/h: expected [44,40,18] to deeply equal [160,40,64]».
+    - V8, the thump fed ×0.11: «the thump played 0.260 for a 50.1 km/h crash».
+  - Survived: V2 (condition 1), V4 and V10 (condition 4).
+- **Regression** on the tree:
+  - the targeted contact suite (10 files): 234 passed, 1 skipped;
+  - vehicle + traffic: 68 files, 858 passed;
+  - reviewed-text-manifest + caption-truth + keep-right-claim-census: 131 passed;
+  - tsc: 22 errors, the environment baseline, none in a touched file.
+  - It did not re-run the full lessons/scenario, lessons and components/sim directories.
+- **Builder's numbers, not probed separately by a verifier.** The first three items are asserted by the new test, which the verifier ran green (14/14):
+  - **The 3 / 5 / 7 km/h parking touches** read 3.025 / 5.018 / 7.014 on the tree. At street tolerance each is a nudge: no COLLISION and no impact cut. At the scenario rung's 0 each is graded and billed.
+  - **The 70 km/h façade on both exams.** Each exam ends at SPEEDING_DANGEROUS at step 359, before the wall, on base and tree alike. Driven 600 steps further, the ear reads the wall at 69.877 (base 6.429).
+  - **The 50 km/h crash through the chain:** thump 1.0 (base 0.26), haptic [160,40,64] (base [44,40,18]), shake 0.04 rad = 2.29° (base 0.76°), and the chase cut in both modes (base withheld it in manoeuvring, because 5.5 < 10).
+  - **The census class medians:** staticObject 5.88 → 42.85, vehicle 2.38 → 16.53, pedestrian 4.74 → 18.72.
+  - **Presentation across the 304 graded contacts:**
+    - the thump changed on 304 (median 0.224 → 0.515);
+    - the haptic hit changed on 297 (40 → 77 ms);
+    - the shake changed on 304 (0.62° → 1.38°);
+    - 150 crossed 10 km/h, the manoeuvring chase-cut line.
+  - **Moving road users:** 44 contacts in census B, each reading the closing speed.
+  - **The full directory runs:**
+    - lessons/scenario/__tests__: 194 files, 4,776 passed, with 2 timeouts that passed alone;
+    - lessons: 126 files, 2,394 passed;
+    - components/sim: 96 files, 1,679 passed, with 1 ENOENT and 1 timeout;
+    - scene: 47 files, 786 passed, with 1 ENOENT.
+
+**The conditions, and how each stands.**
+
+**1. F3: the v_other half of the definition was pinned by no committed test.**
+- Mutant V2 (impactKmh = |v_pre|, the struck body's velocity ignored) survived:
+  - the new test, hz-static-contact-cadence, npc-contact-cadence (test and census), step-contacts, grade-grid and chassis-contact-ear;
+  - `mut-V2-noOther.log`: 4 files, 71 passed;
+  - `mut-V2b.out`: 3 files, 111 passed + 1 skipped.
+- The moving-road-user numbers lived only in the uncommitted census and the verifier's probe: a standing car rear-ended at 30 → 30.002; head-on 40 vs 20 → 61.782.
+- PINNED AT INTEGRATION: `vehicle/impact-closing-speed.test.ts` (3 tests: standing, rear-ended at 30; 40 head-on to a 20 km/h shell; 50 behind a 33.4 km/h shell — each held to the closing speed within 0.541 + 0.1 km/h). V2 turns all 3 red on assertion text («standing, rear-ended at 30: the contact read 0.753 km/h — the closing speed was 30.007»).
+
+**2. F4. RECORDED: a STANDING student struck by a moving body now reads that body's speed.**
+- **At the street tolerance (10 km/h) a strike at 10 km/h or more bills COLLISION, опасна.** Base read about 1–3 km/h there and billed nothing. The verifier's probe:
+  - rear-ended at 30 / 15 → 30.002 / 15.005 (base 2.593 / 1.062);
+  - T-boned at 30 → 30.002 (base 2.878);
+  - at 9 km/h it reads 9.008, below the tolerance.
+  - The sheet attributes no fault: the bill does not say who struck whom.
+- **A student moving slowly into a moving body reads the closing speed too.** A car creeping at 9.7 km/h into a 30 km/h crossing shell reads 31.534 (base 2.925).
+- **Ambient traffic.**
+  - The verifier read a hard post-integration clamp in `traffic/vehicles.ts` that keeps an ambient car from closing on the player. Its spawn census of 21 lessons (idle, then a 12 km/h creep from each spawn) found no contact. Both are on `1f1536d`.
+  - `e58f388` rewrote much of that file (posturescross, +1,453/−33). The clamp is still there (`vehicles.ts:424–440`, «Hard anti-overlap clamp vs the player»), but it is now gated by `!studentBows` (:280–281, :425).
+  - At a signalised junction box, a car that is across the bows of a student coming at it, or committed past his waiting point, is refused only a step that would put the two bodies into each other (`bodiesOverlap` with BODY_GAP_M 0.1, :606–625, :1903). Otherwise it may close on him.
+  - That was read from source for this landing, not measured. The spawn census does not reach a junction box, so whether an ambient car can strike a standing student there on `e58f388` is unmeasured.
+- **Staged actors.**
+  - Scenario rungs compile tolerance 0 and already billed any contact on base. The 2026-09-30 and 2026-10-05 rulings say contact suffices there.
+  - The exposure is a staged actor in a lesson or exam at the street tolerance striking a student who stands lawfully.
+- **Census B** moves 18 tape cells from unbilled to billed at the street tolerance. Each one is a physical crash at 11–62 km/h closing speed (the builder). The founder's text says a crash IS опасна, and no rule changed. The founder is told at this landing.
+- **The census was measured on `1f1536d`.** Doc 88's posturescross landing lists sc-sig-green-wave shadow-correct (its contact at step 1501 with a 33 km/h car) and sc-signal-flashing shadow-correct among the NPC-census cells that no longer strike on the merged tree. Census B was not re-run on `e58f388`.
+
+**3. F8. RECORDED: the builder's «no tools hits» was inaccurate.**
+- `tools/mobile/__tests__/path-follow.test.mjs` and `path-disarm.test.mjs` read `VehicleSim.ts` by regex, and `VehicleRig.tsx` / `LessonScene.tsx` by indexOf. `tools/mobile/lib/steer-bench.mjs` transpiles VehicleSim's import graph.
+- The verifier checked:
+  - the three VehicleSim regexes match on the tree ([true, true, true]);
+  - no import line changed;
+  - the VehicleRig hunk is the docblock at line 136, before the anchors those tests read.
+- So no tools-read string is broken. The lane cannot run these tests; the main-tree gate runs them (see PROVEN ON e58f388).
+
+**4. F7. RECORDED: two defensive branches are unpinned.**
+- V4 (the body-less branch reverted to the post-step |speedKmh|; 61 passed) and V10 (`reset()` keeps the stale snapshot; 52 passed) survive.
+- Both are unreachable in the product:
+  - every `<CuboidCollider>` / `<TrimeshCollider>` mounts inside a `<RigidBody>`, and TestTrack.tsx is imported nowhere;
+  - no respawn happens between `update()` and `world.step`.
+- Either needs a pin if it ever becomes reachable.
+
+**5. The tolerance is the new test's own blind spot (the builder's M2c, the verifier's V3).**
+- A snapshot taken before the wheel impulses stays inside 0.541 km/h by construction, so the new test passes it.
+- Only the hz audit's exact independent pre-solve read kills it (6 red). That audit is the pin for «after the wheel impulses».
+
+**6. CARRIED: correct demos billed a COLLISION at spawn.**
+- This is pre-existing and identical on base. In the harness, the shadow-correct demos of sc-turn-left-oncoming L5, sc-jx-giveway-b1 L5 and sc-jx-equal-left L3–L5 bill a vehicle COLLISION at step 3 (t = 0.05 s, about 1 km/h). It looks like a spawn overlap with a shell (the builder).
+- The posturescross landing's checker counted the same class in the NPC-contact census (15 cells).
+- It is not this lane's. It needs a row of its own.
+
+**What this landing supersedes in doc 88.**
+- In the hz landing of 2026-10-11 (`sc-hz-brake-dont-swerve:a7d0dd29`): the bullet «The impact speed is the number read after the contact step» and the «LATENT DEFECT» block.
+- The impact speed is now the closing speed the step's solve receives (ADR-014 «Amendment 2026-10-18»), in process.
+
+**PROVEN ON e58f388:** the integrator's landing proof in the worktree integ-ic (`gate-ic.patch`, sha256 de6894cc…, 10 files: both lane patches plus test-only pins; the merge verifier ACCEPTED and re-killed every pin by hand).
+- Both patches applied 3-way with no conflict; none of their files changed between `1f1536d` and `e58f388`.
+- **Condition 1 (F3) pinned:** new `vehicle/impact-closing-speed.test.ts`, 3 tests on moving kinematic shells read where the product reads them (`recordPhysicsStep` → `PlayerStepTrackRecorder.contactsAtStep`), each held to the closing speed within 0.541 + 0.1 km/h: a standing car rear-ended at 30; 40 km/h head-on into a 20 km/h shell; 50 km/h behind a 33.4 km/h shell. V2 (the struck body's velocity ignored) turns all 3 red on assertion text, e.g. «standing, rear-ended at 30: the contact read 0.753 km/h — the closing speed was 30.007».
+- Every catalogue-wide directory green on the integrated tree: lessons 2,394; lessons/scenario 4,830; components/sim 1,684; orchestrator 528; rules 1,779; traffic 675; runtime 875; scene 787; vehicle 299; world 2,409; hud 1,388; traces 2,286. tsc: the 21 environment errors, none in a touched file.
+- tools/ tests in the worktree: 2,006 of 2,029 pass; the 1 standing red (the deck-captions freeze) and 7 environment reds that need the main tree's gitignored data. The main-tree gate runs them all on this commit.
+
+**Owed.**
+- **The rig re-drive (F10)**, through `/dev/drive-rig` on PC and on the phone lens: a head-on façade crash at 50 km/h on l0-free-drive and on lex-exam-1. It must show:
+  - the COLLISION card;
+  - the termination (the exam ends at the crash);
+  - the thump, haptic, shake and chase cut at crash strength.
+  On the phone lens the per-render rotation log is the standard for the shake (integrator decision, 2026-10-13).
+- **The founder is told** the F4 exposure (condition 2), including that the junction-box case on `e58f388` is unmeasured.
+- **Triage:** the step-3 spawn overlap (condition 6).
+- **The tools/ tests on the main tree**, unless PROVEN ON e58f388 records them: path-follow and path-disarm, the tests that load `lib/steer-bench.mjs` (condition 3), and touchHintLifetime and guidance-lane-align-span, which went ENOENT in the lane (the builder).
+
+## Landed: with two judged cards on the PC glass and the older one cut, a paragraph whose summary makes both whole takes that summary before paint, and the advisor's card waits where only that keeps both whole. Measured in a real-browser copy of the notify column. `sc-roundabout-entry:fe081cf1` (major), clause 1b' (2026-10-18)
+
+Lane `cardstay2`, one round, built on `1f1536d`.
+- Round 1 was SIGNED OFF WITH CONDITIONS by the adversarial verifier. The conditions are below.
+- **The patch.** `cardstay2-result-r1.patch`: sha256 0d432a23…, 42,272 bytes, 3 files, +525/−11, 0 CR bytes, all three files LF in base (the builder).
+  - The verifier applied it to `1f1536d`. `git diff base` equalled the patch byte for byte, ignoring index lines.
+  - It is cumulative against `1f1536d`, not against HEAD, and it lands applied 3-way onto `e58f388`.
+  - None of its three files changed between `1f1536d` and `e58f388`, and it shares no file with `impactspeed-result-r1.patch`.
+- **Product files (2).**
+  - `hud/HudToasts.tsx`.
+  - `lesson-ui/AdvisorCard.tsx`: it gains `data-hud-advisor=""`, with a comment. The role, the aria-label and `{prompt.textBg}`, which the driveline test reads, are unchanged.
+- **Test file (1).** `hud/__tests__/toast-standing-card.test.ts`, 93 → 110 tests, with a new §7 of 17 rows. The stand-in now takes card tops from live heights and mounts the advisor's card as a column child.
+- What lands is that patch plus the integrator's F6, F7 and F8 pins (conditions 1–3), in test files only.
+- **Not changed** (the builder): W1 and W2 (`look` still returns nothing while a card is read), W3–W9, X1, X3, `useToastBodyChoice`, `visibleToasts` and LessonPlayShell.
+- **No sentence was added or changed.** The reviewed-text manifest is 49/49 with no re-record. No rule, bill, points, verdict or graded clock changed (the verifier).
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:fe081cf1` stays OPEN and PARTIAL, as rig-w3h left it.
+- Every repair claim rests on executed tests and on real-browser copies of the notify column, file:// only, rendered with the shell's own stylesheet. Chromium and WebKit were used; WebKit had fallback fonts.
+- Nothing was seen on a device or through the product shell.
+- **The filed cell, TWO-FAULT-FS1280, sits below the stage height at which both of its cards can be whole.** This landing leaves it as it was: STILL by design, X2 as built.
+- A rig re-drive is owed (below). Whether its frames close the row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **The filed cell.** rig-w3h (above): two judged cards on FS-1280x720. The older FAILED_TO_YIELD card lost its one-liner and law chip for 74 rAFs, its whole overlap with the collision card. On LB-1440 the same happened for 4 rAFs.
+- **The general cause** (the builder, at `1f1536d`).
+  - In `useToastReader.look`, X2 stood only for the TOP judged card.
+  - An older card pushed out by a newer judged card got nothing: no ask for its summary, and no waiting advisor. That held even on roomy stages.
+  - The verifier reproduced two of the builder's counts: on LB-1920 the older card was out in 300 of 390 census rows, and on FS-1920 in 290.
+- **Why the filed stage cannot be repaired this way.** At FS-1280 even the two SUMMARIES do not fit (the builder):
+  - the window without the fold row is 214.6 px;
+  - COLLISION 116.5 + an 8 px gap + FAILED_TO_YIELD 111.3 = 235.8 px, which is 21.2 px short.
+  - The verifier reproduced the filed pair's own floor on a bare 1000-wide box: the law chip is out at H645 (window 204.4 px with the fold row), and both cards are whole at H650. The FS-1280 stage is 619.5 px.
+- **The rig's fidelity, fixed before any measurement** (the builder).
+  - The round-3 rig copy never rendered the shell's stylesheet (`PlayAreaStyles`).
+  - Without it the «ЗАЩО» chip was 62.5 px wide against the product's 57.1, and the FAILED_TO_YIELD card measured 127.8 px against the product's 111.3.
+  - With it the card is 111.25 px, matching the rig-w3h sidecar.
+  - The round-3 floors (548 / 582) were measured without it.
+
+**The integrator's decision W10.** It sits inside the 2026-10-08 delegation and under the cardstay W7–W9 line. It changes no rule, grade, points or graded clock.
+- With two judged cards on the PC glass and the older one cut, a paragraph whose summary makes both whole takes its summary (with the «ЗАЩО» chip) before paint, the newer card first.
+- Where both fit only once the advisor's card waits, the advisor's card waits while both judged cards are whole, and returns when the newer card leaves.
+- Below the measured floor the older card waits behind the existing fold row, as in base.
+
+**What landed.** This is the builder's description. The verifier's measurements are under the next heading.
+- **`toastPairSummaryAsk`, and the probe it shares, `readToastPair`.**
+  - They apply with two judged cards on the glass and the older one cut, judged against the window without the fold row.
+  - The probe squeezes each paragraph's body to its summary card's height, reads the older card's foot, and puts the bodies, the fold row and the scroll back.
+  - It names the card to ask: the newer one first, then the older one.
+  - It asks nothing when the older card is not cut, when a body is still pending, when neither card has a shorter summary, or when even both summaries leave the older card cut. That last case is X2 as built.
+- **Wiring.** The ask is made on the X2 return, and inside a stand on the top card at its TRIM level, its whole state and its last step. W7's own steps for a free older card are unchanged.
+- **The advisor's card.**
+  - `toastPairFitsWithoutAdvisor` runs the same probe with the column child `[data-hud-advisor]` (`TOAST_ADVISOR_ATTR`) also out of flow.
+  - Where only that fits both cards, the column stands for the older card at step 1, with `keep` = the judged cards above it.
+  - A kept stand is free only while exactly those judged cards are above it. It is dropped once its card is on top, takes no step past the first, and leaves the banner and stamp steps to the top card.
+  - The builder says the advisor wait was needed because the asks alone left mode P (crash pin and advisor before the newer card) out on 94 of 98 FS-1440 pairs that are whole in mode B, and left the w3h arrival transients in place.
+- **Comments.** The block «…WHERE BOTH FIT, BOTH STAY WHOLE» and the «TWO JUDGED CARDS ON A SMALL STAGE» bullet now carry the measured both-whole floors.
+- **What the glass does differently**, all with existing text:
+  - a judged card shows its summary with the «ЗАЩО» chip where its paragraph would push the other judged card out;
+  - the advisor's card waits while two judged cards can be whole only without it, and comes back when the newer card leaves.
+
+**What the verifier reproduced.** It worked on its own lane: base `1f1536d` = commit 08e0186, base + the patch = commit 7400afa (tag r1). Log: `D:/knijka-lanes/scratch/cardstay2-verify/PROGRESS.md`. Rig: `rig/`, with its own bundles `dist/v-base.js` and `dist/v-r1.js`. It added an overlap metric, `missing`: frames where two cards are queued but fewer than two are painted. `missing` was 0 on every row.
+- **The rig-w3h cell, base and patch, Chromium** (`rig/w3h-base.json`, `rig/w3h-r1.json`).
+  - FS-1280x720: the older card's one-liner and law chip are out on 80 of 80 frames (k0) and 83 of 83 (k3). The window is 185.1 px with the fold row «↓ обяснението продължава — покажи». Base and patch are identical, matching the product.
+  - LB-1440: base 1 frame, patch 0.
+  - FS-1536 k3: base 3 frames, patch 0.
+- **The both-whole floor, measured in both engines** (`rig/c-r1.json`, `rig/w-r1.json`, `rig/c3-r1.json`, `rig/w3-r1.json`, analysed with `rig/an.cjs`).
+  - Chromium: H818 is clean in all modes. H816 has 2 pin-first rows out: OVERTAKING_IN_BAN_ZONE over ILLEGAL_STOP_IN_BAN_ZONE, plain and /sign, 54 of 54 frames.
+  - WebKit: H880 is clean. H878 has 3 pin-first rows out: OVERTAKING over CROSSED_SOLID_LINE, plain and /u-turn (54 of 54), and CROSSED_SOLID_LINE over OVERTAKING (1 of 54).
+  - Clean above the floor: Chromium H840, H900, H960, LB-1920x969 and FS-1920x1080; WebKit H920, H960 and FS-1920.
+  - Everywhere: top card out 0 and missing 0. Above the floor, oscillation 0 too.
+- **Patch against base.**
+  - Chromium LB-1920 / FS-1920 (780 matched rows): rows with the older card out went 300 → 0 and 290 → 0. Top card worse 0, older card worse 0, older card better 590.
+  - WebKit FS-1920: 307 → 0, nothing worse.
+- **Round-3 results unchanged**, rows identical once frame counts are stripped:
+  - vdrive2, Chromium, on S-SIM, LB-1440, FS-1280 and H548: 1,432 of 1,432, covering the cell (CONTROL-NOPRESS), censusB and censusBA, praise, why (W1/W2), pf, pinfirst, cycle and burst. Judged-out is 0 everywhere.
+  - vdrive3 mode D (✕ on the newer card): 120 of 120.
+  - WebKit LB-1440 spot check: 262 of 262.
+- **No scroll loop.** The probe squeezes and restores the cards, and the scroller feeds `onScroll` into the fold measurement, so it could have re-triggered itself. Base and patch both raised 0 scroll events in 90 cases per bundle: 15 card pairs, paged and scrolled by 10 and 40 px, on FS-1440 and FS-1280 (`rig/sl-base.json`, `rig/sl-r1.json`).
+- **Tests.**
+  - toast-standing-card: 110 of 110 on the patch; 15 of 110 red on base, all on assertion text.
+  - Its 9-file toast set: 377 of 377.
+- **Regression** on lessons/__tests__, lessons/scenario/__tests__, lesson-ui/__tests__ and hud/: 436 files, 9,357 passed, 2 failed, 166 skipped.
+  - The 2 failures: touchHintLifetime is ENOENT on tools/, which the lane does not have; shellClipAffordances timed out at 92.7 s under load and passes 40 of 40 alone.
+  - caption-truth, keep-right-claim-census and reviewed-text-manifest ran inside that suite and are green, with no re-record.
+  - sc-roundabout-entry-traces: 13 of 13.
+  - tsc: 22 errors, the baseline files, none in a touched file.
+- **Tools tests in a read-only mirror:** driveline 165/165, route-fidelity 45/45, wrong-leg-profiles 221/221, reclosure 28/28.
+  - `data-hud-toast-body=` appears once in HudToasts.tsx, at :2892, inside ViolationToast.
+  - No tools test reads `data-hud-advisor` or `TOAST_ADVISOR_ATTR`.
+- **Mutants.** 10, one at a time, each restored and sha256-checked (`mut/log.txt`).
+  - Killed on assertion text: V4 (the advisor looked for inside the scroller), V6 (the ask always names the newer card), V8 (a kept stand with an empty keep), V9 (no slack in the fit) and V10 (a kept stand freed while its card is off the glass).
+  - Survived: V1, V2, V3, V5 and V7 (conditions 1–3).
+- **Builder only, not re-measured by a verifier:**
+  - **Chromium, the other stages**, rows with the older card out, base → patch: FS-1440 357 → 9 (all mode P), FS-1536 352 → 47, FS-1366 328 → 307, LB-1440x900 360 → 346, LB-1440x789 376 → 365, LB-1536 390 → 390, FS-1280 389 → 389.
+  - **WebKit:** LB-1920 361 → 37, FS-1440 365 → 81, FS-1536 362 → 138. One WebKit row was worse (FS-1440 P, 1 → 18 frames); re-driven alone it gave patch 0 and base 1.
+  - **The floors without mode P:** Chromium 782 px, WebKit 850.
+  - **The w3h arrival transients on FS-1366** are gone.
+  - **Its 17 mutants**, all killed.
+  - **Its 437-file regression.**
+  - **The banner one-line counts** (condition 6).
+
+**The conditions, and how each stands.**
+
+**1. F6: the advisor wait hangs on an unpinned attribute.**
+- Mutant V1 survived: removing `data-hud-advisor=""` from `AdvisorCard.tsx:112` leaves the toast set at 377 of 377.
+- No test pinned the attribute on the real AdvisorCard, or that LessonPlayShell mounts it as a child of the notify column beside the toast scroller. The probe reads `scroller.parentElement.children`.
+- A later edit to AdvisorCard would silently turn off the advisor wait and bring back the mode-P cuts.
+- PINNED AT INTEGRATION: `lesson-ui/__tests__/advisorColumnSibling.test.tsx` — §1 renders the real AdvisorCard and requires the attribute (V1 red: «the advisor's card root … does not carry data-hud-advisor»); §2 checks, by a TSX parse of LessonPlayShell.tsx, that the mount and the toast scroller share their nearest host element (the wrap mutant V1b red). The DOM half stays owed to the mode-P device cell.
+
+**2. F7: the probe's scroll restore is not exercised.**
+- Mutant V2 survived: removing the `scrollTop` restore in `readToastPair` passes 377 of 377. The stand-in never changes `scrollTop` during a squeeze.
+- In the real browser the verifier found no case where it matters: 0 scroll events across the 90 paged and scrolled cases on FS-1280 and FS-1440 (`rig/sl-base.json`, `rig/sl-r1.json`).
+- Owed: a stand-in row in which the squeeze clamps `scrollTop`.
+- PINNED AT INTEGRATION: `toast-standing-card.test.ts` §8 «V2»: a column scrolled 120 px whose squeezed content fits is clamped to 0 during the probe, and the probe must put the 120 back (V2 red: «…expected +0 to be 120»).
+
+**3. F8: three guards are not pinned.** Each survived at 377 of 377:
+- V3: `sameStand` ignores `keep`;
+- V5: the check that a squeeze reached the summary height is removed;
+- V7: the older-card cut guard drops `TOAST_FIT_SLACK_PX`.
+
+The census does not depend on them (the verifier). Owed: unit rows that kill each on assertion text.
+- PINNED AT INTEGRATION: `toast-standing-card.test.ts` §8 rows «V3», «V5» and «V7», each red on assertion text under its mutant; the file is 114/114. Merge verifier N2 (recorded): dropping the slack in the post-squeeze fit survives — an accepted boundary mutant.
+
+**4. F9: device cells owed** (below). A layout defect is only proven gone on a device.
+
+**5. CARRIED: founder question 8, the both-whole floor.** This also corrects two earlier sentences of doc 88.
+- **The corrections.** The cardstay landing's condition 5 («two judged cards: 582 px») and the rig-w3h note («above the 582 px two-card floor») both state the TOP card's floor only.
+- **The floor at which both judged cards can be whole:**
+  - Chromium 818 px, or 782 without the pin-first mode;
+  - WebKit 880 px, or 850 without it.
+  - The 818 and 880 are the verifier's; the 782 and 850 are the builder's.
+  - The filed pair alone needs 650 px.
+- **Product stages at or above the floor:** FS-1920x1080 in both engines, and LB-1920x969 in Chromium.
+- **Every other product stage is below it** (the builder's stage heights): FS-1536 (764), FS-1440 (800), FS-1366 (668), FS-1280 (620), LB-1440x900 (655), LB-1440x789, and LB-1536 (588); the builder gives no separate height for LB-1440x789. There the older card waits behind the fold row wherever the two summaries cannot fit, as in base.
+- **Two measured options, unbuilt and not authorised** (the builder's estimates):
+  - (a) the recall pill «ⓘ Инструкции · 6 стъпки» (29.5 px with its gap) yields while two judged cards are cut. That alone would close the filed FS-1280 cell, which is 21.2 px short.
+  - (b) W8, the banner's one line, is allowed for a kept older stand. That would close most of the mode-P gap; the Chromium FS-1440 remainder is 9 rows.
+
+**6. CARRIED: the banner's one-line form, for the triage candidate «wcbannercap».**
+- The builder: Chromium banner one-line rows went +162 / −23 against base, across all stages.
+- The verifier: +35 / −19 in Chromium on LB-1920 / FS-1920, and +6 / −5 in WebKit on FS-1920.
+- These are W7/W8 stands for older cards that are now whole instead of lost.
+
+**7. CARRIED: WebKit was measured with fallback fonts.** file:// fonts are refused, so its cards are taller.
+
+**No ADR is owed.** W10 extends the cardstay W7–W9 layout decisions recorded in the cardstay landing (above). `docs/architecture/07` has no sentence on the PC notify column, the advisor card's gate or the banner's fold, so no ADR sentence is contradicted.
+
+**PROVEN ON e58f388:** the same landing proof.
+- **Condition F6 pinned:** new `lesson-ui/__tests__/advisorColumnSibling.test.tsx`. §1 renders the real AdvisorCard and requires `data-hud-advisor` on its root (V1 red on assertion text). §2 parses LessonPlayShell.tsx with the TSX parser and requires the AdvisorCard mount and the toast scroller to share their nearest host element, with a negative control; the integrator's own wrap mutant V1b is red. It is a structural check, not a render: the device cell with mode P (owed below) is still what proves the probe finds the card in the real DOM.
+- **Conditions F7 and F8 pinned:** four rows in `toast-standing-card.test.ts` §8 — V2 (the scrollTop restore), V3 (sameStand keeps the stand under a replaced card), V5 (the squeeze must reach the summary height) and V7 (the older card inside the 1 px slack) — each red on assertion text; the file is 114/114.
+- Recorded, not pinned (merge verifier N2): dropping the slack in readToastPair's post-squeeze fit (`<= window`) survives the file; an accepted boundary mutant.
+
+**Owed.**
+- **The rig cells (F9):**
+  - TWO-FAULT-FS1280 (the FAILED_TO_YIELD entry, then the island strike): expected STILL, because the stage is below the pair's 650 px floor. Re-drive it against base and record the floor.
+  - TWO-FAULT-LB1440: the product showed 4 rAFs of arrival cut, and the rig shows 0 (base 1). LB-1440 (655 px) is below the census floor, so only the device can say whether the slow arrival frames are gone.
+  - A cell at or above the floor, with the advisor's card up before the newer card (mode P): FS-1920x1080 in both engines, or LB-1920x969 in Chromium. Both judged cards must be whole on every frame of their overlap.
+  - The phone's un-paused L3 exam peek for FAILED_TO_YIELD (filed with «↓ ОЩЕ 7 РЕДА»), which rig-w3h did not judge.
+- **Founder question 8** (condition 5): the 818 / 880 floor, and options (a) and (b).
+- **Triage:** «wcbannercap» (condition 6).

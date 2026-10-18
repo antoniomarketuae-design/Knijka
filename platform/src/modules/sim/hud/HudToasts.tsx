@@ -2066,6 +2066,31 @@ export function readOpenedToastShortPx(scroller: HTMLElement): number | null {
        base had brought back whole (its advisor squeezed the top paragraph into
        its summary).
 
+   …WHERE BOTH FIT, BOTH STAY WHOLE (integrator decision W10, 2026-10-17; lane
+   `cardstay2`). rig-w3h at `1f1536d`, full screen 1280 × 720: the older
+   «Влизане без пропускане» lost its one-liner and law chip for its whole
+   overlap (74 rAFs) with the newer «Удар в неподвижно препятствие» — X2 stood
+   for the top card only. So, with two judged cards on the glass and the older
+   one cut (`toastPairSummaryAsk`, `toastPairFitsWithoutAdvisor`):
+     · a paragraph that keeps the two from fitting is ASKED for its summary
+       before paint — the newer card first, the older card's own next — where
+       with both in their summary forms both are whole; a paragraph that fits
+       beside the older card is never asked;
+     · where they fit only once the advisor's card waits, the column stands for
+       the older card at the FIRST step (the advisor's card and praise wait),
+       KEPT under exactly the judged card above it (`Stand.keep`) and let go the
+       moment that card leaves or another takes its place; no step past the
+       first is taken for it (the banner and the stamp stay the top card's, X2);
+     · only where even the two summaries cannot fit does the older card wait
+       behind the fold row (X2 as built). The filed frame is such a stage: the
+       two summaries need 116.5 + 8 + 111.3 = 235.8 px of a 214.6 px window.
+   Measured in the rig (the product's stages, Chromium, the round-3 census: 20
+   newer × 5 older cards, modes banner / banner + advisor / pin first, and 96
+   trios; 3510 rows matched against `1f1536d`): the top card worse on 0 rows,
+   the older card worse on 0 and better on 1313; letterboxed 1920 × 969 and
+   full screen 1920 × 1080 went from 300 and 290 rows with the older card cut to
+   0, full screen 1440 × 900 from 357 to 9, 1536 × 864 from 352 to 47.
+
    WHAT IS STILL NOT DONE, AND WHY (measured, lane `cardstay`, rounds 1–3).
      · W2's read layout for a SUMMARY (title and law chip pinned, the body box
        scrolling). A summary's body is the one-liner, 16.5–33 px, and while
@@ -2087,7 +2112,15 @@ export function readOpenedToastShortPx(scroller: HTMLElement): number | null {
        law chip stays under the row (the 1165 × 650 rig stage: «Изпреварване
        в зона със забрана» 160.5 and «Спиране в забранена зона» 141.3 against
        131.9). The two-card floor, measured (Chromium and WebKit, the 20
-       tallest top cards × 5 older cards), is 582 px of stage against 548.
+       tallest top cards × 5 older cards), is 582 px of stage against 548 —
+       for the TOP card. With W10 the floor at which BOTH judged cards are
+       whole on every frame (bare 1000-wide stage box, the same census with
+       the older card judged too, modes banner / banner + advisor / pin first
+       and the trios): Chromium 818 px (782 without the pin-first mode),
+       WebKit 880 px (850). Below it the older card waits behind the fold
+       row. Of the product's stages only full screen 1920 × 1080 is above it
+       in both engines, letterboxed 1920 × 969 in Chromium; the filed frame's
+       own pair needs 650 px, its stage has 619.5.
      · «НАУЧИ» CARDS have no summary on PC: measured floors (bare stage
        1000 wide) 516 / 646 / 650 / 673 / 716 px for the five verbatim cards,
        716 for all; below it the fold row announces the card and «покажи»
@@ -2242,11 +2275,135 @@ export function toastCardShrinksItself(card: HTMLElement, scroller: HTMLElement,
   return toastCardInWindow(read.contentTopPx - read.scrollTopPx, summary.cardPx, summary.windowPx) === "whole";
 }
 
+/**
+ * W10 (integrator, 2026-10-17; lane `cardstay2`) — WHERE BOTH FIT, BOTH STAY
+ * WHOLE. Two judged cards on the glass, `newer` above `older`: which of them to
+ * ask for its summary NOW so that both are whole — `"newer"` first, `"older"`
+ * only once the newer card has nothing shorter to show — or `null`:
+ *   · the older card is not cut (its foot within the window the column gives
+ *     it without the fold row, `TOAST_FIT_SLACK_PX` allowed) — a paragraph that
+ *     fits beside it is never asked;
+ *   · a body is still `pending` (its own arrival measurement is next);
+ *   · neither card shows a paragraph with a shorter summary;
+ *   · a read cannot be made (another offset parent, a squeeze that does not
+ *     come out at the summary's height);
+ *   · or even with BOTH in their summary forms the older card would still be
+ *     cut — X2 as built: it waits behind the fold row, which announces it.
+ * THE READ IS A PROBE, the arrival test's own technique (`readToastSummaryFit`)
+ * for two cards at once: each paragraph's body is squeezed so its card takes
+ * exactly its summary card's room (`measureToastSummaryCardPx`), the window is
+ * read with the fold row out of flow (`readToastScrollerWindow`), the older
+ * card's foot is read where the squeeze put it, and every inline style and the
+ * scroll position are put back before this returns.
+ * MEASURED (the product frame, rig-w3h TWO-FAULT, full screen 1280 × 720): a
+ * newer 116.5 px «Удар в неподвижно препятствие» SUMMARY over an older 111.3 px
+ * «Влизане без пропускане» summary in a 214.6 px window — no paragraph, nothing
+ * shorter to show: `null`, the older card waits behind the fold row; the two
+ * summaries need 235.8 px.
+ */
+export function toastPairSummaryAsk(
+  scroller: HTMLElement,
+  newer: HTMLElement,
+  older: HTMLElement,
+  newerPeekBg: string | undefined,
+  olderPeekBg: string | undefined,
+): "newer" | "older" | null {
+  const read = readToastPair(scroller, newer, older, newerPeekBg, olderPeekBg, false);
+  return read !== null && read.fits ? read.first : null;
+}
+
+/**
+ * The column child the stand's first step takes off the glass — the advisor's
+ * card (`AdvisorCard`, `data-hud-advisor`): read only to take its box out of the
+ * window for one probe.
+ */
+export const TOAST_ADVISOR_ATTR = "data-hud-advisor";
+
+/**
+ * W10, the stand's first step for the older card: would BOTH judged cards be
+ * whole, in their summary forms, if the advisor's card waited? `true` only
+ * where the older card is cut as the column stands, the advisor's card is on
+ * the glass, and the same probe as `toastPairSummaryAsk` — with the advisor's
+ * card out of flow too (`position: absolute`, as the fold row is taken out) —
+ * finds the older card's foot inside the window. Everything is put back before
+ * this returns.
+ */
+export function toastPairFitsWithoutAdvisor(
+  scroller: HTMLElement,
+  newer: HTMLElement,
+  older: HTMLElement,
+  newerPeekBg: string | undefined,
+  olderPeekBg: string | undefined,
+): boolean {
+  const read = readToastPair(scroller, newer, older, newerPeekBg, olderPeekBg, true);
+  return read !== null && read.fits;
+}
+
+/** The two-card probe both reads above share (W10). `null`: no claim, or the older card is not cut. */
+function readToastPair(
+  scroller: HTMLElement,
+  newer: HTMLElement,
+  older: HTMLElement,
+  newerPeekBg: string | undefined,
+  olderPeekBg: string | undefined,
+  advisorOut: boolean,
+): { fits: boolean; first: "newer" | "older" | null } | null {
+  const laidOut = (card: HTMLElement) => card.offsetParent !== null && card.offsetParent === scroller.offsetParent;
+  if (!laidOut(newer) || !laidOut(older)) return null;
+  const footPx = (card: HTMLElement) => card.offsetTop - scroller.offsetTop - scroller.clientTop + card.offsetHeight;
+  if (!(footPx(older) - scroller.scrollTop > readToastScrollerWindow(scroller) + TOAST_FIT_SLACK_PX)) return null;
+  const squeezes: Array<{ card: HTMLElement; body: HTMLElement; summaryPx: number }> = [];
+  for (const [card, peekBg] of [
+    [newer, newerPeekBg],
+    [older, olderPeekBg],
+  ] as const) {
+    const body = card.querySelector(`[${TOAST_BODY_ATTR}]`) as HTMLElement | null;
+    const choice = body?.getAttribute(TOAST_BODY_ATTR) ?? null;
+    if (choice === "pending") return null;
+    if (body === null || choice !== "paragraph" || typeof peekBg !== "string" || peekBg.trim().length === 0) continue;
+    const summaryPx = measureToastSummaryCardPx(card, scroller, peekBg);
+    if (Number.isFinite(summaryPx) && summaryPx > 0 && summaryPx < card.offsetHeight) squeezes.push({ card, body, summaryPx });
+  }
+  const advisors = advisorOut
+    ? (Array.from(scroller.parentElement?.children ?? []) as HTMLElement[]).filter((c) => c.getAttribute(TOAST_ADVISOR_ATTR) !== null)
+    : [];
+  if (advisorOut ? advisors.length === 0 : squeezes.length === 0) return { fits: false, first: null };
+  const kept = squeezes.map(({ body }) => ({ height: body.style.height, overflow: body.style.overflow }));
+  const keptAdvisors = advisors.map((a) => a.style.position);
+  const scrollTop = scroller.scrollTop;
+  try {
+    for (const { card, body, summaryPx } of squeezes) {
+      body.style.height = `${Math.max(0, body.offsetHeight - (card.offsetHeight - summaryPx))}px`;
+      body.style.overflow = "hidden";
+    }
+    for (const a of advisors) a.style.position = "absolute";
+    if (squeezes.some(({ card, summaryPx }) => Math.abs(card.offsetHeight - summaryPx) > TOAST_FIT_SLACK_PX)) return null;
+    const fits = footPx(older) <= readToastScrollerWindow(scroller) + TOAST_FIT_SLACK_PX;
+    return { fits, first: squeezes.length === 0 ? null : squeezes[0]!.card === newer ? "newer" : "older" };
+  } finally {
+    squeezes.forEach(({ body }, i) => {
+      body.style.height = kept[i]!.height;
+      body.style.overflow = kept[i]!.overflow;
+    });
+    advisors.forEach((a, i) => {
+      a.style.position = keptAdvisors[i]!;
+    });
+    if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop;
+  }
+}
+
 /** The reader's latch on a judged card (W7–W9; `above`: round 3, see `useToastReader`). */
 interface Stand {
   id: number;
   level: number;
   above: string | null;
+  /**
+   * W10 (lane `cardstay2`): the judged cards above it under which the column
+   * stands for it although a newer judged card put it under the window — taken
+   * only where the two judged cards are whole, in their summary forms, once the
+   * advisor's card waits (`toastPairFitsWithoutAdvisor`).
+   */
+  keep?: string | null;
 }
 
 /** The ids of the judged cards above index `i` of `shown`, as one key. */
@@ -2388,7 +2545,15 @@ export function useToastReader({
   // under (the crash pin's banner or the advisor's card pushed it out).
   const onTop = onGlass && glass.find((t) => hudToastCarriesWhy(t.event.kind))?.id === asked!.id;
   const aboveNow = onGlass ? toastJudgedAbove(glass, glass.findIndex((t) => t.id === asked!.id)) : "";
-  const free = onTop || (stand !== null && stand.above !== null && stand.above === aboveNow);
+  const seenWhole = stand !== null && stand.above !== null && stand.above === aboveNow;
+  // …AND WHERE THE TWO SUMMARIES FIT ONCE THE ADVISOR'S CARD WAITS (W10, lane
+  // `cardstay2`): an older card a newer judged card put under the window is
+  // stood for under exactly the judged cards above it when the stand was taken
+  // (`keep`) — see `look`'s last lines.
+  const carried = stand !== null && onGlass && !onTop && typeof stand.keep === "string" && stand.keep === aboveNow;
+  // A kept stand holds only while those judged cards are above it: the newer card
+  // gone, the reason is gone (the round-3 rule — a stand does not outlive it).
+  const free = (onTop && typeof stand?.keep !== "string") || seenWhole || carried;
   const standing: ToastStanding | null =
     asked === null || !onGlass || !free ? null : stand!.level >= TOAST_STAND_TRIM ? { id: asked.id, trimAge: true } : asked;
   const shown = visibleToasts(cards, quiet, null, standing);
@@ -2417,6 +2582,36 @@ export function useToastReader({
     /** A paragraph is asked for its summary; a body still `pending` is asked nothing — its own first layout effect chooses. */
     const ask = (i: number): number | null =>
       cardAt(i)?.querySelector(`[${TOAST_BODY_ATTR}]`)?.getAttribute(TOAST_BODY_ATTR) === "paragraph" ? shown[i]!.id : null;
+    /**
+     * W10 — the two judged cards on the glass, the older one cut: the paragraph to
+     * ask for its summary so that both are whole (`toastPairSummaryAsk`), or
+     * `null`. Asked only where nothing else answers the older card's cut: no
+     * stand is taken for it (X2 — a newer judged card put it there), or the stand
+     * on the glass has its own card whole or has taken its last step.
+     */
+    const pairAsk = (): number | null => {
+      if (el.querySelector('[data-hud="toasts"]')?.children.length !== shown.length) return null;
+      const judgedAt = shown.flatMap((t, i) => (hudToastCarriesWhy(t.event.kind) ? [i] : []));
+      if (judgedAt.length < 2) return null;
+      const [n, o] = judgedAt as [number, number];
+      const newer = cardAt(n);
+      const older = cardAt(o);
+      if (newer === undefined || older === undefined) return null;
+      const which = toastPairSummaryAsk(el, newer, older, shown[n]!.peekBg, shown[o]!.peekBg);
+      return which === null ? null : shown[which === "newer" ? n : o]!.id;
+    };
+    /** W10: would the two judged cards be whole, in their summary forms, if the advisor's card waited? */
+    const pairFitsWithoutAdvisor = (): boolean => {
+      const judgedAt = shown.flatMap((t, i) => (hudToastCarriesWhy(t.event.kind) ? [i] : []));
+      if (judgedAt.length < 2 || el.querySelector('[data-hud="toasts"]')?.children.length !== shown.length) return false;
+      const [n, o] = judgedAt as [number, number];
+      const newer = cardAt(n);
+      const older = cardAt(o);
+      return newer !== undefined && older !== undefined && toastPairFitsWithoutAdvisor(el, newer, older, shown[n]!.peekBg, shown[o]!.peekBg);
+    };
+    const aboveOf = (i: number) => toastJudgedAbove(shown, i);
+    /** The stand as it is, and W10's ask where there is one. */
+    const kept = (s: Stand) => ({ stand: s, summarise: pairAsk() });
     if (standing !== null && stand !== null) {
       // A judged card ABOVE the one stood for, cut — a newer fault whose summary
       // was laid out after the stand was taken: the stand moves up to it (the
@@ -2429,14 +2624,18 @@ export function useToastReader({
         if (shrinks(above)) return { stand, summarise: ask(above) };
         return { stand: standFor(above, Math.min(stand.level, TOAST_STAND_BANNER)), summarise: null };
       }
-      if (stand.level >= TOAST_STAND_TRIM) return { stand, summarise: null };
+      if (stand.level >= TOAST_STAND_TRIM) return kept(stand);
       const still = readStandingToastCut(el, shown.map((t) => t.id === standing.id));
-      if (still === null) return { stand, summarise: null };
+      if (still === null) return kept(stand);
       if (shrinks(still)) return { stand, summarise: ask(still) };
+      // W10: under a stand kept for an older card (`carried`) a paragraph whose
+      // summary makes both whole is asked, and no step past the first is taken —
+      // those stay the TOP judged card's (X2).
+      if (carried) return { stand, summarise: pairAsk() };
       if (stand.level < TOAST_STAND_BANNER) return { stand: { ...stand, level: stand.level + 1 }, summarise: null };
       // W9: the last step only where it gives a row back — a stamp on a row of its own.
       const card = cardAt(still);
-      return { stand: card !== undefined && toastAgeHasOwnRow(card) ? { ...stand, level: TOAST_STAND_TRIM } : stand, summarise: null };
+      return card !== undefined && toastAgeHasOwnRow(card) ? { stand: { ...stand, level: TOAST_STAND_TRIM }, summarise: null } : kept(stand);
     }
     const cut = readStandingToastCut(el, shown.map((t) => hudToastCarriesWhy(t.event.kind)));
     if (cut === null) return none;
@@ -2446,10 +2645,18 @@ export function useToastReader({
     if (shrinks(cut)) return { stand: null, summarise: ask(cut) };
     const fresh = standFor(cut, TOAST_STAND_YIELD);
     const top = shown.findIndex((t) => hudToastCarriesWhy(t.event.kind));
-    return { stand: cut === top || fresh.above !== null ? fresh : null, summarise: null };
+    if (cut === top || fresh.above !== null) return { stand: fresh, summarise: null };
+    // W10: an older card a newer judged card put under the window — where the two
+    // summaries fit together, the paragraph that keeps them from it is asked;
+    // where they fit only once the advisor's card waits, the column stands for it
+    // at the first step (and asks on its next look), KEPT under these judged cards.
+    const pair = pairAsk();
+    if (pair !== null) return { stand: null, summarise: pair };
+    return { stand: pairFitsWithoutAdvisor() ? { ...fresh, keep: aboveOf(cut) } : null, summarise: null };
   };
   const sameStand = (a: Stand | null, b: Stand | null) =>
-    a === b || (a !== null && b !== null && a.id === b.id && a.level === b.level && a.above === b.above);
+    a === b ||
+    (a !== null && b !== null && a.id === b.id && a.level === b.level && a.above === b.above && (a.keep ?? null) === (b.keep ?? null));
 
   /** The yield the column should stand at, by one look at it as it now is. */
   const yieldTarget = (el: HTMLElement | null): number => {
