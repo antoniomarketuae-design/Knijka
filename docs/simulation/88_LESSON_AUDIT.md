@@ -14969,3 +14969,136 @@ Lane `curvring`, one round, built on `2e9268f`.
   - lane-choice outer-lane: the circulating car passes 25.97 m away, just inside CIRCULATING_REACH_M 26, so YIELDED_TO_PRIORITY is credited only for 11–12 s waits. At a 15 s wait, ambient pedestrian 0 walks into the ring and the near-miss clearance is 0;
   - ped-exit L5: the through-ped mistake also hits the sprinting second crosser, COLLISION:pedestrian. This is identical at base;
   - busy-gap witness at L1: a 38.5 s wait is neither billed nor commended, while 39–41 s waits are billed. This is a possible forced-braking threshold gap.
+
+## Landed: a hard brake held for exactly 0.4 s counts as held on the student's own ledger, as it already did on the follower's, and «Чисто и спокойно каране» is no longer paid over a causeless emergency-grade brake that only the 35 km/h floor acquits. Measured in process only. `sc-follow-tailgater:a31d9216` (major) and `sc-follow-tailgater:e47a45c1` (major) (2026-10-19)
+
+Lane `brakeledger`, one round, built on `e58f388`.
+- Round 1 was SIGNED OFF WITH CONDITIONS by the adversarial verifier on 2026-10-18. The conditions are below.
+- **The patch.** `brakeledger-result-r1.patch`: sha256 f8f45c7d…, 10 files, +1112/−25, 0 CR bytes, every touched file LF in base (the builder).
+  - The verifier applied it to its own lane at `e58f388`. Its lane equalled base plus the patch, and both product files passed its sha check after every swap.
+  - It is cumulative against the lane's base `e58f388`, not against HEAD. The integrator applied it with `git apply --3way --index` onto `e11629b`; git applied all 10 files directly, with no 3-way merge and no conflict.
+  - HEAD carries the ic landing (`vehicle/VehicleSim.ts`, `traffic/playerTrack.ts`, hud) and the cl landing (`lessons/objectives.ts`, `lessons/engine.ts`, traces). None of them touches `rules/engine.ts` or `rules/harshBrakeEpisode.ts`. The lane's tests are re-run on HEAD (see PROVEN ON e11629b). The lane's census was NOT re-run on HEAD (owed, below).
+  - **What lands is 11 files:** the patch's 10, with one comment-only edit by the integrator (the header of `rules/__tests__/floored-brake-withholds-praise.test.ts` named a nonexistent `lessons/scenario/__tests__/floored-brake-withholds-praise.test.ts`; the lesson half is `brake-ledger-live-chain.test.ts`), plus the integrator's pin file `rules/__tests__/floored-brake-reanchor-and-overfloor-hold.test.ts` (conditions 1 and 2). Staged as `gate-bl.patch`, sha256 1d03b5f5…, 11 files, 0 CR bytes.
+  - **Gate «bl» run 1 was refused (2026-10-19 08:23) on two tests of `clips/clipPlan.test.ts`, the freshness gate of the GENERATED `clips/clipPlan.generated.ts`:** with the lane's tie rule the engine bills the first fault of `sc-vp-police-stop` mistake-panic-stop one grid point earlier, so its recomputed `faultTimeSec` is 16.73 against the committed 16.75 (the census's «one grid point earlier» class; no other entry moved). Neither the lane nor the integration ran `src/modules/clips/`. The integrator regenerated the plan with `node tools/clips/gen_clip_plan.mjs` in `integ-bl` (a one-line change; `clipPlan.test.ts` 27/27 green) and staged it: **12 files land**, `gate-bl.patch` re-cut at sha256 7e38801c…. Owed: the committed clip `sc-vp-police-stop__m1`'s fault marker is 0.02 s off the new plan — check it at the next clip re-capture.
+- It carries two triage rows as one design: «sustaintie» (row A, a31d9216) and «flooredpraise» (row B, e47a45c1). The sustaintie lane had not landed separately.
+- **Product files (2).**
+  - `rules/harshBrakeEpisode.ts`: `heldFor` is exported. Its header no longer claims the engine keeps a bare `>=`.
+  - `rules/engine.ts`: `heldFor` at the three sites, and the praise block's reset and hold (below).
+- **Test-side files (8 in the patch).**
+  - New: `rules/__tests__/harsh-brake-sustain-tie.test.ts` (18 tests), `rules/__tests__/floored-brake-withholds-praise.test.ts` (13), `lessons/scenario/__tests__/brake-ledger-live-chain.test.ts` (43) and its support module `brakeLedgerTapes.ts`, which holds the triage tapes byte for byte (the builder).
+  - Modified:
+    - `harsh-brake-episode.test.ts`: the «after 2 s of gentle» row is held to 1/hz slack (was 0.15 s), and the guard rows of 22–26 frames are back in at 30 and 120 Hz;
+    - `follow-tailgater-rig-w3b-ttf25.test.ts`: TTF323's bill is expected 1/60 s earlier than the rig's `59be0de` sheet, because of the tie rule. This is a test pin, not a trace re-record;
+    - `taskCapReference.ts` (the census oracle) restates the causeless ledger's hold and floored reset, and `task-cap-two-sided-census.test.ts` asserts 0 unrestated cause frames and the hold exercised more than 5 times.
+- **What did not change.** The verifier checked: 0.4 s, 7 m/s², the 35 km/h floor, `BRAKING_LINE_MPS2`, the mean's exclusive ×(1+tol), and every bill, point, verdict, star and XP rule. The builder also lists the accrual formula and the floor-lift block as unchanged. No protected threshold moved. No shown string was added or changed. The reviewed-text manifest is green (49/49) with no re-record: the builder on the lane, and the integrator on `e11629b`. The shown output does change on floored drives (below).
+- **Integrator rulings (2026-10-18, under the 2026-10-08 delegation; the founder is told at this landing):**
+  - S1: export `heldFor` and use it at all three sites.
+  - S2: only exact-tie bills move.
+  - F1: the CLEAN_DRIVING payout is held while a causeless episode is accruing.
+  - F2: a withheld payout is a streak reset.
+  - F3: every floored frame withholds.
+  - The 35 km/h floor itself is not ruled (ADR-016) and does not move.
+
+**The rows are NOT closed by this landing.** `sc-follow-tailgater:a31d9216` and `sc-follow-tailgater:e47a45c1` stay OPEN.
+- Every number below was measured in process: the engine's reducer and the live rung chain.
+- Neither the builder, the verifier nor the integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed (below). Whether its frames close either row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **Row A, the tie.** The student's causeless ledger tested «held for the sustain» with a bare `>=` in three places in `rules/engine.ts` (base line numbers, unchanged at `e11629b`): :8264, the mean's window (`heldSec >= cfg.harshBrakeSustainSec`); :8267, the re-anchor; :8327, the bill and the floored record (`qualifiedSec >= …`). The follower's account already used `heldFor` (`harshBrakeEpisode.ts:80`), which holds the exact tie with its 1e-9 relative tolerance. So whether a hard brake held for exactly 24 grid points was billed depended on float rounding.
+  - The builder's base probe, matching the triage: a causeless 60 km/h stab held exactly 24 grid points billed on 883 of 2,400 start points at 9 and 8 m/s², and on 410 at 7.5. 23 points billed on none and 25 on all.
+  - The four «rw» tapes (L3, 24.5 km/h): ph2 k-36 and ramp0.4 k-35 summed to qualifiedSec 0.39999999999999858, so no floored record and no bill; on ph0 k-36 and k-33 the window re-anchored at 25 points. All four were «ИЗДЪРЖАН» with «Чисто и спокойно каране».
+- **Row B, the praise.** The praise reset (base :8687) fired only on a violation or on `taskLatchFresh`. GATE 1 read the episode only through `emitted`, which a floored brake never sets, and GATE 2 did not list it. So a causeless emergency-grade brake that only the floor acquitted was paid «Чисто и спокойно каране» over the very 250 m that held it.
+  - The real follower-less lesson is the harsh-brake lesson itself, `sc-sp-harsh-brake` (L1–L5). Its own phantom slam (the 12 m/s² envelope) floors at 25, 30 and 33 km/h, and at base it minted CLEAN_DRIVING over it at 36.667 / 33.133 / 31.517 s, with the toast and the debrief line, under the headline «Точно това иска да види изпитващият» (the builder).
+
+**What landed.** This is the builder's description; the verifier's measurements are under the next heading.
+- **The tie (S1).** `const windowHeld = heldFor(heldSec, cfg.harshBrakeSustainSec)` feeds both the mean gate and the re-anchor, and the bill and floored record test `heldFor(s.harshBrake.qualifiedSec, cfg.harshBrakeSustainSec)`.
+- **The praise (F1–F3).** Nothing billed or scored changes:
+  - `flooredFresh = s.harshBrake.flooredAt === t` resets `cleanDistanceM`, as a bill does (F2, F3);
+  - `causelessBrakeAccruing = s.harshBrake.activeSince !== null && s.harshBrake.qualifiedSec > 0` holds the payout only, not the accrual (F1).
+- **The builder's controls**, kept to the frame: no-brake 28.583; B0 30.950; sc-sp-harsh-brake at the 4.6 envelope 33.867; sp at 47 km/h coached 15.350. On the reducer: gentle 4 m/s² and 6.99 m/s² causeless stops are paid on the exact owed frame; a 9 m/s² stop with its cause seen is unchanged; a 0.2 s 9 m/s² blip far from the payout is unchanged, and one whose 250 m falls inside it is deferred 7 grid points (30.0167 → 30.1333); a window paid before the brake stands.
+
+**What the verifier reproduced.** It worked on its own lane, `e58f388` + the patch, sha matched, with every measurement on its own probes against base and tree. Log: `D:/knijka-lanes/scratch/brakeledger-verify/PROGRESS.md`; the files named below are in that folder.
+- **Row A** (`reducer-{base,tree}.json`), from 60 km/h over 2,400 start points:
+  - 24-point holds: base bills 883 / 883 / 410 at 9 / 8 / 7.5 m/s²; the tree bills 2,400 at each, always on grid point 25;
+  - 22 and 23 points bill nothing on either side; 25 and 26 points bill on every start on both;
+  - 7.2 m/s² at 25 points (the first frame credits 0.04 s, a tie of the same kind): base 882, tree 2,400;
+  - from 30 km/h, under the floor, a 24-point hold floors on 883 of 2,400 at base and 2,400 on the tree; nothing is billed either way.
+- **The four rw tapes** (`chain-{base,tree}.json`, L3 and L4). At base all four are unbilled and passed, with «Чисто и спокойно каране» at 31.3167–31.35 s. On the tree each is floored and billed on the лепка's report frame (19.7833 / 19.8333 / 19.8333 / 19.8833), coached at L3, charged at L4, not passed, no CLEAN_DRIVING.
+- **84 neighbouring tapes** (6 phases × 2 ramps × 7 pedal frames, L3): 16 gain the bill (the tie class), 0 lose one. 53 billed tapes bill earlier on the tree, all because the floored record now lands on the report frame where base re-anchored and floored later: 33 by 1 frame, 17 by 2, 3 by 5. No tree drive has a report and a floored record but no bill.
+- **Row B.** Case A (no follower) at L1–L5 and the 16 B rows at L3/L4: base praises 64 of these drives, and on 63 of them the praised 250 m holds the floored frames. The tree has 0 such drives. Controls are identical to the frame: no brake 28.5833, B0 30.9500, a gentle 5 m/s² stop 31.0333.
+- **sc-sp-harsh-brake on the verifier's own scripts** (`recordScriptedDrive` on sp-creep-v1, a 12 m/s² envelope at 20 / 28 / 32 / 34 km/h, stop zone y 176 and 184, L1–L5): floored (e.g. 34 km/h, 19.0667..19.7333, 41 frames). Base mints CLEAN_DRIVING over it at 30.7167–42.3833 s; the tree mints none. The 9 m/s² envelope never floors and keeps its praise; the 4.6 m/s² control keeps 33.6667 s; at 40 km/h the stop is still billed at L1 (coached 16.8167 against 16.8333 at base, one frame earlier).
+- **The reducer around the payout** (30 km/h stabs, the pedal at 200 positions around it): 0 violations on the tree for 9 m/s² stabs, rests and 7.5 m/s² stabs; a 12-frame blip mints mid-accrual on 10 base drives and 0 tree drives. Payouts before the brake stand (e.g. 30.0000 on both sides).
+- **Census, its own** (`census-{base,tree}.jsonl`, on the lane at `e58f388` + the patch): every template × every committed trace in content/traces × L1–L5 through liveChainReplay, 2,434 drives, 0 errors.
+  - 28 drives in 6 mistake demos bill HARSH_BRAKING_NO_CAUSE exactly one grid point earlier: rb-circulate-priority panic-brake, merge-accel-lane stop-at-end, ed-d2-stop-address first-spot-dive, hz-breakdown-pulloff lane-stop, vp-telltale-red panic-lane, rb-ped-exit panic-brake.
+  - Bills gained 0, lost 0. No correct, shadow or witness drive is newly billed.
+  - Floored episodes: 0 on base and 0 on the tree, so no committed demo carries one.
+  - CLEAN_DRIVING changes 0; praise windows holding a floored frame 0; payouts minted mid-accrual 0. 586 tree drives pass through accruing frames, but the hold never moves a payout in the catalogue.
+  - Debriefs are byte-identical apart from those 28 bill times. This equals the builder's committed-trace instrument exactly.
+- **Mutants, its own.** Six, one at a time against the lane's four test files (140 tests), each restored and sha-checked (`mutants.txt`). Killed on assertion text, 0 timeouts: V1 (reset on any non-null `flooredAt`, 2 red), V2 (hold only from qualifiedSec 0.2, 1 red), V3 (re-anchor one frame early, 76 red), V6 (bare `>=` inside the shared `heldFor`, 10 red). V4 and V5 survived (conditions 1 and 2).
+- **Regression** on the lane: rules/ 100/100 files, 1,820/1,820; lessons/__tests__ + lesson-ui/__tests__ 172/174 files, 3,209 passed, 165 skipped (touchHintLifetime ENOENT, the lane has no tools/; shellClipAffordances timed out at 60 s and passes 40/40 alone); lessons/scenario/__tests__ 198/198 files, 4,859 passed, 1 skipped, including the grade-grid, staged-pose and staged-world cadence files and live-grade-call; tsc 22 errors, the same set as base (prisma/db stores only).
+- **tools/.** At `e58f388` nothing in tools/ reads `heldFor`, `flooredAt`, `cleanDistanceM`, «Чисто и спокойно каране» or «задръж това ниво». CLEAN_DRIVING appears there only as the 250 m constant in the map generators, and lesson-audit reads the rendered «Похвали» section.
+- **Builder's numbers, not re-measured by a verifier:**
+  - the in-process recorder census through `tools/audit/inprocess-drive.mjs`: 42 drives in 9 demos bill HARSH_BRAKING_NO_CAUSE exactly one grid point earlier, 0 bills gained or lost, 0 points, verdict, CLEAN_DRIVING, debrief or objective changes;
+  - the task-cap generated census: 35 of 16,600 programmes defer one CLEAN_DRIVING by exactly one 0.1 s frame, each on a one-frame speed step that opens a causeless accruing episode; 0 lost, 0 gained;
+  - the sc-sp-harsh-brake sub-floor slams floor one grid point earlier (30 km/h 21.85 → 21.8333, 31 frames; 25 km/h 25.5333 → 25.5167);
+  - its 12 mutants, 12 killed on assertion text, 0 timeouts (A1–A5c on the tie, B1–B5 on the praise).
+
+**What the student sees on a floored drive.** No string was added or changed, but the output moves. Before: the «Чисто и спокойно каране» toast, the result-card praise and «Какво се получи добре: • Чисто и спокойно каране». After: the debrief prints its existing sheet-scoped line «Какво се получи добре: чисто каране без нито едно нарушение по изпитния лист — задръж това ниво.». On the verifier's 63 drives that is the only debrief difference. The headline «…Точно това иска да види изпитващият» prints unchanged at base and tree, on every sc-sp-harsh-brake rung and on the floored tailgater drives.
+
+**The conditions, and how each stands.**
+
+**1. M1: the floored reset after a re-anchor inside ONE pedal application was unpinned at sign-off.**
+- Mutant V4 (`flooredAt === t && flooredSince === activeSince`, so the reset is skipped on floored frames after a re-anchor in the same application) survived all 140 of the lane's tests. The tree itself behaves correctly.
+- The verifier's double slam (`double-{tree,V4}.json`, 34 km/h: 9 m/s² for 25–26 frames, an ease of 2–3 m/s² for 12–25 frames, a second slam): the floored record carries two anchors, and under V4 praise lands 0.13–0.15 s earlier (e.g. 56.0500 → 55.9000), from a 250 m window holding the second anchor's floored frames.
+- Owed at sign-off: a double-slam test inside one pedal application that pins F3 across a re-anchor, red on assertion text under V4.
+- PINNED AT INTEGRATION (the integrator's run, `D:/knijka-lanes/scratch/bl-land/PROGRESS.md` step 3 and `mut-V4.log`; the merge verifier then applied V4 itself and re-killed it on the same assertion text, its finding V3): `rules/__tests__/floored-brake-reanchor-and-overfloor-hold.test.ts`, describe «M1 — every floored frame resets the streak, across a re-anchor inside ONE pedal application (F3)», the double slam from 34 km/h at four start points. Under V4: 4 red on assertion text, e.g. «CLEAN_DRIVING paid at 55.9000, before 250 m from the last floored frame 26.2167 (second anchor 25.6000)», 0 timeouts. engine.ts restored and sha-checked. In the merge verifier's own apply the pin file went 4 failed / 2 passed, 0 timeouts, each failure an AssertionError on the pin's own message (55.9000, and likewise 57.5667, 59.2333 and 60.2333), and engine.ts was restored from a byte copy (sha256 19e192cb…19b7 OK). It found that the test drives `createRuleEngine`/`reduceTick` over 60 Hz tapes and reads the real `s.harshBrake` state, with no stub and no regex, and that it asserts the window never closed and two floored anchors, so it really is one pedal application with a re-anchor.
+
+**2. M2: the payout hold for OVER-floor causeless episodes was unpinned at sign-off.**
+- Mutant V5 (the hold limited to sub-floor episodes, `qualifiedSec > 0 && onsetKmh < harshBrakeMinSpeedKmh`) survived all 140 tests. The tree applies F1 over the floor too, but no lane test pinned it and no committed drive exercises it.
+- The verifier's tape (`double-tree.json`): 50 km/h, 9 m/s² for 40 frames, the pedal at k0 1060–1078. The 18.0000 payout is held, the bill at 18.08–18.38 then resets the streak, and the first CLEAN_DRIVING is at about 37.2 s. Base pays 18.0000. With the pedal from 1081 on, the 18.0000 payout comes before the brake and stands.
+- Owed at sign-off: a test in which a 250 m completing in the 0.4 s before an over-floor bill is not paid, red on assertion text under V5.
+- PINNED AT INTEGRATION (the integrator's run, `bl-land/PROGRESS.md` step 3 and `mut-V5.log`; the merge verifier then applied V5 itself and re-killed it on the same assertion text, its finding V4): the same file, describe «M2 — the payout waits while an OVER-floor causeless episode accrues, and its bill then resets the streak (F1)», over pedal points k0 1055–1090, with a control in which the payout due before the brake is paid to the frame. Under V5: 1 red on assertion text, 19 lines, e.g. «k0 1060: CLEAN_DRIVING paid at 18.0500 inside the accrual before the bill at 18.0833», 0 timeouts. engine.ts restored and sha-checked. In the merge verifier's own apply: 1 failed / 5 passed, 0 timeouts, the AssertionError listing the 19 pedal points k0 1060 to 1078, and engine.ts restored with its sha256 OK. It found that the test asserts exactly one HARSH_BRAKING_NO_CAUSE on every pedal point, no floored frames and `dueInsideAccrual >= 3`, so the case it guards really occurs, and that the control at k0 1200 keeps the pre-brake payout to the frame. The pin file is 6/6 green on the tree.
+
+**3. A3. RECORDED: on constructed tapes the re-anchor tie acquits a band of progressive brakes.**
+- The builder's «no episode is acquitted by the earlier re-anchor» is proved over the committed catalogue only (bills lost 0 in both of its censuses and in the verifier's).
+- The verifier's reducer search (`search2.json`, 18 profiles; `search.json`, 160): from 40 km/h, 4 m/s² for 10 frames, then d2 m/s². For d2 8.45–8.50, base bills on 82 of 120 start points and the tree on 0. At 8.4 both acquit everywhere; at 8.501 and above both bill everywhere (earlier on the tree). In the 160-profile search this was the only band lost, while 3 profiles gained bills on 62 of 120 start points.
+- The mechanism: the window is judged at exactly 0.4 s, where its mean is not over 7, so by S1 it now re-anchors there. The new anchor is at about 30 km/h, under the floor.
+- What follows depends on how long the brake lasts. This reader read it from `search2.json`, where n counts all brake frames (the 10 at 4 m/s² included); the verifier's summary states only the 60-frame case:
+  - with 60 brake frames the tree floors all 120 (base 38), so under row B the praise is withheld;
+  - with 40 brake frames the tree neither bills nor floors on any of the 120 (base billed 82, floored 0). The reducer probe does not record CLEAN_DRIVING. Read from the code, nothing on the tree withholds the praise on those drives (no violation, no floored frame, and the F1 hold lasts only while the episode accrues), but this was not measured.
+- It follows from ruling S1 and doc 88's TP-1 (a mean exactly on the line acquits). On a third of start points base already gave the same acquittal, so the tree turns a verdict that depended on the start point into a uniform one. No committed drive is affected.
+
+**4. B3. INTEGRATOR RULING (2026-10-18): withdraw «задръж това ниво» on a floored drive, in a follow-up lane, not in this landing.**
+- The fallback sentence «…чисто каране без нито едно нарушение по изпитния лист — задръж това ниво.» is scoped and true (the sheet is clean), so it is not a false sentence. But its invitation now asks a student to repeat a floored phantom slam, including on sc-sp-harsh-brake.
+- Precedent: `debrief.ts` has already withdrawn «задръж това ниво» three times when the product flagged the drive (a teach moment, a near miss, an unfinished route).
+- OWED, lane «flooredinvite»: it needs a floored record on LessonResult, the debrief and the wire, which this lane did not build.
+- **Founder question 10 stays open:** should a floored stop be named to the student, and should the L3/L4 headline «Точно това иска да види изпитващият» print over it? Until he answers, brakeledger only withholds the praise.
+
+**What this landing supersedes in doc 88** (line numbers at `e11629b`).
+- :11263 «It keeps a bare >= at that tie for now.» The student's ledger now uses `heldFor` at the tie.
+- :11305, the owed item «The engine's tie rule (TP-1)»: discharged in process by this landing.
+- :12583–12587, «C3. The engine tie — outside the lane, NOT fixed here … compares the student's own sustain with a bare `>=`», including «All 14 are «ИЗДЪРЖАН» with the unscoped praise on the tree.» The 14 random stops were not re-driven by name in this lane.
+- :12593, «The praise on these unbilled forms … in triage as «flooredpraise»», and the triage line at :12616: «flooredpraise» is now built for floored episodes (F1–F3).
+- The F2 lines that say «ИЗДЪРЖАН» with the unscoped praise: these change wherever those drives floor (the builder). Whether each F2 class floors was not re-measured by this lane.
+
+**PROVEN ON e11629b** (the integrator's run in the worktree `D:/knijka-lanes/integ-bl`, log `D:/knijka-lanes/scratch/bl-land/PROGRESS.md` and its `g-*.log`; vitest with one worker, one directory at a time; other lanes' vitest runs shared the box. The merge verifier re-ran rules/ and lessons/scenario/__tests__ itself, one at a time with --maxWorkers=1, and the tools tests, with the integrator's counts exactly (its V6, V7). It confirmed that `gate-bl.patch` equals the staged diff and that `engine.ts` and `harshBrakeEpisode.ts` are byte-identical to the lane's result (V1, V2), and it re-killed the lane verifier's V6 on the lane's four test files, 10 failed / 130 passed, 0 timeouts (V5). The other directory runs are the integrator's alone):
+- The patch sha256 f8f45c7d… matched; all 10 files applied directly (above).
+- lessons/__tests__ 126/126 files, 2,394 passed, 165 skipped; lessons/scenario/__tests__ 201/201 files, 4,960 passed, 1 skipped; components/sim 97/97 files, 1,684 passed (this includes lesson-ui, touchHintLifetime and shellClipAffordances); orchestrator 41/41, 528; rules 101/101, 1,826 (the lane's 100/1,820 plus the pin file's 6); traffic 53/53, 675; runtime 48/48, 875; scene 47/47, 787; vehicle 22/22, 299; world 135/135, 2,409; hud 69/69, 1,388; traces 170/170, 2,372.
+- tsc: 21 errors, the prisma/db environment set, none in a touched file.
+- Reviewed-text manifest 49/49 with no re-record.
+- tools-tests (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4 runs it): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo, in the integrator's run and, to the test, in the merge verifier's own run (V7). The 8 are the standing deck-captions freeze («the corpus has not changed since it was measured») and 7 environmental reds: build-redrive §9(a)(b)(d)(e), count-agreement and finding-reader, because .audit-frames/findings is absent from the worktree, and lane-evidence, because playwright cannot be resolved from its tools/. The worktree cannot judge the tools gate: the main-tree gate decides, and the landing is committed only if the freeze is the sole failure there (merge verifier V7). The 4 failing files re-run against a findings snapshot with KNIJKA_PLAYWRIGHT_ROOT gave 98/100. Two stay red: count-agreement («counters disagree about the open list») and finding-reader («every retirement carries a frame that RESOLVES»). Both read the full .audit-frames ledger; no tools file reads a landed file.
+- NOT re-run on HEAD: the lane's census (the verifier's 2,434-drive liveChainReplay census and the builder's recorder and task-cap censuses).
+
+**Owed.**
+- **The rig re-drive**, through `/dev/drive-rig` on PC and on the phone lens:
+  - an exact-tie causeless stab on sc-follow-tailgater (one of the rw tapes' geometries), which must be billed on the лепка's report frame with no praise;
+  - a floored phantom slam on sc-sp-harsh-brake (25–33 km/h), which must show no «Чисто и спокойно каране» toast or result-card praise;
+  - the rig-w3b TTF323 cell, whose bill the lane now expects 1/60 s earlier than the `59be0de` sheet.
+  Whether those frames close a31d9216 or e47a45c1 is for that wave's judge and verifier.
+- **The lane's census re-run on `e11629b`** (base `e11629b` against the landed tree), as the landing's facts require.
+- **Lane «flooredinvite»** (condition 4, ruling B3).
+- **The founder is told** rulings S1, S2, F1–F3 and B3, condition 3 (the acquitted band, including the 40-frame drives, which by the code but not by measurement keep their praise), and that question 10 stays his.
+- **The tools/ tests on the main tree** (merge verifier V7): the main-tree gate decides the worktree's 8 reds, and the landing is committed only if the deck-captions freeze is the sole failure. In the worktree the two ledger-reading reds (count-agreement, finding-reader) stayed red even against the findings snapshot; only the main tree with its .audit-frames ledger can judge them.
+- **Not measured:** whether the product's pedals produce an exact 24-grid-point hold or the progressive brake of condition 3.

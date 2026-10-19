@@ -84,14 +84,16 @@ const ROWS: Array<[string, Array<[number, number]>]> = [
 for (const n of [12, 18, 20, 22, 23, 24, 25, 26, 30, 45, 60]) ROWS.push([`guard 8 m/s² for ${n} frames`, [[8, n / 60]]]);
 
 /**
- * How far apart the two convictions may land: the next frame — except on the
- * one row whose window RE-ANCHORS (a long gentle brake before the emergency):
- * there the window is re-opened every 0.4 s through the gentle half, and the
- * engine's bare `>=` on a sum of frames re-opens it on the 24th frame or the
- * 25th as the sum rounds, where the step's tie rule always takes the 24th — so
- * the same conviction can land a few frames apart. Both convict.
+ * How far apart the two convictions may land: the next frame, on EVERY row.
+ * Until 2026-10-18 the one row whose window RE-ANCHORS (a long gentle brake
+ * before the emergency) was allowed 0.15 s: the engine's bare `>=` on a sum of
+ * frames re-opened the window on the 24th frame or the 25th as the sum
+ * rounded, where the step's tie rule always took the 24th. The engine now
+ * calls the step's own `heldFor` (`sc-follow-tailgater:a31d9216`), so both
+ * re-anchor on the same frame and that row is held to the same frame as the
+ * rest.
  */
-const slack = (name: string, hz: number): number => (/after 2 s of gentle/.test(name) ? 0.15 : 1 / hz + 1e-9);
+const slack = (_name: string, hz: number): number => 1 / hz + 1e-9;
 
 describe("the step's verdict IS the engine's, on every row, at 60 Hz", () => {
   for (const [name, segs] of ROWS) {
@@ -105,9 +107,12 @@ describe("the step's verdict IS the engine's, on every row, at 60 Hz", () => {
   }
 });
 
-describe("…and at the frame rates the A12 battery measured (30 / 120 Hz) on the rows away from the tie", () => {
+// The guard rows of 22–26 frames used to be left out here: they straddle the
+// sustain, and the engine's bare `>=` and the step's tie rule could part on
+// them. With one tie rule for both ledgers (2026-10-18) they are back in.
+describe("…and at the frame rates the A12 battery measured (30 / 120 Hz), the tie rows included", () => {
   for (const hz of [30, 120]) {
-    for (const [name, segs] of ROWS.filter(([n]) => !/guard 8 m\/s² for 2[2-6] frames/.test(n))) {
+    for (const [name, segs] of ROWS) {
       it(`${hz} Hz — ${name}`, () => {
         const tr = trace(hz, /100 км/.test(name) ? 100 : 60, segs);
         const eng = engineFires(tr);

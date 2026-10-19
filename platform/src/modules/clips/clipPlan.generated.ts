@@ -802,7 +802,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vp-police-stop",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-vp-police-stop/mistake-panic-stop.trace.json",
-    "faultTimeSec": 16.75,
+    "faultTimeSec": 16.73,
     "requiredActors": [
       {
         "kind": "police",

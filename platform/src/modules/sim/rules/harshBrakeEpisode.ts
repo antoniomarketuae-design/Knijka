@@ -71,13 +71,23 @@ export const HARSH_BRAKE_TIE_TOLERANCE = 1e-9;
  * truck (round 3): its guard brakes at 8 m/s², so a brake of 24 whole 60 Hz
  * frames spans exactly 24/60 = 0.4 s, and summed frame by frame that reads
  * 0.39999999999999997 on one tape and 0.4000000000000001 on the next — the
- * same brake harsh or not by a rounding mode. The engine's own ledger compares
- * a student's brake with a bare `>=` (its sums there are of irregular frames,
- * and A12's battery never sits on the tie); for another vehicle's account the
- * tie is the common case, so the same relative tolerance the mean uses is
- * applied here in the direction `>=` already says.
+ * same brake harsh or not by a rounding mode. The same relative tolerance the
+ * mean uses is applied in the direction `>=` already says.
+ *
+ * ONE TIE RULE FOR BOTH LEDGERS (2026-10-18, `sc-follow-tailgater:a31d9216`;
+ * doc 88 TP-1). This used to be private, and the engine's own causeless ledger
+ * (`engine.ts`) compared a STUDENT's brake with a bare `>=`, on the belief that
+ * its sums were of irregular frames and never sat on the tie. Since ADR-014
+ * every tick is a whole 1/60 s grid point, so the student's sums are as
+ * regular as the truck's: 24 grid points sum to 0.39999999999999858 or
+ * 0.4000000000000004 by absolute time alone, and a causeless 9 m/s² stab held
+ * exactly 24 points billed on 883 of 2,400 start points — while the лепка's
+ * report of the SAME brake (this step, with the tolerance) said harsh and the
+ * student's own sum said not. Exported so the engine's three „held for the
+ * sustain" tests (the mean's window, the re-anchor, the bill) call THIS
+ * predicate: a second copy of a tie rule is how the two ledgers diverged.
  */
-function heldFor(sec: number, sustainSec: number): boolean {
+export function heldFor(sec: number, sustainSec: number): boolean {
   return sec >= sustainSec * (1 - HARSH_BRAKE_TIE_TOLERANCE);
 }
 

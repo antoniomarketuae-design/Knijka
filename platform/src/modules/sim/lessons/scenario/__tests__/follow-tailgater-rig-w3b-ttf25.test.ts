@@ -238,7 +238,12 @@ describe("sc-follow-tailgater · the rig-w3b drives replayed in process: the л�
         expect(d.reportsAt.length, cell).toBe(r.tailgater.followerReports.length);
         d.reportsAt.forEach((t, i) => expect(t, cell).toBeCloseTo(r.tailgater.followerReports[i].t, 6));
         expect(d.harsh.length, cell).toBe(r.rigHarsh.length);
-        d.harsh.forEach((h, i) => expect(Math.abs(h.t - r.rigHarsh[i].t), cell).toBeLessThan(0.001 + 1e-9));
+        // ONE GRID POINT EARLIER on TTF323 (brakeledger, 2026-10-18, `sc-follow-tailgater:a31d9216`): the rig drove it
+        // at 59be0de, where the student's ledger asked «held for the sustain?» with a bare `>=`, and its accrual of
+        // exactly 24 grid points summed under 0.4 there; with the step's tie rule (`heldFor`) the same brake is held
+        // on that 24th point and the bill lands 1/60 s sooner. Same bill, same verdict.
+        const tieShift = cell === "pc-L3-TTF323" ? 1 / 60 : 0;
+        d.harsh.forEach((h, i) => expect(Math.abs(h.t - (r.rigHarsh[i].t - tieShift)), cell).toBeLessThan(0.001 + 1e-9));
         expect(d.out.result.passed, cell).toBe(r.rigVerdict === "ИЗДЪРЖАН");
       }
       expect(TTF323.harsh.map((h) => h.charged)).toEqual([false]);

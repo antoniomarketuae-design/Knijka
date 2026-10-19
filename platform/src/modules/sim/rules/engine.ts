@@ -84,7 +84,7 @@ import {
   WRONG_WAY_ROAD_MOTORWAY,
 } from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
-import { BRAKING_LINE_MPS2, HARSH_BRAKE_TIE_TOLERANCE, isHarshBrakeWindow } from "./harshBrakeEpisode";
+import { BRAKING_LINE_MPS2, HARSH_BRAKE_TIE_TOLERANCE, heldFor, isHarshBrakeWindow } from "./harshBrakeEpisode";
 import {
   type ActAmendment,
   DEFAULT_RULE_CONFIG,
@@ -8259,12 +8259,26 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     // relative and 1e-9 — twelve orders of magnitude over the ~1e-15 relative
     // drift of these sums and eleven under any deceleration a car produces, so
     // it can only ever decide the exact tie.
+    //
+    // „HELD FOR THE SUSTAIN" IS THE OTHER EXACT TIE, AND IT IS DECIDED THE
+    // OTHER WAY — FOR „HELD", the direction `>=` already says (2026-10-18,
+    // `sc-follow-tailgater:a31d9216`; doc 88 TP-1). All three of this ledger's
+    // sustain tests (the mean's window here, the re-anchor below, the bill)
+    // call `heldFor` — the one predicate the vehicle step uses. They were bare
+    // `>=`, and on the ADR-014 grid 24 points sum to 0.39999999999999858 or
+    // 0.4000000000000004 by absolute time alone: a causeless 9 m/s² stab from
+    // 60 км/ч held exactly 24 points billed on 883 of 2,400 start points (410
+    // at 7.5 m/s²), and at the лепка's brake check the follower's report of a
+    // brake (`isHarshBrakeWindow`, with the tolerance) said harsh while the
+    // student's own sum of the same 24 points said not — no floored record, no
+    // bill, «Чисто и спокойно каране». A hold of exactly the sustain is held.
+    const windowHeld = heldFor(heldSec, cfg.harshBrakeSustainSec);
     const meanIsEmergencyGrade =
       openWindow !== null &&
-      heldSec >= cfg.harshBrakeSustainSec &&
+      windowHeld &&
       (s.harshBrake.onsetKmh - speed) / 3.6 >
         cfg.harshBrakeDecelMps2 * heldSec * (1 + HARSH_BRAKE_TIE_TOLERANCE);
-    if (openWindow === null || (heldSec >= cfg.harshBrakeSustainSec && !meanIsEmergencyGrade)) {
+    if (openWindow === null || (windowHeld && !meanIsEmergencyGrade)) {
       // Open, or re-anchor. `onsetKmh` is the ANCHOR FRAME's own speed and not
       // `prevSpeedKmh`: both ends of the mean have to be samples this reducer
       // actually holds, or the span is a guess. The first draft paired
@@ -8324,7 +8338,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
           : Math.max(0, Math.min(t - s.harshBrake.lastQualAt, Math.min(dt, 2)));
       s.harshBrake.lastQualAt = t;
     }
-    if (!s.harshBrake.emitted && s.harshBrake.qualifiedSec >= cfg.harshBrakeSustainSec && meanIsEmergencyGrade) {
+    if (
+      !s.harshBrake.emitted &&
+      heldFor(s.harshBrake.qualifiedSec, cfg.harshBrakeSustainSec) &&
+      meanIsEmergencyGrade
+    ) {
       if (s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh) {
         s.harshBrake.emitted = true;
         events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
@@ -8684,12 +8702,49 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * Every drive with no task stamp — every recorder, replay, exam rung and
    * uncapped lesson — never sets `taskLatchFresh`, and is byte-identical.
    */
-  if (events.some((e) => e.kind === "violation") || taskLatchFresh) {
+  /*
+   * …AND A FLOORED BRAKE VOIDS IT TOO, BILLING NOTHING (2026-10-18,
+   * `sc-follow-tailgater:e47a45c1`; the integrator's F1–F3 under the founder's
+   * 2026-10-08 delegation). A causeless brake that is emergency-grade by every
+   * gate of the ledger above — the cause ledger, the mean and the accrual — and
+   * that `harshBrakeMinSpeedKmh` ALONE acquits is recorded as floored
+   * (`flooredAt = t`, on every frame it holds) and rightly bills nothing. But
+   * the streak never heard of it: GATE 1 reads the episode only through
+   * `emitted`, which a floored brake never sets, and GATE 2 does not list it.
+   * MEASURED through the live rung chain at e58f388: a 30 км/ч full-pedal stab
+   * to rest on sc-follow-tailgater L4 with no follower — floored 16.05–17.1 s,
+   * then «Чисто и спокойно каране» at 30.53 s from a window holding it, the
+   * «Браво» toast, «Похвали ✓» and the debrief's «Какво се получи добре»; with
+   * the лепка (the brake before its pass line) 14 of 14 drives at L3/L4 the
+   * same. The 35 км/ч floor answers „is it billed", not „is it clean driving".
+   *  · THE FLOORED FRAME RESETS THE STREAK as a bill does (`taskLatchFresh`'s
+   *    precedent: WITHHOLD, never scope — a rider „the praise is for the clean
+   *    metres" would be false about a window holding the act). Nothing is
+   *    billed, scored or shown; only the praise that window would have minted.
+   *  · AND THE PAYOUT WAITS WHILE A CAUSELESS EPISODE IS ACCRUING toward the
+   *    sustain (`activeSince` open, `qualifiedSec > 0` — GATE 2's discipline:
+   *    defer, never stop the accrual), or a window could complete in the 0.4 s
+   *    BEFORE the first floored frame and be paid out before the reset. If the
+   *    episode never floors, the held metres pay out on the first moving frame
+   *    on which it no longer accrues (released, or re-anchored by the mean).
+   *    Measured: a 0.2 s 9 m/s² blip whose 250 m fell inside it paid 7 grid
+   *    points late; on the task-cap generated census a one-frame speed step
+   *    (a reading past the line) deferred 35 of 16,600 programmes' payouts by
+   *    exactly one 0.1 s frame, none lost. Causeless braking whose readings
+   *    stay under the 7 m/s² line never accrues and holds nothing; braking
+   *    with its cause seen holds nothing.
+   * Windows paid out before the brake, and windows after its last floored
+   * frame, stand. A brake billed over the floor, or by the floor-lift above,
+   * already resets through its violation.
+   */
+  const flooredFresh = s.harshBrake.flooredAt === t;
+  const causelessBrakeAccruing = s.harshBrake.activeSince !== null && s.harshBrake.qualifiedSec > 0;
+  if (events.some((e) => e.kind === "violation") || taskLatchFresh || flooredFresh) {
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
   } else if (!billedAndUncorrected && !s.terminated && moving && s.prevT !== null) {
     // Clamp dt so a pause/resume time jump can't fabricate a huge distance.
     s.cleanDistanceM += (speed / 3.6) * Math.min(t - s.prevT, 2);
-    if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM && !breachAwaitingSustain) {
+    if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM && !breachAwaitingSustain && !causelessBrakeAccruing) {
       s.cleanDistanceM -= cfg.cleanDrivingDistanceM;
       events.push(makeCommendation("CLEAN_DRIVING", t));
     }

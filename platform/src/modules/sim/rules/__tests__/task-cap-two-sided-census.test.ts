@@ -46,6 +46,8 @@ function census(tag: string, n: number, gen: (i: number) => SimTick[]): { mismat
   const cov = emptyCoverage14();
   const mismatches: Mismatch[] = [];
   for (let i = 1; i <= n; i++) mismatches.push(...checkExact(`${tag}${i}`, gen(i), cov));
+  // brakeledger: the reference restates the causeless-brake hold only for the causes a programme can carry — none other may appear.
+  expect(cov.unrestatedCauseFrames, `${tag}: frames carrying an unrestated brake cause`).toBe(0);
   // The coverage of the family, written where a census run asks for it (evidence for a report; never read back).
   if (process.env.TASK_CAP_CENSUS_OUT) appendFileSync(process.env.TASK_CAP_CENSUS_OUT, JSON.stringify({ census: "two-sided", family: tag, mismatches: mismatches.length, cov }) + "\n");
   return { mismatches, cov };
@@ -70,6 +72,9 @@ describe("ROUND 14 — every generated programme's rule events, frame by frame, 
     expect(said(mismatches)).toEqual([]);
     expect(cov.frames).toBeGreaterThan(1_900_000);
     expect(cov.pairFrames).toBe(0);
+    // brakeledger (2026-10-18): a one-frame speed step of this family reads past the harsh line and opens a causeless
+    // episode, so a payout due on it waits a frame — the reference's restated hold must actually be exercised.
+    expect(cov.causelessHeldPayouts).toBeGreaterThan(5);
     floors(cov, [
       ...BOTH_LEDGERS,
       ["speedingBills", 3500],

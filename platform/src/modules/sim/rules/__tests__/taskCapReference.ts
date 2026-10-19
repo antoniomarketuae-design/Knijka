@@ -269,6 +269,12 @@ export interface Coverage14 {
   reverseBlowsWaited: number;
   // ── PRAISE AND ENDINGS ──
   praises: number;
+  /** Payouts due on a frame where a causeless brake was accruing toward the sustain (brakeledger: they wait). */
+  causelessHeldPayouts: number;
+  /** Bill-free frames whose streak a FLOORED causeless brake reset (brakeledger). */
+  flooredResets: number;
+  /** Frames carrying a brake-cause field the causeless-brake restatement does not read (must be 0 on the generated census). */
+  unrestatedCauseFrames: number;
   /** Moving bill-free frames on which ONLY the sign-bound act held the streak (round 8's hold). */
   actHeldPraiseFrames: number;
   speedingEndings: number;
@@ -322,6 +328,9 @@ export const emptyCoverage14 = (): Coverage14 => ({
   reverseBlowsSignBound: 0,
   reverseBlowsWaited: 0,
   praises: 0,
+  causelessHeldPayouts: 0,
+  flooredResets: 0,
+  unrestatedCauseFrames: 0,
   actHeldPraiseFrames: 0,
   speedingEndings: 0,
   pendingEndings: 0,
@@ -385,6 +394,31 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
   /** PRAISE: the clean-driving streak (metres since the last violation) and the previous frame's clock. */
   let clean = 0;
   let prevT: number | null = null;
+  /**
+   * THE CAUSELESS BRAKE, AS FAR AS PRAISE READS IT (brakeledger, 2026-10-18 — `sc-follow-tailgater:e47a45c1`, the
+   * integrator's F1/F3). The base rule now withholds CLEAN_DRIVING in two ways a causeless emergency-grade brake can ask
+   * for: a frame on which an episode is recorded FLOORED (emergency-grade by every gate, acquitted only by the
+   * `harshBrakeMinSpeedKmh` floor) resets the streak as a bill does, and a payout WAITS while an episode is accruing
+   * toward the sustain. Restated here from the ledger's definitions, in this file's own shape: the reading is the
+   * speed's change over `accelWindowSec` (M-18: anchored on the newest sample at or before the window's start); an
+   * episode opens on a causeless frame at or past BRAKING_LINE (2 m/s²), accrues on frames at or past
+   * `harshBrakeDecelMps2` (the first worth its reading's span, every later one its own frame and never the gap), and
+   * re-anchors when, held the sustain (an exact tie held), its mean is not over the line (exclusive, 1e-9 relative);
+   * a frame under the braking line releases it, a braking frame with a cause closes it and the cause sticks until the
+   * release. THE CAUSES these programmes can carry: a reverse gear, the lane offset past `laneKeepMaxOffsetM`, wrong
+   * way. Every other cause the ledger knows (a lead, a signal, a crossing, a stop line, a junction, a hazard) needs a
+   * tick field no programme writes — a frame that carries one is read as a cause and counted (`unrestatedCauseFrames`).
+   */
+  const cbWindow: Array<{ t: number; v: number }> = [];
+  let cbPrevT: number | null = null;
+  let cbOpen: number | null = null;
+  let cbOnset = 0;
+  let cbQ = 0;
+  let cbLastQ: number | null = null;
+  let cbCauseSeen = false;
+  const BRAKING_LINE = 2;
+  const TIE = 1e-9;
+  const cbHeld = (sec: number) => sec >= C.harshBrakeSustainSec * (1 - TIE);
   /** Coverage only: when the last cap bill / weather or bend bill / speeding bill fell. */
   let lastCap = -Infinity;
   let lastKin = -Infinity;
@@ -630,6 +664,54 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
       if (cov !== undefined) cov.offCarriagewayBills++;
     }
 
+    // ── THE CAUSELESS BRAKE (see its declaration): this frame's reading, the episode, the floored frame, the hold ──
+    // A frame carrying a cause field this file does not restate (a lead, a stop line, a junction, any tick event) is
+    // read as a CAUSE — and COUNTED: the generated census requires the count to be 0 on every family, so its praise
+    // stays exact; the lesson census, which feeds real lesson frames, compares violations only and never reads praise.
+    const cbUnrestated = x.leadGapM != null || x.nextStopLineM !== undefined || x.nextJunctionM !== undefined || (x.events ?? []).length > 0;
+    if (cbUnrestated && cov !== undefined) cov.unrestatedCauseFrames++;
+    const cbDt = cbPrevT === null ? 0 : t - cbPrevT;
+    cbPrevT = t;
+    while (cbWindow.length >= 2 && cbWindow[1]!.t <= t - C.accelWindowSec) cbWindow.shift();
+    const cbAnchor = cbWindow.length > 0 ? cbWindow[0]! : null;
+    cbWindow.push({ t, v });
+    const cbA = cbAnchor !== null && cbDt > 0 && t > cbAnchor.t ? (v - cbAnchor.v) / 3.6 / (t - cbAnchor.t) : 0;
+    const cbCauseFree = !cbUnrestated && x.gear >= 0 && Math.abs(x.laneOffsetM) <= C.laneKeepMaxOffsetM && x.wrongWay !== true;
+    if (cbA <= -BRAKING_LINE && !cbCauseFree) cbCauseSeen = true;
+    let flooredHere = false;
+    if (cbA <= -BRAKING_LINE && cbCauseFree && !cbCauseSeen) {
+      const held = cbOpen === null ? 0 : t - cbOpen;
+      const meanOver = cbOpen !== null && cbHeld(held) && (cbOnset - v) / 3.6 > C.harshBrakeDecelMps2 * held * (1 + TIE);
+      if (cbOpen === null || (cbHeld(held) && !meanOver)) {
+        cbOpen = t;
+        cbOnset = v;
+        cbQ = 0;
+        cbLastQ = null;
+      }
+      if (cbDt > 0 && cbA <= -C.harshBrakeDecelMps2) {
+        cbQ +=
+          cbLastQ === null
+            ? cbAnchor === null
+              ? 0
+              : Math.max(0, Math.min(t - cbAnchor.t, 2))
+            : Math.max(0, Math.min(t - cbLastQ, Math.min(cbDt, 2)));
+        cbLastQ = t;
+      }
+      // Over the floor this would be HARSH_BRAKING_NO_CAUSE — a bill this reference does not derive (no programme
+      // drives one; the census would show it as a difference). Under it, the frame is FLOORED.
+      if (cbHeld(cbQ) && meanOver && cbOnset < C.harshBrakeMinSpeedKmh) flooredHere = true;
+    } else if (cbA > -BRAKING_LINE) {
+      cbOpen = null;
+      cbQ = 0;
+      cbLastQ = null;
+      cbCauseSeen = false;
+    } else {
+      cbOpen = null;
+      cbQ = 0;
+      cbLastQ = null;
+    }
+    const causelessAccruing = cbOpen !== null && cbQ > 0;
+
     // ── PRAISE — CLEAN_DRIVING, the base rule (A12), and what the cap may WITHHOLD ──
     // Every CLEAN_DRIVING_DISTANCE of moving metres with no violation pays one commendation. A violation of ANY kind on
     // the frame (an absorbed cap bill included — it is an event) or a NEW task latch (round 3, R4: the blow is the
@@ -641,10 +723,15 @@ export function expectedOutcome(frames: readonly SimTick[], cov?: Coverage14, C:
     const gate1 = [spMinor, spDang, wx, task, fogDuty, bend, offRoad].some((e) => e.billedUncorrected) || signAct !== null;
     const gate2 = [spMinor, spDang, wx, task, fogDuty].some((e) => e.since !== null);
     if (cov !== undefined && bills.length === 0 && !fresh && moving && signAct !== null && ![spMinor, spDang, wx, task, fogDuty, bend, offRoad].some((e) => e.billedUncorrected)) cov.actHeldPraiseFrames++;
-    if (bills.length > 0 || fresh) clean = 0;
-    else if (!gate1 && moving && prevT !== null) {
+    // …and the causeless brake (brakeledger): a FLOORED frame resets the streak as a bill does; a payout waits while an
+    // episode is accruing toward the sustain.
+    if (bills.length > 0 || fresh || flooredHere) {
+      clean = 0;
+      if (cov !== undefined && flooredHere && bills.length === 0 && !fresh) cov.flooredResets++;
+    } else if (!gate1 && moving && prevT !== null) {
       clean += (v / 3.6) * Math.min(t - prevT, 2);
-      if (clean >= C.cleanDrivingDistanceM && !gate2) {
+      if (clean >= C.cleanDrivingDistanceM && !gate2 && causelessAccruing && cov !== undefined) cov.causelessHeldPayouts++;
+      if (clean >= C.cleanDrivingDistanceM && !gate2 && !causelessAccruing) {
         clean -= C.cleanDrivingDistanceM;
         bill({ t, code: PRAISE, kind: "praise" });
         if (cov !== undefined) cov.praises++;
