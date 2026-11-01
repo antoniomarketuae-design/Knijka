@@ -7890,7 +7890,9 @@ const paceRollCapMs = (target) =>
 const routeHold = { offRoadTicks: 0, crashPinnedTicks: 0, clearTicks: 0, unread: 0, firstSec: null, lastSec: null, kinds: new Set() };
 
 const ROUTE_HOLD_OFF_ROAD_BG = "Колата е извън пътя — върни се на платното, за да продължиш";
-const ROUTE_HOLD_CRASH_PINNED_BG = "Колата е притисната след удара — измъкни се назад, за да продължиш";
+// Lane endings (rulings E5/E8/E11): the product's crash lead has three variants (назад / напред / я отдръпни)
+// sharing this 53-character stem — LessonPlayShell CRASH_HOLD_LEAD_BG. `revText.includes` matches all three.
+const ROUTE_HOLD_CRASH_PINNED_BG = "След удара — ако колата опира в удареното, първо леко";
 
 /* ── THE PRODUCT'S OWN «STANDING STILL IS THE MANOEUVRE» — TWO SURFACES ─────
  *

@@ -121,6 +121,7 @@
  * replays and asserts what the row is about on what the PRODUCT returned.
  */
 
+import { heldStaticContactBodies } from "../../../scene/scenarioSceneryProps";
 import { createWorldRuntime } from "../../../runtime";
 import { createTrafficSystem } from "../../../traffic/system";
 import {
@@ -355,7 +356,9 @@ export function liveChainReplay(opts: LiveReplayOptions): LiveReplayOutcome {
   const { lesson, districtRaw: raw, trace } = opts;
   const { runtime, traffic, director, ambientFleet } = buildLiveWorld(lesson, raw);
 
-  let session = createLessonSession(lesson);
+  // As the shell creates it (LessonPlayShell, lane endings round 3 E9): the held
+  // stationary scenery's collider boxes, for the crash pin's contact end.
+  let session = createLessonSession(lesson, { staticContactBodies: heldStaticContactBodies(lesson.id) });
   const outcomes: StagedEventOutcome[] = [];
   const ambientContacts: AmbientContact[] = [];
   const teachMomentCodes: string[] = [];

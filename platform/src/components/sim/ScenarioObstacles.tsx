@@ -79,6 +79,7 @@ import type {
   ScenarioWallObstacle,
   ScenarioWorkerObstacle,
 } from "@/modules/sim/scene/obstacleSpec";
+import { PROP_COLLIDER_DIMS, WALL_DEFAULT_THICKNESS_M } from "@/modules/sim/scene/obstacleSpec";
 import type { NpcColliderUserData } from "./NpcColliders";
 
 // Re-exported so a scene caller still has ONE import for "the obstacle layer";
@@ -187,17 +188,12 @@ export function vehicleColliderDims(
 }
 
 /**
- * Prop colliders — sized to what a bumper (chassis box bottom ≈ 0.28 m) can
- * actually reach, NOT the ground-level base plate (tools/blender/
- * scenario_props.py documents the same contract):
- *  - cone: 0.50 m tall, body ≈ Ø12–16 cm at bumper heights → 16 cm square.
- *  - pole: 1.5 m marker (колче), Ø5 cm shaft → 8 cm square (a hair generous
- *    so a brushing pass registers instead of tunnelling past a 5 cm sliver).
+ * Prop colliders — the numbers live in `scene/obstacleSpec.ts`
+ * (`PROP_COLLIDER_DIMS`, with their sizing contract) since lane endings
+ * round 3, because the lesson engine's crash pin reads them too; this is
+ * the same object, re-exported for every importer that reads it here.
  */
-export const PROP_COLLIDERS: Record<ScenarioPropKind, CuboidDims> = {
-  cone: { half: { x: 0.08, y: 0.25, z: 0.08 }, centerY: 0.25 },
-  pole: { half: { x: 0.04, y: 0.75, z: 0.04 }, centerY: 0.75 },
-};
+export const PROP_COLLIDERS: Readonly<Record<ScenarioPropKind, CuboidDims>> = PROP_COLLIDER_DIMS;
 
 /** Authored prop GLBs (tools/blender/scenario_props.py → glb:optimize). */
 export const PROP_URLS: Record<ScenarioPropKind, string> = {
@@ -206,7 +202,6 @@ export const PROP_URLS: Record<ScenarioPropKind, string> = {
 };
 
 const WALL_DEFAULT_HEIGHT_M = 1.2;
-const WALL_DEFAULT_THICKNESS_M = 0.3;
 
 // ---------------------------------------------------------------------------
 // Internals

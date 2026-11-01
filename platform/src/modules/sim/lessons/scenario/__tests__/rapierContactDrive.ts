@@ -66,6 +66,7 @@
  * mounted (the static census: the staged escort rides the other lane and the
  * sentinel grades it).
  */
+import { heldStaticContactBodies } from "../../../scene/scenarioSceneryProps";
 import RAPIER from "../../../../../../node_modules/@react-three/rapier/node_modules/@dimforge/rapier3d-compat";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -795,7 +796,9 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
     }
   };
   const poseAfterStep: ContactDriveOutcome["poseAfterStep"] = [[opts.start.x, opts.start.y, opts.start.headingDeg, 0]];
-  let session = createLessonSession(lesson);
+  // As the shell creates it (LessonPlayShell, lane endings round 3 E9): the held
+  // stationary scenery's collider boxes, for the crash pin's contact end.
+  let session = createLessonSession(lesson, { staticContactBodies: heldStaticContactBodies(lesson.id) });
   const live = () => session.phase !== "completed" && session.phase !== "aborted";
   const collisionMinKmh = lesson.collisionMinKmh ?? Rig.COLLISION_MIN_KMH;
   const judged: JudgedContact[] = [];

@@ -141,6 +141,7 @@ import {
   parseScenarioLessonId,
   resolveScenarioNextSteps,
   routeHoldForSession,
+  routeHoldWayOutForSession,
   scenarioById,
   scoreRubric,
   serializeCoachedMistakes,
@@ -151,6 +152,7 @@ import {
   teachChipBg,
   teachStakeBg,
   type AdvisorPrompt,
+  type CrashPinWayOut,
   type FinishLessonWire,
   type LessonResult,
   type LessonSessionState,
@@ -188,6 +190,7 @@ import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/ca
 // `advisorCapEchoesStrip`. Same function `hud/StatusDashboard.GovernorCapMark`
 // calls, so the card cannot disagree with the bar about which number binds.
 import { readSpeedContract } from "@/modules/sim/scene/lessonSpeedContract";
+import { heldStaticContactBodies } from "@/modules/sim/scene/scenarioSceneryProps";
 
 /** How long the completed pre-drive checklist stays on screen after the
  *  thirteenth step rolls the car away — see the state that uses it. */
@@ -760,6 +763,13 @@ export interface HudSnapshot {
    * `objectiveTitleUnderHold`; nothing grades on it. See `routeHold`.
    */
   objectiveHold: RouteHold | null;
+  /**
+   * Lane endings round 2 (integrator ruling E5): under a crashPinned hold,
+   * which way is away from what the car struck (`routeHoldWayOutForSession`)
+   * — the banner lead names it. Absent reads as "away", the direction-free
+   * lead. Display only; nothing grades on it.
+   */
+  objectiveHoldWayOut?: CrashPinWayOut;
   objectiveIndex: number;
   objectiveTotal: number;
   objectiveProgress: number | null;
@@ -1101,11 +1111,16 @@ export function bannerObjectiveLineBg(
  * The banner's sentence under a hold — the authored objective, with the thing
  * that has to happen first in front of it.
  *
- * THE WORDS ARE THE ENGINE'S OWN. «притисната» is the noun `engine.ts` uses in
- * the ending this state runs into («След удара колата остана притисната на
- * място»), and «извън пътя» is `offNetworkEndingCopy`'s. The qualification and
- * the ending it precedes therefore describe one situation in one vocabulary,
- * instead of the student meeting two different accounts of the same wall.
+ * THE WORDS ARE THE ENGINE'S OWN. «извън пътя» is `offNetworkEndingCopy`'s, so
+ * the qualification and the ending it precedes describe one situation in one
+ * vocabulary. The crash lead is CONDITIONAL (lane endings, 2026-10-18;
+ * integrator ruling E3): the hold is raised by pose and time, never by contact,
+ * so it may not say the car is pressed («притисната») — measured at 219ac1e it
+ * was raised over a car 2.24–2.51 m clear of the block with the block behind
+ * it. It says what to do IF the car touches what it hit, and asserts neither
+ * case, like the advisor card under it and the pin's own ending
+ * (`finish.ts crashPinEndingCopy`). No longer than the lead it replaced (66
+ * characters), so the folded banner's line budget is unchanged.
  *
  * No `lawRef` and no article number: neither clause is a claim about Bulgarian
  * law (ADR-002), it is a statement about where this car physically is.
@@ -1113,14 +1128,33 @@ export function bannerObjectiveLineBg(
 export function objectiveTitleUnderHold(
   titleBg: string | null,
   hold: RouteHold | null,
+  wayOut: CrashPinWayOut = "away",
 ): string | null {
   if (titleBg === null || hold === null) return titleBg;
   const leadBg =
     hold === "crashPinned"
-      ? "Колата е притисната след удара — измъкни се назад, за да продължиш"
+      ? CRASH_HOLD_LEAD_BG[wayOut]
       : "Колата е извън пътя — върни се на платното, за да продължиш";
   return `${leadBg}: ${titleBg}`;
 }
+
+/**
+ * THE CRASH LEAD NAMES THE WAY AWAY FROM WHAT IT HIT (round 2, integrator
+ * ruling E5 — the round-1 verifier reversed into sc-pk-driveway's wall and the
+ * lead said «назад», into the wall). Keyed like the advisor card under it
+ * (`advisor.ts CRASH_HOLD_CARD_BG`, `finish.ts crashPinWayOut`): «назад»
+ * after a forward strike of a stationary body, «напред» after a reversing one,
+ * «я отдръпни» (direction-free) for a road user or a travel the pin could not
+ * read. All three share the 53-character stem «След удара — ако колата опира в
+ * удареното, първо леко» (one constant serves a reader of the glass for all
+ * three) and are 59 / 60 / 64 characters — none longer than the 66-character
+ * lead before them, so the W6/W7 folded-banner line budget is unchanged.
+ */
+const CRASH_HOLD_LEAD_BG: Record<CrashPinWayOut, string> = {
+  back: "След удара — ако колата опира в удареното, първо леко назад",
+  forward: "След удара — ако колата опира в удареното, първо леко напред",
+  away: "След удара — ако колата опира в удареното, първо леко я отдръпни",
+};
 
 /**
  * WHEN THE BANNER TAKES ITS ONE-LINE FORM — sc-roundabout-entry:fe081cf1
@@ -1593,6 +1627,7 @@ export function snapshotOf(
     // silently break the match and put the unqualified demand back on the glass
     // on a second card, one row under its own qualification.
     objectiveHold: routeHoldForSession(s),
+    objectiveHoldWayOut: routeHoldWayOutForSession(s),
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
     objectiveProgress:
@@ -2772,7 +2807,7 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
   // (`objective-banner-task-cap.test.ts`, «the phone's task row»).
   const taskLineBg = s.mistakeMode
     ? s.lessonDescriptionBg
-    : objectiveTitleUnderHold(bannerObjectiveLineBg(s.snap), s.snap.objectiveHold);
+    : objectiveTitleUnderHold(bannerObjectiveLineBg(s.snap), s.snap.objectiveHold, s.snap.objectiveHoldWayOut);
 
   // The gate and the fold — one place, and a pure one, so the four conditions
   // can be driven one at a time. It is NOT the gate the roomy `AdvisorCard` is
@@ -4828,7 +4863,12 @@ export function LessonPlayShell({
    */
   const hintInput = useHintInput();
   // Engine state: ref-resident, frame-rate mutations, zero re-renders.
-  const [initialSession] = useState(() => createLessonSession(lesson));
+  // Lane endings round 3 (E9): the held stationary scenery's collider boxes,
+  // so the crash pin can say which END of the car touched a wall or a prop —
+  // the crash hold's way out and the pin ending's corrective. Coaching only.
+  const [initialSession] = useState(() =>
+    createLessonSession(lesson, { staticContactBodies: heldStaticContactBodies(lesson.id) }),
+  );
   const sessionRef = useRef<LessonSessionState>(initialSession);
   const finalizedRef = useRef(false);
   const lastTickRef = useRef<SimTick | null>(null);
@@ -5950,7 +5990,7 @@ export function LessonPlayShell({
   const abortNow = () => finalize(abortSession(sessionRef.current, nowSec()));
 
   const retry = () => {
-    sessionRef.current = createLessonSession(lesson);
+    sessionRef.current = createLessonSession(lesson, { staticContactBodies: heldStaticContactBodies(lesson.id) });
     finalizedRef.current = false;
     lastTickRef.current = null;
     startedAtMsRef.current = Date.now();
@@ -8396,7 +8436,7 @@ export function LessonPlayShell({
               // demand standing over a car that cannot obey it.
               // …and with the task's own binding cap when it is stricter than
               // the sign (founder ruling 2026-09-22, `bannerObjectiveLineBg`).
-              titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold)}
+              titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}
               // …on ONE line while an opened explanation still needs the two
               // the hold's lead added — the reader's last step, and only under
               // a hold (`bannerOneLineWhileReading`). The sentence is whole in

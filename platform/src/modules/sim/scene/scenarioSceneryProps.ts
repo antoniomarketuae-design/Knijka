@@ -41,6 +41,7 @@
 
 import { parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
 import type { ScenarioObstacleSpec, ScenarioPropObstacle } from "./obstacleSpec";
+import { staticContactBodiesOf } from "./obstacleSpec";
 
 // ---------------------------------------------------------------------------
 // Source 1 — district-authored cones (meta.scenario.cones)
@@ -1237,4 +1238,21 @@ export function heldSceneryFor(
   const parsed = parseScenarioLessonId(lessonId);
   const dressing = (parsed && HELD_SCENERY[parsed.templateId]) || [];
   return [...dressing, ...scenarioConesOf(districtRaw)];
+}
+
+/**
+ * THE HELD STATIONARY BODIES OF A LESSON, AS BOXES — lane endings round 3
+ * (integrator ruling E9). What the shell hands `createLessonSession` as
+ * `staticContactBodies`, so the crash pin can say which END of the car
+ * touched a wall or a prop at a COLLISION bill (lessons/finish.ts
+ * `crashPinContactEnd`). Keyed on the lesson id alone, because the session is
+ * created before the district loads: the template's held walls and props
+ * (`HELD_SCENERY`), boxed with the numbers their colliders are mounted with
+ * (`obstacleSpec.ts staticContactBodiesOf`). A district's own cones
+ * (`scenarioConesOf`) are not known yet and are not listed, so a contact
+ * with one reads as an unlisted body and gets the direction-free advice —
+ * never a guessed side. Grades nothing.
+ */
+export function heldStaticContactBodies(lessonId: string): ReturnType<typeof staticContactBodiesOf> {
+  return staticContactBodiesOf(heldSceneryFor(lessonId, null));
 }

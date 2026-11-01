@@ -33,7 +33,13 @@ import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "./objectives";
 // name WHICH site a wait or a conviction belongs to — imported for the same
 // reason the arc above is: the hold and the voice may not disagree about where
 // „this junction" ends.
-import { CRASH_PIN_DRIVING_KMH, YIELD_ROUNDABOUT_APPROACH_M, YIELD_STOP_LINE_REACH_M } from "./finish";
+import {
+  CRASH_PIN_DRIVING_KMH,
+  YIELD_ROUNDABOUT_APPROACH_M,
+  YIELD_STOP_LINE_REACH_M,
+  crashPinWayOut,
+  type CrashPinWayOut,
+} from "./finish";
 import { parseScenarioLessonId } from "./scenario";
 // Deep, not through the `./scenario` barrel: the barrel line belongs in
 // scenario/index.ts, a file this lane does not own. The value import above
@@ -1036,13 +1042,51 @@ function offCarriagewaySustainedNow(s: LessonSessionState): boolean {
  * where the car is and this module cannot read it — the same withdrawal
  * `yieldWaitAdvisorPrompt` and `controllerWaitAdvisorPrompt` already make, and
  * the honesty rule at the top of this file („a prompt may only promise a key
- * that really performs the step"). The pinned card carries „[", the key that
- * really walks the selector toward R — the chip `advisorPromptForObjective`
- * already gives the reverse park.
+ * that really performs the step"). The pinned card carried „[" — the key that
+ * really walks the selector toward R — until lane endings (2026-10-18) made its
+ * reverse conditional; it carries none now (see `routeHoldAdvisorPrompt`).
  */
-const ROUTE_HOLD_CARD_BG: Record<RouteHold, string> = {
-  crashPinned:
-    "Съвсем леко назад с прави колела, после огледай и чак тогава напред — газта напред само притиска колата още по-навътре в удареното.",
+/*
+ * THE PINNED CARD IS CONDITIONAL (lane endings, 2026-10-18; integrator ruling
+ * E3). The hold is raised by pose and time alone (`routeHoldForSession`: the
+ * pin armed for ROUTE_HOLD_S), and nothing it reads says whether the car is
+ * pressed against what it hit. Measured at 219ac1e on the product chassis:
+ * sc-hz-brake-dont-swerve CUT-L/CUT-R raise it with the car 2.24–2.51 m CLEAR
+ * of the block and the block BEHIND it, where «Съвсем леко назад… газта напред
+ * само притиска колата още по-навътре в удареното» ordered a reverse toward
+ * the block; sc-pk-driveway raises it with the car in contact with a wall. So
+ * the card asserts neither case: if the car touches what it hit, ease away
+ * from it first (and why); otherwise look and then move off.
+ *
+ * AWAY FROM THE STRUCK BODY, NOT «BACK» (round 2, integrator ruling E5).
+ * Round 1 always said «назад», and the round-1 verifier reversed the product
+ * chassis (selector R) into sc-pk-driveway's wall — a reverse drill — and the
+ * car rested PRESSED (0.001–0.137 m) with the wall 4.0 m BEHIND its centre:
+ * the card ordered it further into the wall and called the way out the way
+ * in. The PRESSED branch now names the direction away from what it hit, off
+ * the fact the pin recorded at the impact (`finish.ts crashPinWayOut`). Since
+ * round 3 (E9) that fact is WHICH END of the car touched the stationary body
+ * at the bill, not the travel: reversing on a lock swings the FRONT corner
+ * into the wall, and round 2's travel key told that car to go forward, into
+ * it. Front half touched → ease back; rear half touched → ease forward; both,
+ * neither, a road user or no fact → the direction-free advice (move gently
+ * away from it). Since round 4 (E11) a direction is named only while the end
+ * it heads toward is more than SWEEP_RESOLUTION_M clear of every listed body
+ * on the pose the card is shown on (`crashPin.clear`): a car wedged by a
+ * second, unbilled contact with its other end gets the direction-free card.
+ * The FREE branch is the same in all three.
+ */
+const CRASH_HOLD_CARD_BG: Record<CrashPinWayOut, string> = {
+  back: "Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.",
+  forward:
+    "Ако колата опира в удареното, първо съвсем леко напред с прави колела — задният ход само я притиска. Ако не опира, огледай се и тогава потегли.",
+  // No «с прави колела» here: the direction-free branch also serves a contact
+  // the pin cannot place (side-on, a road user), where it is not the way off —
+  // and the card fits the 240 px column (< 150 characters) without it.
+  away: "Ако колата опира в удареното, първо съвсем леко я отдръпни от него — натискът към него само я притиска. Ако не опира, огледай се и тогава потегли.",
+};
+
+const ROUTE_HOLD_CARD_BG: Record<"offRoad", string> = {
   offRoad:
     "Не дърпай волана — отпусни газта, изправи колелата и се върни под малък ъгъл: извън платното сцеплението е друго и спирачният път е по-дълъг.",
 };
@@ -1064,13 +1108,23 @@ const ROUTE_HOLD_CARD_BG: Record<RouteHold, string> = {
  *    not a stronger word: it is the catalogue's own clause for OFF_CARRIAGEWAY
  *    (`rules/catalog.ts`) and the card's, and `advisor-route-hold.test.ts`
  *    pins the card to it;
- *  · pinned, reverse first, because throttle forward only presses the car
- *    further into what it hit — the card's own because-clause.
+ *  · pinned, away from what it hit first IF the car touches it, because
+ *    pushing toward it only presses it in — the card's own because-clause
+ *    (conditional since lane endings, 2026-10-18; the direction named off the
+ *    impact since its round 2, `CRASH_HOLD_PEEK_BG`).
  * The rest — lift off, straighten the wheels, the small angle, look before
  * going forward — stays whole behind «Прочети».
  */
-const ROUTE_HOLD_PEEK_BG: Record<RouteHold, string> = {
-  crashPinned: "Първо назад: напред притиска в удареното.",
+const CRASH_HOLD_PEEK_BG: Record<CrashPinWayOut, string> = {
+  // Conditional like its card (lane endings, E3), and AWAY from what it hit
+  // like its card (round 2, E5): the act is for a car that touches it, and the
+  // because-clause stays with it. Each wraps to two 24-character lines.
+  back: "Ако опира — първо назад: напред я притиска.",
+  forward: "Ако опира — напред: назад я притиска.",
+  away: "Ако опира — отдръпни я: към него я притиска.",
+};
+
+const ROUTE_HOLD_PEEK_BG: Record<"offRoad", string> = {
   offRoad: "Не дърпай волана — тук сцеплението е друго.",
 };
 
@@ -1126,12 +1180,37 @@ export function objectiveWithheldAfterImpact(s: LessonSessionState): boolean {
   return !drivingAgain;
 }
 
+/**
+ * Which way is away from what the car struck, for the crashPinned hold's
+ * card, peek and banner lead (round 2, integrator ruling E5): read off the
+ * impact the pin recorded (`LessonSessionState.crashPin.impact`,
+ * `finish.ts crashPinWayOut`). "away" — the direction-free advice — when no
+ * pin or no impact fact is held. Since round 4 (E11) a named direction also
+ * needs the end it heads toward to be clear of every listed body on the pose
+ * the advice is shown on (`crashPin.clear`, re-measured on every grid point
+ * the pin is armed), so a car wedged by a second, unbilled contact with its
+ * other end is given the direction-free advice.
+ */
+export function routeHoldWayOutForSession(s: LessonSessionState): CrashPinWayOut {
+  return crashPinWayOut(s.crashPin?.impact, s.crashPin?.clear);
+}
+
 /** The card the coach shows instead of an unobeyable objective. */
-export function routeHoldAdvisorPrompt(hold: RouteHold): CoachedAdvisorPrompt {
+export function routeHoldAdvisorPrompt(
+  hold: RouteHold,
+  // Round 2 (E5): which way is away from the struck body. Defaults to the
+  // direction-free advice, true whatever side the body is on.
+  wayOut: CrashPinWayOut = "away",
+): CoachedAdvisorPrompt {
   return {
-    textBg: ROUTE_HOLD_CARD_BG[hold],
-    keys: hold === "crashPinned" ? ["["] : [],
-    peekBg: ROUTE_HOLD_PEEK_BG[hold],
+    textBg: hold === "crashPinned" ? CRASH_HOLD_CARD_BG[wayOut] : ROUTE_HOLD_CARD_BG[hold],
+    // No chip on either card. The pinned card used to carry «[» — the key that
+    // walks the selector toward R — when it ordered a reverse; it now advises a
+    // reverse only IF the car touches what it hit, and a bare key glyph cannot
+    // say „if" (lane endings, integrator ruling E3: the chip stays only if its
+    // own label is conditional and true in both cases).
+    keys: [],
+    peekBg: hold === "crashPinned" ? CRASH_HOLD_PEEK_BG[wayOut] : ROUTE_HOLD_PEEK_BG[hold],
   };
 }
 
@@ -1162,7 +1241,7 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
   // carriageway or pinned in what it just hit is not waiting for anything; the
   // answer to „what am I supposed to be doing" is the recovery.
   const hold = routeHoldForSession(s);
-  if (hold !== null) return routeHoldAdvisorPrompt(hold);
+  if (hold !== null) return routeHoldAdvisorPrompt(hold, routeHoldWayOutForSession(s));
 
   if (s.currentObjectiveIndex >= s.objectives.length) {
     // Nothing left to advise — but a live yield is still worth a card, because

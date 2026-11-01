@@ -442,9 +442,11 @@
  * randomness, same state + same tick ⇒ same output.
  */
 
+import { obbSeparationM, PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M, SWEEP_RESOLUTION_M, type Obb2D } from "../collision";
 import type { SimTick } from "../rules";
 import type {
   FinishGateState,
+  LessonSessionState,
   ObjectiveParams,
   RouteFinishZone,
   YieldReason,
@@ -2141,6 +2143,516 @@ export function routeRunOutArrived(
   // + = beyond the mark, the sign convention of stepReachZone's capsule.
   return ((here.x - mark.x) * ax + (here.y - mark.y) * ay) / m > 0;
 }
+
+// ---------------------------------------------------------------------------
+// THE STALLED RUN-OUT — lane endings, 2026-10-18 (rows sc-crossing-dart:1c7a07d8
+// «rescueladder» and sc-hz-brake-dont-swerve:870904d4; integrator rulings E1/E2).
+//
+// THE SAME TWO JOBS, ON THE OTHER PATH. The run-out above separated „award the
+// task" from „end the drive" for a chain that COMPLETED. A chain that will not
+// complete is ended by gate 1 (`routeFinishZone`), whose ring is the terminal
+// anchor's radius — ladder-widened, floored to one lane — held FINISH_DWELL_S.
+// So that ending kept both of the run-out's defects, and printed «Стигна края
+// на маршрута» over them:
+//   · SHORT — measured at 219ac1e with the route-runout census driver widened
+//     to every located objective (flat 40 km/h, no events): 300 stalled
+//     endings, mean 7.40 m short of the mark at L1 and 3.63 m at L5;
+//     sc-crossing-dart 10.0 / 7.8 / 4.4 / 4.4 / 4.4 m at L1–L5, still rolling;
+//   · INVERTED — 44 of the 52 templates with both rungs end L1 more than 0.5 m
+//     shorter than L5: the forgiving rung got the least road again;
+//   · and the terminal-unearnable arm (`engine.ts terminalUnearnable`, e.g.
+//     sc-hzbds-stop after the block is touched) the same sentence over a car
+//     resting up to 9 m short of the mark.
+//
+// THE RULE AS BUILT. Gate 1 still ARMS the ending, on either arm, exactly where
+// and when it always did (radius, ladder, dwell, cap: untouched). On a route
+// that ends at an arrival mark (`routeEndMark`) its latch now starts THIS
+// run-out instead of ending the drive, and it is bounded exactly like the one
+// above:
+//   ARRIVED — `routeRunOutArrived` (ROUTE_RUNOUT_ARRIVE_M of the mark, or past
+//     it along the route's approach — `routeApproachFrom`). The only exit that
+//     may say «Стигна края на маршрута», and it says it;
+//   AT REST — a full standstill short of the mark (B15's freeze honoured);
+//   SPENT — ROUTE_RUNOUT_MAX_S of run-out (B15's freeze honoured).
+// The last two end on `openTasksEndingCopy`, which claims no arrival. A latch
+// that is already an arrival ends on that frame, on the old sentence, exactly
+// as before. A route with no arrival mark (passSignal, maneuver anchors) ends on
+// the latch frame as before: nothing here touches it.
+//
+// WHY THE CHAIN IS FROZEN WHILE IT RUNS. Base ended the drive on the latch
+// frame, so every objective's status on that frame IS the verdict base gave.
+// Letting the chain run on through the added road would let it earn (a
+// placeless task completing during the run-out, the terminal behind it ticking
+// inside its own ring) or refuse something base never measured — a verdict
+// moved by an ending repair. So the objective loop is not stepped once this
+// run-out is armed (`engine.ts`); rule events still are, because a real act on
+// the added road is a real act.
+// ---------------------------------------------------------------------------
+
+/** The stalled run-out's state — carried on `LessonSessionState.routeFinishRunOut`. */
+export type RouteFinishRunOut = NonNullable<LessonSessionState["routeFinishRunOut"]>;
+
+/** Which of the stalled run-out's three exits ended the drive on this frame. */
+export type RouteFinishRunOutExit = "arrived" | "atRest" | "spent";
+
+/**
+ * WHERE „PAST THE MARK" IS MEASURED FROM on the stalled path: the route's own
+ * approach — the last EARLIER located objective (`targetPoint`) further than
+ * ROUTE_RUNOUT_ARRIVE_M from the mark — and only without one, the car's pose on
+ * the latch frame.
+ *
+ * NOT THE LATCH POSE FIRST, which is what the completed run-out uses, and the
+ * difference is measured rather than argued. The completed run-out is armed on
+ * the frame the terminal is ENTERED, always on the approach side. Gate 1 latches
+ * wherever its dwell completes, and on the terminal-unearnable arm that can be
+ * past the mark: sc-hz-brake-dont-swerve's stop mark (4.06, 184) is 4.8 m short
+ * of the debris block's face, so a car that touches the block latches at
+ * y ≈ 186.8 — and an axis drawn from there points BACKWARDS, so a car that then
+ * rolls 6 m back toward the start would read „past the mark" and be told it
+ * arrived. The route's previous waypoint has no such failure: the route is
+ * authored to approach its last mark from it.
+ */
+export function routeApproachFrom(
+  objectives: readonly ObjectiveParams[],
+  here: Point,
+): Point {
+  const mark = routeEndMark(objectives);
+  if (mark === null) return here;
+  for (let i = objectives.length - 2; i >= 0; i--) {
+    const p = targetPoint(objectives[i]);
+    if (p !== null && dist(p, mark) > ROUTE_RUNOUT_ARRIVE_M) return p;
+  }
+  return here;
+}
+
+/**
+ * Arm the stalled run-out on the frame gate 1 latches. `from` is
+ * `routeApproachFrom` — the side of the mark the route approaches it from.
+ */
+export function armRouteFinishRunOut(
+  mark: { x: number; y: number },
+  from: { x: number; y: number },
+  arm: RouteFinishRunOut["arm"],
+): RouteFinishRunOut {
+  return { markX: mark.x, markY: mark.y, fromX: from.x, fromY: from.y, elapsedSec: 0, arm };
+}
+
+/**
+ * One frame of the stalled run-out — the completed run-out's three exits
+ * (`engine.ts`, „THE RUN-OUT'S THREE EXITS"), in the same order and with the
+ * same freeze: arrival first (a fact about the road, not the clock), then
+ * nothing at all while the lawful wait holds, then the standstill (magnitude —
+ * reverse reads negative), then the ceiling. `prevT` is the session's previous
+ * tick time; the clamp is the completed run-out's own.
+ */
+export function stepRouteFinishRunOut(
+  runOut: RouteFinishRunOut,
+  tick: Pick<SimTick, "t" | "speedKmh" | "position">,
+  prevT: number,
+  lawfulWait: boolean,
+): { runOut: RouteFinishRunOut; exit: RouteFinishRunOutExit | null } {
+  const mark = { x: runOut.markX, y: runOut.markY };
+  const from = { x: runOut.fromX, y: runOut.fromY };
+  if (routeRunOutArrived(mark, from, tick.position)) return { runOut, exit: "arrived" };
+  if (lawfulWait) return { runOut, exit: null };
+  if (Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH) return { runOut, exit: "atRest" };
+  const dt = Math.min(Math.max(tick.t - prevT, 0), 1);
+  const elapsedSec = runOut.elapsedSec + dt;
+  const next = { ...runOut, elapsedSec };
+  return { runOut: next, exit: elapsedSec >= ROUTE_RUNOUT_MAX_S ? "spent" : null };
+}
+
+/**
+ * THE UNEARNABLE TERMINAL'S STANDSTILL BAR, seconds — integrator ruling E2:
+ * FINISH_STUCK_S, the B2 bar this module already holds a motionless car at the
+ * end of a route to, and NOT a new number. A car standing still with a task in
+ * front of it that it can no longer earn (`engine.ts terminalUnearnable`) is in
+ * exactly the state gate 2 was sized for — „not going anywhere on its own" —
+ * except that it stands outside the disc gate 2 watches. Only standstill
+ * accrues (magnitude ≤ FINISH_STANDSTILL_KMH), so a moving car never does and
+ * this is not a duration cap («WHAT THIS MODULE CANNOT END» refuses one).
+ */
+export const UNEARNABLE_STANDSTILL_S = FINISH_STUCK_S;
+
+/**
+ * THE ONE SENTENCE FOR „THE TASK CAN NO LONGER BE EARNED, AND THE DRIVE ENDS
+ * WHERE THE CAR IS" (integrator rulings E1 + E2: one state, one sentence).
+ *
+ * Spoken by the stalled run-out's AT REST and SPENT exits and by the
+ * unearnable terminal's standstill (`UNEARNABLE_STANDSTILL_S`). It must be true
+ * at every pose those three reach — 6 m short of the mark, still rolling around
+ * inside the ring, or standing 10 m past the mark after a swerve — so it claims
+ * no arrival («Стигна») and no stop at the route's end («Спря в края»): the
+ * first is gate 1's arrival sentence, the second is gate 2's. What it says is
+ * true by construction on the frame it is shown: once one of these endings
+ * fires, the open tasks cannot be done in this attempt (the chain is frozen on
+ * the run-out; the terminal was already unearnable), and the debrief lists each
+ * of them and every fault — `buildLessonResult` prints both.
+ *
+ * Titles unchanged — «Край на маршрута» / «Край на изпитния маршрут» — because
+ * `tools/mobile/__tests__/canary-pills.test.mjs` and `tools/mobile/
+ * engprog-look.mjs` detect an ending by /Край на маршрута/. Original copy, no
+ * law claim (ADR-002).
+ */
+export function openTasksEndingCopy(examMode: boolean): {
+  kind: "lesson";
+  titleBg: string;
+  explanationBg: string;
+} {
+  return {
+    kind: "lesson",
+    titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
+    explanationBg: examMode
+      ? "Оставащите задачи вече не могат да бъдат изпълнени в този опит, затова изпитът приключва тук и не е издържан. Разборът показва всяка от тях и всяка допусната грешка."
+      : "Оставащите задачи вече не могат да бъдат изпълнени в този опит, затова урокът приключва тук. Разборът показва всяка от тях и всяка грешка.",
+  };
+}
+
+/**
+ * THE CRASH PIN'S ENDING — lane endings, row sc-pk-driveway:7fa8b79e
+ * («pinfree»), integrator ruling E3: ONE wording true of a PRESSED car and a
+ * FREE car alike.
+ *
+ * The pin (`engine.ts`, CRASH_PIN_STUCK_S) ends a drive on pose and stillness
+ * alone: within CRASH_PIN_RADIUS_M of the impact pose and motionless for the
+ * bar. It reads no contact and no clearance, so it cannot know whether the car
+ * is pressed against what it hit or standing free of it — and both happen:
+ * measured at 219ac1e on the product chassis, sc-hz-brake-dont-swerve CUT-L
+ * rests 2.508 m clear of the block with the block BEHIND it (its drive-on twin
+ * drives 158 m with no further contact), while sc-pk-driveway's walls hold the
+ * car in contact or 0.0–0.49 m off. The sentence it used to print — «колата
+ * остана притисната на място и не може да продължи» — was false of the first.
+ *
+ * So the first sentence says only what the pin measured: the car stopped by the
+ * place it struck and stayed still, and the drive closes there. True of both
+ * cases on every frame it is shown. The title is kept as it was. Original
+ * copy, no law claim (ADR-002).
+ *
+ * THE SECOND SENTENCE IS THE CORRECTIVE OF THE CRASH IT CLOSES (round 2,
+ * integrator ruling E6; verifier condition C1). Round 1 kept base's corrective
+ * for every pin ending — «по-ранно намаляване и достатъчна дистанция до всичко
+ * неподвижно напред» — and it is false of three crashes the pin closes: a
+ * REVERSE into a wall (sc-pk-driveway with the selector in R, the verifier's
+ * rev.json: the wall 4.0 m BEHIND the car's centre), a strike of a PERSON (the
+ * census ends sc-pe-jaywalker and sc-crossing-child-ball on the pin) and a
+ * strike of another VEHICLE, which moves (sc-follow-brake, sc-junction-rhr,
+ * sc-rb-busy-gap …). So the sentence is keyed on the facts the pin records at
+ * the impact (`CrashPinImpact`, `crashPinImpact` below): since round 3 (E10)
+ * the END of the car that touched a stationary body × the car's direction of
+ * travel × the kind of body the bill names (`crashPinCorrective`). Round 2
+ * keyed a stationary body on the travel alone and closed a FRONT-swing reverse
+ * strike — the front corner swung into the wall on a turned wheel — on
+ * «…спиране навреме преди всичко зад колата», which named what was not hit.
+ * The front strike of a stationary body while travelling forward keeps base's
+ * sentence VERBATIM (`b5-crash-pin-rescue` reads «дистанц»). Every other case
+ * gets a sentence true of that crash, in the
+ * register of the COLLISION card for the same body (`rules/catalog.ts
+ * COLLISION_CONTACT_COPY`), citing no law. An impact with no fact recorded
+ * (absent: a session that predates it) gets the sentence that names neither
+ * a direction nor a body.
+ *
+ * The EXAM sentence is not keyed: «Разборът показва удара, всяка останала
+ * задача и какво трябваше да се направи преди него» names no corrective, no
+ * direction and no body, so it is already true of every crash the pin closes
+ * (base copy, kept).
+ */
+export function crashPinEndingCopy(
+  examMode: boolean,
+  impact?: CrashPinImpact,
+): {
+  kind: "lesson";
+  titleBg: string;
+  explanationBg: string;
+} {
+  return {
+    kind: "lesson",
+    titleBg: examMode ? "Край на изпита след удара" : "Край на упражнението след удара",
+    explanationBg: examMode
+      ? "След удара колата спря до мястото на удара и остана неподвижна, затова изпитът приключва тук. Разборът показва удара, всяка останала задача и какво трябваше да се направи преди него."
+      : `След удара колата спря до мястото на удара и остана неподвижна, затова урокът приключва тук. Разборът показва как се стига до такъв удар и какво го предотвратява: ${CRASH_PIN_CORRECTIVE_BG[crashPinCorrective(impact)]}`,
+  };
+}
+
+/**
+ * THE FACTS THE PIN RECORDS AT THE IMPACT — round 2 (integrator rulings E5 /
+ * E6) and round 3 (E9 / E10: «the way out is keyed on which END of the car
+ * touched the struck body at the bill»).
+ *
+ * `travel` — WHICH WAY THE CAR WAS TRAVELLING WHEN IT STRUCK. The source is
+ * the signed forward speed at the grid point BEFORE the one the contact is
+ * heard at: `LessonSessionState.lastTick.speedKmh` (written on every applyTick,
+ * `engine.ts` «THE DRIVE'S LAST TESTIMONY»), which on the product is
+ * `VehicleSim.speedKmh` = forwardSpeedMs() × 3.6 (vehicle/VehicleSim.ts, the
+ * `speedKmh` getter) — negative in reverse; committed traces carry the same
+ * sign (every sample with gear −1 and |v| > 1 reads v < 0, 8,745 samples in
+ * 48 traces). That is the velocity the contact step began from: the step's
+ * solve receives it plus that one step's wheel impulses (`VehicleSim
+ * solveStartVel`, the impactspeed landing at 219ac1e). The contact tick's OWN
+ * speed is not used: it is read after the solve that stopped the car and
+ * bounced it back. Above FINISH_STANDSTILL_KMH either way the car was
+ * travelling; at or under it (a car at rest, or no earlier tick) the travel is
+ * `unknown`. No new number, no new channel, nothing on the wire or SimTick.
+ *
+ * `body` — WHAT IT STRUCK: the COLLISION bill's own `detail` (`rules/engine.ts`
+ * stamps the struck body's kind on it, «vehicleCutIn» being a vehicle), or,
+ * on a tick whose bill carries none, the tick's `collision` events; most
+ * vulnerable first when one tick names several (a person over a vehicle over
+ * a stationary body). `null` when neither names one.
+ *
+ * `end` — WHICH END OF THE CAR TOUCHED THE STRUCK BODY (round 3, E9). The
+ * travel does NOT say which side a stationary body is on: the round-2 verifier
+ * reversed the product chassis on a steering lock into sc-pk-driveway's wall
+ * and the FRONT corner swung into it (front half 0.001 m from the wall, rear
+ * half 0.582 m, at the bill) — the classic error of every reverse drill — and
+ * the round-2 card, keyed on the travel, told that car to go forward, into the
+ * wall (`endings-verify/r2/replay-pk26.json`: a new graded contact at step
+ * 653). So the end is measured from the contact geometry itself, on the
+ * COLLISION bill's own tick: the car's box (`collision playerObb`, the box
+ * every gate grades contact with) split at its centre along its heading into
+ * a FRONT half and a REAR half, each tested against the stationary bodies the
+ * world mounted a collider for (`LessonSessionState.staticContactBodies`,
+ * handed in at session creation — see `crashPinContactEnd`). A half within
+ * CRASH_PIN_END_TOUCH_M of one of them touched it. `front` / `rear` when
+ * exactly one half did; `both` (side-on, or wedged between two bodies) and
+ * `neither` (what it struck is not one of the listed bodies: a kerb, a façade,
+ * a cone of the district) settle no side; `unknown` when the session lists no
+ * bodies at all, or the bill names a body that is not stationary (a road user
+ * moves; its own box is not the listed scenery's).
+ */
+export type CrashPinTravel = "forward" | "reverse" | "unknown";
+export type CrashPinBody = "staticObject" | "vehicle" | "pedestrian" | "cyclist";
+export type CrashPinEnd = "front" | "rear" | "both" | "neither" | "unknown";
+export interface CrashPinImpact {
+  travel: CrashPinTravel;
+  body: CrashPinBody | null;
+  /** Round 3 (E9). Absent reads as `unknown` (a session that predates it). */
+  end?: CrashPinEnd;
+}
+
+/**
+ * How close a half of the car's box must be to a stationary body, at the
+ * COLLISION bill's grid point, to count as the half that touched it, m.
+ *
+ * DERIVED, the integrator's bound (E9: «the verifier's 0.05 m, never wider»),
+ * and it is a third of SWEEP_RESOLUTION_M (collision/obb.ts, 0.15 m) — the
+ * band inside which the product calls a body TOUCHED at all (`objectives.ts
+ * namedBodyTouched`, and ROW C's PRESSED). It has to be tighter than that
+ * band, because the other half of a car pressed against a wall corner is
+ * itself often inside 0.15 m of the same wall (a car angled 5° into a wall
+ * along its side): with the touched band the corner strike reads `both` and
+ * the way out is lost. MEASURED on the round-2 verifier's 345-drive
+ * product-chassis sweep (sc-pk-driveway, sc-park-wall, sc-hz-brake-dont-swerve
+ * at L1/L3/L5, selector R and D, constant steer): at the bill the struck wall
+ * is ≤ 0 m from the car on 110 drives, in (0, 0.05] on 34 and in
+ * (0.05, 0.15] on 3 — a real contact sits inside 0.05 m of the half that made
+ * it; and keyed on this band, 0 of the 113 PRESSED cars is advised a move
+ * that lowers its separation to the wall (the travel key: 2 of 113).
+ */
+export const CRASH_PIN_END_TOUCH_M = 0.05;
+
+const CRASH_PIN_BODY_RANK: readonly CrashPinBody[] = ["pedestrian", "cyclist", "vehicle", "staticObject"];
+
+function asCrashPinBody(v: unknown): CrashPinBody | null {
+  if (v === "vehicleCutIn") return "vehicle";
+  return CRASH_PIN_BODY_RANK.includes(v as CrashPinBody) ? (v as CrashPinBody) : null;
+}
+
+/**
+ * WHICH END OF THE CAR TOUCHES ONE OF THE LISTED STATIONARY BODIES at this
+ * pose — see `CrashPinImpact.end`. `bodies` undefined (the session was handed
+ * none) is `unknown`: no fact, never a guess. The halves are the car's own
+ * box (`playerObb`: PLAYER_HALF_LENGTH_M × PLAYER_HALF_WIDTH_M) cut at its
+ * centre, each PLAYER_HALF_LENGTH_M long, centred PLAYER_HALF_LENGTH_M / 2
+ * ahead of and behind the centre along the heading.
+ */
+function carHalves(pose: { x: number; y: number; headingDeg: number }): { front: Obb2D; rear: Obb2D } {
+  const rad = (pose.headingDeg * Math.PI) / 180;
+  const q = PLAYER_HALF_LENGTH_M / 2;
+  const half = (sign: 1 | -1): Obb2D => ({
+    x: pose.x + sign * q * Math.sin(rad),
+    y: pose.y + sign * q * Math.cos(rad),
+    headingDeg: pose.headingDeg,
+    halfLengthM: q,
+    halfWidthM: PLAYER_HALF_WIDTH_M,
+  });
+  return { front: half(1), rear: half(-1) };
+}
+
+export function crashPinContactEnd(
+  pose: { x: number; y: number; headingDeg: number },
+  bodies: readonly Obb2D[] | undefined,
+): CrashPinEnd {
+  if (bodies === undefined) return "unknown";
+  const { front, rear } = carHalves(pose);
+  const touches = (h: Obb2D) => bodies.some((b) => obbSeparationM(h, b) <= CRASH_PIN_END_TOUCH_M);
+  const f = touches(front);
+  const r = touches(rear);
+  return f && r ? "both" : f ? "front" : r ? "rear" : "neither";
+}
+
+/** The pin's impact facts on the tick it (re-)arms — see `CrashPinImpact`. */
+export function crashPinImpact(
+  prevSignedSpeedKmh: number | undefined,
+  billDetails: readonly unknown[],
+  contactBodies: readonly unknown[],
+  contactEnd: (body: CrashPinBody | null) => CrashPinEnd = () => "unknown",
+): CrashPinImpact {
+  const v = prevSignedSpeedKmh;
+  const travel: CrashPinTravel =
+    v === undefined || !Number.isFinite(v) || Math.abs(v) <= FINISH_STANDSTILL_KMH
+      ? "unknown"
+      : v > 0
+        ? "forward"
+        : "reverse";
+  const pick = (vals: readonly unknown[]): CrashPinBody | null => {
+    const named = new Set(vals.map(asCrashPinBody).filter((b): b is CrashPinBody => b !== null));
+    return CRASH_PIN_BODY_RANK.find((b) => named.has(b)) ?? null;
+  };
+  const body = pick(billDetails) ?? pick(contactBodies);
+  // Only a STATIONARY body is measured against the listed scenery: a road user
+  // is not one of those boxes, and the nearest wall to a car that struck a
+  // pedestrian says nothing about the pedestrian.
+  const end: CrashPinEnd = body === "staticObject" ? contactEnd(body) : "unknown";
+  return { travel, body, end };
+}
+
+/**
+ * WHICH WAY IS AWAY FROM THE STRUCK BODY — the crashPinned hold's advice for a
+ * car that touches what it hit (integrator rulings E5, and E9 for the key).
+ *
+ * THE FACT: the struck body touches one END of the car, and moving the car
+ * toward its OTHER end frees it. FRONT half touched → ease BACK (forward only
+ * presses it in); REAR half touched → ease FORWARD (reverse only presses it
+ * in). Both halves, neither, a road user (it moves, and its box is not the
+ * listed scenery's), or no fact at all → the direction-free advice: move
+ * gently away from what it touches. The car's direction of travel is NOT read
+ * here — it was round 2's key, and the round-2 verifier refuted it on a
+ * front-swing reverse strike (`CrashPinImpact.end`).
+ *
+ * AND ONLY WHILE THAT WAY IS FREE (round 4, E11): the direction the end picks
+ * is named only while the end the move heads toward is clear of every listed
+ * body on the pose the advice is shown on (`crashPinClearEnds`); otherwise the
+ * direction-free advice.
+ */
+export type CrashPinWayOut = "back" | "forward" | "away";
+
+/**
+ * IS THE WAY CLEAR — which END of the car is more than CRASH_PIN_WAY_CLEAR_M
+ * clear of EVERY listed stationary body at this pose (round 4, integrator
+ * ruling E11). The advice names a direction only while the end that move
+ * heads toward is clear: «назад» needs the REAR half clear, «напред» the
+ * FRONT half.
+ *
+ * WHY (the round-3 verifier's refutation, `endings-verify/r3/replay-n26.json`,
+ * `replay-n14.json`). The end that touched is measured at the COLLISION bill.
+ * A car that keeps moving after it can touch a SECOND body with its OTHER end
+ * inside the same open contact episode — not billed, so the pin does not
+ * re-arm and the bill's end is never re-measured. sc-pk-driveway L1 (round 2's
+ * decisive drive): the front corner strikes wall #0 on a reverse lock, 64
+ * steps later the rear strikes wall #1 at 3 km/h, and the car rests with its
+ * rear 0.002 m from wall #1 and its front 0.071 m from wall #0. The bill's end
+ * said «назад», and doing it pressed the rear into wall #1; «напред»
+ * re-strikes wall #0. Neither direction is free, and only the direction-free
+ * advice is true of that car. So the bill's end still picks the direction,
+ * and this fact — measured on the pose the advice is SHOWN on, every grid
+ * point while the pin is armed (`engine.ts`, `crashPin.clear`) — may only
+ * withdraw it.
+ *
+ * THE BAND is SWEEP_RESOLUTION_M (collision/obb.ts, 0.15 m), the integrator's
+ * number: the band inside which ROW C calls a car PRESSED, and inside which
+ * the product calls a body touched at all (`objectives.ts namedBodyTouched`).
+ * An end within it of ANY listed body — the bill's or another — has no free
+ * way. Never wider (it would withdraw true advice from cars with room), and
+ * not the 0.05 m end band: that band says which half MADE contact, this one
+ * says whether a half has ROOM. `undefined` when the session holds no bodies
+ * — no fact, and the way out is then direction-free.
+ */
+export const CRASH_PIN_WAY_CLEAR_M = SWEEP_RESOLUTION_M;
+
+export interface CrashPinClear {
+  front: boolean;
+  rear: boolean;
+}
+
+export function crashPinClearEnds(
+  pose: { x: number; y: number; headingDeg: number },
+  bodies: readonly Obb2D[] | undefined,
+): CrashPinClear | undefined {
+  if (bodies === undefined) return undefined;
+  const { front, rear } = carHalves(pose);
+  const clear = (h: Obb2D) => bodies.every((b) => obbSeparationM(h, b) > CRASH_PIN_WAY_CLEAR_M);
+  return { front: clear(front), rear: clear(rear) };
+}
+
+export function crashPinWayOut(impact: CrashPinImpact | undefined, clear?: CrashPinClear): CrashPinWayOut {
+  if (impact === undefined || impact.body !== "staticObject") return "away";
+  // Round 4 (E11): the direction stands only while the end it heads toward is
+  // free of every listed body on the pose the advice is shown on.
+  if (impact.end === "front") return clear?.rear === true ? "back" : "away";
+  if (impact.end === "rear") return clear?.front === true ? "forward" : "away";
+  return "away";
+}
+
+/** Which corrective the pin's lesson ending closes on — see `crashPinEndingCopy`. */
+export type CrashPinCorrective =
+  | "staticAhead"
+  | "reversing"
+  | "frontSwing"
+  | "vulnerable"
+  | "vehicle"
+  | "general";
+
+/**
+ * Keyed on the end that touched × the travel × the struck body's kind (round
+ * 3, E10). A stationary body: FRONT while travelling forward → `staticAhead`
+ * (base's sentence verbatim); REAR while reversing → `reversing`; FRONT while
+ * REVERSING → `frontSwing` (the front corner swung out on a turned wheel —
+ * the cause is the swing, not what is behind); any other combination (both
+ * halves, neither, unknown end, a rear touch while travelling forward, an
+ * unknown travel) → `general`, which names neither a direction nor a body. A
+ * person on foot or a bicycle → `vulnerable`, another vehicle → `vehicle`,
+ * whatever the travel: the end is not measured for a road user, and both
+ * sentences are true in either direction. Nothing recorded → `general`.
+ */
+export function crashPinCorrective(impact: CrashPinImpact | undefined): CrashPinCorrective {
+  if (impact === undefined) return "general";
+  if (impact.body === "pedestrian" || impact.body === "cyclist") return "vulnerable";
+  if (impact.body === "vehicle") return "vehicle";
+  if (impact.body !== "staticObject") return "general";
+  if (impact.end === "front" && impact.travel === "forward") return "staticAhead";
+  if (impact.end === "rear" && impact.travel === "reverse") return "reversing";
+  if (impact.end === "front" && impact.travel === "reverse") return "frontSwing";
+  return "general";
+}
+
+/**
+ * The correctives, each true of the crash it is keyed to:
+ *  · staticAhead — the front struck a stationary body while travelling
+ *    forward: base's sentence, verbatim;
+ *  · reversing — the rear struck a stationary body while reversing: what is
+ *    behind the car is seen only by looking, so slowly, looking back and in
+ *    the mirrors, stopping in time;
+ *  · frontSwing — the FRONT struck a stationary body while REVERSING (round 3,
+ *    E10): on a reverse with the wheel turned the front swings out to the
+ *    side, so the corrective names the swing and the front corner — not what
+ *    is behind, which is not what was hit;
+ *  · vulnerable — a person on foot or on a bicycle: the COLLISION card's own
+ *    «готовност да спреш» register;
+ *  · vehicle — another vehicle, which moves and may have struck him: room
+ *    around the car, chosen in time — true whoever closed the gap;
+ *  · general — no direction and no body settled: names neither.
+ */
+const CRASH_PIN_CORRECTIVE_BG: Record<CrashPinCorrective, string> = {
+  staticAhead: "по-ранно намаляване и достатъчна дистанция до всичко неподвижно напред.",
+  reversing:
+    "на заден ход — съвсем бавно, с поглед назад и в огледалата, и спиране навреме преди всичко зад колата.",
+  frontSwing:
+    "при заден ход със завъртян волан предницата излиза встрани — затова следи и предния ъгъл, а не само това зад колата.",
+  vulnerable: "по-ранно намаляване и готовност да спреш, щом до пътя ти има пешеходец или велосипедист.",
+  vehicle:
+    "достатъчно място около колата — скорост, дистанция и пролука, избрани навреме, преди другата кола да е твърде близо.",
+  general: "по-ранно намаляване и достатъчно място около колата.",
+};
 
 // ---------------------------------------------------------------------------
 // THE LAWFUL WAIT — B15 (founder, „Кръгово движение"): «the roundabout convicts

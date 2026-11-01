@@ -88,6 +88,7 @@ export {
   YIELD_ROUNDABOUT_APPROACH_M,
   YIELD_STOP_LINE_REACH_M,
   YIELD_WAIT_MAX_S,
+  type CrashPinWayOut,
   type YieldReason,
   type YieldWaitContext,
 } from "./finish";
@@ -167,6 +168,9 @@ export {
   ROUTE_HOLD_S,
   routeHoldAdvisorPrompt,
   routeHoldForSession,
+  // Lane endings round 2 (E5): which way is away from what the car struck —
+  // the shell's crash-hold banner lead reads it beside `routeHoldForSession`.
+  routeHoldWayOutForSession,
   serializeAdvisorSetting,
   // Founder ruling 2026-09-25 «Only the named stretch» (round 4): the ACTIVE
   // objective's task cap has stopped binding, so the strip and the banner stop

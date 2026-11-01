@@ -3661,6 +3661,13 @@ export function contactVoidsObjective(
  * with «колата остана притисната на място» over a car that had rolled two
  * metres clear of the block (measured, the released-pedal crash: round 1 of
  * lane hztick shipped exactly that and its verifier read the false sentence).
+ * CORRECTED 2026-10-18 (lane endings): the arm keeps such a car from the pin
+ * only while it rests within gate 1's disc (9 m of the mark) — a car resting
+ * further out, but within CRASH_PIN_RADIUS_M of the impact, still meets the pin
+ * at ten seconds, and one resting further than both met no ending at all. Lane
+ * endings closed both: the pin's sentence now claims only what it measured
+ * (`finish.ts crashPinEndingCopy`), and a standstill on an unearnable terminal
+ * outside the disc ends the drive (`engine.ts`, E2).
  *
  * ONE REFUSAL, NEVER A TRAP: the objective keeps its honest `active` status
  * and `buildLessonResult` still reports finished-and-failed. The same

@@ -30,6 +30,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { crashPinWayOut } from "../finish";
 
 import { VIOLATIONS, type SimTick } from "../../rules";
 import {
@@ -213,10 +214,20 @@ describe("pinned in what he just hit — the same silence, the other clause", ()
     expect(s.phase).toBe("driving");
     expect(s.offNetworkSinceSec).not.toBeNull();
     expect(routeHoldForSession(s)).toBe("crashPinned");
-    expect(advisorPromptForSession(s)?.textBg).toBe(routeHoldAdvisorPrompt("crashPinned").textBg);
+    // Lane endings rounds 2–3 (E5 / E9): the card names a direction only where the
+    // END of the car that touched a stationary body is known. This fixture's session
+    // is handed no scenery boxes (the planting is not one), so no end is known and
+    // the card is the direction-free one — true whichever side the planting is on.
+    expect(crashPinWayOut(s.crashPin?.impact)).toBe("away");
+    expect(advisorPromptForSession(s)?.textBg).toBe(routeHoldAdvisorPrompt("crashPinned", "away").textBg);
   });
 
-  it("its chip names the key that really walks the selector — the advisor's honesty rule", () => {
+  it("it promises NO key — its reverse is conditional now, and a key glyph cannot say «if» (the advisor's honesty rule)", () => {
+    // Lane endings (2026-10-18, integrator ruling E3): until then the card
+    // ordered a reverse unconditionally and carried «[», the reverse park's own
+    // chip (asserted equal below, for the record of what it was). The card now
+    // advises a reverse only IF the car touches what it hit; a bare «[» would
+    // order it either way, so the chip is dropped.
     const reverse = advisorPromptForObjective("t", {
       kind: "completeManeuver",
       maneuver: "parkInBay",
@@ -229,7 +240,8 @@ describe("pinned in what he just hit — the same silence, the other clause", ()
       headingTolDeg: 12,
       entry: "reverse",
     });
-    expect(routeHoldAdvisorPrompt("crashPinned").keys).toEqual(reverse.keys);
+    expect(reverse.keys).toEqual(["["]);
+    expect(routeHoldAdvisorPrompt("crashPinned").keys).toEqual([]);
   });
 
   it("the off-road card promises no key at all", () => {
@@ -241,10 +253,11 @@ describe("pinned in what he just hit — the same silence, the other clause", ()
 });
 
 describe("the copy — retrieved, explained, and not a second copy of the banner", () => {
-  const cards = (["offRoad", "crashPinned"] as const).map((h) => ({
-    hold: h,
-    textBg: routeHoldAdvisorPrompt(h).textBg,
-  }));
+  // Lane endings round 2 (E5): the pinned card has three ways out — each must fit.
+  const cards = [
+    { hold: "offRoad", textBg: routeHoldAdvisorPrompt("offRoad").textBg },
+    ...(["back", "forward", "away"] as const).map((w) => ({ hold: `crashPinned:${w}`, textBg: routeHoldAdvisorPrompt("crashPinned", w).textBg })),
+  ];
 
   it("both fit the 240 px column the rest of this module's cards are held to", () => {
     for (const { hold, textBg } of cards) {

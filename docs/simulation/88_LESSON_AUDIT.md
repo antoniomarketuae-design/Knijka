@@ -15102,3 +15102,311 @@ Lane `brakeledger`, one round, built on `e58f388`.
 - **The founder is told** rulings S1, S2, F1–F3 and B3, condition 3 (the acquitted band, including the 40-frame drives, which by the code but not by measurement keep their praise), and that question 10 stays his.
 - **The tools/ tests on the main tree** (merge verifier V7): the main-tree gate decides the worktree's 8 reds, and the landing is committed only if the deck-captions freeze is the sole failure. In the worktree the two ledger-reading reds (count-agreement, finding-reader) stayed red even against the findings snapshot; only the main tree with its .audit-frames ledger can judge them.
 - **Not measured:** whether the product's pedals produce an exact 24-grid-point hold or the progressive brake of condition 3.
+
+## Wave C verdicts — 2026-10-19
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`cc77b2715b0f`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 22 |
+
+**Open list: 31 → 30**, out of 1559 filed across the whole programme (1528 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3j re-judge: `sc-roundabout-entry:fe081cf1` CLOSED under the founder's 2026-10-19 delegation on question 8 (integrator note, 2026-10-19)
+
+The founder delegated question 8 (the minimum supported screen) on 2026-10-19 («Choose the best options for fixes about the 5 open rows that wait my answer»). The integrator chose: two judged cards are shown both whole only at a stage of at least the measured floor (818 px in Chromium, 880 in WebKit, cardstay2); below it the older card waiting behind the ANNOUNCED fold row is the defined behaviour, not a defect; a cut without the fold row announcing it, or a single card cut at or above its 548 px floor, stays a defect. Owed, no row: a «Цял екран» suggestion below the single-card floor; a compact HUD belongs to the redesign 2027 track.
+
+The rig-w3j capture of 2026-10-18 (wf_db1da37a-ef2, HEAD `219ac1e`) was re-judged without a re-drive (workflow `rig-rejudge-w3j-fe`, wf_88e4db00-943: the capture result taken from the journal, a judge and an adversarial verifier; journal `handoff-2026-10-08/reports/rig-rejudge-w3j-fe-journal.jsonl`). **Open list 31 → 30 (4 critical, 24 major, 2 minor).**
+- The one clause rig-w3j left open, FS-1280x720 (stage 619.5 px, below the two-card floor): the older FAILED_TO_YIELD card keeps its title on the glass; its one-liner and law chip wait below the window behind the fold row «↓ ОБЯСНЕНИЕТО ПРОДЪЛЖАВА — ПОКАЖИ», which is up for 63 rAFs over the 60-rAF overlap. The newer card is whole over its whole life (447 rAFs). That is the ruled behaviour.
+- Every other clause was closed at rig-w3h / rig-w3j (the phone's L3 peek whole, the PC single card at or above 548 px, «ЗАЩО» opened on both lenses, two cards both whole at FS-1920 Chromium and WebKit).
+- The verifier opened the evidence frame (`pc-L3-TWO-FAULT-FS1280x720-26-c1-plus1s.png`) and the filed frame, read the sidecar's 933 per-rAF records and the fold row's code, and could not refute the closure.
+- What the closure does NOT show: no device has shown a stage below 548 px with the fullscreen suggestion (not built); WebKit at FS-1280 was not driven.
+
+### rig-w3k: the first drives of the cl and bl landings at `cc77b27` — `sc-hz-brake-dont-swerve:cb563b2d`, `sc-follow-tailgater:a31d9216` and `:e47a45c1` PARTIAL (integrator note, 2026-11-01)
+
+Workflow `rig-wave-w3k` (wf_d7dda13a-129) ran at `cc77b27` (health attested `cc77b27`; the rig's channel C-step pad, decided per physics step; PC and phone bit-identical to the grid point in every paired cell). Specs were drafted and critic-checked by `draft-rig-w3k` (22 fixes applied). Journal `handoff-2026-10-08/reports/rig-w3k-journal.jsonl`; frames under `.audit-frames/rig-w3k/<lesson>/<id8>/`. **Open list stays 30.**
+
+- **`cb563b2d` (critical) PARTIAL.** (b) the shift-x10 rest off the carriageway and the shift-x-4.06 rest wholly in the escort's lane, and (c) all three title-claiming gates (sc-hzbds-stop, sc-hzes-stop, sc-lnom-wait incl. the roll-through): CLOSED — no ✓, the lane card «Спря, но не изцяло в своята лента», the outOfLane row and debrief line, PC L3 / phone L3 / PC L1; the lawful controls still tick. (a) the façade bounce: OPEN — six PC tries each rest 9.97–12.3 m from the mark, never inside the 9 m ring, so the filed crash-pinned rest inside the ring (ruling L11) was never on a frame; billed COLLISION, no ✓, the end row without a reason line (observation (a) under L5). Owed: a cell whose crash rest falls INSIDE the ring, PC + phone.
+- **`a31d9216` PARTIAL.** Test 1 (above the floor, an exact 24-grid-point causeless stab billed on every start incl. the starts with q 0.3999999999999986; 23 never, 25 always; PC ×8, phone ×2, L4) CLOSED; test 2 (below the floor with the лепка: floored and billed on the report grid point, no CLEAN_DRIVING) CLOSED in substance — the filed tapes did not reproduce on the chassis, the tie was reached with another pedal shape at the same float. Test 2b (the re-anchor tie at engine.ts :8267) NOT SHOWN — owed: a ramp whose window re-anchors exactly at 24 grid points (≈ R30).
+- **`e47a45c1` PARTIAL.** (1) no CLEAN_DRIVING over a floored episode, (2) no «Браво» toast, (3) no result-card «Похвали ✓», (4) no debrief bullet: CLOSED on sc-sp-harsh-brake (PC L3, phone L3, PC L4) against a paid control. (5) the L3/L4 headline and «задръж това ниво» over a floored drive: RECORDED, owed to lane «flooredinvite» (Q10 / B3). (6) the filed instance on sc-follow-tailgater WITH its лепка: OPEN — no drive was both floored and unbilled (the ramp never floored; the pad stabs floored but the лепка reported and the bill came). Owed: a floored, unbilled stop on that lesson with the лепка present but not reporting.
+- What the wave does NOT show: the phone's audio and haptics (WebKit); the 360-drive bounce sweep was not re-run.
+
+## Landed: at the route-finish gate «Стигна края на маршрута» is said only of a car that reached the mark (the exam path's stoppedStuck ending still says it without that check, below); a car standing still on the road, outside the route-end disc and beyond the crash pin's reach, after a task it can no longer earn, ends 12 s later on its own sentence; and the crash pin's ending and hold advice say only what the pin measured, naming a way out only while that way is clear. Measured in process only. `sc-crossing-dart:1c7a07d8` (major), `sc-hz-brake-dont-swerve:870904d4` (major) and `sc-pk-driveway:7fa8b79e` (major) (2026-11-01)
+
+Lane `endings`, four rounds, built on `219ac1e`.
+- Rounds 1, 2 and 3 were REFUTED by the adversarial verifier, each on row C only. Round 4 was SIGNED OFF WITH CONDITIONS. The conditions are below.
+  - The round-4 verifier stopped on 2026-10-19 at 13:02, during its scenario-directory run, at the owner's request. It resumed on 2026-11-01 at 00:38 on the same account, found its lane still exactly the round-4 tree (`git diff tree4` empty), re-ran the interrupted directory, and gave its verdict at 03:04 (its PROGRESS.md).
+  - Rows A and B held from round 1. The verifier's row-A/B probe outputs were byte-identical through all four rounds (below).
+- **The patch.** `endings-result-r4.patch`: sha256 33ad59a7…, 36 files, +3262/−96, 0 CR bytes, every touched file LF in base (the builder; its round-1 report had called these files CRLF, and its round-2 report corrected that).
+  - The verifier returned its lane to base, moved the test files earlier rounds had added out to scratch, confirmed `git diff base` empty, and applied the patch cleanly as `tree4`.
+  - It is cumulative against the lane's base `219ac1e`, not against HEAD. The builder checked it applies to `e11629b` except the two generated reviewed-text-manifest files (`manifest.json`, `units.source.txt`), which must be re-recorded on the landed tree.
+  - HEAD `cc77b27` carries the cl landing (lanegate: `lessons/objectives.ts`, `lessons/engine.ts`; curvring: traces) and the bl landing (`rules/engine.ts`, `rules/harshBrakeEpisode.ts`, the clip plan). `lessons/engine.ts` is shared with lanegate, so the patch is applied 3-way and every lane test, the census and the manifest are re-run on the landed tree (see PROVEN ON cc77b27).
+- **Integrator rulings** (under the founder's 2026-10-08 delegation; the founder is told at this landing):
+  - E1: «Стигна края» only when `routeRunOutArrived` (within `ROUTE_RUNOUT_ARRIVE_M` 2.5 m of the mark, or past it). Otherwise the stalled run-out continues, bounded like the completed one (B15 freeze, AT REST, SPENT at `ROUTE_RUNOUT_MAX_S`), and ends on ONE non-arrival sentence.
+  - E2: an unearnable terminal with the car standing outside gate 1's disc ends after `FINISH_STUCK_S` 12 s, on the same sentence.
+  - E3: the crash pin's ending says only what the pin measured.
+  - E4: lanegate lands first. It did, in `e11629b`.
+  - E5–E8 (round 2): the hold advice names a way out away from the struck body; the corrective is true of the crash; E7, pin the round-1 conditions; E8, list the strings the tools read.
+  - E9–E10 (round 3): the way out is keyed on WHICH END of the car touched the struck body at the bill, with the stationary bodies handed to the engine once at session creation (`staticContactBodies`); the corrective is keyed on end × travel × body kind, with a new front-swing reverse corrective.
+  - E11–E13 (round 4): a direction is named only while the end the move heads toward is clear (more than `SWEEP_RESOLUTION_M` 0.15 m) of EVERY listed body, re-evaluated while the hold is up, else the direction-free «я отдръпни»; the advised move must lower no separation and book no billed contact (an unbilled settle after it is recorded, not a defect); the tests measure every listed body.
+
+**The rows are NOT closed by this landing.** `sc-crossing-dart:1c7a07d8`, `sc-hz-brake-dont-swerve:870904d4` and `sc-pk-driveway:7fa8b79e` stay OPEN.
+- Every number below was measured in process: the engine, the live rung chain, and the product chassis on rapier through the lane harness (`rapierContactDrive`, 60 Hz).
+- Neither the builder, the verifier nor the integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close any of the three rows is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong.** The builder reproduced each row on `219ac1e`; the verifier's base numbers are under its heading.
+- **Row A (1c7a07d8), «Стигна края» short of the mark.** Gate 1 (`routeFinishZone`, on `!onTerminal || terminalUnearnable`) ended a stalled chain after `FINISH_DWELL_S` 0.5 s inside a ring the L1/L2 tolerance ladder had widened, and printed «Стигна края на маршрута» wherever the latch fell. The product's own arrival rule (`routeRunOutArrived`, 2.5 m) was armed only on completed chains. The builder's base probe: 300 stalled endings, all on «Стигна края», 229 of them more than 2.5 m short of the mark. Mean short of the mark at L1..L5: 7.40 / 5.65 / 3.53 / 3.53 / 3.63 m. 44 of 52 templates were inverted (L1 ending further short of the mark than L5). sc-crossing-dart ended 10.0 / 7.78 / 4.44 / 4.44 / 4.44 m short.
+- **Row B (870904d4), a car standing after an unearnable task never ended.** Gate 1 is anchored on its 9 m disc and the pin lets go beyond 6 m of the impact, so an unearnable terminal resting outside both had no ending. The builder's base drive (sc-hz-brake-dont-swerve, held brake after a swerve): bill at step 880, rest at step 953 9.852 m from the mark, still «driving» at step 7,200.
+- **Row C (7fa8b79e), the crash pin's words.** The pin asserted «…остана притисната на място…» and the hold ordered a reverse-out from pose and stillness alone, with no term reading contact or clearance. The builder's base drives CUT-R / CUT-L: the car rests 2.242 / 2.508 m clear with the block behind it, and the drive ends at step 1565 / 1567 on «притисната».
+
+**What landed.** This is the builder's description; the verifier's measurements are under the next heading.
+- **E1, the stalled run-out** (`finish.ts`, «THE STALLED RUN-OUT»; `lessons/engine.ts`). On a route with an arrival mark, gate 1's latch on either arm now arms a run-out instead of ending the drive. Its exits come in the completed run-out's order:
+  - ARRIVED (`routeRunOutArrived`), the only exit that says «Стигна края»;
+  - the B15 freeze;
+  - AT REST: |v| ≤ `FINISH_STANDSTILL_KMH` 1, read as a magnitude, so a car reversing faster than 1 km/h is not at rest;
+  - SPENT at `ROUTE_RUNOUT_MAX_S` 20 s.
+  AT REST and SPENT end on the new non-arrival sentence.
+  - «Past the mark» is measured from `routeApproachFrom` (the last earlier located objective more than 2.5 m from the mark, else the latch pose), because sc-hz-brake-dont-swerve latches past its mark.
+  - While the run-out is armed the objective chain is frozen as it stood on the latch frame; rule events still run. A latch that is already an arrival, and a route with no arrival mark, end on the latch frame as before.
+- **E2, the unearnable standstill** (`lessons/engine.ts`). A clock starts when all of these hold: the chain is on its unearnable terminal, gate 1 has not latched, the car is outside gate 1's disc and on the network, and |v| ≤ 1. Any motion, entering the disc, leaving the network or a B15 wait clears it. At `FINISH_STUCK_S` 12 s the drive ends on the same non-arrival sentence. Within 6 m of the impact the crash pin ends the drive first, at `CRASH_PIN_STUCK_S` 10 s. The check runs after every gate, so one ending is pushed.
+- **E3 and E5–E13, the crash pin.**
+  - The ending no longer claims a press.
+  - `crashPin.impact {travel, body, end}` is recorded at the COLLISION bill's own grid point and re-recorded on every re-arm. `crashPinContactEnd` measures `end` against the listed bodies. The car's box is cut at its centre into a front half and a rear half, and a half within 0.05 m of a listed body has touched.
+  - The way out (`crashPinWayOut`):
+    - front → «назад», only if the rear half is clear;
+    - rear → «напред», only if the front half is clear;
+    - everything else (both, neither, unknown, a road user, no fact) → the direction-free «я отдръпни».
+  - The clearance (`crashPinClearEnds`, `CRASH_PIN_WAY_CLEAR_M` = `SWEEP_RESOLUTION_M` 0.15 m) is re-measured on every grid point while the pin is armed, from that tick's pose against every listed body. A second, unbilled contact by the other end inside the same open episode is therefore seen while the hold is up.
+  - The card, the peek and the banner lead all read one function, `routeHoldWayOutForSession` (the shell's lead at `LessonPlayShell.tsx:1630`).
+  - The corrective (`crashPinCorrective`) follows the bill:
+    - pedestrian or cyclist → vulnerable;
+    - vehicle → vehicle;
+    - static, front + forward → base's sentence verbatim;
+    - static, rear + reverse → reversing;
+    - static, front + reverse → front-swing;
+    - any other static combination → general.
+  - The exam pin ending is not keyed. Its second sentence names no corrective (integrator confirmed in round 3).
+- **A new engine-only input.** No product code held an identity for a stationary body (static contacts are anonymous on the tick).
+  - So the held scenery's collider boxes are handed in once, at session creation: `LessonEngineOptions.staticContactBodies`, from `heldStaticContactBodies(lesson.id)`, at both shell creation sites and in the two harnesses. A source-text test pins these call sites.
+  - `WALL_DEFAULT_THICKNESS_M` and `PROP_COLLIDER_DIMS` moved unchanged from `ScenarioObstacles.tsx` to `scene/obstacleSpec.ts`. `ScenarioObstacles.tsx` re-exports `PROP_COLLIDERS` as the same object.
+  - Nothing goes on the wire, the store or SimTick.
+  - District cones, kerbs, façades and the forecourt are not listed. A contact with them gets the direction-free advice.
+- **Comments.** The engine comment at the ending arms (base ~:3850) is rewritten to the rule as built, and `objectives.ts` gets a CORRECTED note. This discharges the comment item doc 88 gave lane «pinfree» (:12663).
+- **What did not change** (the builder):
+  - the constants and ladder: `ROUTE_RUNOUT_ARRIVE_M`, `FINISH_DWELL_S`, `FINISH_LANE_FLOOR_M`, the ladder, every radius, `CRASH_PIN_RADIUS_M` 6, `CRASH_PIN_STUCK_S` 10, `CRASH_PIN_DRIVING_KMH` 5, `OFF_NETWORK_STUCK_S` 75 and `ROUTE_HOLD_S`;
+  - grading: every bill, point, verdict, star and objective status;
+  - the pin's timing;
+  - the stoppedStuck gate and its sentence.
+  No protected threshold moved.
+
+**Shown text.** Final strings (the builder; the lane's manifest: 13,287 source strings, fingerprint 045813fd8ce2…; base 13,271).
+- Added, the non-arrival ending (titles «Край на маршрута» / «Край на изпитния маршрут» kept):
+  - lesson: «Оставащите задачи вече не могат да бъдат изпълнени в този опит, затова урокът приключва тук. Разборът показва всяка от тях и всяка грешка.»
+  - exam: «Оставащите задачи вече не могат да бъдат изпълнени в този опит, затова изпитът приключва тук и не е издържан. Разборът показва всяка от тях и всяка допусната грешка.»
+- Changed, the pin ending (titles kept):
+  - lesson: «След удара колата спря до мястото на удара и остана неподвижна, затова урокът приключва тук. Разборът показва как се стига до такъв удар и какво го предотвратява: », followed by one of six correctives:
+    - «по-ранно намаляване и достатъчна дистанция до всичко неподвижно напред.» (base, verbatim);
+    - «на заден ход — съвсем бавно, с поглед назад и в огледалата, и спиране навреме преди всичко зад колата.»;
+    - «при заден ход със завъртян волан предницата излиза встрани — затова следи и предния ъгъл, а не само това зад колата.»;
+    - «по-ранно намаляване и готовност да спреш, щом до пътя ти има пешеходец или велосипедист.»;
+    - «достатъчно място около колата — скорост, дистанция и пролука, избрани навреме, преди другата кола да е твърде близо.»;
+    - «по-ранно намаляване и достатъчно място около колата.»
+  - exam: «След удара колата спря до мястото на удара и остана неподвижна, затова изпитът приключва тук. Разборът показва удара, всяка останала задача и какво трябваше да се направи преди него.»
+- Changed, the crashPinned hold, three variants each:
+  - card: «Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.» / «…първо съвсем леко напред с прави колела — задният ход само я притиска…» / «…първо съвсем леко я отдръпни от него — натискът към него само я притиска…»;
+  - peek: «Ако опира — първо назад: напред я притиска.» / «Ако опира — напред: назад я притиска.» / «Ако опира — отдръпни я: към него я притиска.»;
+  - banner lead: «…назад» (59 characters), «…напред» (60) and «…я отдръпни» (64). All three share the 53-character stem «След удара — ако колата опира в удареното, първо леко», and all are within the 66 characters the W6/W7 folded-banner floors were measured at.
+- Removed: «Колата е притисната след удара — измъкни се назад, за да продължиш», «Съвсем леко назад с прави колела, после огледай и чак тогава напред — газта напред само притиска колата още по-навътре в удареното.», «Първо назад: напред притиска в удареното.», both «…остана притисната на място…» endings, and the hold's «[» key chip.
+- «Стигна края на маршрута…» is unchanged. At the route-finish gate it is now shown only on an arrival. The exam path's gate-2 (stoppedStuck) ending «Стигна края на маршрута, затова изпитът приключва тук…» is also unchanged, and it still does not check arrival (merge verifier N1; see «Not cured by this landing» below). The card that `sc-roundabout-entry:9e85f27e` quotes is among the removed strings. This lane leaves that row's bill untouched, and the row stays open.
+- In round 4 no string was added or changed; only which variant is chosen moved. A car whose advised end is within 0.15 m of any listed body now gets the direction-free card, peek and lead.
+- The refusal is never bare: each new ending states its reason (THEO-4).
+
+**Rounds 1–3, refuted on row C.**
+- **Round 1.** The card's «pressed» branch was a fixed order to reverse. On sc-pk-driveway, a reverse drill, the verifier reversed the chassis into the driveway wall at L1. The car rests PRESSED (0.001–0.137 m, the wall about 4 m behind its centre), and card, peek and lead told it to reverse into the wall. The builder's chassis harness had pinned selector D, so all 64 of its sc-pk-driveway drives were forward.
+- **Round 2.** The way out keyed on the travel direction. A reverse on a steering lock strikes with the front corner. On sc-pk-driveway L1 n26 the card said «напред»; doing it booked a new graded contact at step 653 and moved the pin ending from step 986 to 1253. The reversing corrective named the wrong cause.
+- **Round 3.** The bill-end key was measured only at the bill. A car that then touches a second body with its OTHER end, inside the same open episode, rests wedged. On the builder's own committed n26 drive the rear hit wall #1 64 steps after the bill and rested 0.0018 m from it, and «назад» pressed it in. The verifier's fast sweep found a second wedge (pk L5 n14).
+
+**What the verifier reproduced.** Its own lane, `219ac1e` + the round-4 patch, its own probes and analysers. Log: `D:/knijka-lanes/scratch/endings-verify/PROGRESS.md`; files under `r4/` there.
+- **Row C, four sweeps**, all re-run by the verifier on tree4:
+  - the round-2 configuration (345 drives) and the fast/glancing configuration (322), both first swept by the verifier in rounds 2–3 and re-run by the builder in round 4;
+  - its own close-start wedge sweep on sc-pk-driveway (seed 4242; 215 of 343 starts filtered as spawn overlaps);
+  - sc-ed-poligon-chain, which no earlier round had swept.
+  - On all four, 0 PRESSED cars are given a direction that lowers their separation to ANY listed body:
+    - its round-3 analyser on its tree4 runs of the two configurations: towardAny 0 over 103 and 31 PRESSED directional cars;
+    - its round-4 act probe: lowersPressed 0 over 109, 64 and 93 directional cars.
+    Bodies more than 0.15 m away were approached on 2, 16 and 13 rows, with no contact.
+  - Both wedged cars from round 3 (pk L1 n26, pk L5 n14) now get the direction-free card, peek and lead.
+  - Of the 277 cars given a direction, 0 touch at both ends at the hold, and the way never changes while a hold is up.
+  - Replays of the advised move with straight wheels book 0 billed contacts at throttle 0.25 and 0.5. At 0.25, 222 of 254 PRESSED cars are freed, with 1 judged, unbilled contact (n23, condition 2).
+  - The cost of the 0.15 m check:
+    - on the two configurations, cars given a direction fall 112 → 109 and 39 → 36, and 342 of 345 and 319 of 322 rows are unchanged from round 3;
+    - 93 of 118 holds on the wedge sweep and 64 of 72 on sc-ed-poligon-chain keep a direction.
+    So the advice is not made useless.
+- **Rows A and B**, measured in round 1 and byte-identical in rounds 2, 3 and 4 (sha256 cc26cdea…, ebcb9baa…, 5ea580b5…, 9394f1eb…):
+  - V1 covers every reachZone-terminal lesson and rung (675 rows, 300 stalled) × five behaviours after the latch.
+    - False «Стигна края»: 0 on the tree, against 1,500 on base. The 0 does not hold on the exam path: its gate-2 ending still says «Стигна края» whether or not the car arrived (merge verifier N1, below).
+    - 0 of 52 templates inverted; never-ended 114 on both.
+    - Mean end distance from the mark at L1–L5: 2.41 m on every rung on the tree, against 8.40 / 6.59 / 4.50 / 4.50 / 4.56 m at base.
+    - sc-crossing-dart ends 2.444 m from the mark on every rung.
+  - V2: 0 of 1,562 reaching cells have the approach axis misaligned, and no sample is wrongly called past the mark.
+  - HZ, 180 chassis drives on sc-hz-brake-dont-swerve (L1–L5, steer ±1, three onsets, three speeds): every held-brake drive ends 720 steps (12.0 s) after rest on the non-arrival sentence, with no double endings.
+  - V3, a contact-void terminal then rest: the 16 base strands all end on the tree.
+  - The only arrivals beyond 2.5 m in the census are past the mark, or abreast of it one lane over (sc-ln-turn-lane-arrows 3.64 m, 0.17 m along the road).
+- **Census** (liveChainReplay, 2,434 cells, 808 correct demos): the round-4 tree is byte-identical to round 3.
+  - Against base: 410 changed cells (264 later arrivals, 103 arrival → non-arrival, 43 pin texts).
+  - 0 changes to grade, phase, rule events or hold kind; stoppedStuck 150 and the never-ended set are unchanged.
+  - 32 shadow-correct cells change their end time only. Their verdict is failed or unfinished on both sides (the harness stalls on base too).
+- **Mutants, its own nine**, each restored with checkout and a sha256 check:
+  - W1, W2, W3, W4, W6, W7, W8 and W9 are killed on assertion text, with no Type/ReferenceError or timeout.
+  - W5 survives (condition 1).
+  - The round-1 survivors V1, V2, V3, V9 and V10 have been killed since round 2.
+- **Regression** on its lane:
+  - lessons/__tests__: 127/127 files (2,456 passed).
+  - lessons/scenario/__tests__: 199/199 files (4,872 passed).
+  - lesson-ui + components/sim + scenarioObstacles + scene: 113/116 files in the batch run. The three red files:
+    - touchHintLifetime: ENOENT, because the lane has no tools/;
+    - guidance-lane-align-span: §7 ENOENT, plus §1 and §6 hitting the 60 s vitest timeout under disk load;
+    - shellClipAffordances: one 60 s timeout («THE GENERAL FORM»).
+    Re-run alone, shellClipAffordances is 40/40 and guidance-lane-align-span 14/15, with only §7 (ENOENT) red.
+  - tsc: 22 errors, in the same files as the baseline.
+  - The manifest, caption-truth and keep-right census tests are green inside the directory runs.
+- **Builder's numbers, not re-measured by a verifier:** its 29 mutants (8 on E11, R4a–R4g including R4c2; E7's five; round 3's sixteen), all 29 killed on assertion text with 0 timeouts.
+
+**The conditions, and how each stands.**
+
+**1. C1: the banner lead's use of the clearance check was unpinned at sign-off (mutant W5 survived).**
+- The product is right: `LessonPlayShell.tsx:1630` builds `objectiveHoldWayOut: routeHoldWayOutForSession(s)`, which reads `crashPin.clear`.
+- Mutant W5 rewrites the snapshot to pass a crashPin whose `clear` is all-true, so the lead stays directional for a wedged car. It survived the six crash-hold test files (152/152). Every lead fixture with a crashPin has no bodies, and objective-banner-task-cap pins only the two `objectiveTitleUnderHold` call sites.
+- Owed at sign-off: a shell-level test in which a wedged pin (impact end front, `clear.rear` false) gets the direction-free «…първо леко я отдръпни» lead, and which goes red on assertion text under W5.
+- PINNED AT INTEGRATION (the integrator's run, `D:/knijka-lanes/scratch/en-land/PROGRESS.md` step 3 and `W5.log`; the merge verifier then applied W5 itself and saw it die on assertion text, its finding V3): `platform/src/components/sim/lesson-ui/__tests__/crashLeadClearance.test.ts`, «a WEDGED car (struck by the front, rear 0.002 m from a second listed wall) gets the direction-free lead on every hold frame».
+  - It compiles sc-pk-driveway, creates a session with `staticContactBodies`, drives it through `applyTick`, and reads every hold frame through the exported product functions `snapshotOf`, `bannerObjectiveLineBg` and `objectiveTitleUnderHold`, the banner mount's own expression. There is no stub and no regex. It also asserts `crashPin.clear` = {front: false, rear: false}, and a control case with the rear clear must keep «назад», so the wedge assertion cannot pass by default.
+  - Under W5 in the integrator's run: «AssertionError: expected [ { t: 8, way: 'back', …(1) }, …(13) ] to deeply equal []», 14 hold frames showing «…първо леко назад» on the wedged car (1 failed, 1 passed). LessonPlayShell.tsx was restored and sha-checked (4e493f52…bd9b5 before and after); green again 2/2.
+  - In the merge verifier's own apply W5 failed the test the same way, «AssertionError … toEqual([])», 14 frames showing «…първо леко назад» (1 failed, 1 passed); it restored the file by copy, sha256 4e493f52…bd9b5 before and after.
+  - The merge verifier also re-applied the integrator's other two mutants and the lane verifier's W2, and saw each die on assertion text (V4, V5):
+    - M-mount2arg (the banner mount at :8439 back to two arguments) fails toast-why-room §5.2 («expected … to contain 'titleBg={objectiveTitleUnderHold(bann…'») and two objective-banner-task-cap cases;
+    - T-oldlead (the old `ROUTE_HOLD_CRASH_PINNED_BG`) fails route-fidelity 44/45 on «LessonPlayShell.tsx no longer contains «Колата е притисната след удара — измъкни се назад…»»;
+    - W2 (only the first listed body is checked for clearance) fails 8 of 154 tests across endings-gate1-runout (5), endings-chassis (2, «expected 'back' to be 'away'») and crashLeadClearance (1), with 0 TypeError, ReferenceError or timeout lines; finish.ts restored, sha256 808af0eb…4812 before and after.
+
+**2. C2 (E12). RECORDED: three unbilled settles at or below 0.4 km/h after the advised move ended.** Not defects under E12.
+- sc-pk-driveway L1 b1 n23, advised «назад»: 0.4 km/h staticObject at step 513, hold at 386 (the builder: 37 steps after the move ended).
+- sc-pk-driveway L3 b0 n19, advised «я отдръпни» (no input): 0.3 km/h at step 676, hold at 557.
+- sc-pk-driveway L3 b1 n56, from the verifier's wedge sweep, advised «я отдръпни» (no input): 0.4 km/h at step 626, hold at 452.
+- The builder found the first two; the verifier reproduced both and found the third.
+- The verifier's notes beside it:
+  - At throttle 0.25, six directional cars barely move (below breakaway). At 0.5 and 1.0 the same advised selector moves them away and the separation rises (n5 0.009 → 0.244 / 2.386 m; n23 0.008 → 0.092 / 0.183 m).
+  - At throttle 0.5 held for 90 steps, 5 drives book judged, unbilled contacts 90–100 steps after the hold, at 2.2–10.1 km/h. Example: pk L1 b0 n9, «назад», rear 0.788 → 0.001 m from wall #1.
+  - That is not the advised move («съвсем леко»), and 0 contacts are billed at any throttle. It is recorded for the device check.
+
+**3. The tools readers (E8).**
+- `tools/mobile/lesson-audit.mjs:7893` `ROUTE_HOLD_CRASH_PINNED_BG` must become the 53-character stem «След удара — ако колата опира в удареното, първо леко». It is matched with `includes` at :8205, so one value covers all three leads. Then route-fidelity.test.mjs and path-follow.test.mjs are run.
+- The `/удар|притисн/` matchers at `tools/mobile/lib/path-evidence.mjs:468` and `tools/mobile/lib/path-follow.mjs:1257` still match the pin ending, the three leads and the three cards, through «удар». They do not match the peeks.
+- The `/Край на маршрута/` readers (canary-pills.test.mjs:1253, engprog-look.mjs:57) are untouched.
+- See PROVEN ON cc77b27.
+
+**4. The landing re-runs (E4).**
+- The two generated manifest files are re-recorded once on the landed tree.
+- endings-gate1-runout, endings-chassis, route-runout, the census and the manifest are re-run on HEAD (lanegate's `objectives.ts` / `engine.ts`, brakeledger's rules).
+- `src/modules/clips/` (the clip-plan freshness gate) is run.
+- See PROVEN ON cc77b27.
+
+**Not cured by this landing: the exam path's gate-2 ending** (the merge verifier's N1; integrator decision D1, 2026-11-01, under the founder's 2026-10-08 and 2026-10-19 delegations).
+- When gate 2 ends an exam drive (stoppedStuck), `engine.ts:4194–4198` in the landed tree still says «Стигна края на маршрута, затова изпитът приключва тук…» whether or not the car arrived. In lesson mode the same branch says «Спря в края на маршрута, но задачата тук не се отчете…».
+- The landing neither causes nor worsens it. These cells are byte-identical on HEAD, and across the census «Стигна края» more than 2.5 m from the mark falls 383 → 31.
+- The merge verifier's reading of `scratch/en-land/census-landed.jsonl`: 77 exam cells end on «Стигна края», and 32 of them have distToMark null, i.e. a gate-2 ending with no route-end mark. Example: sc-park-perp-rev/mistake-no-observation L4, where the lesson cells L1/L2 on the same trace say «Спря в края на маршрута…».
+- Its correction of the integrator's five exam L4 cells: four rest at poses beyond the mark along +y (e.g. sc-pk-ban-stop, y 239.95 against a mark about 5 m short of that), so they are likely past the mark, not short of it. sc-park-parallel-exit/mistake-no-room L4, 6.6 m away, is the clear case.
+- D1: this is not a landing blocker and does not change the landed tree. Row A (`1c7a07d8`) is therefore NOT cured for exam mode, and it stays open.
+- Owed: a follow-up lane «examend» under ruling E1, in which the exam stoppedStuck / gate-2 sentence says «Стигна края» only when `routeRunOutArrived` holds, and otherwise a true non-arrival sentence. The device re-drive must include an exam-mode drive.
+
+**Recorded, not fixed.**
+- **The cost of E11.** The half-box reading withdraws to direction-free some advice that was neutral or right (the §3 flank scrape, pk L5 n25, park-wall L5 n2, pk L1 n3, park-wall L5 n24). The advice stays true but is less specific.
+- **Following the advice can make the pin ending later.** Moving restarts the pin's stillness clock (`CRASH_PIN_STUCK_S`, frozen).
+  - On the round-3 sweep, the ending came later than doing nothing on 94 of 106 directional cars, about 10 s after the car stopped again (the builder).
+  - On the decisive n26 drive in round 3, when it was told «назад», the ending was 986 whether the card was followed or not.
+  - In round 4 that car is direction-free and ends at 986 with no input; the control «напред» books a new graded contact and ends later.
+- **Bodies that are not listed.** District cones (the session is created before the district loads), kerbs, façades and the forecourt have no box. Their contacts get the direction-free advice and the general corrective.
+- **The driveway's forward approach to wall #1** is billed on the apron kerb, about 5.4 m before the wall. The car reaches the wall inside the same open episode, so the pin keeps the apron impact (the builder, round 3).
+- **A reverse into a parked car** is graded body «vehicle». It gets the direction-free hold and the vehicle corrective, measured at engine level only.
+- **Row B's banner clause.** The row's own text says the banner keeps asking «Спри преди препятствието — с пълна спирачка, В своята лента», a task already unearnable. The builder records that the banner still asks it for the full 12 s until E2 ends the drive, and the advisor has no unearnable-task wording. The re-drive judge must read that clause.
+- **The second staticObject bill on the drive-on path** (y ≈ 316 on sc-hz-brake-dont-swerve). The s+1 forward drives end on the pin because of it. This lane did not decide whether that bill is fair.
+- **For the founder** (the round-2 verifier's N5, kept by ruling E5): the hold card's free branch «Ако не опира, огледай се и тогава потегли» is also shown after a pedestrian or child strike. That is 22 census pin cells, e.g. sc-pe-jaywalker and sc-crossing-child-ball mistake-collision.
+
+**Recorded, not filed: the docs agent's six new findings** (integrator decision D2, 2026-11-01). They are candidates, not open rows, under the founder's 2026-10-19 order of no new triage rounds until the open list is well down.
+1. **sc-crash-pin, after a person strike (a NORTH-STAR item).** After a pedestrian or child strike the crashPinned card's free branch «Ако не опира, огледай се и тогава потегли» invites the student to drive on; 22 census pin cells (e.g. sc-pe-jaywalker, sc-crossing-child-ball mistake-collision). The base text («…измъкни се назад, за да продължиш») also invited it, so the landing does not make it worse in kind. Owed to a small product lane «vruafterstrike»: no shown text may invite the student to drive on after striking a person, and the duty is named only by retrieval from content/law. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/endings-r2.json` (verify finding N5); `D:/knijka-lanes/scratch/endings-verify/r2/census-tree2.jsonl`.
+2. **sc-pk-driveway, the advised move at a firmer throttle (minor, for the device check).** At throttle 0.5 held for 90 steps, 5 drives book judged, unbilled contacts at 2.2–10.1 km/h, 90–100 steps after the hold (e.g. pk L1 b0 n9 «назад», rear 0.788 → 0.001 m from wall #1), against a card that says «съвсем леко». Evidence: `D:/knijka-lanes/scratch/endings-verify/r4/replay3-dir.json` (endings-r4.json verify N2).
+3. **sc-pk-driveway, the apron kerb.** A forward drive up the driveway to wall #1 is billed COLLISION on the apron kerb about 5.4 m before the wall, and the pin keeps that impact; whether a kerb touch on a lawful driveway approach should bill COLLISION is undecided. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/endings-r3.json` (build report, RECORD, NOT FIXED).
+4. **Crash pin, a reverse into a parked car.** It is graded body «vehicle», so the pin ending closes on the vehicle corrective rather than the reversing one, and the hold is direction-free; measured at engine level only. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/endings-r2.json` (build RECORD) and `endings-r3.json` (corrective table).
+5. **sc-hz-brake-dont-swerve, an earnable terminal at rest beside the block.** A car with an EARNABLE terminal and no contact that comes to rest beside the block (L1/L2, steer −1, 52 km/h) is still in phase «driving» at 60 s; no ending is armed for it. It is pre-existing and outside the endings lane. Evidence: `D:/knijka-lanes/scratch/endings-verify/hz.json` (endings-r1.json verify N2).
+6. **The instrument (liveChainReplay).** 32 shadow-correct cells (sc-signal-response, sc-signal-redyellow, sc-ac-night-lights, -rain-lights, -highbeam-lead, -fog, -wind-truck-pass) stall in the live chain at base and on the tree with verdict failed or unfinished although their own trace tests pass, so the census cannot judge those correct demos. Evidence: `D:/knijka-lanes/scratch/endings-verify/compare-mine.json` (endings-r1.json verify N3; the builder's census note).
+
+**What this landing supersedes in doc 88** (line numbers at `cc77b27`).
+- :12644, «A touched car that rests beyond 9 m is NOT covered: it ends on the crash pin's sentence or does not end by itself». Such a car now ends one of three ways:
+  - on the pin, within 6 m of the impact;
+  - beyond that, by E2, 12 s after rest, if it stands on the road network;
+  - off the network, by the existing off-network ending, unchanged.
+- :12637 and :12658, the «…колата остана притисната на място и не може да продължи…» ending: that string is removed.
+- :12663, the two comments «left as landed; correcting them belongs to lane «pinfree»»: rewritten in this patch (the builder).
+- :12697 «CARRIED, not fixed — the crash pin's sentence on a free car» and :12715 «Lane «pinfree»»: discharged in process by this landing. Device frames are still owed.
+- :12911 and :12970, the W6 one-line banner «Колата е притисната след удара — измъкни се наза…»: that lead no longer exists. The W6/W7 reading is now owed on the three new leads.
+
+**PROVEN ON cc77b27** (the integrator's run in the worktree `D:/knijka-lanes/integ-en`, log `D:/knijka-lanes/scratch/en-land/PROGRESS.md` and its logs; vitest with one worker, one directory at a time. The merge verifier confirmed that `gate-en.patch` equals the staged diff and that the product files are the lane's bytes (V1, V2), re-killed every pin and the lane verifier's W2 on assertion text (V3–V5, under condition 1), and re-ran the scenario, lessons, components/sim + scene + clips + hud directories and the tools tests itself (V6). The other directory runs are the integrator's alone):
+- The patch sha256 33ad59a7… matched, and `git apply --3way --index --binary` exited 0 on the clean worktree.
+  - 3-way merged cleanly against cc77b27's changes: `crashCoachWithdrawal.test.ts`, `lessons/engine.ts` (shared with lanegate), `lessons/objectives.ts`, `lessons/types.ts` and the manifest's strings.{1,3,4,5,6,8,b,d,e}.txt.
+  - Conflicted: only the two generated manifest files, `manifest.json` (the source surface's fingerprint and count, HEAD 13284 against the lane's 13287) and `units.source.txt`. The integrator took the lane side and re-recorded both.
+- **What lands is 39 files** (+3383/−98), 0 CR bytes, staged as `gate-en.patch`, sha256 ef097295…:
+  - the lane's 36;
+  - the C1 pin file `components/sim/lesson-ui/__tests__/crashLeadClearance.test.ts` (condition 1);
+  - a test-only teach of `hud/__tests__/toast-why-room.test.ts` §5.2 to the lane's three-argument banner mount. The lane never ran hud/__tests__, so hud run 1 was 68/69 files, 1 red on «expected … to contain 'titleBg={objectiveTitleUnderHold(bann…'»; mutant M-mount2arg proves the taught test can fail;
+  - `tools/mobile/lesson-audit.mjs` `ROUTE_HOLD_CRASH_PINNED_BG` set to the 53-character stem «След удара — ако колата опира в удареното, първо леко», with a comment (E8, condition 3); mutant T-oldlead proves it.
+  - The merge verifier applied the lane patch 3-way to a temporary index on cc77b27, leaving out the manifest: the 21 files it touched all have the gate's blobs, and only the pin, the teach, the constant and the 15 generated manifest files differ. No protected threshold appears in the product diff.
+- **The reviewed-text manifest** was re-recorded once on the landed tree (49/49), byte-identical whether recorded from the merged files or from cc77b27's. Against HEAD 28 entries moved, all the lane's endings strings; source strings 13,271 at base, 13,284 at HEAD, 13,300 landed. Report: `scratch/en-land/manifest-report-vsHEAD.txt`.
+- **Directories**, all green: clips 19/19 files, 302 (the clip-plan freshness gate green, no regeneration); lessons/__tests__ 127/127, 2,456 passed, 165 skipped (endings-gate1-runout, route-runout); lessons/scenario/__tests__ 202/202, 5,002 passed, 1 skipped (endings-chassis, the manifest, caption-truth, keep-right census); components/sim 98/98, 1,686 (crashLeadClearance, and touchHintLifetime and guidance-lane-align-span with tools/ present, so no ENOENT); orchestrator 41/41, 528; rules 101/101, 1,826; traffic 53/53, 675; runtime 48/48, 875; scene 47/47, 787; vehicle 22/22, 299; world 135/135, 2,409; hud 69/69, 1,388 after the teach; traces 170/170, 2,372.
+  - The merge verifier's own runs: scenario 202/202 files, 5,002 passed, 1 skipped; lessons 127/127, 2,456 passed, 165 skipped; components/sim + scene + clips + hud/__tests__ 233/233 files, 4,163/4,163, the freshness gate green.
+- tsc: 21 errors, the environment baseline, none in a touched file.
+- **Census**, HEAD against landed (the lane's r4 probe, liveChainReplay, 2,434 cells each, 0 errors):
+  - 0 grade, 0 phase, 0 rule-event and 0 hold-kind changes. Endings changed 410 and endedAtSec 363, the same as the lane's base → r4. Never-ended 503 = 503.
+  - «Стигна края на маршрута» more than 2.5 m from routeEndMark: HEAD 383, landed 31. 26 of the 31 are past the mark along the run-out, which E1 allows. 5 are exam-mode L4 cells with no run-out armed, byte-identical on HEAD, the landed tree and the lane's signed-off r4 census (see «Not cured by this landing» above for the merge verifier's reading of them).
+  - For the HEAD baseline 13 files were swapped to cc77b27 and restored from the index with a sha256 check; the probe was moved out to `scratch/en-land/probes/`.
+- **Tools tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4 runs it): the worktree run is 2,029 tests, 2,006 pass, 8 fail, in the integrator's run and in the merge verifier's own (V6).
+  - The 8 are the deck-captions freeze («the corpus has not changed since it was measured») and 7 environmental reds: build-redrive §9(a)(b)(d)(e), count-agreement and finding-reader, «could not find .audit-frames/findings», and lane-evidence, «Cannot find module 'playwright'».
+  - Re-run read-only against the main-tree resources, they are green (finding-reader 7/7, build-redrive 69/69, lane-evidence 10/10) except count-agreement's apply-reroute line, «apply-reroute.mjs printed no WORKED line» (13/14), which comes from running the worktree's script against the main tree's corpus.
+  - route-fidelity 45/45; path-follow is green inside the full run, with only its ⚠ todo items. The `/удар|притисн/` matchers needed no change.
+  - The worktree cannot judge the tools gate: the main-tree gate decides.
+
+**Owed.**
+- **The rig re-drive, right after the gate**, through `/dev/drive-rig` on PC and on the phone lens:
+  - a stalled sc-crossing-dart drive (row A): no «Стигна края» more than 2.5 m short of the mark;
+  - an exam-mode drive (row A on the exam path, N1 and D1), e.g. sc-park-parallel-exit/mistake-no-room L4: the gate-2 ending's sentence on a car that did not arrive;
+  - the sc-hz-brake-dont-swerve PC keyboard swerve with the brake held (row B): the banner and guidance 10 s after rest, and the new ending at rest + 12 s;
+  - a reverse into sc-pk-driveway's wall (row C), three ways, reading the card, the peek and the lead each time: straight («напред»); on a lock (front swing, «назад» with the front-swing corrective); and a front-swing wedge (direction-free);
+  - on sc-pk-driveway, the advised move made with a firmer-than-light throttle (e.g. pk L1 b0 n9, «назад»): whether a heavier input runs the car into the other wall (the verifier's throttle-0.5 note, condition 2);
+  - the three crash leads in the folded banner on PC and phone (W6/W7);
+  - CUT-R / CUT-L on sc-hz-brake-dont-swerve: the free car's pin ending.
+  Whether those frames close 1c7a07d8, 870904d4 or 7fa8b79e is for that wave's judge and verifier.
+- **The founder is told:**
+  - rulings E1–E13;
+  - the cost of E11;
+  - the three recorded settles (condition 2);
+  - the round-2 verifier's question about the free branch after a person strike.
+- **Lane «examend»** (N1, decision D1): under ruling E1, the exam stoppedStuck / gate-2 sentence says «Стигна края» only when `routeRunOutArrived` holds, otherwise a true non-arrival sentence.
+- **Lane «vruafterstrike»** (candidate 1 of «Recorded, not filed», decision D2): no shown text may invite the student to drive on after striking a person; the duty is named only by retrieval from content/law.
+- **The device check of the three unbilled settles** (condition 2).
+- **The tools/ tests on the main tree:** the worktree run is 2,006 pass / 8 fail (the deck-captions freeze and 7 environmental reds, re-run green against the main-tree resources except count-agreement's apply-reroute line), and the main-tree gate decides. touchHintLifetime and guidance-lane-align-span §7, which were red in the lanes for ENOENT (the §1 and §6 timeouts of the lane's batch run did not recur when the file ran alone), are green in components/sim on the integration worktree, where tools/ is present.
+- **Not measured:**
+  - any of this on a device;
+  - contacts with façades and other world colliders that are not listed bodies.

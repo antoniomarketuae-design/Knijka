@@ -265,10 +265,14 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
     return p!;
   }
   const TASK = "Премини през кръговото и излез с десен мигач";
-  const PINNED = objectiveTitleUnderHold(TASK, "crashPinned")!;
+  // Rounds 2–3 (E5 / E9): the rig's drive struck the island — world geometry, not a listed scenery box, so
+  // no END is known and the lead's way out is the direction-free «я отдръпни».
+  const PINNED = objectiveTitleUnderHold(TASK, "crashPinned", "away")!;
 
   it("THE RIG'S BANNER, one line: the same sentence, whole in the DOM, set on one line with an ellipsis — and it starts with the hold's own order", () => {
-    expect(PINNED).toBe(`Колата е притисната след удара — измъкни се назад, за да продължиш: ${TASK}`);
+    // Lane endings (2026-10-18, integrator ruling E3): the lead is conditional now — the hold cannot tell a car
+    // pressed against what it hit from one standing free of it — and no longer than the lead it replaced (66; round 2: 59).
+    expect(PINNED).toBe(`След удара — ако колата опира в удареното, първо леко я отдръпни: ${TASK}`);
     const p = sentenceOf(true, PINNED);
     expect(p.props.children, "the one-line form changed the sentence").toBe(PINNED);
     const cls = String(p.props.className).split(/\s+/);
@@ -276,8 +280,9 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
     expect(cls).not.toContain("break-words");
     // the line begins with the hold's condition and its order. Where it ends is the browser's to say and is
     // not asserted here; laid out in Chromium at the rig's 304 px (lane scratch r2/spike/banner.mjs) the banner
-    // goes 76.25 → 48.75 px and the line ends after «…измъкни се назад,»
-    expect(PINNED.startsWith("Колата е притисната след удара — измъкни се назад")).toBe(true);
+    // goes 76.25 → 48.75 px and the line ended after «…измъкни се назад,» with the old lead; the new lead is the
+    // 59–64 characters (rounds 2–3), and where its line ends on the device is owed to the rig (lane endings' report).
+    expect(PINNED.startsWith("След удара — ако колата опира в удареното")).toBe(true);
   });
 
   it("NOT ASKED FOR: the banner is the banner it was — the sentence wraps and nothing is cut", () => {
@@ -300,7 +305,8 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
 
   it("IN THE SHELL: the sentence's expression is the base's — ONE field for the banner and the follow-hint pill — and the one-line form is a second prop", () => {
     const shell = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
-    expect(shell).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold)}");
+    // Round 2 (E5): the same ONE field, now with the way out the advisor card names.
+    expect(shell).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}");
     expect(shell).toContain("oneLine={bannerOneLineWhileReading(snap.objectiveHold, toastReader.bannerYields)}");
     // the only `truncate` in the banner is the one-line arm's
     const banner = readFileSync(resolve(__dirname, "../../../../modules/sim/hud/ObjectiveBanner.tsx"), "utf8");

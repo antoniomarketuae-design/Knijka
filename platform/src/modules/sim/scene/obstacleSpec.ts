@@ -204,3 +204,67 @@ export type ScenarioObstacleSpec =
   | ScenarioAnimalObstacle
   | ScenarioWorkerObstacle
   | ScenarioFuelStationObstacle;
+
+// ---------------------------------------------------------------------------
+// THE STATIONARY COLLIDER BOXES — lane endings round 3 (integrator ruling E9)
+// ---------------------------------------------------------------------------
+//
+// The header above keeps colliders with the component, and the MOUNT still
+// lives there (components/sim/ScenarioObstacles.tsx: `ObstacleWall`,
+// `PropInstances`). Two of its numbers moved here, unchanged, because a pure
+// reader now needs them and must read the SAME numbers the colliders are
+// mounted with, not a copy: the lesson engine's crash pin says which END of
+// the car touched a stationary body at a COLLISION bill (lessons/finish.ts
+// `crashPinContactEnd`), so the crash hold can tell a car pressed against a
+// wall which way is away from it. The component imports both back and
+// re-exports `PROP_COLLIDERS`, so every existing importer reads the same
+// object.
+
+/** A wall's default thickness when the spec omits it, m (ObstacleWall). */
+export const WALL_DEFAULT_THICKNESS_M = 0.3;
+
+/**
+ * Prop colliders — sized to what a bumper (chassis box bottom ≈ 0.28 m) can
+ * actually reach, NOT the ground-level base plate (tools/blender/
+ * scenario_props.py documents the same contract):
+ *  - cone: 0.50 m tall, body ≈ Ø12–16 cm at bumper heights → 16 cm square.
+ *  - pole: 1.5 m marker (колче), Ø5 cm shaft → 8 cm square (a hair generous
+ *    so a brushing pass registers instead of tunnelling past a 5 cm sliver).
+ * Half-extents: x = width, y = height, z = length (along the heading).
+ */
+export const PROP_COLLIDER_DIMS: Readonly<
+  Record<ScenarioPropKind, { half: { x: number; y: number; z: number }; centerY: number }>
+> = {
+  cone: { half: { x: 0.08, y: 0.25, z: 0.08 }, centerY: 0.25 },
+  pole: { half: { x: 0.04, y: 0.75, z: 0.04 }, centerY: 0.75 },
+};
+
+/**
+ * The plan-view boxes (district metres, heading of the LENGTH axis, 0 = north,
+ * clockwise — collision `Obb2D`) of the obstacles in `obstacles` that mount a
+ * STATIONARY, untagged collider — the bodies a contact grades as
+ * `staticObject`: walls (length along the heading, thickness across) and props
+ * (`PROP_COLLIDER_DIMS`). Vehicles grade as `vehicle`, and animals, workers and
+ * the forecourt are not listed (no box here is theirs to claim), so a contact
+ * with one of those reads as an unlisted body — never a guess.
+ */
+export function staticContactBodiesOf(
+  obstacles: readonly ScenarioObstacleSpec[],
+): { x: number; y: number; headingDeg: number; halfLengthM: number; halfWidthM: number }[] {
+  const out: { x: number; y: number; headingDeg: number; halfLengthM: number; halfWidthM: number }[] = [];
+  for (const o of obstacles) {
+    if (o.kind === "wall") {
+      out.push({
+        x: o.x,
+        y: o.y,
+        headingDeg: o.headingDeg,
+        halfLengthM: o.lengthM / 2,
+        halfWidthM: (o.thicknessM ?? WALL_DEFAULT_THICKNESS_M) / 2,
+      });
+    } else if (o.kind === "prop") {
+      const d = PROP_COLLIDER_DIMS[o.prop];
+      out.push({ x: o.x, y: o.y, headingDeg: o.headingDeg, halfLengthM: d.half.z, halfWidthM: d.half.x });
+    }
+  }
+  return out;
+}

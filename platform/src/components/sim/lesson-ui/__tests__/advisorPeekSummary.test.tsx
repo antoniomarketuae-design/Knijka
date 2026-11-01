@@ -129,7 +129,8 @@ function authoredPrompts(): Array<{ where: string; prompt: AdvisorPrompt }> {
   const out: Array<{ where: string; prompt: AdvisorPrompt }> = [];
   for (const id of PRE_DRIVE_STEP_ORDER) out.push({ where: `preDrive:${id}`, prompt: advisorPromptForPreDriveStep(id) });
   out.push({ where: "routeHold:offRoad", prompt: routeHoldAdvisorPrompt("offRoad") });
-  out.push({ where: "routeHold:crashPinned", prompt: routeHoldAdvisorPrompt("crashPinned") });
+  // Lane endings round 2 (E5): one card per way out — back, forward, away.
+  for (const w of ["back", "forward", "away"] as const) out.push({ where: `routeHold:crashPinned:${w}`, prompt: routeHoldAdvisorPrompt("crashPinned", w) });
   out.push({ where: "controller", prompt: controllerWaitAdvisorPrompt() });
   out.push({ where: "railRed", prompt: railPriorityWaitAdvisorPrompt() });
   out.push({ where: "railRed:convicted", prompt: railPriorityWaitAdvisorPrompt(true) });
@@ -154,7 +155,7 @@ function evalVariants(): Array<ObjectiveEvalState | undefined> {
 describe("census — every prompt carries a summary that fits, or can never be an advisor row", () => {
   it("the authored prompts: all of them, all rules", () => {
     const rows = authoredPrompts();
-    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 5 + REASONS.length * 3);
+    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 7 + REASONS.length * 3);
     const broken: string[] = [];
     for (const { where, prompt } of rows) {
       if (typeof prompt.peekBg !== "string") {
@@ -203,10 +204,21 @@ describe("census — every prompt carries a summary that fits, or can never be a
     expect(off.peekBg).toMatch(/^Не дърпай волана/u);
     expect(off.peekBg).toContain("сцеплението е друго");
     expect(off.textBg).toContain("сцеплението е друго");
-    const pinned = routeHoldAdvisorPrompt("crashPinned");
-    expect(pinned.peekBg).toMatch(/назад/u);
-    expect(pinned.peekBg).toContain("притиска");
-    expect(pinned.textBg).toContain("притиска");
+    // Round 2 (E5): the act names the way away from the struck body — «назад» after a
+    // forward strike, «напред» after a reversing one, «отдръпни я» where the side is unknown.
+    for (const [w, act] of [["back", /назад/u], ["forward", /напред/u], ["away", /отдръпни я/u]] as const) {
+      const p = routeHoldAdvisorPrompt("crashPinned", w);
+      expect(p.peekBg).toMatch(act);
+      expect(p.peekBg).toContain("притиска");
+      expect(p.textBg).toContain("притиска");
+      expect(p.peekBg).toMatch(/^Ако опира/u);
+      expect(p.textBg).toMatch(/^Ако колата опира/u);
+    }
+    const pinned = routeHoldAdvisorPrompt("crashPinned", "back");
+    // Conditional since lane endings (2026-10-18, integrator ruling E3): the act
+    // is for a car that touches what it hit — the hold cannot tell which.
+    expect(pinned.peekBg).toMatch(/^Ако опира/u);
+    expect(pinned.textBg).toMatch(/^Ако колата опира/u);
   });
 
   it("the mirror lines name the LOOK, not a mouse or a hold the phone does not have", () => {
@@ -289,10 +301,18 @@ describe("advisorOverlayRow — the hint card's shape", () => {
   });
 
   it("04-t178s: the key chip rides in the sheet, not in the two lines", () => {
+    // Lane endings (2026-10-18, integrator ruling E3): the pinned card carries
+    // no chip any more (its reverse is conditional), so the sheet is the
+    // sentence alone; the rule — no chip in the two lines — is held on the
+    // reverse park, which still carries «[».
     const prompt = routeHoldAdvisorPrompt("crashPinned");
     const row = advisorOverlayRow(prompt);
     expect(row.peekBg).not.toContain("[");
-    expect(row.detailBg).toBe(`${prompt.textBg} ([)`);
+    expect(row.detailBg).toBe(prompt.textBg);
+    const park = { ...prompt, keys: ["["] };
+    const parkRow = advisorOverlayRow(park);
+    expect(parkRow.peekBg).not.toContain("[");
+    expect(parkRow.detailBg).toBe(`${prompt.textBg} ([)`);
   });
 
   it("a sentence that already fits does not grow a button that opens itself", () => {

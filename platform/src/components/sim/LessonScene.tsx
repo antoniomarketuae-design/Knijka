@@ -330,10 +330,10 @@ const FOLLOW_HINT_POLL_S = 0.25;
  * banner and the advisor card. Absent means null, which means the pill exactly
  * as it shipped.
  *
- * A HOLD OF EITHER KIND. `crashPinned` stands the pill down too. A car pinned
- * against what it hit is told «Съвсем леко назад с прави колела…» — back out
- * first — and „follow the line" would compete with the one order that card
- * gives.
+ * A HOLD OF EITHER KIND. `crashPinned` stands the pill down too. A car held
+ * after a crash is told «Ако колата опира в удареното, първо съвсем леко
+ * назад…» — ease back first if it touches what it hit (conditional since lane
+ * endings, 2026-10-18) — and „follow the line" would compete with that card.
  *
  * MEASURED ON THE PARKING CORPUS, the direction that is worse than the defect:
  * all 78 committed sc-park-* / sc-pk-* tapes (26 shadow-correct, 52 mistake),

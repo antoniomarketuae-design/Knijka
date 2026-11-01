@@ -2346,6 +2346,26 @@ export interface LessonSessionState {
    */
   touchedNamedBodies?: readonly string[];
   /**
+   * Lane endings round 3 (integrator ruling E9; additive, ENGINE session state
+   * only — the wire, the store and SimTick do not carry it). The collider
+   * boxes of the STATIONARY scenery the world mounts for this lesson (held
+   * walls and props — `components/sim/ScenarioObstacles lessonStaticContactBodies`,
+   * from the very numbers its colliders are mounted with), handed in at
+   * session creation (`LessonEngineOptions.staticContactBodies`). Read ONLY to
+   * say which END of the car touched a stationary body at a COLLISION bill
+   * (`crashPin.impact.end`) — a coaching fact for the crash hold's way out
+   * and the pin ending's corrective. Grades nothing, ends nothing. Absent
+   * (a session created without them) reads as no fact: the end is `unknown`
+   * and the advice direction-free, which is true of every contact.
+   */
+  staticContactBodies?: readonly {
+    x: number;
+    y: number;
+    headingDeg: number;
+    halfLengthM: number;
+    halfWidthM: number;
+  }[];
+  /**
    * FR-B5-JAM (additive) — the CRASH PIN (finish.ts CRASH_PIN_STUCK_S).
    *
    * Armed by a graded COLLISION with the pose it happened at; disarmed the
@@ -2371,6 +2391,39 @@ export interface LessonSessionState {
      * ends nothing. Absent reads as false (not yet at rest).
      */
     cameToRest?: boolean;
+    /**
+     * Lane endings rounds 2–3 (integrator rulings E5 / E6, E9 / E10;
+     * additive, ENGINE session state only — the wire, the store and SimTick do
+     * not carry it). The facts recorded at THIS arm (the last impact): which
+     * way the car was travelling (the signed speed at the grid point before
+     * the contact), the kind of body the bill names, and — round 3 — which END
+     * of the car touched a stationary body at the bill (`finish.ts
+     * crashPinContactEnd`, measured against `staticContactBodies`). Re-set on
+     * every re-arm. Read by the crashPinned hold's way-out advice (the END)
+     * and the pin ending's corrective (end × travel × body) — `finish.ts
+     * crashPinImpact`, `crashPinWayOut`, `crashPinCorrective`. Grades nothing
+     * and ends nothing. Absent reads as nothing known: the direction-free
+     * advice and the corrective that names no body.
+     */
+    impact?: {
+      travel: "forward" | "reverse" | "unknown";
+      body: "staticObject" | "vehicle" | "pedestrian" | "cyclist" | null;
+      end?: "front" | "rear" | "both" | "neither" | "unknown";
+    };
+    /**
+     * Lane endings round 4 (integrator ruling E11; additive, ENGINE session
+     * state only — the wire, the store and SimTick do not carry it). Which END
+     * of the car is more than SWEEP_RESOLUTION_M clear of EVERY listed
+     * stationary body (`staticContactBodies`) on THIS grid point's pose —
+     * re-measured on every tick while the pin is armed, so a second contact
+     * after the bill, inside the same open contact episode (not billed, so no
+     * re-arm), is seen (`finish.ts crashPinClearEnds`). Read ONLY by the
+     * crashPinned hold's way out (`finish.ts crashPinWayOut`): «назад» needs
+     * the rear clear, «напред» the front; otherwise the direction-free advice.
+     * Grades nothing and ends nothing. Absent (a session without bodies) reads
+     * as no fact: the direction-free advice.
+     */
+    clear?: { front: boolean; rear: boolean };
   };
   /**
    * O22 — session time the current OFF-NETWORK run began (`finish.ts`
@@ -2416,6 +2469,48 @@ export interface LessonSessionState {
     fromY: number;
     elapsedSec: number;
   };
+  /**
+   * THE STALLED RUN-OUT (additive, 2026-10-18, lane endings — integrator ruling
+   * E1). Gate 1 (`routeFinishZone`) still ARMS the ending of a chain that will
+   * not complete — an earlier task open, or the terminal objective made
+   * unearnable — but on a route that ends at an arrival waypoint it no longer
+   * ENDS the drive on the frame it latches, on the ladder-widened ring. From
+   * that frame the drive runs out to the mark exactly like `routeRunOut` (the
+   * same three exits, the same freeze), and only an arrival
+   * (`finish.ts routeRunOutArrived`) is told «Стигна края на маршрута».
+   *
+   * Written on the latch frame and carried, unchanged in shape, until the drive
+   * ends; while it is present the objective chain is FROZEN as it stood on the
+   * latch frame (the frame base ended on), so the added road can neither earn
+   * nor refuse a task. `arm` records which of gate 1's two arms armed it — a
+   * census fact, read by nothing graded.
+   *
+   * Absent on every drive gate 1 never latched on, on every route with no
+   * arrival mark (`routeEndMark` null: those end on the latch frame as before),
+   * and on every drive whose chain completed. Not carried by the wire or the
+   * store.
+   */
+  routeFinishRunOut?: {
+    markX: number;
+    markY: number;
+    fromX: number;
+    fromY: number;
+    elapsedSec: number;
+    arm: "earlierTaskOpen" | "terminalUnearnable";
+  };
+  /**
+   * THE UNEARNABLE TERMINAL'S STANDSTILL (additive, 2026-10-18, lane endings —
+   * integrator ruling E2). The session time a car whose chain stands on an
+   * UNEARNABLE terminal objective (`engine.ts terminalUnearnable`, the value
+   * that arms gate 1) last came to a full standstill — magnitude ≤
+   * `finish.ts FINISH_STANDSTILL_KMH`, on the network, OUTSIDE gate 1's disc —
+   * or absent while any of that is untrue. Cleared by the lawful-wait freeze
+   * (B15), by any motion, by entering gate 1's disc and by leaving the network.
+   * At `finish.ts FINISH_STUCK_S` the drive ends where the car stands, on
+   * `finish.ts openTasksEndingCopy`. Grades nothing. Not carried by the wire
+   * or the store.
+   */
+  unearnableStillSinceSec?: number;
 }
 
 // ---------------------------------------------------------------------------

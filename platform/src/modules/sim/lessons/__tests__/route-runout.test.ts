@@ -331,6 +331,166 @@ describe("catalogue — a completed route ends AT its end, on every rung", () =>
 });
 
 // ---------------------------------------------------------------------------
+// 2b. THE SAME CENSUS, WIDENED TO STALLED CHAINS (lane endings, 2026-10-18 —
+//     row sc-crossing-dart:1c7a07d8, integrator ruling E1)
+// ---------------------------------------------------------------------------
+//
+// The census above skips every route this flat driver cannot complete, and
+// that skip hid the inversion it forbids: a chain that stalls on an earlier
+// task was ended by gate 1 half a second inside the ladder-widened ring, on
+// «Стигна края на маршрута». Measured at 219ac1e with exactly this driver
+// (every located objective, then 60 m on): 300 stalled endings, mean 7.40 m
+// short of the mark at L1 against 3.63 m at L5, and 44 of the 52 templates
+// with both rungs inverted by more than 0.5 m (sc-crossing-dart 10.0 / 7.8 /
+// 4.4 / 4.4 / 4.4 m at L1–L5, still rolling). The stalled run-out
+// (finish.ts) now decides those endings; this census holds it.
+//
+// A FINER CLOCK THAN THE CENSUS ABOVE, and why. At 0.1 s and 40 km/h the
+// driver moves 1.11 m a tick — more than the 0.5 m inversion margin — so two
+// rungs that both ARRIVE can differ by a whole tick of road (measured:
+// sc-merge-from-property ends 2.44 m short at L1 and 1.33 m at L5, both
+// arrivals, because the L5 latch fell inside the arrival radius one tick
+// later). At 0.02 s a tick is 0.22 m, under the margin.
+
+const LOCATED = (p: ObjectiveParams): Pt | null => {
+  const a = p as unknown as { x?: unknown; y?: unknown };
+  return typeof a.x === "number" && typeof a.y === "number" ? { x: a.x, y: a.y } : null;
+};
+
+interface StalledRow {
+  id: string;
+  level: number;
+  stalled: boolean;
+  ended: boolean;
+  shortM: number;
+  /** Past the mark along the driver's own last leg. */
+  past: boolean;
+  /** The ending card's explanation, if any. */
+  text: string | null;
+  titleBg: string | null;
+  arm: string | null;
+}
+
+/** spawn → every LOCATED objective → 60 m past the last, flat 40 km/h, 0.02 s. */
+function driveLocated(lesson: LessonSpec, params: ObjectiveParams[], mark: Pt): Omit<StalledRow, "id" | "level"> {
+  const pts: Pt[] = [spawnOf(lesson)];
+  for (const p of params) {
+    const q = LOCATED(p);
+    if (q) pts.push(q);
+  }
+  const a = pts[pts.length - 2];
+  const b = pts[pts.length - 1];
+  const m = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const ux0 = (b.x - a.x) / m;
+  const uy0 = (b.y - a.y) / m;
+  pts.push({ x: b.x + ux0 * 60, y: b.y + uy0 * 60 });
+  const DT = 0.02;
+  const MPS = 40 / 3.6;
+  let session: LessonSessionState = createLessonSession(lesson);
+  let t = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const from = pts[i - 1];
+    const to = pts[i];
+    const legM = Math.hypot(to.x - from.x, to.y - from.y);
+    if (legM < 1e-6) continue;
+    const ux = (to.x - from.x) / legM;
+    const uy = (to.y - from.y) / legM;
+    for (let s = 0; s <= legM; s += MPS * DT) {
+      const pos = { x: from.x + ux * s, y: from.y + uy * s };
+      const r = applyTick(
+        session,
+        makeTick({ t, speedKmh: 40, maxSpeedKmh: 130, position: pos, headingDeg: (Math.atan2(ux, uy) * 180) / Math.PI }),
+      );
+      session = r.state;
+      t += DT;
+      if (session.phase !== "driving") {
+        const ending = r.hudEvents.find((e) => e.kind === "lesson" && /^Край/u.test(e.titleBg ?? "")) as
+          | { titleBg?: string; explanationBg?: string }
+          | undefined;
+        return {
+          stalled: session.objectives.some((o) => o.status !== "done"),
+          ended: true,
+          shortM: Math.hypot(pos.x - mark.x, pos.y - mark.y),
+          past: (pos.x - mark.x) * ux0 + (pos.y - mark.y) * uy0 > 0,
+          text: ending?.explanationBg ?? null,
+          titleBg: ending?.titleBg ?? null,
+          arm: session.routeFinishRunOut?.arm ?? null,
+        };
+      }
+    }
+  }
+  return { stalled: true, ended: false, shortM: NaN, past: false, text: null, titleBg: null, arm: null };
+}
+
+describe("catalogue — a STALLED route ends at its end too, and is told it arrived only when it did", () => {
+  const rows: StalledRow[] = [];
+  for (const spec of SCENARIO_TEMPLATES) {
+    for (const rung of spec.levels) {
+      const lesson = compileScenario(spec, rung.level);
+      const params = lesson.objectives.map(parseObjectiveParams);
+      if (params.length < 2) continue;
+      const mark = routeEndMark(params);
+      if (mark === null) continue;
+      rows.push({ id: spec.id, level: rung.level, ...driveLocated(lesson, params, mark) });
+    }
+  }
+  const stalled = rows.filter((r) => r.ended && r.stalled);
+  const ARRIVAL = "Стигна края на маршрута";
+
+  it("drove the catalogue and measured it: hundreds of stalled endings, every distance finite", () => {
+    expect(rows.length).toBeGreaterThan(600);
+    expect(stalled.length).toBeGreaterThan(250);
+    expect(stalled.filter((r) => !Number.isFinite(r.shortM))).toEqual([]);
+    // Every one of them was armed by gate 1's earlier-task arm (this driver
+    // touches nothing, so no terminal is made unearnable).
+    expect(stalled.filter((r) => r.arm !== "earlierTaskOpen").map((r) => `${r.id}@L${r.level} ${r.arm}`)).toEqual([]);
+  });
+
+  it("no stalled ending is told «Стигна края на маршрута» short of the mark: within ROUTE_RUNOUT_ARRIVE_M of it, or past it", () => {
+    const told = stalled.filter((r) => r.text?.includes(ARRIVAL));
+    expect(told.length).toBe(stalled.length); // this driver drives through, so every one arrives
+    const false_ = told.filter((r) => !(r.shortM <= ROUTE_RUNOUT_ARRIVE_M + 1e-9 || r.past));
+    expect(false_.map((r) => `${r.id}@L${r.level} ${r.shortM.toFixed(2)} m short`)).toEqual([]);
+  });
+
+  it("the four filed families end at the mark on every rung, L1 to L5, under their own titles", () => {
+    for (const id of ["sc-crossing-dart", "sc-follow-distance", "sc-speed-zone", "sc-junction-stop"]) {
+      const mine = stalled.filter((r) => r.id === id);
+      expect(mine.map((r) => r.level), id).toEqual([1, 2, 3, 4, 5]);
+      for (const r of mine) {
+        expect(r.shortM <= ROUTE_RUNOUT_ARRIVE_M || r.past, `${id}@L${r.level} ${r.shortM.toFixed(2)} m`).toBe(true);
+        expect(r.text, `${id}@L${r.level}`).toContain(ARRIVAL);
+        expect(r.titleBg).toBe(r.level === 4 ? "Край на изпитния маршрут" : "Край на маршрута");
+      }
+    }
+  });
+
+  it("the tolerance ladder no longer shortens a beginner's STALLED drive either: L1 ends no further from the mark than L5 + 0.5 m", () => {
+    const byId = new Map<string, Map<number, number>>();
+    for (const r of stalled) {
+      const m = byId.get(r.id) ?? new Map<number, number>();
+      m.set(r.level, r.shortM);
+      byId.set(r.id, m);
+    }
+    const inverted: string[] = [];
+    let pairs = 0;
+    for (const [id, m] of byId) {
+      const l1 = m.get(1);
+      const l5 = m.get(5);
+      if (l1 === undefined || l5 === undefined) continue;
+      pairs++;
+      if (l1 > l5 + 0.5) inverted.push(`${id}: L1 ${l1.toFixed(2)} m, L5 ${l5.toFixed(2)} m`);
+    }
+    expect(pairs).toBeGreaterThan(40);
+    expect(inverted).toEqual([]);
+  });
+
+  it("…and the run-out made no drive stop ending: the rungs this bare driver never ends are not more than at 219ac1e (114, out of scope)", () => {
+    expect(rows.filter((r) => !r.ended).length).toBeLessThanOrEqual(114);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3. The three exits, and the freeze — a drive must still always END
 // ---------------------------------------------------------------------------
 

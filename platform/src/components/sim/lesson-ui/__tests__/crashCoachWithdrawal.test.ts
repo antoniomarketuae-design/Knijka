@@ -134,7 +134,7 @@ function drive() {
           lessonDescriptionBg: lesson.descriptionBg,
           governorCapKmh: null,
         });
-      const banner = objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold);
+      const banner = objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut);
       glass.push({
         t,
         card: {
@@ -185,13 +185,22 @@ describe("sc-roundabout-entry L3 — the island contact of drive b, through the 
       expect(g.banner.off).toBe(g.banner.on);
     }
     const late = RUN.glass.find((g) => g.t >= RUN.impactT! + ROUTE_HOLD_S + 0.05)!;
-    expect(late.banner.on).toMatch(/^Колата е притисната след удара/);
+    // Lane endings (2026-10-18, integrator ruling E3): the lead is CONDITIONAL —
+    // the hold is raised by pose and time and never knows whether the car is
+    // pressed, so it no longer says «Колата е притисната» (false of a car that
+    // stands free of what it hit, measured on sc-hz-brake-dont-swerve CUT-L/R).
+    // Rounds 2–3 (E5 / E9): and it names the way AWAY from what was struck only
+    // where the END of the car that touched it is known — the island is world
+    // geometry, not one of the scenery's listed boxes, so the lead is the
+    // direction-free one.
+    expect(late.banner.on).toMatch(/^След удара — ако колата опира в удареното, първо леко я отдръпни: /);
     expect(late.banner.off).toBe(late.banner.on);
   });
 
   it("…and from ROUTE_HOLD_S the coach is the recovery card, as before", () => {
     const first = RUN.glass.find((g) => g.t >= RUN.impactT! && g.card.on !== null);
-    expect(first?.card.on).toBe(routeHoldAdvisorPrompt("crashPinned").textBg);
+    // Round 3 (E9): no listed body touched (the island) — the direction-free card.
+    expect(first?.card.on).toBe(routeHoldAdvisorPrompt("crashPinned", "away").textBg);
     expect(first!.t - RUN.impactT!).toBeGreaterThanOrEqual(ROUTE_HOLD_S - 1e-9);
     expect(first!.t - RUN.impactT!).toBeLessThanOrEqual(ROUTE_HOLD_S + 1 / 60 + 1e-9);
   });

@@ -113,14 +113,23 @@ import {
   CRASH_PIN_STUCK_S,
   FINISH_STANDSTILL_KMH,
   ROUTE_RUNOUT_MAX_S,
+  UNEARNABLE_STANDSTILL_S,
+  armRouteFinishRunOut,
+  crashPinEndingCopy,
+  crashPinClearEnds,
+  crashPinContactEnd,
+  crashPinImpact,
   createFinishGate,
+  openTasksEndingCopy,
   routeDepartedEndingCopy,
   routeEndMark,
   routeFinishZone,
   offNetworkEndingCopy,
+  routeApproachFrom,
   routeRunOutArrived,
   stepOffNetwork,
   stepFinishGate,
+  stepRouteFinishRunOut,
   stepYieldWait,
   TASK_CAP_STRETCH_START,
   stepTaskCapStretch,
@@ -157,6 +166,15 @@ export interface LessonEngineOptions {
   /** Night flag for the pre-drive machine + rule engine (headlights). */
   isNight?: boolean;
   ruleConfig?: Partial<RuleEngineConfig>;
+  /**
+   * Lane endings round 3 (integrator ruling E9): the collider boxes of the
+   * stationary scenery the world mounts for this lesson — the shell passes
+   * `components/sim/ScenarioObstacles lessonStaticContactBodies(lesson)`.
+   * Coaching only: it lets the crash pin say which END of the car touched a
+   * stationary body (`LessonSessionState.staticContactBodies`). Omitted, the
+   * session is bit-identical to one created before it existed.
+   */
+  staticContactBodies?: LessonSessionState["staticContactBodies"];
 }
 
 export function createLessonSession(
@@ -195,6 +213,9 @@ export function createLessonSession(
     coachedMistakes: [],
     lastT: 0,
     endedAtSec: null,
+    ...(opts.staticContactBodies !== undefined
+      ? { staticContactBodies: opts.staticContactBodies }
+      : {}),
   };
 }
 
@@ -3363,7 +3384,17 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     if (!atOrigin || Math.abs(tick.speedKmh) > POSE_MOTION_KMH) posedAtSec = tick.t;
   }
 
-  if (prev.phase === "driving" && posedAtSec !== undefined && currentIndex < objectives.length) {
+  // THE STALLED RUN-OUT FREEZES THE CHAIN (lane endings, 2026-10-18). Once gate
+  // 1 has latched on a chain that will not complete, its ending is decided and
+  // only WHERE the drive stops is still open (finish.ts „THE STALLED RUN-OUT").
+  // Base ended the drive on that latch frame, so the objectives as they stood
+  // on it are the verdict; the added road may neither earn nor refuse a task.
+  if (
+    prev.phase === "driving" &&
+    posedAtSec !== undefined &&
+    currentIndex < objectives.length &&
+    prev.routeFinishRunOut === undefined
+  ) {
     objectives = [...objectives];
     evalStates = [...evalStates];
 
@@ -3775,6 +3806,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let finishGate = prev.finishGate;
   let finishRescueGate = prev.finishRescueGate;
   let finishDepartureGate = prev.finishDepartureGate;
+  // Lane endings (2026-10-18): the stalled run-out (E1) and the unearnable
+  // terminal's standstill clock (E2) — types.ts carries both.
+  let finishRunOut = prev.routeFinishRunOut;
+  let unearnableStillSinceSec = prev.unearnableStillSinceSec;
   let stoppedStuck = false;
   if (
     prev.phase === "driving" &&
@@ -3785,6 +3820,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   ) {
     const params = objectives.map((o) => o.params);
     const onTerminal = currentIndex === objectives.length - 1;
+    // Hoisted (lane endings) so the E2 standstill below reads the SAME value
+    // that arms gate 1 — never a re-spelling of it. Only the non-frozen branch
+    // computes it; under the lawful-wait freeze the E2 clock is cleared anyway.
+    let terminalUnearnable = false;
 
     if (yieldWait?.holding === true) {
       // B15 — THE FREEZE. This frame is a student standing still because the
@@ -3843,6 +3882,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           strandedDwellSec: 0,
         };
       }
+      // …and the unearnable terminal's standstill (E2) for the same reason: a
+      // second spent stopped because the road said so is evidence of nothing,
+      // so the clock is DROPPED, not paused — exactly as `dwellUnspendable`
+      // drops the crash pin's.
+      unearnableStillSinceSec = undefined;
     } else {
       // Gate 1 — the stalled chain. Presence-based and generous, and it stays
       // off the terminal objective, where every correct final approach would
@@ -3880,7 +3924,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // `null` stays „unknown" and leaves the strand exactly where it was.
       const terminalActiveSince =
         currentIndex === 0 ? 0 : objectives[currentIndex - 1].completedAtSec;
-      const terminalUnearnable =
+      terminalUnearnable =
         onTerminal &&
         (personContactVoidsObjective(params[currentIndex], struckAPersonInRun) ||
           // The contact term is monotone for exactly the same reason and
@@ -3892,11 +3936,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           // The named body (`stopShortOf`) is monotone for the attempt in the
           // same way, and its one gate — `sc-hzbds-stop` — IS the last
           // objective of its drill, so this arm is load-bearing: without it a
-          // car that struck the block and rolled clear is left for the crash
-          // pin, which closes the drive ten seconds later on «колата остана
-          // притисната на място» — false of a car standing free
-          // (`objectives.ts namedBodyTouchVoidsObjective`). With it the stalled
-          // chain ends where the route ends, on gate 1's own sentence.
+          // car that struck the block and came to rest is not ended by any
+          // gate anchored at the end of the route. With it — as built by lane
+          // endings (2026-10-18) — the ending is decided by where the car
+          // stands: inside gate 1's disc gate 1 arms the ending and the
+          // stalled run-out decides it («Стигна края на маршрута» only on an
+          // arrival — ROUTE_RUNOUT_ARRIVE_M of the mark, or past it — else
+          // `openTasksEndingCopy`); outside the disc, a full standstill on the
+          // network ends it after UNEARNABLE_STANDSTILL_S on that same
+          // sentence (E2, below). The crash pin can still close such a drive
+          // first when the car rests within CRASH_PIN_RADIUS_M of the impact
+          // (ten seconds against twelve), and its sentence no longer claims
+          // the car is pressed against anything (`crashPinEndingCopy`).
           namedBodyTouchVoidsObjective(
             params[currentIndex],
             touchedNamedBodies?.includes(objectives[currentIndex].spec.id) === true,
@@ -3990,6 +4041,38 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         if (zone !== null) {
           finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
         }
+        // ── E2 — A REFUSAL MUST NOT DOUBLE AS A TRAP, WHEREVER THE CAR STANDS ──
+        // (lane endings, 2026-10-18; sc-hz-brake-dont-swerve:870904d4). The arm
+        // above is anchored on gate 1's disc, so a car that has made its own
+        // terminal unearnable and then comes to rest OUTSIDE that disc had no
+        // ending at all: measured at 219ac1e on the product chassis, the keyboard
+        // swerve (full brake + full lock from y 181) clips the block, slides past
+        // and rests 9.852 m from the mark against a 9 m disc and 6+ m from the
+        // impact (so the crash pin has let go) — phase "driving" at 120 s, the
+        // banner still asking for the stop it can no longer earn.
+        //
+        // So a FULL STANDSTILL on the network, outside gate 1's disc, with the
+        // chain on this same unearnable terminal (the value computed above — not a
+        // re-spelling), held UNEARNABLE_STANDSTILL_S (= FINISH_STUCK_S, the B2
+        // bar), ends the drive where the car stands. Magnitude, because reverse
+        // reads negative and backing up is not standing still. Inside the disc
+        // gate 1 owns the ending (and fires first: half a second against twelve),
+        // so the clock never runs there; off the network `stepOffNetwork` owns it,
+        // with its own true sentence. A moving car never accrues, so this is not a
+        // duration cap. Grades nothing: the objective stays active and the result
+        // finished-and-failed.
+        const insideGate1 =
+          zone !== null &&
+          Math.hypot(tick.position.x - zone.x, tick.position.y - zone.y) <= zone.radiusM;
+        const standingOnUnearnable =
+          terminalUnearnable &&
+          finishGate?.reachedAtSec == null &&
+          !insideGate1 &&
+          tick.edgeId !== null &&
+          Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH;
+        unearnableStillSinceSec = standingOnUnearnable ? (unearnableStillSinceSec ?? tick.t) : undefined;
+      } else {
+        unearnableStillSinceSec = undefined;
       }
       // Gate 2 — simply stuck. Runs on EVERY frame regardless of which objective
       // is active, because the state it detects does not care: a car standing
@@ -4063,7 +4146,43 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
 
     stoppedStuck =
       finishGate?.reachedAtSec == null && finishRescueGate?.reachedAtSec != null;
-    if (finishGate?.reachedAtSec != null || stoppedStuck) {
+    // ── E1 — GATE 1 ARMS THE ENDING; ONLY AN ARRIVAL IS TOLD IT ARRIVED ──────
+    // (lane endings, 2026-10-18; sc-crossing-dart:1c7a07d8, integrator ruling
+    // E1). On a route that ends at an arrival mark, gate 1's latch — on either
+    // arm — starts the stalled run-out (finish.ts „THE STALLED RUN-OUT") instead
+    // of ending the drive on the ladder-widened ring: «Стигна края на маршрута»
+    // only on ARRIVED, `openTasksEndingCopy` on AT REST / SPENT. A latch that is
+    // already an arrival ends on this frame, as before. With no arrival mark the
+    // latch ends the drive on this frame, on the sentence it always had.
+    let gateEnding: "routeEnd" | "openTasks" | null = null;
+    if (finishGate?.reachedAtSec != null) {
+      const endMark = routeEndMark(params);
+      if (endMark === null) {
+        gateEnding = "routeEnd";
+      } else {
+        const runOutStep = stepRouteFinishRunOut(
+          finishRunOut ??
+            armRouteFinishRunOut(
+              endMark,
+              routeApproachFrom(params, tick.position),
+              onTerminal ? "terminalUnearnable" : "earlierTaskOpen",
+            ),
+          tick,
+          prev.lastT,
+          yieldWait?.holding === true,
+        );
+        finishRunOut = runOutStep.runOut;
+        if (runOutStep.exit === "arrived") gateEnding = "routeEnd";
+        else if (runOutStep.exit !== null) gateEnding = "openTasks";
+      }
+    } else if (stoppedStuck) {
+      gateEnding = "routeEnd";
+    }
+    if (gateEnding === "openTasks") {
+      phase = "completed";
+      endedAtSec = tick.t;
+      hudEvents.push(openTasksEndingCopy(examMode));
+    } else if (gateEnding === "routeEnd") {
       phase = "completed";
       endedAtSec = tick.t;
       // THEO-4: never a bare verdict. Say WHAT stopped the drive and WHY
@@ -4096,6 +4215,18 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       phase = "completed";
       endedAtSec = tick.t;
       hudEvents.push(routeDepartedEndingCopy(examMode));
+    }
+    // E2's ending (the clock is above): the SAME sentence as E1's at-rest exit —
+    // one state, one sentence. Checked after every gate, so a frame on which a
+    // gate also ends the drive pushes exactly one ending.
+    if (
+      phase === "driving" &&
+      unearnableStillSinceSec !== undefined &&
+      tick.t - unearnableStillSinceSec >= UNEARNABLE_STANDSTILL_S
+    ) {
+      phase = "completed";
+      endedAtSec = tick.t;
+      hudEvents.push(openTasksEndingCopy(examMode));
     }
   }
 
@@ -4236,6 +4367,27 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           dwellUnspendable || rearmMovedM > CRASH_PIN_RADIUS_M
             ? null
             : (crashPin?.stillSinceSec ?? null),
+        // Lane endings round 2 (E5 / E6): what this impact was — the car's
+        // direction of travel off the PREVIOUS grid point's signed speed (this
+        // tick's own speed is read after the solve that stopped it) and the
+        // body the bill names. Round 3 (E9 / E10): and which END of the car
+        // touched a stationary body, measured on THIS tick — the bill's own
+        // grid point, the pose the contact is heard at (ADR-014, amendment
+        // 2026-10-11) — against the scenery the session was handed. Coaching
+        // facts for the hold's way-out advice and the ending's corrective;
+        // nothing reads them to grade or to end.
+        impact: crashPinImpact(
+          prev.lastTick?.speedKmh,
+          scoredEvents
+            .filter((e) => e.kind === "violation" && e.terminateSession === true)
+            .map((e) => (e.kind === "violation" ? e.detail : undefined)),
+          tick.events.filter((e) => e.kind === "collision").map((e) => (e.kind === "collision" ? e.withWhat : undefined)),
+          () =>
+            crashPinContactEnd(
+              { x: tick.position.x, y: tick.position.y, headingDeg: tick.headingDeg },
+              prev.staticContactBodies,
+            ),
+        ),
       };
     } else if (crashPin !== undefined) {
       const awayM = Math.hypot(tick.position.x - crashPin.x, tick.position.y - crashPin.y);
@@ -4263,6 +4415,25 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       const atRestNow = Math.abs(tick.speedKmh) <= CRASH_PIN_DRIVING_KMH;
       const cameToRest = crashed ? atRestNow : crashPin.cameToRest === true || atRestNow;
       if (crashPin.cameToRest !== cameToRest) crashPin = { ...crashPin, cameToRest };
+      // Lane endings round 4 (E11) — IS THE WAY CLEAR, on THIS grid point's
+      // pose: which end of the car has more than SWEEP_RESOLUTION_M of room
+      // from every listed stationary body. Re-measured on every tick the pin
+      // is armed (the hold reads the latest), because the end the bill
+      // measured cannot see a second contact by the OTHER end inside the same
+      // open contact episode — that contact is not billed and does not re-arm
+      // the pin. A coaching fact for the hold's way out only; nothing reads it
+      // to grade or to end. Written only when it changes, and never written for
+      // a session handed no bodies (no fact → the direction-free advice).
+      const clear = crashPinClearEnds(
+        { x: tick.position.x, y: tick.position.y, headingDeg: tick.headingDeg },
+        prev.staticContactBodies,
+      );
+      if (
+        clear !== undefined &&
+        (crashPin.clear === undefined || crashPin.clear.front !== clear.front || crashPin.clear.rear !== clear.rear)
+      ) {
+        crashPin = { ...crashPin, clear };
+      }
     }
   }
   /**
@@ -4303,13 +4474,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     // THEO-4: never a bare verdict. Name what happened, say why the drive is
     // being closed rather than left running, and hand him to the debrief —
     // where the collision's own explanation and corrective already live.
-    hudEvents.push({
-      kind: "lesson",
-      titleBg: examMode ? "Край на изпита след удара" : "Край на упражнението след удара",
-      explanationBg: examMode
-        ? "След удара колата остана притисната на място и маршрутът не може да продължи, затова изпитът приключва тук. Разборът показва удара, всяка останала задача и какво трябваше да се направи преди него."
-        : "След удара колата остана притисната на място и не може да продължи по маршрута — затова урокът приключва тук, вместо да те държи блокиран. Разборът показва как се стига до такъв удар и какво го предотвратява: по-ранно намаляване и достатъчна дистанция до всичко неподвижно напред.",
-    });
+    // The words are only what this gate MEASURED — pose and stillness, never
+    // contact — so they are true of a car pressed against what it hit and of
+    // one standing free of it alike (finish.ts `crashPinEndingCopy`, lane
+    // endings / integrator ruling E3); its corrective is the one true of THIS
+    // crash — keyed on the impact the pin recorded (round 2, ruling E6).
+    hudEvents.push(crashPinEndingCopy(examMode, crashPin.impact));
   }
 
   // A13: exam sessions TERMINATE the moment the official limits are crossed
@@ -4529,6 +4699,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // state to carry: it terminated the session on the frame it was taken, so
       // only the live object is ever written back.
       ...(runOut !== undefined && runOut !== null ? { routeRunOut: runOut } : {}),
+      // Lane endings: additive like the run-out above; the E2 clock is written
+      // while it lives and once more to CLEAR it (`...prev` cannot express a
+      // field going back to absent), so a drive that never stands on an
+      // unearnable terminal writes neither.
+      ...(finishRunOut !== undefined ? { routeFinishRunOut: finishRunOut } : {}),
+      ...(unearnableStillSinceSec !== undefined || prev.unearnableStillSinceSec !== undefined
+        ? { unearnableStillSinceSec }
+        : {}),
       // FR-B5-JAM: the one field that must be able to go BACK to absent (the
       // student reversed out and drove away), which the additive spread above
       // cannot express over `...prev` — so it is written unconditionally.
