@@ -85,11 +85,41 @@ describe("sc-vu-bikelane-turn — mistake demos grade their exact codes (doc 76 
     // contact branch never ran again. Now the sentinel outlives it and the
     // strike on a vulnerable road user is billed.
     //
+    // TWO STRIKES SINCE lane vru2offset (sc-vu-bikelane-turn:9141072b,
+    // integrator ruling V1 — the demo script is kept): the with-flow rider was
+    // authored 2.6 m NORTH of the car's lane (y −1.46, offset −2.6), so this
+    // script's turn never reached his line and only the counter-flow rider was
+    // struck. On the south track (y −6.66, offset +2.6) he is where the card
+    // says, and the same turn runs into him first. MEASURED on this script
+    // (the sentinel's own actorId on every collision report):
+    //   · t 18.13 — COLLISION, the WITH-FLOW rider (sc-vbl-rider-wf): car
+    //     (−6.22, −5.92) turning across his line, rider (−3.36, −6.66) riding
+    //     straight east; reports on 5 consecutive frames to 18.20. His runner
+    //     resolves «collision» and bills no hook (it had billed one at 18.20,
+    //     with him ahead-LEFT at (−3.16, −1.46), off a line the car never crossed);
+    //   · t 18.38 — COLLISION, the COUNTER-FLOW rider (sc-vbl-rider-cf), as
+    //     before (B81); his runner's hook at 18.20 stays on the sheet.
     // COPY DEBT (copy lane): the card still names the priority fault alone.
     const drive = drives.get("mistake-cut-path")!;
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual(["COLLISION", "FAILED_TO_YIELD"]);
-    expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(1);
+    expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(2);
+    // Which body each strike is: the sentinel's actorId, in the order struck.
+    const struck: string[] = [];
+    recordScVuBikelaneTurnDrive(district, "mistake-cut-path", {
+      onTick: (tick) => {
+        for (const e of tick.events) {
+          if (e.kind !== "collision") continue;
+          const id = (e as { actorId?: string }).actorId ?? "(unnamed)";
+          if (!struck.includes(id)) struck.push(id);
+        }
+      },
+    });
+    expect(struck).toEqual(["sc-vbl-rider-wf", "sc-vbl-rider-cf"]);
+    expect(drive.outcomes.map((o) => `${o.eventId}:${o.detail}`)).toEqual([
+      "sc-vbl-rider-wf:collision",
+      "sc-vbl-rider-cf:violation",
+    ]);
     expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
     expect([...SC_VU_BIKELANE_TURN.mistakes[1].codeRefs]).toEqual(["FAILED_TO_YIELD"]);

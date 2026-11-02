@@ -491,7 +491,7 @@ function child(deltas: readonly number[]): RiderRow {
 const rowsOf = (r: RiderRow, kind: string) => r.rows.filter((x) => x[1] === kind);
 
 describe("the chassis into a staged rider's shell — one touch is one kind under one name, and one row", () => {
-  it("sc-vu-bikelane-turn L1, the cut-path demo carried on (the verifier's cell): the sentinel and the shell report the counter-flow rider as ONE cyclist — no «vehicle» report, one cyclist row", () => {
+  it("sc-vu-bikelane-turn L1, the cut-path demo carried on (the verifier's cell): the sentinel and the shell report each rider struck as ONE cyclist — no «vehicle» report, one cyclist row per rider", () => {
     const r = bikelane([1 / 60]);
     note(`[bikelane 60 Hz] clock ${r.shellClock} reports ${JSON.stringify(r.reports)} ear ${JSON.stringify(r.ear)} rows ${JSON.stringify(r.rows)} closed ${r.closedAt}`);
     const rider = r.reports.filter(([, , id]) => id === "sc-vbl-rider-cf");
@@ -503,9 +503,22 @@ describe("the chassis into a staged rider's shell — one touch is one kind unde
     expect(r.reports.filter(([, w]) => w === "vehicle")).toEqual([]);
     expect(r.reports.filter(([, w, id]) => w === "cyclist" && id !== "sc-vbl-rider-cf" && id !== "sc-vbl-rider-wf")).toEqual([]);
     for (const [, w] of rider) expect(w).toBe("cyclist");
-    // ONE row for the touch (it was two: «cyclist» and, one step later, «vehicle»).
+    // ONE row for each touch (it was two: «cyclist» and, one step later, «vehicle»).
+    //
+    // TWO RIDERS ARE STRUCK SINCE lane vru2offset (sc-vu-bikelane-turn:9141072b):
+    // the with-flow rider was authored 2.6 m NORTH of the car's lane (y −1.46),
+    // where this turn never reached him; on the south track (y −6.66) the turn
+    // runs into him first. MEASURED at 60 Hz: base cc77b27 — reports from grid
+    // point 1096, all «sc-vbl-rider-cf», ear [1097 cyclist npc 1001 graded], one
+    // row at t 18.27; this tree — reports from 1051 «sc-vbl-rider-wf» (to 1069)
+    // then from 1137 «sc-vbl-rider-cf», ear [1052 npc 1000 graded, 1138 npc 1001
+    // graded], rows at t 17.52 and 18.95. One row per body struck, each body
+    // heard once by the ear.
     expect(rowsOf(r, "vehicle")).toEqual([]);
-    expect(rowsOf(r, "cyclist").length).toBe(1);
+    const struck = [...new Set(r.reports.map(([, , id]) => id))];
+    expect(struck).toEqual(["sc-vbl-rider-wf", "sc-vbl-rider-cf"]);
+    expect(r.ear.map(([, kind, npcId, graded]) => `${kind}:${npcId}:${graded}`)).toEqual(["cyclist:1000:true", "cyclist:1001:true"]);
+    expect(rowsOf(r, "cyclist").length).toBe(struck.length);
   }, 600_000);
 
   it("…and on every cadence the same reports, the same ear, the same rows, the same sheet", () => {

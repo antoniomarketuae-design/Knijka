@@ -950,12 +950,22 @@ const VBL_CF_Y = -8.26; // westbound rider line (lane center − 4.2)
  * stat and the graded cyclistNear query) because its runner casts it one —
  * lane npcstep rounds 2–4, never the sign of the offset.
  *
- * CONTENT QUESTION, CARRIED (not changed by lane npcstep — it moves a rider):
- * the offset is AUTHORED as `VBL_WF_Y − VBL_THROUGH_Y` = −6.66 − (−4.06) =
- * −2.6, and offsetPolyline offsets to the RIGHT OF TRAVEL (south, for this
- * eastbound rider). So −2.6 carries it 2.6 m NORTH, to y ≈ −1.46 — not the
- * south curb line y = −6.66 the lines above intend (that needs +2.6). Measured
- * in the lane (r2/out/pos.txt); filed for the integrator as a content row.
+ * THE OFFSET IS `VBL_THROUGH_Y − VBL_WF_Y` = −4.06 − (−6.66) = +2.6
+ * (sc-vu-bikelane-turn:9141072b, lane vru2offset). offsetPolyline
+ * (traffic/graph.ts) shifts a path to the RIGHT OF TRAVEL, and this rider
+ * travels EAST, so a POSITIVE offset carries him SOUTH: from the eastbound
+ * lane centre −4.06 to the with-flow line −6.66 of the south track — the
+ * map's meta.scenario.cycleTrack.withFlowYM, the same +2.6 curb line every
+ * sibling curb rider uses. Through 2026-10-19 it was authored
+ * `VBL_WF_Y − VBL_THROUGH_Y` = −2.6, which put him 2.6 m NORTH, at y −1.46:
+ * inside the car's own lane, 2.6 m to its LEFT, on every tick of L1–L5 — so
+ * every sentence of this lesson that names «движещия се направо
+ * велосипедист» behind and to the right was false on every frame, and on
+ * mistake-cut-path his runner billed the hook while he rode ahead-left of the
+ * car, off a line the car never crossed. The world, measured
+ * (vu-bikelane-wf-rider-line.test.ts): y −6.66 from his spawn to the mouth on
+ * every rung; the shadow still yields to him, 13.03–15.20 m closest live
+ * across L1–L5 (14.26 m in the recorder).
  */
 const VBL_RIDER_WF: CyclistRightHookSpec = {
   id: "sc-vbl-rider-wf",
@@ -967,7 +977,7 @@ const VBL_RIDER_WF: CyclistRightHookSpec = {
     pathNodes: ["vu-n-w", "vu-n-c", "vu-n-e"],
     hold: { nodeIndex: 1, offsetM: -30 }, // curb-side, 30 m short of vu-n-c
     cruiseSpeedMps: 3.0, // ~11 km/h — a city cyclist; overtaken below the follow floor
-    extraRightOffsetM: VBL_WF_Y - VBL_THROUGH_Y, // −2.6 AS AUTHORED: rides at y ≈ −1.46, not the south curb line — the content question above
+    extraRightOffsetM: VBL_THROUGH_Y - VBL_WF_Y, // +2.6 — right of travel = SOUTH: the with-flow line y −6.66 (see above)
     colorIndex: 1,
   },
   junctionNodeIndex: 1,
