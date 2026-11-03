@@ -321,6 +321,278 @@ export function releaseTouchControls(touch: TouchInputSource, ...pads: PadPointe
 }
 
 /**
+ * ===========================================================================
+ * 2026-11-01 — A SLIDING THUMB IS OBSERVED IN SAMPLES, NOT CROSSINGS.
+ * ===========================================================================
+ * sc-turn-left-oncoming:d0017a65, integrator rulings R7 / R8 / R9.
+ *
+ * The drive pad is a joystick: a thumb held below the middle brakes and the
+ * middle 44 px command nothing, so a student brakes and lifts by SLIDING the
+ * thumb, which the browser reports as `pointermove`. Browsers align
+ * `pointermove` to the frame and coalesce it — one event per frame, carrying
+ * the LAST digitizer sample's position and time — so a handler that reads only
+ * the event sees one sample per frame, which is frame sampling again: a lift
+ * or a press made and undone inside a frame is invisible, and the crossing
+ * into the brake zone is stamped at the first sample AFTER it (round-2
+ * verifier, F1: 0.12 s lifts armed the assist on 0.25–0.5 s frames).
+ *
+ * R7 — every sample the browser kept: `pointerSamples` hands back the
+ * event's `getCoalescedEvents()` in order, each with its own `clientY` and
+ * `timeStamp`, or the event itself where the list is empty or the method is
+ * absent (not every browser or WebView implements it).
+ *
+ * R8 — a transition made by a SAMPLE happened somewhere after the previous
+ * sample: `PadSampleClock.sample` stamps it as the interval [the previous
+ * sample's time, this sample's] — the bound `pollPadPedals` already gives a
+ * gamepad poll — so a lift is credited only what was observed of it (a lower
+ * bound: release at the LATER end, the next press at the EARLIER end) and a
+ * press likewise. A pointerdown / pointerup is a discrete event at its own
+ * time and stays exact (`begin` / `end`) — so a press is exact when the
+ * pointerdown MAKES it (the thumb put down inside the brake zone) and a release
+ * when the pointerup makes it; a thumb put down in the neutral zone makes no
+ * press, and the press it later slides into is a move (round 5, below). A
+ * pointer the pad ADOPTS mid-slide
+ * has no previous sample the pad saw: its first sample's interval is open
+ * (−∞), which credits no lift before it.
+ *
+ * R9 — what this guarantees against a FALSE R: where the browser keeps
+ * coalesced samples, every slid crossing is placed no earlier than what the
+ * digitizer observed allows, so a lift is never over-credited — no lift
+ * shorter than REVERSE_ASSIST_LIFT_S arms and no press shorter than
+ * REVERSE_ASSIST_HOLD_S shifts, for every lift and press that spans a sample
+ * (one briefer than a scan can fall between two samples unseen). Where
+ * `getCoalescedEvents` is absent the slide is POLLED, like a gamepad: one
+ * sample per event, conservative by the interval (one short lift or press is
+ * never over-credited), but a lift and a press both made between two events
+ * are not seen at all, so pumping near the frame period can read as one long
+ * lift and one long press (ADR-017 «Update 2026-11-01»).
+ *
+ * ===========================================================================
+ * 2026-11-01, ROUND 4 — A RESTING THUMB SENDS NOTHING (rulings R11–R13).
+ * ===========================================================================
+ * A digitizer scans at a fixed period P and the browser sends a sample only
+ * when a scan saw a change, so a thumb resting still between two slides sends
+ * no samples at all. R8's interval then reached back to the LAST sample of the
+ * release slide, before the rest: a real 0.3 s lift ending in a 2 px rest
+ * inside the middle was credited ≈ 0 s, and the ruled gesture slid that way
+ * reached R in 9–10 of 40 phases (round-3 verifier F1). A press sample at T
+ * after silence also says the scan at T − P saw NO change: the crossing came
+ * after T − P.
+ *
+ * R11 — the pad learns P as the smallest POSITIVE spacing between two
+ * consecutive samples INSIDE ONE coalesced list, for the session (never a
+ * constant, never across events — across events a stamp may be a dispatch
+ * time). Every spacing of one digitizer is a whole number of scans, so the
+ * smallest seen is ≥ P and converges to it from above: using it can only
+ * under-credit a lift — PROVIDED every sample in a list is a real scan (a
+ * platform that appends a made-up, resampled sample can show a spacing below
+ * P; round 5, R16) and the scan rate does not change during the session (a
+ * digitizer that slows from 240 to 120 Hz keeps the faster P). A move-made
+ * transition at sample time T is stamped [max(previous sample, T − P), T]
+ * once P is known and the previous sample is a MOVE; after a pointerdown the
+ * bound is not taken (the platform's touch slop can hold the first moves of a
+ * touch back, so silence there does not prove the thumb was still — and this
+ * has a cost, round 5, R15), and while P is unknown the previous sample.
+ *
+ * R12 — a coalesced sample whose stamp does not advance past the previous
+ * sample's (a browser giving every coalesced sample the parent event's stamp:
+ * the Pointer Events tests ask only that coalesced stamps never decrease) is
+ * bounded by the last EARLIER distinct stamp — never the exact [T, T], which
+ * over-credited the lift before it by up to a frame (round-3 verifier F2) —
+ * and a list holding such a pair teaches no P at all.
+ *
+ * R13 — what this costs, said plainly. The bound against a false R rests on
+ * two device facts: each coalesced sample carries its own scan time (else
+ * R12), and the scan period does not change during the session. The gesture
+ * side is bounded by ONE scan once P is learned — a slid crossing is seen up
+ * to one scan late (so the slid +1-frame cell is bounded by one sample; the
+ * ruled gesture is the +2-frame one) — but until P is learned, i.e. until a
+ * coalesced list has held two distinct-time samples, a slid press after a
+ * resting thumb is credited from the previous sample and the ruled gesture may
+ * not reach R. That is the case on a device whose digitizer is no faster than
+ * its frames (one sample per list, e.g. 60 Hz touch on a 60 Hz display: the
+ * gesture reached R in 5–24 of 40 phases at 60 Hz in the round-4 probe, the
+ * thumb resting 2–10 px inside the middle) and on
+ * a browser that stamps a list alike. There the gesture made with the thumb
+ * lifted off and put back down INSIDE THE BRAKE ZONE (the pointerdown is the
+ * press: exact) and the keyboard are exact — not a thumb put back down in the
+ * neutral zone and slid in, which round 5 found under-credited even once P is
+ * learned (below; ADR-017 «Update 2026-11-01, round 4» and «…, round 5»).
+ *
+ * ===========================================================================
+ * 2026-11-01, ROUND 5 — WHAT THE POINTERDOWN EXEMPTION COSTS (rulings
+ * R15–R18). No timing code changed in round 5; these are its stated limits.
+ * ===========================================================================
+ * R15 — the exemption is KEPT. The ruled gesture made as «lift the thumb off
+ * the brake (pointerup), put it back down just inside the NEUTRAL zone, rest,
+ * slide into the brake» is credited only pointerdown − pointerup of lift,
+ * because the first move after a pointerdown takes no T − P bound: with P
+ * learned and a 120 Hz digitizer it reached R and moved the car in 9–10 of 40
+ * phases with a 2 px rest and 23–24 of 40 with a 5 px rest, on all 8
+ * cadences, whether the thumb was put back 0.02 or 0.2 s after the lift-off
+ * (round-4 verifier F1). Taking the bound there would cure it (40/40, and 0
+ * false R with no slop) — but a platform whose touch slop holds back the
+ * moves within 8 px of a pointerdown would then credit those held-back moves
+ * as lift: lifts of 0.24–0.2495 s armed in 245–980 of 980 sweeps at 0.5 px/ms
+ * and up to 686 of 980 at 1 px/ms in the verifier's model. A false R is the
+ * dangerous failure and a gesture that must be repeated the safe one, so the
+ * exemption stays until the phone shows whether it delivers a touch's first
+ * moves (R18); pinned by engine/__tests__/reverseAssist-cadence.test.ts
+ * «R15 / R19» and components/sim/__tests__/pedalStampsOverlay.test.tsx.
+ * R16 — the premise «the smallest in-list spacing is ≥ the scan period»
+ * fails if the platform appends RESAMPLED samples to the list: in the
+ * verifier's Android-style model (a sample interpolated at frame − 5 ms),
+ * lifts of 0.245–0.2495 s armed in 1–4 of 980 sweeps. Chrome on Android
+ * dispatches touch unbuffered by default and its coalesced events are the
+ * raw ones, so this is accepted as the platform class of the dispatch-latency
+ * tie, not a defect of the rule; a scan-rate change mid-session is an
+ * assumption. The phone cell records which is true (R18).
+ */
+
+/** One pointer sample: where the thumb was and when (the event's clock). */
+export interface PointerSample {
+  readonly clientY: number;
+  readonly timeStamp: number;
+}
+
+/** The shape `pointerSamples` reads — a DOM PointerEvent, or a stand-in. */
+export interface CoalescingPointerEvent extends PointerSample {
+  getCoalescedEvents?: () => readonly PointerSample[];
+}
+
+/**
+ * R7: every sample a pointer event carries, oldest first — its coalesced
+ * list when the browser keeps one, else the event itself.
+ */
+export function pointerSamples(e: CoalescingPointerEvent): readonly PointerSample[] {
+  const list = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : null;
+  if (list && list.length > 0) return list;
+  return [e];
+}
+
+/** A pad transition's time on the event clock: `[sinceMs, atMs]`. Both are
+ *  absent when the event carried no usable time (SimInput then stamps «now»). */
+export interface PadSampleStamp {
+  readonly atMs?: number;
+  /** The earliest instant the change can have happened (= atMs for a
+   *  discrete press / release; the previous sample for a slide). */
+  readonly sinceMs?: number;
+}
+
+const usableMs = (ms: unknown): ms is number => typeof ms === "number" && Number.isFinite(ms);
+
+/**
+ * R8 / R11 / R12: the sample clock of ONE pad — the previous sample of its
+ * current gesture, and the digitizer's scan period P learned for the session —
+ * so a transition made by a move is stamped as the interval it can have
+ * happened in, and never a millisecond earlier than what was observed allows.
+ */
+export class PadSampleClock {
+  /** The latest sample time of the current gesture (null: no gesture, or an
+   *  adopted pointer before its first sample). */
+  private lastMs: number | null = null;
+  /** The last stamp of the current gesture strictly EARLIER than `lastMs`
+   *  (R12: what a sample whose stamp does not advance is bounded by). */
+  private prevDistinctMs: number | null = null;
+  /** Whether `lastMs` is a MOVE sample (not the gesture's pointerdown). */
+  private lastIsMove = false;
+  /** R11: the smallest positive spacing ever seen between two consecutive
+   *  samples INSIDE ONE coalesced list, ms — ≥ the digitizer's scan period P
+   *  and converging to it from above. +∞ until a list has held two
+   *  distinct-time samples. Kept for the session: `end()` never resets it. */
+  private periodMs = Number.POSITIVE_INFINITY;
+
+  /** R11: the scan period learned so far, ms (+∞ while unknown). */
+  get learnedPeriodMs(): number {
+    return this.periodMs;
+  }
+
+  /** A discrete pointerdown at `atMs`: exact, and the gesture's first sample. */
+  begin(atMs: number | undefined): PadSampleStamp {
+    this.prevDistinctMs = null;
+    this.lastIsMove = false;
+    if (!usableMs(atMs)) {
+      this.lastMs = null;
+      return {};
+    }
+    this.lastMs = atMs;
+    return { atMs, sinceMs: atMs };
+  }
+
+  /**
+   * Every sample of ONE pointer event, oldest first (its coalesced list, or
+   * the event alone — `pointerSamples`): one stamp per sample, in order.
+   * Only spacings between two samples of THIS list teach P (R11), and only
+   * when every stamp in it advances (R12: a list with an equal or a
+   * backwards pair is not on the digitizer's clock, so it teaches nothing).
+   */
+  sampleList(samples: readonly PointerSample[]): PadSampleStamp[] {
+    let onScanClock = true;
+    for (let i = 1; i < samples.length; i++) {
+      const a = samples[i - 1]!.timeStamp;
+      const b = samples[i]!.timeStamp;
+      if (!usableMs(a) || !usableMs(b) || !(b > a)) onScanClock = false;
+    }
+    // The spacing taught is the list's OWN: this sample against the one
+    // before it in the same list — never against a sample of an earlier event.
+    return samples.map((s, i) =>
+      this.sampleAt(s.timeStamp, onScanClock && i > 0 ? s.timeStamp - samples[i - 1]!.timeStamp : null),
+    );
+  }
+
+  /** The gesture ended (pointerup / cancel / lost capture / hide). The
+   *  learned scan period is the device's, not the gesture's: it stays. */
+  end(): void {
+    this.lastMs = null;
+    this.prevDistinctMs = null;
+    this.lastIsMove = false;
+  }
+
+  /**
+   * A move sample at `atMs`. `listGapMs`: its spacing from the sample before
+   * it in the same coalesced list, when that list is on the scan clock (else
+   * null) — the only spacing that teaches P.
+   *
+   * - No previous sample (an ADOPTED pointer): the interval is open (−∞).
+   * - R12, a stamp that does not advance past the previous sample's: bounded
+   *   by the last EARLIER distinct stamp (−∞ if none) — never the exact
+   *   [T, T], which over-credits the lift before it by up to a frame when a
+   *   browser gives every coalesced sample the parent event's stamp.
+   * - Otherwise round 3's interval, the previous sample — and R11: once P is
+   *   known and the previous sample is a move, max(previous, T − P). The
+   *   digitizer reports a scan only when it saw a change, so a sample at T
+   *   after silence also says the scan at T − P saw none: the crossing came
+   *   after T − P. P is never below the true period while every listed
+   *   sample is a real scan and the scan rate holds (R16), so this can only
+   *   under-credit a lift. After a pointerdown the bound is not taken: the
+   *   first moves of a touch can be held back by the platform's touch slop,
+   *   so silence there does not prove the thumb was still (R15: kept, at the
+   *   cost of a re-touch in neutral then a slide being under-credited).
+   */
+  private sampleAt(atMs: number | undefined, listGapMs: number | null): PadSampleStamp {
+    if (!usableMs(atMs)) return {};
+    if (this.lastMs === null) {
+      this.lastMs = atMs;
+      this.prevDistinctMs = null;
+      this.lastIsMove = true;
+      return { atMs, sinceMs: Number.NEGATIVE_INFINITY };
+    }
+    if (!(atMs > this.lastMs)) {
+      const bound = this.prevDistinctMs ?? Number.NEGATIVE_INFINITY;
+      this.lastIsMove = true;
+      return { atMs, sinceMs: Math.min(bound, atMs) };
+    }
+    if (listGapMs !== null && listGapMs > 0) this.periodMs = Math.min(this.periodMs, listGapMs);
+    let since = this.lastMs;
+    if (this.lastIsMove && Number.isFinite(this.periodMs)) since = Math.max(since, atMs - this.periodMs);
+    this.prevDistinctMs = this.lastMs;
+    this.lastMs = atMs;
+    this.lastIsMove = true;
+    return { atMs, sinceMs: since };
+  }
+}
+
+/**
  * Mutable touch axis state, merged into SimInput.read() (attachTouch).
  * One instance per scene; the overlay writes, the input pipeline reads.
  * mergeInto mutates the caller's reusable output object — zero allocation
@@ -334,6 +606,31 @@ export class TouchInputSource {
   private brakeActive = false;
   private brakeValue = 0;
 
+  /**
+   * R4 (2026-10-19, sc-turn-left-oncoming:d0017a65): told of every pedal
+   * write, with the pointer event's own `timeStamp` when the overlay passes
+   * one, so SimInput can stamp the brake / throttle CHANNEL transitions at the
+   * input rather than at the next frame that happens to read them
+   * (engine/pedalTiming.ts). Set by SimInput.attachTouch.
+   *
+   * `sinceMs` (R8, 2026-11-01): when the write comes from a pointer SAMPLE
+   * rather than a discrete event (a slide of the drive pad's thumb), the
+   * transition happened somewhere after the previous sample — the overlay
+   * passes that sample's time and the stamp becomes the interval
+   * [sinceMs, atMs] (`PadSampleClock` below). Omitted for a press / release.
+   */
+  onPedalChange: ((atMs?: number, sinceMs?: number) => void) | null = null;
+
+  /** The throttle axis while a finger owns it, else null. */
+  get throttleAxis(): number | null {
+    return this.throttleActive ? this.throttleValue : null;
+  }
+
+  /** The brake axis while a finger owns it, else null. */
+  get brakeAxis(): number | null {
+    return this.brakeActive ? this.brakeValue : null;
+  }
+
   /** Steer axis, VehicleInput convention (-1..1, +1 = LEFT). */
   setSteer(value: number): void {
     this.steerActive = true;
@@ -346,32 +643,39 @@ export class TouchInputSource {
     this.steerValue = 0;
   }
 
-  setThrottle(value: number): void {
+  /** `atMs`: the pointer event's `timeStamp` (R4) — omitted off an event.
+   *  `sinceMs`: the previous pointer sample's, when this write is a sample
+   *  of a moving thumb (R8) — omitted for a discrete press / release. */
+  setThrottle(value: number, atMs?: number, sinceMs?: number): void {
     this.throttleActive = true;
     this.throttleValue = Math.min(1, Math.max(0, value));
+    this.onPedalChange?.(atMs, sinceMs);
   }
 
-  releaseThrottle(): void {
+  releaseThrottle(atMs?: number, sinceMs?: number): void {
     this.throttleActive = false;
     this.throttleValue = 0;
+    this.onPedalChange?.(atMs, sinceMs);
   }
 
-  setBrake(value: number): void {
+  setBrake(value: number, atMs?: number, sinceMs?: number): void {
     this.brakeActive = true;
     this.brakeValue = Math.min(1, Math.max(0, value));
+    this.onPedalChange?.(atMs, sinceMs);
   }
 
-  releaseBrake(): void {
+  releaseBrake(atMs?: number, sinceMs?: number): void {
     this.brakeActive = false;
     this.brakeValue = 0;
+    this.onPedalChange?.(atMs, sinceMs);
   }
 
   /** Overlay hidden/unmounted (pause, quiz, teach card, keyboard takeover) —
    *  nothing may stay held down. */
-  releaseAll(): void {
+  releaseAll(atMs?: number): void {
     this.releaseSteer();
-    this.releaseThrottle();
-    this.releaseBrake();
+    this.releaseThrottle(atMs);
+    this.releaseBrake(atMs);
   }
 
   /**

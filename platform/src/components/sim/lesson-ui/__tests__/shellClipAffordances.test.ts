@@ -1018,7 +1018,9 @@ describe("the legend is said on the one frame a priority-10 line can be heard", 
     // (LessonScene), so gating the legend on the SHADOW CAR's aids left the
     // teal ribbon, the chevron and the 11 m shaft unnamed on every rung where
     // the aids are withdrawn — L3, L4 and the exam.
-    expect(CODE).toContain("const guidanceShown = lesson.objectives.length > 0;");
+    // …except after a person strike, when the layer is hidden and the legend
+    // leaves with it (lane endings2 r3, N14: `routeGuidanceStandsDown`).
+    expect(CODE).toContain("const guidanceShown = lesson.objectives.length > 0 && !routeGuidanceStandsDown(snap.objectiveHold);");
     expect(CODE).toContain("const legendApplies = compact && !ended && guidanceShown;");
     expect(CODE).toContain("{!compact && !ended && guidanceShown ? (");
     // The blue row is the one that really does depend on the aids, and it is the

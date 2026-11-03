@@ -2511,6 +2511,34 @@ export interface LessonSessionState {
    * or the store.
    */
   unearnableStillSinceSec?: number;
+  /**
+   * Lane endings2 (integrator ruling N5; additive, ENGINE session state only —
+   * the wire, the store and SimTick do not carry it). The session second of the
+   * FIRST scored COLLISION bill whose detail is a pedestrian or a cyclist (the
+   * filter the crash pin's impact reads). Set whether or not the pin arms and
+   * NEVER cleared — not read off `crashPin.impact`, which a later static or
+   * vehicle bill replaces. Read only by the coach: the "personStruck" route
+   * hold (`advisor.ts routeHoldForSession`, `personHoldCopy`) and the crash
+   * pin ending's citation chip. Grades nothing, ends nothing, folds nothing.
+   */
+  personStruckAtSec?: number;
+  /**
+   * Lane endings2 (integrator rulings N2 / N3; additive, client display
+   * metadata — NOT on SimTick, the wire, the store or the server debrief). The
+   * ending sentence the engine pushed as a HUD event on the frame that
+   * completed the drive, field for field (`engine.ts pushEnding`). Absent on
+   * every drive that ended without one (the completed run-out, the exam
+   * termination alone, an abort, `finishSession`). Copied to
+   * `LessonResult.ending` by `buildLessonResult`.
+   */
+  endingCopy?: LessonEndingCopy;
+}
+
+/** The ending's sentence as pushed — see `LessonSessionState.endingCopy`. */
+export interface LessonEndingCopy {
+  titleBg: string;
+  explanationBg: string;
+  lawRef?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -2600,6 +2628,15 @@ export interface LessonResult {
    * catalog events (wire.ts) — never trusted from the client.
    */
   examTermination?: ExamTermination;
+  /**
+   * Lane endings2 (N2 / N3; additive, client-only display metadata): the
+   * ending sentence the drive was closed on (`LessonSessionState.endingCopy`),
+   * rendered once on the end card under the verdict pill
+   * (`SessionEndScreen`, `data-hud="end-ending"`) unless `examTermination`
+   * is set (N4: the protocol card owns the reason). Absent on server-rebuilt
+   * and stored results — `finishLessonPayload` never sends it.
+   */
+  ending?: LessonEndingCopy;
   /**
    * The violations the drive SHOWED and the score deliberately did NOT charge
    * (additive; see CoachedMistake). Client results copy the engine state's

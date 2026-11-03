@@ -41,9 +41,20 @@ import {
   type ReverseShiftSource,
 } from "../reverseAssist";
 
-const DT = 0.05; // 20 Hz frames — HOLD_S (0.35) is exactly 7 frames
-/** Frames of lifted pedal that arm the next press (0.25 s → 5 frames). */
-const LIFT_FRAMES = Math.ceil(REVERSE_ASSIST_LIFT_S / DT);
+const DT = 0.05; // 20 Hz frames
+/**
+ * Frames of lifted pedal that arm the next press. These frames carry no
+ * source-timed log, so the machine reads one sample per update, as a polled
+ * source polled by its own updates (engine/pedalTiming.ts, sc-turn-left-
+ * oncoming:d0017a65): the first lifted frame credits 0, so 0.25 s watched
+ * takes 6 frames (5 intervals), one more than the 5 that used to credit
+ * 5 × 0.05 before 2026-10-18. (In the scene the log times it at the input:
+ * engine/__tests__/reverseAssist-cadence.test.ts.)
+ */
+const LIFT_FRAMES = Math.ceil(REVERSE_ASSIST_LIFT_S / DT) + 1;
+/** Frames of an armed press that shift: the rising-edge frame credits 0, so
+ *  0.35 s watched is 8 frames (7 intervals) — was 7 frames of 7 × 0.05. */
+const HOLD_FRAMES = Math.ceil(REVERSE_ASSIST_HOLD_S / DT) + 1;
 
 interface FrameOverrides {
   speedKmh?: number;
@@ -83,14 +94,14 @@ describe("ReverseAssist rule a (D → R)", () => {
   it("emits shiftToR 0.35 s into an ARMED press (stopped car, foot lifted first)", () => {
     const a = new ReverseAssist();
     lift(a);
-    expect(run(a, 6)).toEqual([]); // 0.30 s — not yet
-    expect(a.update(frame())).toBe("shiftToR"); // 0.35 s exactly
+    expect(run(a, HOLD_FRAMES - 1)).toEqual([]); // 0.30 s watched — not yet
+    expect(a.update(frame())).toBe("shiftToR"); // 0.35 s watched, exactly
   });
 
   it("emits at most once per press — a fresh lift is required", () => {
     const a = new ReverseAssist();
     lift(a);
-    expect(run(a, 7)).toEqual(["shiftToR"]);
+    expect(run(a, HOLD_FRAMES)).toEqual(["shiftToR"]);
     // Still standing on the pedal (in D, hypothetically — or in R, where this
     // is the very frame the remapped brake would otherwise fire rule c and
     // start the car oscillating D↔R under one motionless foot).
@@ -98,15 +109,15 @@ describe("ReverseAssist rule a (D → R)", () => {
     expect(run(a, 60, { selector: "R" })).toEqual([]);
     // Lift, press again: the gesture is complete and the toggle is available.
     lift(a, { selector: "R" });
-    expect(run(a, 7, { selector: "R" })).toEqual(["shiftToD"]);
+    expect(run(a, HOLD_FRAMES, { selector: "R" })).toEqual(["shiftToD"]);
   });
 
   it("releasing the pedal mid-hold resets the timer (and re-arms)", () => {
     const a = new ReverseAssist();
     lift(a);
-    run(a, 5); // 0.25 s in
+    run(a, 5); // 0.20 s watched in
     lift(a); // foot off long enough to arm the next press
-    expect(run(a, 6)).toEqual([]); // fresh hold — 0.30 s is not enough
+    expect(run(a, HOLD_FRAMES - 1)).toEqual([]); // fresh hold — 0.30 s is not enough
     expect(run(a, 1)).toEqual(["shiftToR"]);
   });
 
@@ -166,7 +177,7 @@ describe("LAW 1: the brake that stops the car never asks for reverse", () => {
   it("a moving frame mid-press disarms it for good", () => {
     const a = new ReverseAssist();
     lift(a);
-    run(a, 3); // armed press, 0.15 s in
+    run(a, 3); // armed press, 0.10 s watched in
     run(a, 1, { speedKmh: 4 }); // the car was rolling after all (kerb, slope)
     expect(run(a, 400)).toEqual([]);
   });
@@ -188,7 +199,7 @@ describe("LAW 1: the brake that stops the car never asks for reverse", () => {
     for (let v = 18; v > 0.6; v -= 0.6) run(a, 1, { speedKmh: v }); // brake to a stop
     expect(run(a, 40)).toEqual([]); // …hold it a while — nothing happens
     lift(a); // take the foot off
-    expect(run(a, 7)).toEqual(["shiftToR"]); // press ↓ again → R
+    expect(run(a, HOLD_FRAMES)).toEqual(["shiftToR"]); // press ↓ again → R
   });
 });
 
@@ -196,7 +207,7 @@ describe("ReverseAssist rule c (R → D)", () => {
   it("emits shiftToD after an armed press of the remapped brake in R", () => {
     const a = new ReverseAssist();
     lift(a, { selector: "R" });
-    expect(run(a, 6, { selector: "R" })).toEqual([]);
+    expect(run(a, HOLD_FRAMES - 1, { selector: "R" })).toEqual([]);
     expect(a.update(frame({ selector: "R" }))).toBe("shiftToD");
   });
 
@@ -226,8 +237,7 @@ describe("ReverseAssist manual-shift suppression", () => {
     expect(run(a, silentFrames, {})).toEqual([]); // eligible the whole time
     // Suppression consumed — a fresh lift + full hold now fires.
     lift(a);
-    const holdFrames = Math.ceil(REVERSE_ASSIST_HOLD_S / DT); // 7
-    expect(run(a, holdFrames, {})).toEqual(["shiftToR"]);
+    expect(run(a, HOLD_FRAMES, {})).toEqual(["shiftToR"]);
   });
 
   it("a press spanning the whole silence stays unarmed after it ends", () => {
@@ -241,11 +251,11 @@ describe("ReverseAssist manual-shift suppression", () => {
   it("a manual shift mid-hold drops the accumulated hold time", () => {
     const a = new ReverseAssist();
     lift(a);
-    run(a, 6); // 0.30 s in
+    run(a, 6); // 0.25 s watched in
     a.noteManualShift();
     run(a, 40, { brakePedal: 0 }); // burn the 2 s silence with the foot off
     lift(a);
-    expect(run(a, 6)).toEqual([]); // needs the FULL 0.35 s again
+    expect(run(a, HOLD_FRAMES - 1)).toEqual([]); // needs the FULL 0.35 s again
     expect(run(a, 1)).toEqual(["shiftToR"]);
   });
 });
@@ -418,7 +428,7 @@ describe("LAW 2's scope: the assist's own armed press is not a stop press", () =
     // transmition." Stationary car, foot off the pedals, then ↓ and hold.
     const b = new Box();
     b.run(LIFT_FRAMES, 0, 0, 0); // foot off, at rest — this is what arms it
-    b.run(7, 0, 1, 0); // ↓ held: 0.35 s → shiftToR on the 7th frame
+    b.run(HOLD_FRAMES, 0, 1, 0); // ↓ held: 0.35 s watched → shiftToR on the 8th frame
     expect(b.commands).toEqual(["shiftToR"]);
     expect(b.selector).toBe("R");
     // …and the VERY NEXT frame, with the same unbroken press, is reverse
@@ -460,10 +470,10 @@ describe("LAW 2's scope: the assist's own armed press is not a stop press", () =
   it("is symmetric coming OUT of R — ↑ takes D and drives forward", () => {
     const b = new Box();
     b.run(LIFT_FRAMES, 0, 0, 0);
-    b.run(7, 0, 1, 0); // ↓ → R
+    b.run(HOLD_FRAMES, 0, 1, 0); // ↓ → R
     b.run(20, 0, 1, -10); // reversing on ↓
     b.run(LIFT_FRAMES, 0, 0, 0); // stop, foot off — arms the next press
-    b.run(7, 1, 0, 0); // ↑ (the brake in R) held → shiftToD
+    b.run(HOLD_FRAMES, 1, 0, 0); // ↑ (the brake in R) held → shiftToD
     expect(b.commands).toEqual(["shiftToR", "shiftToD"]);
     const f = b.step(1, 0, 0);
     expect(f.throttle).toBe(1);
@@ -473,7 +483,7 @@ describe("LAW 2's scope: the assist's own armed press is not a stop press", () =
   it("the exemption is not sticky — the next hand-worked flip is guarded", () => {
     const b = new Box();
     b.run(LIFT_FRAMES, 0, 0, 0);
-    b.run(7, 0, 1, 0); // assist → R, exempt
+    b.run(HOLD_FRAMES, 0, 1, 0); // assist → R, exempt
     expect(b.step(0, 1, 0).throttle).toBe(1);
     b.run(4, 1, 1, 0); // ↑ (the brake in R) comes down to stop the car
     b.shiftByHand("D"); // …and the hand moves the lever while it is held

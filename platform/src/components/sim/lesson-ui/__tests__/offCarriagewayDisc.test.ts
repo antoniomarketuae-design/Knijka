@@ -202,9 +202,11 @@ describe("both mounts carry it — read as a tree, not as text", () => {
   it("compact and roomy read the SAME predicate the banner arms on", () => {
     expect(mounts()).toHaveLength(2);
     for (const m of mounts()) {
-      // `objectiveHold` is `routeHoldForSession` — so the bar, the banner
-      // (`objectiveTitleUnderHold`) and the coach card change on one frame.
-      expect(m.offCarriageway).toBe('snap.objectiveHold === "offRoad"');
+      // `offCarriagewayHold` is `offCarriagewayHoldForSession` — the off-road
+      // clauses of `routeHoldForSession` alone (lane endings2, N10), so the bar
+      // still arms on the banner's off-road frame, and a person strike, whose
+      // hold outranks off-road, cannot take the mark off a car on the verge.
+      expect(m.offCarriageway).toBe("snap.offCarriagewayHold === true");
     }
   });
 
@@ -212,7 +214,7 @@ describe("both mounts carry it — read as a tree, not as text", () => {
     // The neutralisation a `toContain` accepts: the field is still present,
     // still `boolean`, still type-checks, and the qualifier never renders.
     const mutated = SHELL_SRC.replace(
-      /offCarriageway=\{snap\.objectiveHold === "offRoad"\}/g,
+      /offCarriageway=\{snap\.offCarriagewayHold === true\}/g,
       "offCarriageway={false}",
     );
     expect(mutated).not.toBe(SHELL_SRC);

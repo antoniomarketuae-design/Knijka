@@ -35,6 +35,7 @@ import {
   createTelemetry,
   hasTouchScreen,
   isTouchOnlyDevice,
+  PedalEdgeLog,
   ReverseAssist,
   ReversePedalMapper,
   ReverseStuckWatch,
@@ -43,6 +44,10 @@ import {
   StuckStartWatch,
   TouchInputSource,
   useReverseViewEnabled,
+  type PedalStamp,
+  type PedalTiming,
+  type ReverseAssistCommand,
+  type ReverseAssistFrame,
   type ReverseShiftSource,
   type ReverseStuckDirection,
   type StuckStartReason,
@@ -247,7 +252,7 @@ import {
   type LessonWorldCore,
 } from "@/modules/sim/scene/lessonWorldRecipe";
 import { createLessonWindShelter } from "@/modules/sim/scene/lessonWindShelter";
-import { RouteGuidance } from "./RouteGuidance";
+import { RouteGuidance, routeGuidanceStandsDown } from "./RouteGuidance";
 import {
   ScenarioObstacles,
   type ObstacleColliderFootprint,
@@ -988,7 +993,90 @@ export class GatedSimInput extends SimInput {
    *  is literally true in R). Applied BEFORE the raw capture below, so the
    *  A2 observer, the scenario director and the recorder all see the
    *  FUNCTIONAL pedals. */
-  reversePedalRemap = false;
+  get reversePedalRemap(): boolean {
+    return this.remapOn;
+  }
+  set reversePedalRemap(remap: boolean) {
+    this.remapOn = remap;
+    // A flip moves the FUNCTIONAL brake to the other channel: timed now.
+    this.refreshFunctionalBrake(this.eventStamp(undefined));
+  }
+  private remapOn = false;
+  /**
+   * THE FUNCTIONAL BRAKE'S TRANSITIONS, TIMED AT THE INPUT (R4, 2026-10-19,
+   * sc-turn-left-oncoming:d0017a65 — engine/pedalTiming.ts). The channel that
+   * is the brake right now — S/↓ ∪ LT ∪ the touch brake in D, W/↑ ∪ RT ∪ the
+   * touch throttle in R, plus a channel LAW 2 holds as a brake while it is
+   * disowned — with every change stamped by the source that made it: the
+   * pointer event's timeStamp, the RAW key's, the gamepad poll's, the drive
+   * rig's physics step. ReverseAssist (at the frame's start) and
+   * StuckStartWatch (at its end) each read it from their own cursor, so a
+   * lift or a press between two frames is SEEN and measured by its own times,
+   * not by the frames that happened to sample it.
+   */
+  readonly brakeLog = new PedalEdgeLog();
+  private functionalBrakeDown = false;
+  /**
+   * …AND THE OTHER PEDAL CONTROL'S, ON THE SAME STAMPS (R20, 2026-11-01 round
+   * 6; R24, 2026-11-02 round 7). The control that is NOT the functional
+   * brake's own channel — W/↑ ∪ RT ∪ the touch throttle in D, S/↓ ∪ LT ∪ the
+   * touch brake in R (the reverse accelerator there) — down whenever the
+   * student holds it, WHATEVER LAW 2 says of it. The assist's both-pedals
+   * disarm reads it at the frame's START (engine/pedalTiming.ts PedalLatch),
+   * where the last read()'s `rawThrottle` is the previous frame's: after a
+   * render stall that was a whole stall old while the brake beside it was
+   * current, and a W held across an S press at a standstill shifted the car to
+   * R (round 6). Round 6 also gated this log by LAW 2's disown — and that flag
+   * is the LAST read()'s verdict, decided on the keyboard RAMP, so after a
+   * hand-worked R → D shift with W held, a W lifted, an S pressed after a real
+   * lift and the W pressed again before any read saw its ramp fall to PEDAL_ON
+   * still counted as «disowned, a brake», not as a throttle: the press armed
+   * and shifted D → N → R with BOTH keys down (round-6 verifier, F1). Two
+   * controls down is never the reverse gesture, whatever role LAW 2 gives
+   * them, so the disarm's control is not gated by the disown (R24). LAW 2's
+   * own job — which control drives the car after a hand-worked flip — is
+   * untouched: read() still hands physics zero throttle from a disowned pedal,
+   * and the disowned channel still sits in the brake's log above.
+   */
+  readonly throttleLog = new PedalEdgeLog();
+  private functionalThrottleDown = false;
+
+  /** What a machine is handed to read the log at this instant. The pads are
+   *  polled first, so the log is current for every source: an event has
+   *  already been logged at its own time, a pad change is logged by this poll. */
+  brakeTiming(): PedalTiming {
+    this.pollPads();
+    return { log: this.brakeLog, nowMs: this.clockMs(), stepS: this.stepClockS?.() ?? null };
+  }
+
+  /** The same for the other pedal control's log (R24: as the student holds it, WHATEVER LAW 2 says of it) — polled first for the same reason. */
+  throttleTiming(): PedalTiming {
+    this.pollPads();
+    return { log: this.throttleLog, nowMs: this.clockMs(), stepS: this.stepClockS?.() ?? null };
+  }
+
+  protected override onPedalChannelEdge(_channel: "brake" | "throttle", _down: boolean, stamp: PedalStamp): void {
+    this.refreshFunctionalBrake(stamp);
+  }
+
+  private refreshFunctionalBrake(stamp: PedalStamp): void {
+    const brake = this.brakeChannelDown;
+    const throttle = this.throttleChannelDown;
+    const disowned = this.reverseMapper.isDisowned;
+    const down = this.remapOn ? throttle || (disowned && brake) : brake || (disowned && throttle);
+    if (down !== this.functionalBrakeDown) {
+      this.functionalBrakeDown = down;
+      this.brakeLog.push({ ...stamp, down });
+    }
+    // The other pedal CONTROL — the swapped channel in R — as the student
+    // holds it, NOT gated by LAW 2's disown: `disowned` is the last read()'s
+    // verdict on the ramp, a frame old at the frame-start decision (R24).
+    const gas = this.remapOn ? brake : throttle;
+    if (gas !== this.functionalThrottleDown) {
+      this.functionalThrottleDown = gas;
+      this.throttleLog.push({ ...stamp, down: gas });
+    }
+  }
   /**
    * WHICH ROUTE last CHANGED `reversePedalRemap` — written by the driveline
    * subscription at the moment of the change, because that is the only moment
@@ -1027,6 +1115,8 @@ export class GatedSimInput extends SimInput {
   override read(): VehicleInput {
     const out = super.read();
     this.reverseMapper.apply(out, this.reversePedalRemap, this.reversePedalRemapSource);
+    // LAW 2's disown is decided on this read's values: it may move the brake.
+    this.refreshFunctionalBrake(this.eventStamp(undefined));
     this.rawThrottle = out.throttle;
     this.rawBrake = out.brake;
     this.rawSteer = out.steer;
@@ -1201,7 +1291,9 @@ export interface LessonSceneProps {
   dashboardStatusRef?: React.RefObject<DashboardStatus>;
   /** The shell's `snap.objectiveHold` (`routeHoldForSession`): non-null while
    *  the objective cannot be acted on from where the car is. Read by the
-   *  «Следвай синята линия» pill only — see `followHintStandsDown`. A string
+   *  «Следвай синята линия» pill — see `followHintStandsDown` — and, for
+   *  "personStruck" only, by the in-world route guidance and the shadow
+   *  ribbon (`routeGuidanceStandsDown`, RouteGuidance.tsx). A string
    *  that changes on hold edges, so `SceneSlot`'s memo still holds. Absent =
    *  null = the pill as it shipped. */
   routeHold?: RouteHold | null;
@@ -2494,6 +2586,9 @@ export function ReadyScene({
     // reachable without a keyboard. The merge is a no-op while no axis is
     // active, so a keyboard-only session is byte-identical to before.
     input.attachTouch(touchSource);
+    // R4: a STEP-KEYED pad (the drive rig's, ADR-017) is stamped at the physics
+    // step it applies its change at — the steps taken so far, on FIXED_DT.
+    input.stepClockS = () => (stepTrackRef.current?.stepCount ?? 0) * FIXED_DT;
     inputRef.current = input;
     const audio = new SimAudio();
     audioRef.current = audio;
@@ -3042,11 +3137,8 @@ export function ReadyScene({
               // it is. Written onto the same per-frame channel the bar polls.
               tierCapKmh={tierCapKmh}
               tierNameBg={DIFFICULTY_PRESETS[difficulty].labelBg}
-              reverseAssist={reverseAssist}
-              reverseAssistEnabled={reverseAssistEnabled}
               reverseStuck={reverseStuck}
               stuckStart={stuckStart}
-              assistShiftingRef={assistShiftingRef}
               driveLocked={driveLocked}
               drivelineEventsRef={drivelineEventsRef}
               glanceQueueRef={glanceQueueRef}
@@ -3066,6 +3158,20 @@ export function ReadyScene({
               rain={rain}
               fog={fogWeather}
               snow={snowWeather}
+              paused={physicsPaused}
+            />
+            {/* THE AUTO-REVERSE ASSIST'S TURN COMES FIRST IN EVERY FRAME
+                (2026-10-19, R5): its useFrame runs at a priority below
+                rapier's stepper, so a press that reaches its hold is shifted
+                to R before the frame's physics reads the pedals. */}
+            <ReverseAssistDriver
+              reverseAssist={reverseAssist}
+              reverseAssistEnabled={reverseAssistEnabled}
+              assistShiftingRef={assistShiftingRef}
+              cabinRef={cabinRef}
+              inputRef={inputRef}
+              sampleRef={sampleRef}
+              driveLocked={driveLocked}
               paused={physicsPaused}
             />
             {/* A11 hittable traffic: a fixed pool of kinematic collider
@@ -3188,6 +3294,10 @@ export function ReadyScene({
             // The world's own plates, so the coach panel can stand down for one
             // that is drawn through its title (sc-zebra-approach:2c75cf8f).
             worldSigns={geometry.signs}
+            // Lane endings2 r3 (N14): after a person strike the layer is
+            // HIDDEN, not unmounted — the route is still derived and still
+            // published to the drive rig. `routeGuidanceStandsDown`.
+            routeHold={routeHold}
           />
         ) : null}
         {/* S0-View ?ghost=demo: the Shadow Car (translucent ghost + blue path
@@ -3205,6 +3315,14 @@ export function ReadyScene({
               trace={shadowTrace}
               clockRef={aidClockRef}
               showGhost={aids?.shadowCar === true}
+              // …and it leaves after a person strike, by the same predicate as
+              // the route guidance (lane endings2 r3, N14): it is the blue line
+              // «Следвай синята линия» names, the whole demonstrated drive
+              // laid on the road ahead, and nothing painted in the world may
+              // teach the next move of a drive the student must not continue.
+              // Only the ribbon: the ghost is parked at 0:00 and plays only if
+              // the student opens the demo deck himself.
+              showRibbon={!routeGuidanceStandsDown(routeHold)}
               // The blue demonstration ribbon goes quiet over the painted
               // crossings and the junction paint, exactly as RouteGuidance's
               // does — sc-crossing-dart:f0bf371d, `06-waited.png`, where it ran
@@ -3645,6 +3763,8 @@ export function ReadyScene({
         tapRef={glancePingTapRef}
         hidden={physicsPaused}
         showButtons={!touchCapable}
+        // C1 / N18: no «огледай» chip under the person hold (glancePingsStandDown).
+        routeHold={routeHold}
       />
 
       {/* [telltale-pings] founder 2026-07-28: „from the POV behind the car …
@@ -4782,11 +4902,8 @@ function RuntimeDriver({
   dashboardStatusRef,
   tierCapKmh,
   tierNameBg,
-  reverseAssist,
-  reverseAssistEnabled,
   reverseStuck,
   stuckStart,
-  assistShiftingRef,
   driveLocked,
   drivelineEventsRef,
   glanceQueueRef,
@@ -4875,22 +4992,12 @@ function RuntimeDriver({
   tierCapKmh: number | null;
   /** …and the tier's own name, so the readout can say WHOSE ceiling it is. */
   tierNameBg: string;
-  /** Auto-reverse assist machine (engine/reverseAssist.ts) — stepped once
-   *  per live frame; emitted commands are executed through the SAME
-   *  DrivelineState gear gate as the [ / ] keys. */
-  reverseAssist: ReverseAssist;
-  /** Lesson-static gate: false on examMode lessons (the exam grades the
-   *  real selector procedure — the assist stays completely silent). */
-  reverseAssistEnabled: boolean;
-  /** LAW 2's voice (engine/reverseStuck.ts) — stepped on the same live frames
-   *  as the assist, off the mapper's own `isDisowned`. */
+  /** LAW 2's voice (engine/reverseStuck.ts) — stepped on every live frame,
+   *  off the mapper's own `isDisowned`. */
   reverseStuck: ReverseStuckWatch;
   /** „The car itself is refusing" (engine/stuckStart.ts) — stepped on the same
    *  live frames, off the driveline and the functional throttle. */
   stuckStart: StuckStartWatch;
-  /** True only for the microtask of executing an assist shift, so the
-   *  driveline subscription can tell assist steps from MANUAL ones. */
-  assistShiftingRef: React.RefObject<boolean>;
   /** True while the procedure runs — the observer only listens then. */
   driveLocked: boolean;
   drivelineEventsRef: React.RefObject<DrivelineEvent[]>;
@@ -5390,55 +5497,12 @@ function RuntimeDriver({
     tRef.current = sessionClock.frame(dt, steps.stepCount);
     const sample = sampleRef.current;
 
-    // Auto-reverse assist (founder 2026-07-17): press the brake at a
-    // standstill in D → the assist works the SAME selector gate as the
-    // [ / ] keys (two gearDown steps, D→N→R); in R the pedals are already
-    // remapped by GatedSimInput (S/↓ = reverse throttle, W/↑ = brake), so
-    // pressing the remapped brake at a standstill walks the gate back up
-    // (R→N→D). Interlocks, DrivelineEvents, HUD telltales and the recorder
-    // all see canonical transitions. Hard gates: never on examMode lessons
-    // (prop), never during the pre-drive procedure (a held brake there IS a
-    // step), automatic box only (the manual tier keeps the real gearbox),
-    // engine running only.
+    // THE AUTO-REVERSE ASSIST IS NOT STEPPED HERE (2026-10-19, R5): it runs in
+    // ReverseAssistDriver at the START of the frame, before rapier's stepper
+    // reads the input, so the press that reaches its hold is handed reverse
+    // throttle on that same frame — see `reverseAssistFrameStart` below.
     //
-    // The word is PRESS, not hold, and it is load-bearing: since 2026-08-05
-    // the assist only reads a press that begins after the car is stopped and
-    // the pedal has been lifted (reverseAssist.ts LAW 1). A brake carried in
-    // from motion and held — the Б2 stop line, a red light, a give-way wait —
-    // shifts nothing, because that pedal drove the car backwards into traffic
-    // for as long as this assist has existed.
-    //
-    // …and BECAUSE the press had to be lifted first, it also carries through as
-    // the reverse accelerator: the flip it causes is labelled "assist" for the
-    // mapper (see the driveline subscription), so ↓ at a standstill takes R and
-    // moves the car on that one press — founder ruling 2026-08-11, „thats
-    // automatic transmition". Every hand-worked route stays guarded.
-    if (reverseAssistEnabled && !driveLocked && cabin) {
-      const dl = cabin.driveline;
-      if (dl.transmission === "automatic" && dl.engineOn) {
-        const cmd = reverseAssist.update({
-          speedKmh: sample.speedKmh,
-          selector: dl.selector,
-          brakePedal: input?.rawBrake ?? 0,
-          throttlePedal: input?.rawThrottle ?? 0,
-          dtSec: dt,
-        });
-        if (cmd) {
-          // Mark the steps assist-driven so the driveline subscription does
-          // not count them as manual (which would self-suppress for 2 s) and
-          // so the mapper knows this flip was an ARMED press (LAW 2's scope).
-          assistShiftingRef.current = true;
-          try {
-            const step = cmd === "shiftToR" ? () => dl.gearDown() : () => dl.gearUp();
-            if (step()) step(); // second gate step only if the first engaged
-          } finally {
-            assistShiftingRef.current = false;
-          }
-        }
-      }
-    }
-
-    // LAW 2's VOICE (engine/reverseStuck.ts). The guard above is only half of
+    // LAW 2's VOICE (engine/reverseStuck.ts). The mapper's guard is only half of
     // the founder's „it turns to R (reverse) but the car does not move did it
     // break or ?": the other half is that nothing told him. This reads the
     // mapper's own `isDisowned` — no second opinion about the pedals, no
@@ -5497,6 +5561,8 @@ function RuntimeDriver({
         // brake in D/M/R — the Б2 line, a red light, a give-way wait — is
         // still not read at all. See the three gates in engine/stuckStart.ts.
         brakePedal: input.rawBrake,
+        // …timed at the input, from the SAME log the assist reads (R3/R4).
+        brakeTiming: input.brakeTiming?.() ?? null,
         speedKmh: sample.speedKmh,
         driveline: cabin.driveline.physicsInput,
         stalled: cabin.driveline.stalled,
@@ -5690,6 +5756,170 @@ function RuntimeDriver({
 }
 
 /**
+ * The frame priority of the assist's turn: BELOW rapier's stepper, which runs
+ * on R3F's default priority 0 (<Physics updateLoop="follow">, no
+ * updatePriority). R3F sorts subscribers by priority alone, and a negative
+ * one does not take rendering over (only a positive one does), so this runs
+ * first in every frame whatever order the components mounted in.
+ */
+export const REVERSE_ASSIST_FRAME_PRIORITY = -1;
+
+/** The driveline the assist reads and works — DrivelineState's own surface. */
+interface AssistDriveline {
+  readonly transmission: string;
+  readonly engineOn: boolean;
+  readonly selector: ReverseAssistFrame["selector"];
+  gearDown(): boolean;
+  gearUp(): boolean;
+}
+
+/**
+ * THE AUTO-REVERSE ASSIST'S TURN, AT THE START OF THE FRAME (founder
+ * 2026-07-17; rulings 2026-08-05 LAW 1, 2026-08-11 LAW 2's scope; R4/R5
+ * 2026-10-19, sc-turn-left-oncoming:d0017a65).
+ *
+ * Press the brake at a standstill in D → the assist works the SAME selector
+ * gate as the [ / ] keys (two gearDown steps, D→N→R); in R the pedals are
+ * remapped by GatedSimInput (S/↓ = reverse throttle, W/↑ = brake), so pressing
+ * the remapped brake at a standstill walks the gate back up (R→N→D).
+ * Interlocks, DrivelineEvents, HUD telltales and the recorder all see canonical
+ * transitions. Hard gates: never on examMode lessons (`enabled`), never during
+ * the pre-drive procedure (a held brake there IS a step), automatic box only
+ * (the manual tier keeps the real gearbox), engine running only.
+ *
+ * The word is PRESS, not hold, and it is load-bearing: since 2026-08-05 the
+ * assist only reads a press that begins after the car is stopped and the pedal
+ * has been lifted (reverseAssist.ts LAW 1). A brake carried in from motion and
+ * held — the Б2 stop line, a red light, a give-way wait — shifts nothing.
+ *
+ * …and BECAUSE the press had to be lifted first, it also carries through as
+ * the reverse accelerator: the flip it causes is labelled "assist" for the
+ * mapper (the driveline subscription records it), so ↓ at a standstill takes R
+ * and moves the car on that one press — founder ruling 2026-08-11, „thats
+ * automatic transmition". Every hand-worked route stays guarded.
+ *
+ * TWO THINGS SINCE 2026-10-19. The lift and the press are read from the
+ * functional brake's source-timed log (`input.brakeTiming()`), not from the
+ * last read's pedal value, so their lengths are the student's and not the
+ * frame's (R4). And this runs at the START of the frame, before rapier's
+ * stepper reads the input (ReverseAssistDriver, REVERSE_ASSIST_FRAME_PRIORITY):
+ * the frame on which a held press reaches its hold is the frame whose physics
+ * steps are handed reverse throttle (R5). It used to run at the frame's end,
+ * after them. `dtSec` is the frame's own `sessionClockAdvance(delta)`, the
+ * increment the session clock takes for the same frame; `speedKmh` is the
+ * car as the previous frame left it, the newest the scene has at this point.
+ *
+ * WHAT IT READS, AND AS OF WHEN (R20, 2026-11-01 round 6). Deciding before the
+ * reads means the last read()'s values are the PREVIOUS frame's. That was true
+ * of the brake until R4 and of the throttle until R20: the both-pedals disarm
+ * read `rawThrottle`, so after a render stall a W held one frame before it
+ * read 0.02 while S, pressed 0.05 s into a 0.45 s stall, had reached HOLD_S on
+ * its own key time — and the car shifted to R with both pedals down. Each
+ * input now, and why it is current at this instant:
+ *   · the brake and the throttle — each from its own source-timed log
+ *     (`brakeTiming()` / `throttleTiming()`, the pads polled first): every
+ *     event already handled is in it at its own time. NOT EVERY ROLE IN THEM
+ *     IS AS OF NOW: which channel is the brake still uses LAW 2's disown, the
+ *     last read()'s verdict on the ramp, a frame old here. Round 6 gated the
+ *     throttle by it too, and a disowned W pressed again beside S was left
+ *     out of the throttle's log — a false R with both keys down (round-6
+ *     verifier, F1). Since R24 (round 7) the throttle's log is the other
+ *     pedal control as the student holds it, whatever the disown says, so the
+ *     disarm is current; a brake log that still counts a disowned control as
+ *     a brake is safe beside it, because that control is in BOTH logs and a
+ *     press it makes is disarmed;
+ *   · the speed — `sampleRef`, written after the last physics step. It is the
+ *     car's state NOW, not a stale one: the car moves only in a physics step,
+ *     and none has run since (after a stall it is still the speed before it,
+ *     because the car has not been stepped through the stall yet);
+ *   · the selector, the box and the engine — the driveline's own fields,
+ *     changed synchronously by whatever changes them (keys, gear sheet,
+ *     cockpit, this assist), so they are as of this call;
+ *   · `enabled` / `driveLocked` — lesson state as the last render committed
+ *     it; gates, not pedals, and closing either stops the assist outright.
+ */
+export function reverseAssistFrameStart(s: {
+  assist: ReverseAssist;
+  enabled: boolean;
+  driveLocked: boolean;
+  driveline: AssistDriveline | null;
+  input: Pick<GatedSimInput, "brakeTiming" | "throttleTiming"> | null;
+  speedKmh: number;
+  dtSec: number;
+  /** True only while the assist's own gate steps execute, so the driveline
+   *  subscription neither counts them as manual (which would self-suppress
+   *  for 2 s) nor guards the flip (LAW 2's scope: an ARMED press). */
+  shifting: { current: boolean };
+}): ReverseAssistCommand | null {
+  const dl = s.driveline;
+  if (!s.enabled || s.driveLocked || dl === null) return null;
+  if (dl.transmission !== "automatic" || !dl.engineOn) return null;
+  // BOTH PEDALS AS OF NOW (R20, 2026-11-01 round 6). Nothing here reads the
+  // last read()'s `rawBrake` / `rawThrottle`: at a frame's start they are the
+  // PREVIOUS frame's, a whole stall old after a stall. The brake and the
+  // throttle are each read from its own source-timed log; the sampled values
+  // below are the machine's fallback for a caller with no log and are unread
+  // when the timings are given (no input: nothing is pressed).
+  const cmd = s.assist.update({
+    speedKmh: s.speedKmh,
+    selector: dl.selector,
+    brakePedal: 0,
+    throttlePedal: 0,
+    dtSec: s.dtSec,
+    brakeTiming: s.input?.brakeTiming() ?? null,
+    throttleTiming: s.input?.throttleTiming() ?? null,
+  });
+  if (cmd) {
+    s.shifting.current = true;
+    try {
+      const step = cmd === "shiftToR" ? () => dl.gearDown() : () => dl.gearUp();
+      if (step()) step(); // second gate step only if the first engaged
+    } finally {
+      s.shifting.current = false;
+    }
+  }
+  return cmd;
+}
+
+/** Steps `reverseAssistFrameStart` once per live frame, before the physics. */
+function ReverseAssistDriver({
+  reverseAssist,
+  reverseAssistEnabled,
+  assistShiftingRef,
+  cabinRef,
+  inputRef,
+  sampleRef,
+  driveLocked,
+  paused,
+}: {
+  reverseAssist: ReverseAssist;
+  /** Lesson-static gate: false on examMode lessons. */
+  reverseAssistEnabled: boolean;
+  assistShiftingRef: React.RefObject<boolean>;
+  cabinRef: React.RefObject<CabinControls | null>;
+  inputRef: React.RefObject<GatedSimInput | null>;
+  sampleRef: React.RefObject<VehicleSample>;
+  driveLocked: boolean;
+  /** The SAME prop that pauses the physics and RuntimeDriver. */
+  paused: boolean;
+}) {
+  useFrame((_, delta) => {
+    if (paused) return;
+    reverseAssistFrameStart({
+      assist: reverseAssist,
+      enabled: reverseAssistEnabled,
+      driveLocked,
+      driveline: cabinRef.current?.driveline ?? null,
+      input: inputRef.current,
+      speedKmh: sampleRef.current.speedKmh,
+      dtSec: sessionClockAdvance(delta),
+      shifting: assistShiftingRef,
+    });
+  }, REVERSE_ASSIST_FRAME_PRIORITY);
+  return null;
+}
+
+/**
  * One row of the key legend. `essential` marks the short default set — the
  * keys a student needs to get the car moving and look around; everything else
  * is reference material behind „Всички клавиши".
@@ -5763,8 +5993,8 @@ export interface ControlsHelpRow {
  *               is the refusal the student actually meets when he presses ].
  *      reverse  «на място: пусни и натисни пак → задна / напред» describes
  *               `ReverseAssist`, and the scene gates that machine on
- *               `dl.transmission === "automatic"` (see the assist block in
- *               RuntimeDriver's frame loop). On „Напреднал" the gesture is
+ *               `dl.transmission === "automatic"` (see
+ *               `reverseAssistFrameStart`). On „Напреднал" the gesture is
  *               not merely different — it is not running at all. This is the
  *               row's own exam clause reproduced one tier over: „a product
  *               that prints a control it has disabled is refusing an input in
@@ -5861,8 +6091,8 @@ export function controlsHelpRows({
     // for why the exam spelling must not borrow the gear row's identity.
     // …AND THE MANUAL BOX ANSWERS BEFORE EITHER OF THEM, because on that box
     // the machine BOTH sentences describe is switched off. The scene gates the
-    // assist on `dl.transmission === "automatic"` (the assist block in
-    // RuntimeDriver's frame loop, three screens down), so on „Напреднал“ the
+    // assist on `dl.transmission === "automatic"` (`reverseAssistFrameStart`,
+    // three screens down), so on „Напреднал“ the
     // gesture row is not a different truth — it is a control the product has
     // disabled, printed as if it worked, which is the row's own exam clause
     // reproduced one tier over. The exam spelling is false here for a third

@@ -474,6 +474,12 @@ class SyntheticPad {
     connected: true,
     mapping: "standard" as const,
     timestamp: 0,
+    /** Not part of the Gamepad API: this pad changes at PHYSICS STEPS (ADR-017),
+     *  so SimInput stamps its pedal transitions with the step being read, on the
+     *  step clock, rather than with the wall-clock poll (engine/pedalTiming.ts,
+     *  2026-10-19, sc-turn-left-oncoming:d0017a65). Without it the standstill
+     *  duty cycle's 0.12 s lift looked as long as the frames it spanned. */
+    stepKeyed: true,
     axes: this.axes,
     buttons: this.buttons,
     vibrationActuator: null,

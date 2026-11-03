@@ -142,6 +142,11 @@ import {
   resolveScenarioNextSteps,
   routeHoldForSession,
   routeHoldWayOutForSession,
+  offCarriagewayHoldForSession,
+  personHoldCopy,
+  personHoldControlHint,
+  routeGuidanceStandsDown,
+  sessionEndControlLabelBg,
   scenarioById,
   scoreRubric,
   serializeCoachedMistakes,
@@ -450,7 +455,7 @@ export function rejectionHint(
  * already had to be rewritten once for teaching the keyboard inside a lesson
  * whose whole premise is the cockpit. „педалът" is true on all three.
  */
-function reverseStuckHint(direction: ReverseStuckDirection): {
+export function reverseStuckHint(direction: ReverseStuckDirection): {
   titleBg: string;
   explanationBg: string;
 } {
@@ -664,6 +669,84 @@ export function transmissionSwitchHint(
   };
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE CAUSE OF EACH REFUSAL, IN ONE SENTENCE — for the person hold only (lane
+ * endings2, round 3, integrator ruling N16). `personHoldControlHint`
+ * (lessons/advisor.ts) has the rule: after a person strike each hint above is
+ * answered with what the car did and why, then the person exit sentence, and
+ * nothing that names a move. These are those sentences, one per case of the
+ * hint beside it, each true whenever its hint fires (chosen by the same
+ * reason, gate or position the hint itself is chosen by), and none matching
+ * the drive-on stems. Where the hint's own title already IS the cause it is
+ * reused verbatim. Outside the hold none of these is shown.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function stuckStartCauseBg(reason: StuckStartReason): string {
+  switch (reason) {
+    case "engineOff":
+      return "Двигателят е изключен — газта не движи колата";
+    case "stalled":
+      return "Двигателят угасна — газта няма какво да задвижи";
+    case "parked":
+      return "Лостът е на P — колата е паркирана";
+    case "neutral":
+      return "Лостът е на N — моторът не е свързан с колелата";
+    case "parkingBrake":
+      return "Ръчната спирачка е вдигната — колата е задържана";
+  }
+}
+
+export function reverseStuckCauseBg(direction: ReverseStuckDirection): string {
+  return `Лостът е на ${direction === "backward" ? "R" : "D"}, но педалът още спира`;
+}
+
+export function transmissionSwitchCauseBg(movedSelectorTo: SelectorPosition): string {
+  return `Смяната на нивото премести лоста на ${movedSelectorTo === "M" ? "предавка" : movedSelectorTo}`;
+}
+
+export function rejectionCauseBg(rejection: DrivelineRejection, snap: DrivelineSnapshot): string {
+  if (rejection.kind === "startRejected") {
+    return rejection.reason === "clutch"
+      ? "Двигателят не запали — колата е в предавка"
+      : "Двигателят не запали — лостът не е на P или N";
+  }
+  switch (rejection.reason) {
+    case "speed":
+      return "Лостът не влезе в R или P — колата се движи";
+    case "clutch":
+      return "Предавката не влезе без натиснат съединител";
+    case "endOfGate":
+      if (snap.selector === "D") return "Лостът вече е в D — в тази посока позиция няма";
+      if (snap.selector === "M") return `Лостът вече е на последната предавка (M${snap.manualGear})`;
+      return "Лостът вече е в P — в тази посока позиция няма";
+  }
+}
+
+/**
+ * THE WORLD-EDGE CARD'S PARAGRAPH (`setWorldEdgeNear` in the shell's tick).
+ * Without a person strike it is the sentence that shipped, byte for byte: what
+ * is out there, then «…върни се към синята линия и продължи по маршрута на
+ * урока». After one (lane endings2 r3, N16's rule — the cause, then the exit)
+ * the second half would teach the next move of a drive the hold forbids, and
+ * after N14 the blue line it names is no longer drawn: so the card keeps its
+ * account of the edge and ends on the person exit sentence instead.
+ */
+const WORLD_EDGE_WALLED_BG =
+  "Учебната зона свършва тук: отпред е плътен ред сгради — това е ръбът " +
+  "на картата, а не улица, и не се минава. Нищо отвъд маршрута не се " +
+  "оценява, но удар в тези сгради се брои за пътнотранспортно " +
+  "произшествие като всеки друг сблъсък.";
+const WORLD_EDGE_OPEN_BG =
+  "Оттук нататък няма нито път, нито сграда — теренът просто свършва. " +
+  "Това не е част от упражнението и нищо отвъд ръба не се оценява.";
+export function worldEdgeDetailBg(near: "walled" | "open", personExitBg: string | null): string {
+  if (personExitBg !== null) return `${near === "walled" ? WORLD_EDGE_WALLED_BG : WORLD_EDGE_OPEN_BG} ${personExitBg}`;
+  return near === "walled"
+    ? `${WORLD_EDGE_WALLED_BG} Спри, върни се към синята линия и продължи по маршрута на урока.`
+    : `${WORLD_EDGE_OPEN_BG} Върни се към синята линия и продължи по маршрута на урока.`;
+}
+
 // -- Minimap visibility (founder review 2026-07-28) ---------------------------
 // Verbatim: „this minimap of the town is not needed to be on all the time it
 // can be used or turned on by pressing a button because currently its eating
@@ -770,6 +853,26 @@ export interface HudSnapshot {
    * lead. Display only; nothing grades on it.
    */
   objectiveHoldWayOut?: CrashPinWayOut;
+  /**
+   * Lane endings2 (N5): under the "personStruck" hold, the lead the banner and
+   * the phone task row print ALONE in place of the task
+   * (`advisor.ts personHoldCopy`). Absent/null without a person strike.
+   */
+  objectiveHoldPersonLeadBg?: string | null;
+  /**
+   * Lane endings2 r3 (N16 / N14): the person hold's exit sentence — the peek of
+   * `personHoldCopy` for the current phase — for the shell's own cards that
+   * answer the student after a strike (the world-edge card). Absent/null
+   * without a person strike.
+   */
+  objectiveHoldPersonPeekBg?: string | null;
+  /**
+   * Lane endings2 (N10): whether the car is off the carriageway by the hold's
+   * off-road clauses ALONE (`offCarriagewayHoldForSession`) — what the
+   * StatusDashboard's off-carriageway mark reads, so the person hold, which
+   * outranks off-road, cannot drop the mark. Absent reads as false.
+   */
+  offCarriagewayHold?: boolean;
   objectiveIndex: number;
   objectiveTotal: number;
   objectiveProgress: number | null;
@@ -1129,8 +1232,15 @@ export function objectiveTitleUnderHold(
   titleBg: string | null,
   hold: RouteHold | null,
   wayOut: CrashPinWayOut = "away",
+  // Lane endings2 (N5): the person hold's lead (`snap.objectiveHoldPersonLeadBg`).
+  personLeadBg: string | null = null,
 ): string | null {
   if (titleBg === null || hold === null) return titleBg;
+  // N5 — AFTER A PERSON STRIKE THE TASK IS NOT ISSUED: the lead stands ALONE,
+  // with no «: <task>», and never falls through to the off-road lead. Without
+  // the snapshot's lead (a caller that does not pass it) the line is withheld —
+  // never the task — and the coach card still carries the hold.
+  if (hold === "personStruck") return personLeadBg;
   const leadBg =
     hold === "crashPinned"
       ? CRASH_HOLD_LEAD_BG[wayOut]
@@ -1628,6 +1738,9 @@ export function snapshotOf(
     // on a second card, one row under its own qualification.
     objectiveHold: routeHoldForSession(s),
     objectiveHoldWayOut: routeHoldWayOutForSession(s),
+    objectiveHoldPersonLeadBg: personHoldCopy(s)?.leadBg ?? null,
+    objectiveHoldPersonPeekBg: personHoldCopy(s)?.peekBg ?? null,
+    offCarriagewayHold: offCarriagewayHoldForSession(s),
     objectiveIndex: s.currentObjectiveIndex + 1,
     objectiveTotal: s.objectives.length,
     objectiveProgress:
@@ -2807,7 +2920,7 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
   // (`objective-banner-task-cap.test.ts`, «the phone's task row»).
   const taskLineBg = s.mistakeMode
     ? s.lessonDescriptionBg
-    : objectiveTitleUnderHold(bannerObjectiveLineBg(s.snap), s.snap.objectiveHold, s.snap.objectiveHoldWayOut);
+    : objectiveTitleUnderHold(bannerObjectiveLineBg(s.snap), s.snap.objectiveHold, s.snap.objectiveHoldWayOut, s.snap.objectiveHoldPersonLeadBg);
 
   // The gate and the fold — one place, and a pure one, so the four conditions
   // can be driven one at a time. It is NOT the gate the roomy `AdvisorCard` is
@@ -5640,7 +5753,12 @@ export function LessonPlayShell({
     (rejection: DrivelineRejection, snap: DrivelineSnapshot) => {
       if (finalizedRef.current) return;
       if (rejection.kind === "shiftRejected") setGearRejectFlash((k) => k + 1);
-      const hint = rejectionHint(rejection, snap, hintInput);
+      // N16 (lane endings2 r3): under the person hold, the cause and the exit.
+      const hint = personHoldControlHint(
+        sessionRef.current,
+        rejectionHint(rejection, snap, hintInput),
+        rejectionCauseBg(rejection, snap),
+      );
       const t = nowSec();
       const last = rejectionToastAtRef.current[hint.key] ?? Number.NEGATIVE_INFINITY;
       if (t - last < REJECTION_TOAST_COOLDOWN_S) return;
@@ -5666,7 +5784,11 @@ export function LessonPlayShell({
   const handleReversePedalStuck = useCallback(
     (direction: ReverseStuckDirection) => {
       if (finalizedRef.current) return;
-      const hint = reverseStuckHint(direction);
+      const hint = personHoldControlHint(
+        sessionRef.current,
+        reverseStuckHint(direction),
+        reverseStuckCauseBg(direction),
+      );
       push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
     },
     [push],
@@ -5682,10 +5804,10 @@ export function LessonPlayShell({
     (reason: StuckStartReason) => {
       if (finalizedRef.current) return;
       // The LIVE tier, not the lesson's — the picker switches it mid-drive.
-      const hint = stuckStartHint(
-        reason,
-        drivelineRef.current?.transmission ?? "automatic",
-        hintInput,
+      const hint = personHoldControlHint(
+        sessionRef.current,
+        stuckStartHint(reason, drivelineRef.current?.transmission ?? "automatic", hintInput),
+        stuckStartCauseBg(reason),
       );
       push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
     },
@@ -5711,7 +5833,11 @@ export function LessonPlayShell({
   const handleTransmissionChanged = useCallback(
     (transmission: TransmissionMode, movedSelectorTo: SelectorPosition) => {
       if (finalizedRef.current) return;
-      const hint = transmissionSwitchHint(transmission, movedSelectorTo, hintInput, lessonBox);
+      const hint = personHoldControlHint(
+        sessionRef.current,
+        transmissionSwitchHint(transmission, movedSelectorTo, hintInput, lessonBox),
+        transmissionSwitchCauseBg(movedSelectorTo),
+      );
       push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
     },
     [hintInput, lessonBox, push],
@@ -6438,7 +6564,12 @@ export function LessonPlayShell({
    */
   const shadowRibbonShown =
     lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true;
-  const guidanceShown = lesson.objectives.length > 0;
+  // …and after a person strike the lines it names are not drawn (lane
+  // endings2 r3, N14: `routeGuidanceStandsDown` hides the route layer and the
+  // shadow ribbon), so the legend — the phone's line and the PC panel — leaves
+  // with them: a sentence about a green line that is not on the road is false,
+  // and «…до която караш» teaches the drive the hold forbids.
+  const guidanceShown = lesson.objectives.length > 0 && !routeGuidanceStandsDown(snap.objectiveHold);
   const legendApplies = compact && !ended && guidanceShown;
   /**
    * ═══════════════════════════════════════════════════════════════════════════
@@ -6861,16 +6992,10 @@ export function LessonPlayShell({
               kind: "hint" as const,
               tone: "warn" as const,
               lineBg: "Наближаваш края на учебната зона",
-              detailBg:
-                worldEdgeNear === "walled"
-                  ? "Учебната зона свършва тук: отпред е плътен ред сгради — това е ръбът " +
-                    "на картата, а не улица, и не се минава. Нищо отвъд маршрута не се " +
-                    "оценява, но удар в тези сгради се брои за пътнотранспортно " +
-                    "произшествие като всеки друг сблъсък. Спри, върни се към синята " +
-                    "линия и продължи по маршрута на урока."
-                  : "Оттук нататък няма нито път, нито сграда — теренът просто свършва. " +
-                    "Това не е част от упражнението и нищо отвъд ръба не се оценява. " +
-                    "Върни се към синята линия и продължи по маршрута на урока.",
+              detailBg: worldEdgeDetailBg(
+                worldEdgeNear,
+                snap.objectiveHold === "personStruck" ? (snap.objectiveHoldPersonPeekBg ?? null) : null,
+              ),
               blocking: false,
               ackLabelBg: "Разбрах",
               onAck: () => setWorldEdgeNear(null),
@@ -7633,11 +7758,13 @@ export function LessonPlayShell({
               },
             ]
           : []),
+        // The label is `sessionEndControlLabelBg`'s — the one function the
+        // person hold's copy names this control by (lane endings2, N5).
         lesson.objectives.length === 0
-          ? { key: "finish", labelBg: "Завърши сесията", onSelect: finishNow }
+          ? { key: "finish", labelBg: sessionEndControlLabelBg(lesson), onSelect: finishNow }
           : {
               key: "abort",
-              labelBg: examMode ? "Прекрати изпита" : "Прекрати урока",
+              labelBg: sessionEndControlLabelBg(lesson),
               tone: "danger" as const,
               onSelect: abortNow,
             },
@@ -7926,13 +8053,13 @@ export function LessonPlayShell({
               </button>
               {lesson.objectives.length === 0 ? (
                 <button type="button" className="btn-accent px-4 py-1.5 text-xs" onClick={finishNow}>
-                  Завърши сесията
+                  {sessionEndControlLabelBg(lesson)}
                 </button>
               ) : (
                 <button type="button" className="btn-ghost px-4 py-1.5 text-xs" onClick={abortNow}>
                   {/* A13: no mid-exam restart — leaving = abort, next try is a
                       fresh attempt from the briefing. */}
-                  {examMode ? "Прекрати изпита" : "Прекрати урока"}
+                  {sessionEndControlLabelBg(lesson)}
                 </button>
               )}
             </>
@@ -8436,7 +8563,7 @@ export function LessonPlayShell({
               // demand standing over a car that cannot obey it.
               // …and with the task's own binding cap when it is stricter than
               // the sign (founder ruling 2026-09-22, `bannerObjectiveLineBg`).
-              titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}
+              titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)}
               // …on ONE line while an opened explanation still needs the two
               // the hold's lead added — the reader's last step, and only under
               // a hold (`bannerOneLineWhileReading`). The sentence is whole in
@@ -8926,7 +9053,7 @@ export function LessonPlayShell({
                 // 140 still on the bar). The predicate is the banner's own, so
                 // the two surfaces arm on the same frame; see
                 // `OffCarriagewayMark`.
-                offCarriageway={snap.objectiveHold === "offRoad"}
+                offCarriageway={snap.offCarriagewayHold === true}
                 rejectFlashKey={gearRejectFlash}
                 compact
                 // The stall telltale's accessible name was „рестартирай
@@ -8945,7 +9072,7 @@ export function LessonPlayShell({
                 // …and the same for the off-carriageway qualifier, for the same
                 // reason: one of the two mounts carrying it would leave the
                 // desktop and the phone disagreeing about what the disc means.
-                offCarriageway={snap.objectiveHold === "offRoad"}
+                offCarriageway={snap.offCarriagewayHold === true}
                 rejectFlashKey={gearRejectFlash}
                 input={hintInput}
               />

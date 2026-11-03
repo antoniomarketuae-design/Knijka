@@ -26,7 +26,8 @@
  *   · BY EXECUTION — the cut (sceneGradeCut.ts) runs RuntimeDriver's frame
  *     callback from its FIRST statement through the graded call (the
  *     blocked-attempt latch, the dashboard write, the paused early-out, the
- *     pre-drive block, the session clock, the assist, both stuck watches), and
+ *     pre-drive block, the session clock, both stuck watches — and, until
+ *     2026-10-19, the reverse assist, which now runs at the frame's start), and
  *     refuses to cut a callback that reads a name no harness supplies.
  *
  *   §1 reads what the cut runs and what it refuses;
@@ -389,7 +390,7 @@ const FRAME_RUNS: Array<{ name: string; frames: number[] }> = [
 describe("§1 the frame callback is cut out WHOLE, every name it reads is accounted for, and only an unconditional call is accepted", () => {
   const cut = sceneGradeCut();
 
-  it("the region is the callback from its FIRST statement through the call — the latch, the dashboard, the paused early-out, the pre-drive block, the session clock, the assist and both stuck watches", () => {
+  it("the region is the callback from its FIRST statement through the call — the latch, the dashboard, the paused early-out, the pre-drive block, the session clock and both stuck watches (the assist runs at the frame's START since 2026-10-19, outside it)", () => {
     expect(cut.shape).toBe("function");
     const flat = cut.frameRegion.map((s) => s.replace(/\s+/g, " "));
     expect(flat[0]).toBe(FIRST_LINE.trim());
@@ -404,7 +405,15 @@ describe("§1 the frame callback is cut out WHOLE, every name it reads is accoun
     expect(flat).toContain("const input = inputRef.current;");
     expect(flat).toContain("const dt = sessionClockAdvance(delta);");
     expect(flat).toContain("tRef.current = sessionClock.frame(dt, steps.stepCount);");
-    expect(flat.some((s) => s.startsWith("if (reverseAssistEnabled && !driveLocked && cabin) {"))).toBe(true);
+    // 2026-10-19 (sc-turn-left-oncoming:d0017a65, R5): the auto-reverse assist
+    // is NOT stepped by this callback any more — it runs in ReverseAssistDriver
+    // at the START of the frame, before rapier's stepper reads the pedals
+    // (LessonScene.tsx reverseAssistFrameStart; executed on every cadence in
+    // engine/__tests__/reverseAssist-cadence.test.ts). A copy of it here would
+    // decide the shift after the physics reads again.
+    expect(flat.some((s) => s.startsWith("if (reverseAssistEnabled && !driveLocked && cabin) {"))).toBe(false);
+    expect(cut.frameFreeNames).not.toContain("reverseAssist");
+    expect(cut.frameFreeNames).not.toContain("assistShiftingRef");
     expect(flat.filter((s) => s.startsWith("if (driveLocked || !cabin || input === null) {")).length).toBe(2);
     // LessonScene's own module-level declarations it reads, compiled with it.
     expect(cut.frameModuleDecls.map((d) => d.split(/[ (=]/).slice(0, 2).join(" "))).toEqual([
@@ -636,6 +645,8 @@ describe("§4 a PAUSED frame grades nothing, advances no clock and steps no coac
     const assist = r.scope.reverseAssist as ReverseAssist;
     const stuck = r.scope.reverseStuck as ReverseStuckWatch;
     const start = r.scope.stuckStart as StuckStartWatch;
+    // The assist is spied too: since 2026-10-19 this callback never steps it
+    // (it runs at the frame's start, ReverseAssistDriver) — live or paused.
     const calls = {
       assist: vi.spyOn(assist, "update"),
       stuckUpdate: vi.spyOn(stuck, "update"),
@@ -659,7 +670,7 @@ describe("§4 a PAUSED frame grades nothing, advances no clock and steps no coac
     }
     expect(r.gradeGrid.clock.last).toBe(6);
     const before = { counts: p.counts(), t: r.tRef.current, session: (r.scope.sessionClock as PhysicsSessionClock).timeSec, log: r.log.length };
-    expect(before.counts.assist).toBe(2);
+    expect(before.counts.assist).toBe(0); // not this callback's (2026-10-19)
     expect(before.counts.stuckUpdate).toBe(2);
     expect(before.counts.startUpdate).toBe(2);
     expect(p.surfaced).toEqual(["blocked", "blocked"]);
@@ -719,7 +730,7 @@ describe("§4 a PAUSED frame grades nothing, advances no clock and steps no coac
     ]);
     expect(p.drivelineEvents.length).toBe(0);
     expect(p.glances.length).toBe(0);
-    expect(p.counts().assist).toBe(3);
+    expect(p.counts().assist).toBe(0); // not this callback's (2026-10-19)
   });
 
   it("a paused frame on which rapier took no step (the ordinary pause) grades nothing and moves nothing either", () => {
@@ -735,7 +746,7 @@ describe("§4 a PAUSED frame grades nothing, advances no clock and steps no coac
     expect(r.wrong).toEqual([]);
   });
 
-  it("R3 — the early-out removed: the paused frame advances the session clock, steps the assist and both watches, and reaches the graded call (which grades the owed steps)", () => {
+  it("R3 — the early-out removed: the paused frame advances the session clock, steps both watches, and reaches the graded call (which grades the owed steps)", () => {
     const p = pausedRun(altered(PAUSE_AT, AFTER_PAUSE));
     const { r } = p;
     takeSteps(r, p.live, 3);
@@ -746,7 +757,7 @@ describe("§4 a PAUSED frame grades nothing, advances no clock and steps no coac
     expect(res.calls).toBe(1);
     expect(r.gradeGrid.clock.last).toBe(5);
     expect(r.tRef.current).toBeGreaterThan(before.t);
-    expect(p.counts().assist).toBe(before.counts.assist + 1);
+    expect(p.counts().assist).toBe(0); // not this callback's (2026-10-19)
     expect(p.counts().stuckUpdate).toBe(before.counts.stuckUpdate + 1);
     expect(p.counts().startUpdate).toBe(before.counts.startUpdate + 1);
     // …and §4's own pins say so: this is what the first test refuses.
@@ -778,7 +789,10 @@ const F_MUTANTS: Record<string, { from: string; to: string }> = {
     from: "    if (driveLocked && cabin) {\n      const tracker = trackerRef.current;",
     to: "    if (driveLocked && cabin) {\n      if (delta > 0.02) return;\n      const tracker = trackerRef.current;",
   },
-  F2: { from: "        if (cmd) {\n", to: "        if (cmd) {\n          if (delta > 0.02) return;\n" },
+  // F2 — «an early return in the assist's shift branch» — has no target since
+  // 2026-10-19: the assist is stepped at the frame's START, in
+  // LessonScene.tsx reverseAssistFrameStart, not by this callback (§1 pins
+  // its absence here).
   F3: {
     from: "      if (stuck !== null) onReversePedalStuck?.(stuck);",
     to: "      if (stuck !== null) { onReversePedalStuck?.(stuck); if (delta > 0.02) return; }",
@@ -1309,7 +1323,6 @@ function scenarioOf(spec: ScenarioSpec): Made {
 }
 
 const PRE_DRIVE = "pre-drive (driveLocked, a cold cabin: belt, lights, stalk, a look, a brake press and release, a refused move-off, ignition, the gate to D, the parking brake, a ready move-off)";
-const ASSIST = "the reverse assist commands both shifts (two armed brake presses at a standstill, D → R → D)";
 const REVERSE_STUCK = "the reverse-stuck watch fires (R, a disowned pedal, a standstill)";
 const STUCK_START = "the stuck-start watch fires (engine off, throttle held), and a blocked press outside the pre-drive is surfaced";
 const REJECTIONS = "driveline rejections, a tier switch that moves the lever, and the attempt recorder streaming driveline events";
@@ -1342,15 +1355,11 @@ const SCENARIOS: Record<string, ScenarioSpec> = {
     },
     expect: { blocked: ["blocked"] },
   },
-  [ASSIST]: {
-    start: "ready",
-    driveLocked: false,
-    durationSec: 2.6,
-    act: (t, _c, p) => {
-      p.rawBrake = (t >= 0.5 && t < 1.2) || (t >= 1.7 && t < 2.4) ? 1 : 0;
-    },
-    expect: { assistShifts: ["N", "R", "N", "D"] },
-  },
+  // The reverse assist's scenario left this table on 2026-10-19 with the
+  // assist itself (sc-turn-left-oncoming:d0017a65, R5): the frame callback no
+  // longer steps it. Its cadence drive is engine/__tests__/
+  // reverseAssist-cadence.test.ts, through the scene's own
+  // reverseAssistFrameStart and the real GatedSimInput.
   [REVERSE_STUCK]: {
     start: "ready",
     driveLocked: false,
@@ -1798,7 +1807,7 @@ describe("§6d N14 — the round-5 verifier's P1, P3 and P7 BY EXECUTION (cut wi
 });
 
 describe("§6b the same branches catch the round-4 verifier's F1–F6 BY EXECUTION (cut with the refusal off): on frames longer than 20 ms the frame's last point is left to the next frame's step loop — and at one step per frame each is invisible", () => {
-  const WHERE: Record<string, string> = { F1: PRE_DRIVE, F2: ASSIST, F3: REVERSE_STUCK, F4: STUCK_START, F5: REJECTIONS, F6: STUCK_START };
+  const WHERE: Record<string, string> = { F1: PRE_DRIVE, F3: REVERSE_STUCK, F4: STUCK_START, F5: REJECTIONS, F6: STUCK_START };
   for (const [id, m] of Object.entries(F_MUTANTS)) {
     it(id, () => {
       const cut = sceneGradeCutOf(altered(m.from, m.to), { refuseEarlyExits: false });
@@ -1851,16 +1860,18 @@ describe("§6c BRANCH CENSUS — every branch of the frame callback before its g
 
   it("the probes see the branches they claim: the census run with the pre-drive scenario removed misses the pre-drive branches", () => {
     const cut = sceneGradeCutOf(SCENE_TEXT, { probeBranches: true });
-    const made = scenarioOf(SCENARIOS[ASSIST]);
-    const d = drive(cut, framesFor(3, 2.6), made.sc);
+    // (The assist's scenario served here until 2026-10-19; the reverse-stuck
+    // one is the same kind of live, unlocked drive.)
+    const made = scenarioOf(SCENARIOS[REVERSE_STUCK]);
+    const d = drive(cut, framesFor(3, SCENARIOS[REVERSE_STUCK].durationSec), made.sc);
     made.done();
     const hits = d.scene.branchHits();
     const preDrive = cut.branchProbes.filter((p) => p.what.startsWith("if (driveLocked && cabin) → then"));
     expect(preDrive).toHaveLength(1);
     expect(hits[preDrive[0].id]).toBeUndefined();
-    const assist = cut.branchProbes.filter((p) => p.what.startsWith("if (cmd) → then"));
-    expect(assist).toHaveLength(1);
-    expect(hits[assist[0].id]).toBe(2);
+    const stuck = cut.branchProbes.filter((p) => p.what.startsWith("if (stuck !== null) → then"));
+    expect(stuck).toHaveLength(1);
+    expect(hits[stuck[0].id]).toBe(1);
   });
 });
 

@@ -92,7 +92,10 @@
  *     motion — including one carried through a shift INTO neutral, because
  *     the gate opening is not a rising edge — can be held forever and this
  *     stays silent. Nothing in engine/reverseAssist.ts is touched; its two
- *     exported constants are imported and its reasoning is reused.
+ *     exported constants are imported and its reasoning is reused — and since
+ *     2026-10-19 its pedal timing too (engine/pedalTiming.ts TimedPedal, on
+ *     the same source-timed brake log), so a lift counts here exactly as it
+ *     counts there: release → press, timed at the input, never by the frame.
  *
  * The brake press then serves the SAME `STUCK_START_HINT_S`, the same settle
  * beat and the same repeat cadence as the throttle, and produces the same
@@ -144,12 +147,13 @@
  * that lets the car move at all still sits at half the threshold.
  *
  * Pure state machine — no DOM, no React, no clock of its own (the caller feeds
- * its clamped render dt), exactly like `ReverseAssist` and `ReverseStuckWatch`
- * beside it.
+ * its clamped render dt, and the brake's source-timed log), exactly like
+ * `ReverseAssist` and `ReverseStuckWatch` beside it.
  */
 
 import type { DrivelinePhysicsInput } from "../vehicle";
 import { REVERSE_ASSIST_LIFT_S, REVERSE_ASSIST_STANDSTILL_KMH } from "./reverseAssist";
+import { spanReaches, TimedPedal, type PedalTiming } from "./pedalTiming";
 
 /** Continuous seconds of real throttle, at a standstill, on a car that cannot
  *  move, before the cockpit says anything. See the measurement above. */
@@ -203,6 +207,12 @@ export interface StuckStartFrame {
    * omitted brake is a lifted brake, which is what those callers meant.
    */
   brakePedal?: number;
+  /**
+   * The FUNCTIONAL brake's source-timed transitions (GatedSimInput.brakeTiming)
+   * — the SAME log the reverse assist reads (engine/pedalTiming.ts). When
+   * present the brake is read from it and `brakePedal` is not.
+   */
+  brakeTiming?: PedalTiming | null;
   /** Signed or unsigned — only |speed| is read. */
   speedKmh: number;
   /** The live driveline, read straight off DrivelineState.physicsInput. */
@@ -244,11 +254,14 @@ export class StuckStartWatch {
    *  waiting out the repeat cooldown: it means the student just cleared the
    *  previous blocker and is owed the next step now, not in ten seconds. */
   private saidReason: StuckStartReason | null = null;
-  /** Seconds the brake has been OFF at a standstill inside the P/N gate — what
-   *  earns the right to count the NEXT press (LAW 1's discipline). */
-  private brakeLiftS = 0;
-  /** Was the brake down last frame? (rising-edge detection) */
-  private brakeDown = false;
+  /** The brake as this watch reads it — the lift at a standstill inside the
+   *  P/N gate is what earns the right to count the NEXT press (LAW 1's
+   *  discipline). The assist's own pedal timing (engine/pedalTiming.ts,
+   *  sc-turn-left-oncoming:d0017a65): it used to add the whole frame delta to
+   *  one sample of a lifted pedal, so on a 0.5 s frame a momentary ease of the
+   *  foot armed the hint; a lift is now release → press, timed at the input,
+   *  and the hint and the assist agree on what a lift is (R3). */
+  private readonly brake = new TimedPedal();
   /** May THIS brake press count as „I am asking the car to move"? */
   private brakeArmed = false;
 
@@ -298,34 +311,34 @@ export class StuckStartWatch {
    * thing a held brake can mean when the gearbox is transmitting nothing?
    *
    * The gate closing (any selector but P/N, or an engine that is not running)
-   * does NOT clear `brakeDown`: it records it. That single line is what makes
+   * does NOT forget the pedal: its edges are still read. That is what makes
    * „roll to a stop in D, clutch, shift to N, keep standing on the pedal"
    * silent forever — when the gate opens the pedal is already down, so there
    * is no rising edge and the press can never be armed. Arming requires a foot
    * that genuinely left the pedal, at a standstill, inside the gate.
    */
   private stepBrakeArming(f: StuckStartFrame, stopped: boolean): boolean {
-    const down = (f.brakePedal ?? 0) > STUCK_START_PEDAL_ON;
+    this.brake.step({
+      dtSec: f.dtSec,
+      stopped,
+      sampledDown: (f.brakePedal ?? 0) > STUCK_START_PEDAL_ON,
+      timing: f.brakeTiming,
+    });
     const inGate =
       f.driveline.engineOn &&
       (f.driveline.selector === "P" || f.driveline.selector === "N");
     if (!inGate) {
-      this.brakeLiftS = 0;
+      // No lift counts time outside the gate, and a press spanning the gate
+      // stays unarmed (its press edge was read while the gate was closed).
+      this.brake.floorNow();
       this.brakeArmed = false;
-      this.brakeDown = down; // a press spanning the gate stays unarmed
       return false;
     }
-    if (!down) {
-      this.brakeLiftS = stopped ? this.brakeLiftS + f.dtSec : 0;
-      this.brakeArmed = false;
-      this.brakeDown = false;
-      return false;
+    if (this.brake.releasedThisUpdate || !this.brake.down) this.brakeArmed = false;
+    if (!this.brake.down) return false;
+    if (this.brake.pressedThisUpdate) {
+      this.brakeArmed = stopped && spanReaches(this.brake.pressLiftS, REVERSE_ASSIST_LIFT_S);
     }
-    if (!this.brakeDown) {
-      this.brakeArmed = stopped && this.brakeLiftS >= REVERSE_ASSIST_LIFT_S;
-    }
-    this.brakeDown = true;
-    this.brakeLiftS = 0;
     if (!stopped) this.brakeArmed = false; // it became a stopping input
     return this.brakeArmed;
   }
@@ -333,8 +346,7 @@ export class StuckStartWatch {
   /** End the episode — the scene calls this when the drive is not live. */
   reset(): void {
     this.resetEpisode();
-    this.brakeLiftS = 0;
-    this.brakeDown = false;
+    this.brake.floorNow();
     this.brakeArmed = false;
   }
 

@@ -831,10 +831,12 @@ export function StatusDashboard({
    * IS THE RUNTIME SAYING THERE IS NO ROAD UNDER THE CAR? (`sc-ac-truck-spray:
    * 7e53374c` — see `OffCarriagewayMark` for the frame and the measurement.)
    *
-   * Read off `snap.objectiveHold === "offRoad"` at both mounts, which is
-   * `lessons/advisor.ts routeHoldForSession` — the SAME predicate and the same
-   * `ROUTE_HOLD_S` the objective banner and the coach card arm on, so the three
-   * surfaces change together. A separate clock here would make the bar and the
+   * Read off `snap.offCarriagewayHold` at both mounts, which is
+   * `lessons/advisor.ts offCarriagewayHoldForSession` — the off-road clauses of
+   * `routeHoldForSession` alone (lane endings2, N10: the person hold outranks
+   * off-road and must not take this mark off a car on the verge), with the SAME
+   * predicate and the same `ROUTE_HOLD_S` the objective banner and the coach
+   * card arm on, so the surfaces change together. A separate clock here would make the bar and the
    * banner disagree about the moment, which is the drift that block warns about
    * in its own words („surfaces that change at different moments read as
    * bugs").

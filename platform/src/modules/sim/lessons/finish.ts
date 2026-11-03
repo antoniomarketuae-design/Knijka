@@ -2309,6 +2309,95 @@ export function openTasksEndingCopy(examMode: boolean): {
 }
 
 /**
+ * THE EXAM'S ARRIVAL SENTENCE — gate 1's arrival (and its no-mark latch, E1
+ * «as before») and gate 2's arrived exam case say it. One literal, two
+ * readers (`engine.ts` gate 1, `stoppedStuckEndingCopy` below).
+ */
+export const ROUTE_END_REACHED_EXAM_BG =
+  "Стигна края на маршрута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка.";
+
+/**
+ * GATE 2'S ENDING — lane endings2, 2026-11-02 (sc-crossing-dart:1c7a07d8 exam
+ * path, merge verifier N1; integrator rulings N1 and N1b).
+ *
+ * WHAT WAS FALSE. Gate 2 (`terminalRescueZone`, the „simply stuck" gate) ended
+ * an EXAM drive on «Стигна края на маршрута…» whatever the car had done: 6.6 m
+ * short of the mark (sc-park-parallel-exit/mistake-no-room L4), beside a bay
+ * that has no arrival mark at all (sc-park-perp-rev L4), or driven away from a
+ * roundabout (sc-rb-exit-signal/mistake-exit-no-signal L4). And on an OUTSIDE
+ * anchor (passSignal / roundabout / threePointTurn) the gate is not a
+ * standstill gate at all — its region face latches FINISH_LEAVE_S after the
+ * car is beyond the departure circle, at any speed — so the lesson sentence
+ * «Спря в края на маршрута…» was false there too (sc-rb-exit-signal L1).
+ *
+ * THE RULE. Keyed on the anchor's mode (`terminalRescueZone(params)?.mode`) and
+ * on arrival (`routeRunOutArrived(routeEndMark, routeApproachFrom, pose)` — E1's
+ * own predicate, unchanged; the mark is non-null only for a reachZone, so an
+ * arrival is only possible on an inside anchor):
+ *  · exam, inside, arrived — the arrival sentence, verbatim;
+ *  · exam, inside, not arrived or no mark — the rescue face is a full
+ *    standstill (maxSpeedKmh FINISH_STANDSTILL_KMH, held FINISH_STUCK_S /
+ *    FINISH_BAY_STUCK_S) inside a disc floored at FINISH_LANE_FLOOR_M around
+ *    the terminal anchor, so «стоя неподвижно при края на маршрута» is true on
+ *    the latch frame; it claims no arrival;
+ *  · outside, either mode of drive — the latch is on the region face (beyond
+ *    the departure circle, after arming inside it) or the stranded face (in
+ *    the band beyond the work site), so the car was at the work site and is
+ *    now outside it: «напусна мястото, където свършва маршрутът», true at any
+ *    speed; it claims no standstill;
+ *  · lesson, inside — kept verbatim («Спря в края…»; its claim short of the
+ *    mark belongs to sc-mv-uturn-ban:15ed5059 (b)).
+ * «не всички задачи се отчетоха» is true on every latch: the gates run only
+ * while a task is open (`engine.ts`, currentIndex < objectives.length), and
+ * gate 2 runs whichever task is active, so no variant names the last one. «не
+ * е издържан» is true because `passed` needs `completedAll`. Titles unchanged
+ * (the tools detect an ending by /Край на маршрута/). Original copy, no law
+ * claim (ADR-002). Display only: nothing here grades, ends or times anything.
+ */
+export function stoppedStuckEndingCopy(
+  examMode: boolean,
+  mode: "inside" | "outside",
+  arrived: boolean,
+): { kind: "lesson"; titleBg: string; explanationBg: string } {
+  const explanationBg = examMode
+    ? mode === "outside"
+      ? "Колата напусна мястото, където свършва маршрутът, но не всички задачи се отчетоха, затова изпитът приключва тук и не е издържан. Разборът показва всяка неизпълнена задача и всяка допусната грешка."
+      : arrived
+        ? ROUTE_END_REACHED_EXAM_BG
+        : "Колата стоя неподвижно при края на маршрута, но не всички задачи се отчетоха, затова изпитът приключва тук и не е издържан. Разборът показва всяка неизпълнена задача и всяка допусната грешка."
+    : mode === "outside"
+      ? "Колата напусна мястото, където свършва маршрутът, но не всички задачи се отчетоха, затова урокът приключва тук. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път."
+      : // B2/B3: the car has been standing still at the end of the route with
+        // the task open. Say that plainly — the student has been sitting there
+        // wondering what the simulator wants, and the honest answer is that it
+        // did not register and he is not trapped here.
+        "Спря в края на маршрута, но задачата тук не се отчете — затова урокът приключва, вместо да те държи на място. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път.";
+  return {
+    kind: "lesson",
+    titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
+    explanationBg,
+  };
+}
+
+/**
+ * THE DRIVER'S DUTY AFTER STRIKING A PERSON — BY CITATION ONLY (lane endings2,
+ * integrator rulings N5 / N6; ADR-002: the product never free-recalls law).
+ *
+ * After a scored COLLISION with a pedestrian or a cyclist the coach says
+ * «не продължавай с колата» and names the provision that says what the driver
+ * must do — it does not list the duties. ал. 1 and not т. 2: т. 1 binds every
+ * ПТП (stop to establish what happened), and the sim cannot know whether
+ * anyone was injured, which is what т. 2 turns on. Retrieved from
+ * content/law/acts/zdvp.json, unit «чл. 123»; `law-citations.test.ts` scans
+ * this `lawRef:` literal like every other one in modules/sim. Every surface
+ * that names the duty interpolates THIS value — the person hold's cards
+ * (`advisor.ts personHoldCopy`) and the crash pin's ending on a drive with a
+ * person strike (`crashPinEndingCopy`). Nowhere else in the source is the
+ * article typed.
+ */
+export const PERSON_STRIKE_DUTY = { lawRef: "ЗДвП чл. 123, ал. 1" } as const;
+
+/**
  * THE CRASH PIN'S ENDING — lane endings, row sc-pk-driveway:7fa8b79e
  * («pinfree»), integrator ruling E3: ONE wording true of a PRESSED car and a
  * FREE car alike.
@@ -2359,10 +2448,16 @@ export function openTasksEndingCopy(examMode: boolean): {
 export function crashPinEndingCopy(
   examMode: boolean,
   impact?: CrashPinImpact,
+  // Lane endings2 (N5 / N6): the drive struck a person at some point
+  // (`LessonSessionState.personStruckAtSec`), whatever the LAST impact was —
+  // the ending then carries the duty's citation, so the toast and the end
+  // card show it as a chip. The wording and the corrective are unchanged.
+  personStruck = false,
 ): {
   kind: "lesson";
   titleBg: string;
   explanationBg: string;
+  lawRef?: string;
 } {
   return {
     kind: "lesson",
@@ -2370,6 +2465,7 @@ export function crashPinEndingCopy(
     explanationBg: examMode
       ? "След удара колата спря до мястото на удара и остана неподвижна, затова изпитът приключва тук. Разборът показва удара, всяка останала задача и какво трябваше да се направи преди него."
       : `След удара колата спря до мястото на удара и остана неподвижна, затова урокът приключва тук. Разборът показва как се стига до такъв удар и какво го предотвратява: ${CRASH_PIN_CORRECTIVE_BG[crashPinCorrective(impact)]}`,
+    ...(personStruck ? { lawRef: PERSON_STRIKE_DUTY.lawRef } : {}),
   };
 }
 

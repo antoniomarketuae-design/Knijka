@@ -40,6 +40,9 @@ export type {
 // (founder 2026-08-09: „it turns to R (reverse) but the car does not move did
 // it break or ?"). This decides WHEN that is confusion rather than an
 // ordinary shift; the words are the shell's.
+export { PedalEdgeLog, PedalLatch, TimedPedal, spanReaches, PEDAL_CLOCK_EPS_S } from "./pedalTiming";
+export type { PedalEdge, PedalStamp, PedalTiming, PlacedStamp, PedalClock } from "./pedalTiming";
+
 export {
   ReverseStuckWatch,
   REVERSE_STUCK_HINT_S,
@@ -99,6 +102,8 @@ export {
 export {
   TouchInputSource,
   PadPointer,
+  PadSampleClock,
+  pointerSamples,
   releaseTouchControls,
   steerFromDrag,
   driveAxisFromDrag,
@@ -112,6 +117,7 @@ export {
   TOUCH_DRIVE_ABSOLUTE_RANGE_PX,
   TOUCH_DRIVE_NEUTRAL_HALF_PX,
 } from "./touch";
+export type { PointerSample, CoalescingPointerEvent, PadSampleStamp } from "./touch";
 
 // doc 82 §4.3 F5 — three discrete haptic events, always redundant with a
 // visual or audio cue (a quarter of the phone audience is on iOS Safari,

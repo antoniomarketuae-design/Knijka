@@ -262,10 +262,10 @@ export function MousePedals({
         keyHint="S"
         tone="var(--danger)"
         riseSec={BRAKE_RISE_SEC}
-        onValue={(v) => {
+        onValue={(v, atMs) => {
           wake();
-          if (v > 0) touch.setBrake(v);
-          else touch.releaseBrake();
+          if (v > 0) touch.setBrake(v, atMs);
+          else touch.releaseBrake(atMs);
         }}
       />
       <Pedal
@@ -274,10 +274,10 @@ export function MousePedals({
         keyHint="W"
         tone="var(--success)"
         riseSec={THROTTLE_RISE_SEC}
-        onValue={(v) => {
+        onValue={(v, atMs) => {
           wake();
-          if (v > 0) touch.setThrottle(v);
-          else touch.releaseThrottle();
+          if (v > 0) touch.setThrottle(v, atMs);
+          else touch.releaseThrottle(atMs);
         }}
       />
     </div>
@@ -304,8 +304,11 @@ function Pedal({
   tone: string;
   /** Seconds from resting to fully depressed while held (see the constants). */
   riseSec: number;
-  /** 0..1 pedal travel, once per animation frame while held; 0 on release. */
-  onValue: (value: number) => void;
+  /** 0..1 pedal travel, once per animation frame while held; 0 on release.
+   *  `atMs` is the pointer event's timeStamp on the press and the release —
+   *  the instants the reverse assist times a lift and a press by (R4,
+   *  engine/pedalTiming.ts); the ramp's frames in between carry none. */
+  onValue: (value: number, atMs?: number) => void;
 }) {
   const [down, setDown] = useState(false);
   // The ramp lives in refs + rAF, never in React state: a 60 Hz setState for a
@@ -342,7 +345,7 @@ function Pedal({
     // callback only writes into the shared TouchInputSource, which is a stable
     // object for the whole session, so a re-render mid-press cannot make the
     // captured one wrong.
-    onValue(valueRef.current);
+    onValue(valueRef.current, e.timeStamp);
     paint(valueRef.current);
     const step = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000);
@@ -356,12 +359,13 @@ function Pedal({
     rafRef.current = requestAnimationFrame(step);
   };
 
-  const release = () => {
+  const release = (e?: React.PointerEvent<HTMLButtonElement>) => {
     stopRamp();
+    const atMs = e?.timeStamp;
     setDown((was) => {
       if (was) {
         valueRef.current = 0;
-        onValue(0);
+        onValue(0, atMs);
         paint(0);
       }
       return false;

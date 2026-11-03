@@ -88,6 +88,9 @@ export {
   YIELD_ROUNDABOUT_APPROACH_M,
   YIELD_STOP_LINE_REACH_M,
   YIELD_WAIT_MAX_S,
+  // Lane endings2 (N1 / N6): gate 2's ending, and the duty's one citation.
+  PERSON_STRIKE_DUTY,
+  stoppedStuckEndingCopy,
   type CrashPinWayOut,
   type YieldReason,
   type YieldWaitContext,
@@ -171,6 +174,18 @@ export {
   // Lane endings round 2 (E5): which way is away from what the car struck —
   // the shell's crash-hold banner lead reads it beside `routeHoldForSession`.
   routeHoldWayOutForSession,
+  // Lane endings2 (N5 / N10): the person hold's copy, the control label it
+  // names (also the shell's menus), and the off-carriageway mark's own reading.
+  offCarriagewayHoldForSession,
+  personHoldCopy,
+  // Lane endings2 r3 (N16): the shell's car-control hints under the person hold.
+  personHoldControlHint,
+  // Lane endings2 r3 (N14): the route guidance stands down under the person hold.
+  routeGuidanceStandsDown,
+  // Lane endings2 at integration (C1 / N18): so do the «огледай» edge pings.
+  glancePingsStandDown,
+  sessionEndControlLabelBg,
+  type PersonHoldCopy,
   serializeAdvisorSetting,
   // Founder ruling 2026-09-25 «Only the named stretch» (round 4): the ACTIVE
   // objective's task cap has stopped binding, so the strip and the banner stop
@@ -361,6 +376,7 @@ export type {
   FinishGateState,
   LessonMistakeHit,
   LessonPhase,
+  LessonEndingCopy,
   LessonResult,
   LessonSessionState,
   ObjectiveDetail,

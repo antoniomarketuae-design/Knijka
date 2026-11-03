@@ -26,6 +26,7 @@ import {
   type StuckStartReason,
 } from "../stuckStart";
 import {
+  PedalEdgeLog,
   REVERSE_ASSIST_LIFT_S,
   REVERSE_ASSIST_STANDSTILL_KMH,
   ReversePedalMapper,
@@ -386,5 +387,107 @@ describe("StuckStartWatch — the brake, in the two positions that transmit noth
       if (r !== null) said.push(r);
     }
     expect(said).toEqual([]);
+  });
+});
+
+/**
+ * THE LIFT IS THE ASSIST'S LIFT — sc-turn-left-oncoming:d0017a65 (integrator
+ * ruling R3, 2026-10-18). The brake channel's arming borrowed LAW 1 whole, and
+ * with it LAW 1's frame-timed lift: `brakeLiftS += dtSec` credited a whole
+ * frame to one sample of a lifted pedal, so on a 0.5 s frame a momentary ease
+ * of the foot in N counted as a quarter second of lift and armed the hint. Both
+ * machines now credit a lift only with the time they WATCHED it — without a
+ * log, the update that first sees it credits nothing (these two tests) — and
+ * since 2026-10-19 (R4) both read the SAME source-timed brake log, so a lift is
+ * release → press on the input's own clock (the block after these).
+ */
+describe("StuckStartWatch — the brake lift is an OBSERVED lift, on every frame length", () => {
+  const NEUTRAL: Partial<DrivelinePhysicsInput> = { selector: "N" };
+  const frameAt = (dtSec: number, brakePedal: number) => ({
+    throttlePedal: 0,
+    brakePedal,
+    speedKmh: 0,
+    driveline: { ...READY, ...NEUTRAL },
+    stalled: false,
+    dtSec,
+  });
+
+  it("one 0.5 s frame of a lifted brake arms nothing: the press after it stays silent", () => {
+    const w = new StuckStartWatch();
+    const said: StuckStartReason[] = [];
+    w.update(frameAt(0.5, 1)); // standing on it in N, never lifted
+    w.update(frameAt(0.5, 0)); // ONE sample of a lift (a 0.12 s ease, fused by the frame)
+    for (let i = 0; i < 20; i++) {
+      const r = w.update(frameAt(0.5, 1));
+      if (r !== null) said.push(r);
+    }
+    expect(said).toEqual([]);
+  });
+
+  it("a lift WATCHED for REVERSE_ASSIST_LIFT_S arms it on the same 0.5 s frames", () => {
+    const w = new StuckStartWatch();
+    const said: StuckStartReason[] = [];
+    w.update(frameAt(0.5, 1));
+    w.update(frameAt(0.5, 0));
+    w.update(frameAt(0.5, 0)); // a 0.5 s observed span ≥ LIFT_S
+    expect(REVERSE_ASSIST_LIFT_S).toBeLessThanOrEqual(0.5);
+    for (let i = 0; i < 20; i++) {
+      const r = w.update(frameAt(0.5, 1));
+      if (r !== null) said.push(r);
+    }
+    expect(said).toEqual(["neutral"]);
+  });
+});
+
+/**
+ * …AND TIMED AT THE INPUT (R3 + R4, 2026-10-19). Fed the functional brake's log
+ * (GatedSimInput.brakeTiming — the one the assist reads), the hint's lift is
+ * the lift the student made. The drive rig's standstill pulse (0.22 s on /
+ * 0.12 s off) sampled by 0.37 s frames shows the pedal «up» at frames in a row
+ * — one long lift to anything that reads one sample per frame — and armed the
+ * hint; on the log its every lift is 0.12 s.
+ */
+describe("StuckStartWatch — the brake lift is the lift the input made (the shared log)", () => {
+  const NEUTRAL: Partial<DrivelinePhysicsInput> = { selector: "N" };
+  function drivePulse(timed: boolean, f: number, end: number, edges: number[], startHeld: boolean): StuckStartReason[] {
+    const w = new StuckStartWatch();
+    const log = new PedalEdgeLog();
+    let down = startHeld;
+    if (startHeld) log.push({ down: true, atMs: 0, earliestMs: 0 });
+    let ei = 0;
+    const said: StuckStartReason[] = [];
+    for (let t = f; t <= end; t += f) {
+      while (ei < edges.length && edges[ei]! <= t) {
+        down = !down;
+        log.push({ down, atMs: edges[ei]! * 1000, earliestMs: edges[ei]! * 1000 });
+        ei++;
+      }
+      const r = w.update({
+        throttlePedal: 0,
+        brakePedal: down ? 1 : 0,
+        brakeTiming: timed ? { log, nowMs: t * 1000 } : null,
+        speedKmh: 0,
+        driveline: { ...READY, ...NEUTRAL },
+        stalled: false,
+        dtSec: f,
+      });
+      if (r !== null) said.push(r);
+    }
+    return said;
+  }
+  const pulseEdges: number[] = [];
+  for (let k = 0; k < 60; k++) pulseEdges.push(k * 0.34 + 0.22, (k + 1) * 0.34);
+
+  it("the standstill pulse on 0.37 s frames: one sample per frame arms the hint, the log does not", () => {
+    expect(drivePulse(false, 0.37, 20, pulseEdges, true)).toContain("neutral");
+    expect(drivePulse(true, 0.37, 20, pulseEdges, true)).toEqual([]);
+  });
+
+  it("a real lift (1 s) then a held press arms it on the log, on 0.37 s and 0.5 s frames alike", () => {
+    for (const f of [0.37, 0.5]) expect(drivePulse(true, f, 8, [2, 3], true)).toEqual(["neutral"]);
+  });
+
+  it("a 0.24 s lift on the log never arms it, on any of these frames", () => {
+    for (const f of [1 / 60, 0.1, 0.25, 0.37, 0.5]) expect(drivePulse(true, f, 8, [2, 2.24], true)).toEqual([]);
   });
 });

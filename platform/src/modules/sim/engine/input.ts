@@ -5,6 +5,8 @@
 
 import { IDLE_INPUT, type VehicleInput } from "../vehicle";
 import type { TouchInputSource } from "./touch";
+import type { PedalStamp } from "./pedalTiming";
+import { REVERSE_ASSIST_PEDAL_ON } from "./reverseAssist";
 
 export interface SimInputCallbacks {
   /** C — chase ↔ cockpit. */
@@ -172,6 +174,28 @@ export class SimInput {
   // P1: optional touch overlay source (TouchControls) — merged LAST in read().
   private touchSource: TouchInputSource | null = null;
 
+  // ---- R4 (2026-10-19, sc-turn-left-oncoming:d0017a65): the pedal CHANNELS'
+  // transitions, timed by the source that made them (engine/pedalTiming.ts).
+  // A channel is the brake role (S/↓, LT, the touch brake) or the throttle
+  // role (W/↑, RT, the touch throttle), merged exactly as read() merges the
+  // values — touch active replaces, else keyboard ∪ gamepad — except that a
+  // key counts as the KEY, not as the ramped pedal the key makes.
+  private keyBrake = false;
+  private keyThrottle = false;
+  private padBrake = false;
+  private padThrottle = false;
+  private brakeCh = false;
+  private throttleCh = false;
+  private lastPollMs: number | null = null;
+  private lastStampMs = Number.NEGATIVE_INFINITY;
+  /**
+   * The physics-step clock, s (steps taken × FIXED_DT) — set by the scene.
+   * Read ONLY to stamp a STEP-KEYED pad (the drive rig's, ADR-017: its pad
+   * object carries `stepKeyed: true`), whose changes happen at physics steps
+   * rather than at any wall-clock instant a poll could see.
+   */
+  stepClockS: (() => number) | null = null;
+
   constructor(
     private readonly callbacks: SimInputCallbacks = {},
     /** Monotonic clock (ms) — injectable for tests. */
@@ -198,7 +222,87 @@ export class SimInput {
    * observers) treats touch exactly like any other device.
    */
   attachTouch(source: TouchInputSource | null): void {
+    if (this.touchSource) this.touchSource.onPedalChange = null;
     this.touchSource = source;
+    // R4: a touch pedal's transition is stamped with the pointer event's own
+    // timeStamp when the overlay passes it (TouchControls / MousePedals do).
+    // R8: a write from a pointer SAMPLE also passes the previous sample's
+    // time, and the stamp is the interval since it (touch.ts PadSampleClock).
+    if (source)
+      source.onPedalChange = (atMs, sinceMs) => this.refreshPedalChannels(this.eventStamp(atMs, sinceMs));
+    this.refreshPedalChannels(this.eventStamp(undefined));
+  }
+
+  /** The input clock now, ms — the clock every pedal stamp is on. */
+  clockMs(): number {
+    return this.nowMs();
+  }
+
+  /** Is the brake-role channel down (raw keys, LT, the touch brake)? */
+  get brakeChannelDown(): boolean {
+    return this.brakeCh;
+  }
+
+  /** Is the throttle-role channel down (raw keys, RT, the touch throttle)? */
+  get throttleChannelDown(): boolean {
+    return this.throttleCh;
+  }
+
+  /** A channel changed state — GatedSimInput turns these into the FUNCTIONAL
+   *  brake's log (LessonScene.tsx). */
+  protected onPedalChannelEdge(_channel: "brake" | "throttle", _down: boolean, _stamp: PedalStamp): void {}
+
+  /**
+   * An event's stamp on the input clock: its own `timeStamp` when that is a
+   * time on this clock (finite, not in the future), else now. `atMs` — where
+   * a lift or a press is counted FROM — is never before an earlier stamp, so
+   * the stamps of one input stay in order (later is the safe side for it);
+   * `earliestMs` — where a lift ENDS — keeps the event's own time, never
+   * pushed later: an event that happened during a long frame but was
+   * dispatched after that frame's reads must not lengthen the lift before it.
+   *
+   * `sinceMs` (R8): a transition seen in a pointer SAMPLE happened somewhere
+   * after the previous sample, so `earliestMs` is taken back to it — never
+   * later than the event's own time; −∞ (no earlier sample seen) credits no
+   * lift before it. Omitted, the event is a discrete one and exact.
+   */
+  protected eventStamp(timeStamp: unknown, sinceMs?: unknown): PedalStamp {
+    const now = this.nowMs();
+    const own = typeof timeStamp === "number" && Number.isFinite(timeStamp) && timeStamp <= now ? timeStamp : now;
+    const at = Math.max(own, this.lastStampMs);
+    this.lastStampMs = at;
+    const since = typeof sinceMs === "number" && !Number.isNaN(sinceMs) ? Math.min(sinceMs, own) : own;
+    return { atMs: at, earliestMs: since };
+  }
+
+  private refreshPedalChannels(stamp: PedalStamp): void {
+    const touchBrake = this.touchSource?.brakeAxis ?? null;
+    const touchThrottle = this.touchSource?.throttleAxis ?? null;
+    const brake = touchBrake !== null ? touchBrake > REVERSE_ASSIST_PEDAL_ON : this.keyBrake || this.padBrake;
+    const throttle =
+      touchThrottle !== null ? touchThrottle > REVERSE_ASSIST_PEDAL_ON : this.keyThrottle || this.padThrottle;
+    if (brake !== this.brakeCh) {
+      this.brakeCh = brake;
+      this.onPedalChannelEdge("brake", brake, stamp);
+    }
+    if (throttle !== this.throttleCh) {
+      this.throttleCh = throttle;
+      this.onPedalChannelEdge("throttle", throttle, stamp);
+    }
+  }
+
+  private isHeld(code: string): boolean {
+    return this.pressed.has(code) || this.pressedViaKey.has(code);
+  }
+
+  /** The RAW pedal keys changed (or may have): restamp the channels. */
+  private keyPedalsChanged(timeStamp: unknown): void {
+    const brake = this.isHeld("KeyS") || this.isHeld("ArrowDown");
+    const throttle = this.isHeld("KeyW") || this.isHeld("ArrowUp");
+    if (brake === this.keyBrake && throttle === this.keyThrottle) return;
+    this.keyBrake = brake;
+    this.keyThrottle = throttle;
+    this.refreshPedalChannels(this.eventStamp(timeStamp));
   }
 
   /**
@@ -252,7 +356,7 @@ export class SimInput {
     // HANDLED_CODES so it never scrolls the page.
     out.handbrake = false;
 
-    this.mergeGamepad(out);
+    this.mergeGamepad(out, now);
     // Touch merges LAST and by priority (active axis replaces) — inside
     // read() so GatedSimInput's raw capture + gate see touch pedals too.
     this.touchSource?.mergeInto(out);
@@ -260,15 +364,29 @@ export class SimInput {
   }
 
   /** Standard mapping: left stick X = steer, RT = throttle, LT = brake, A = handbrake. */
-  private mergeGamepad(out: VehicleInput): void {
-    if (typeof navigator === "undefined" || typeof navigator.getGamepads !== "function") return;
-    let pad: Gamepad | null = null;
+  /** The first connected standard-mapping pad, or null. */
+  private findPad(): Gamepad | null {
+    if (typeof navigator === "undefined" || typeof navigator.getGamepads !== "function") return null;
     for (const p of navigator.getGamepads()) {
-      if (p && p.connected && p.mapping === "standard") {
-        pad = p;
-        break;
-      }
+      if (p && p.connected && p.mapping === "standard") return p;
     }
+    return null;
+  }
+
+  /**
+   * Poll the pads' pedal channels NOW, without advancing the keyboard ramps or
+   * producing a VehicleInput. A machine that reads the pedal log first asks for
+   * this (GatedSimInput.brakeTiming): an event source has already told the log
+   * everything up to now, a polled pad has told it only up to its last poll —
+   * so without a fresh poll a pad released since then would still look held.
+   */
+  protected pollPads(): void {
+    this.pollPadPedals(this.findPad(), this.nowMs());
+  }
+
+  private mergeGamepad(out: VehicleInput, nowMs: number): void {
+    const pad = this.findPad();
+    this.pollPadPedals(pad, nowMs);
     if (!pad) return;
 
     const rawSteer = pad.axes[0] ?? 0;
@@ -282,6 +400,30 @@ export class SimInput {
     if (throttle > out.throttle) out.throttle = throttle;
     if (brake > out.brake) out.brake = brake;
     out.handbrake = out.handbrake || handbrake;
+  }
+
+  /**
+   * R4 for the gamepad: a poll sees only that a trigger changed SINCE the
+   * previous poll, so its edge is stamped [the previous poll, this poll] —
+   * except a STEP-KEYED pad (the drive rig's, ADR-017), whose change happens at
+   * the physics step being read and is stamped there, on the step clock.
+   */
+  private pollPadPedals(pad: Gamepad | null, nowMs: number): void {
+    const brake = (pad?.buttons[6]?.value ?? 0) > REVERSE_ASSIST_PEDAL_ON;
+    const throttle = (pad?.buttons[7]?.value ?? 0) > REVERSE_ASSIST_PEDAL_ON;
+    const previousPoll = this.lastPollMs ?? nowMs;
+    this.lastPollMs = nowMs;
+    if (brake === this.padBrake && throttle === this.padThrottle) return;
+    this.padBrake = brake;
+    this.padThrottle = throttle;
+    const stepKeyed = pad !== null && (pad as unknown as { stepKeyed?: unknown }).stepKeyed === true;
+    const at = Math.max(nowMs, this.lastStampMs);
+    const stamp: PedalStamp =
+      stepKeyed && this.stepClockS !== null
+        ? { atMs: at, earliestMs: at, stepS: this.stepClockS() }
+        : { atMs: at, earliestMs: Math.min(at, previousPoll) };
+    this.lastStampMs = at;
+    this.refreshPedalChannels(stamp);
   }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
@@ -302,6 +444,7 @@ export class SimInput {
     // (The one-shots keep the guard: not re-firing on repeat is what it is for.)
     this.pressed.add(e.code);
     if (fallback !== null) this.pressedViaKey.add(fallback);
+    this.keyPedalsChanged(e.timeStamp);
     if (e.repeat) return;
     if (this.debugKeys) this.logKey(e);
     if (e.code === "KeyC") this.callbacks.onToggleCamera?.();
@@ -313,11 +456,13 @@ export class SimInput {
     this.pressed.delete(e.code);
     const fallback = keyFallbackCode(e);
     if (fallback !== null) this.pressedViaKey.delete(fallback);
+    this.keyPedalsChanged(e.timeStamp);
   };
 
   private readonly onBlur = (): void => {
     this.pressed.clear();
     this.pressedViaKey.clear();
+    this.keyPedalsChanged(undefined);
   };
 
   /** ?debugkeys=1: ring-buffer the press on window.__aidriveKeyLog + one

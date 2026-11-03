@@ -15655,3 +15655,537 @@ Lane `vru2offset`, one round, built on `cc77b27`.
   - any of this on a device;
   - the lane's live-sheet and rapier numbers on `230c7b8` beyond what PROVEN ON 230c7b8 states;
   - whether any rider offset outside the builder's census list (e.g. `examBankData.ts:567`) is on the wrong side.
+
+### rig-w3n: the vo landing's first drive at `69418cf` — `sc-vu-bikelane-turn:9141072b` PARTIAL; `sc-hz-brake-dont-swerve:870904d4` PARTIAL (the CLOSED was refuted on a strict split) (integrator note, 2026-11-02)
+
+Workflow `rig-wave-w3n` (wf_b31712dd-349) ran at `69418cf` (health attested `69418cf`). It used the channel C-step pad, named starts and a DRIVE LEDGER (every drive is reported; only a pre-defined rig fault may be superseded). The specs were drafted and critic-checked by `draft-rig-w3n` (19 fixes). Journal: `handoff-2026-10-08/reports/rig-w3n-journal.jsonl`. Frames are under `.audit-frames/rig-w3n/<lesson>/<id8>/`. It was relaunched once after the 2026-11-02 app restart.
+
+- **`9141072b` PARTIAL.**
+  - **(b) is CLOSED: no bill on a rider the car never cut off.** Six admissible cut-path drives, phone identical to PC:
+    - at L1 and L3 the hook is billed with the car crossing his line 5.5 / 4.1 m ahead of him, within 9 m;
+    - at L2 there is a real COLLISION with the with-flow rider;
+    - he «yielded» on every shadow and only-behind drive.
+  - **(a) is STILL, under the mirror / shoulder reading.**
+    - The side is cured: the line error is ≤ 0.0025 m on every drive.
+    - But on the careful shadow drive the with-flow rider is ALWAYS AHEAD of the car (minimum lead +9.56 m at L1, +10.21 m at L3). Instruction 3, the objective and the moment «Огледало и рамо назад» send the student to look in the mirror for a rider who is never behind. The vo landing had recorded this as candidate C2; it is now this row's clause.
+    - The mistake card «Отрязване на колелото по алеята» was never shown on any cut-path drive.
+  - Lane «vbltiming» is being briefed: re-stage the rider to come from behind on the careful drive, and find why the card never shows.
+- **`870904d4` PARTIAL. The judge's CLOSED was REFUTED by its verifier.**
+  - The bounded search found the filed form (K1-c1640). It is a clip of the block at 37.77 km/h, then a rest 9.603 m from the mark and 6.542 m from the impact. Every FORM drive ends 720 grid points (FINISH_STUCK_S 12 s) after rest on the non-arrival sentence, on PC L3 ×2, PC L1, the mirror cell and the phone. The creep cell confirms «a moving car never accrues».
+  - The verifier held the spec's strict PRECEDENCE: the phone cell differs from PC in the last bit of headingDeg at count 1822, after the rest. That is a cross-engine floating-point effect, but the spec allowed no tolerance, so the difference counts as a SPLIT.
+  - It also noted that the phone never shows the ending sentence: the endingshown defect, owed to lane «endings2».
+  - The next drive of this row uses a stated tolerance (1e-6 on poses, exact on graded and decision fields, as the 9141072b cells already do), after endings2 lands.
+- **Open list: 26 (3 critical), unchanged.**
+
+## Landed: the reverse assist times the lift and the press of the founder's 2026-08-11 gesture by the input, not by the frame that happened to see them, and decides at the frame's start, before the physics reads the gear. Its both-pedals disarm reads the student's other pedal control, timed the same way, whatever LAW 2's disown says of it. On the paths the verifiers drove, a brake pumped or held at rest no longer shifts the gear without that gesture, outside the ruled platform classes (R16, F6 and round 5's F1), and no shift was decided with both physical pedal controls down. The ruled gesture still shifts and moves the car on that press, except on the stated limits of the phone's slid drive pad (R15, R13, F3). Outside the ruled gesture, a shift back R → D after a lift shorter than LIFT_S + 2 frames of a long render stall can be lost when that one stall frame holds both the other control's release and the press (round 7's F4, the safe failure). Measured in process only. `sc-turn-left-oncoming:d0017a65` (major) (2026-11-02)
+
+Lane `reverseatrest`, seven rounds, built on `219ac1e`.
+- Rounds 1, 2, 3 and 4 were REFUTED by the adversarial verifier. Round 5, a ruling round in which no timing code changed, was SIGNED OFF WITH CONDITIONS. Its landing `land-ra` (2026-11-01, worktree `integ-ra` at `230c7b8`) was STOPPED at step 6 by the integrator, and its merge verifier REJECTED it (below). Round 6 was REFUTED. Round 7 was SIGNED OFF WITH CONDITIONS on 2026-11-02 (the verifier's PROGRESS.md, 14:19). The conditions are below.
+- Reports: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/reverseatrest-r1.json` … `reverseatrest-r7.json`; the stopped landing is `land-ra-journal.jsonl` in the same folder (the integrator, the docs agent, the merge verifier, the docs verifier). Verifier log: `D:/knijka-lanes/scratch/reverseatrest-verify/PROGRESS.md`; its round-2 outputs are at the top of that folder and its later files under `r3/` … `r7/`. Builder log: `D:/knijka-lanes/scratch/reverseatrest-impl/PROGRESS.md`.
+- **The patch.** `reverseatrest-result-r7.patch`, sha256 e23300646060c0e4de6cc34d2fe82e20737b2bcf268d8c1ad343dad70708eaf7, which matches the builder's. 19 files, +4097/−222 (5,134 lines), 0 CR bytes, every touched file LF in base (the builder).
+  - The verifier returned its lane to base, moved the six files round 6 had added to `attempts/r6-added`, confirmed `git diff base` was empty, applied the patch cleanly as tag `r7`, and found that `git diff --binary base` hashes to e2330064…. From round 6 to round 7 the only non-comment change in product code is `LessonScene.tsx:1074` (checked by diff). The test file `reverseAssist-stall-throttle.test.ts` (+201/−4) and the ADR also changed.
+  - It is cumulative against the lane's base `219ac1e`, not against HEAD. HEAD `69418cf` also carries e11629b (lanegate), cc77b27 (brakeledger), 230c7b8 (endings) and 69418cf (vru2offset). Of the patch's 19 files, HEAD has touched two since 219ac1e. `LessonScene.tsx` was touched by 230c7b8: one comment-only hunk at :333, 4 lines out and 4 in, so the lane's line numbers still hold. `docs/architecture/07` was touched by cc77b27 (+11 lines, the builder's «offset +11») and by 69418cf (+2 lines, which makes hunk #1 conflict). So the patch is applied 3-way, and every lane test, the directories and the whole tools suite are re-run on the landed tree (PROVEN ON 69418cf).
+  - The tools patch `reverseatrest-tools-r6.patch`, sha256 618564603946713478fedb8110ee74cffb0118f05256ccbaa6af72ffae221188, did not change in round 7 and applies on 69418cf (the builder). It carries the taught resolve hook, the re-derived T14.0 pins, the frame-start models and the restated proofs.
+- **Integrator rulings**, all under the founder's 2026-10-08 delegation; the founder is told at this landing. The gesture's numbers are the founder's 2026-08-11 ruling and do not move: `REVERSE_ASSIST_LIFT_S` 0.25 s, `REVERSE_ASSIST_HOLD_S` 0.35 s.
+  - R1–R3 (2026-10-18): a span is credited only as far as it was observed; the reverse assist and `engine/stuckStart.ts`'s P/N hint share one rule for what a lift is.
+  - R4–R6 (2026-10-19): every brake transition carries its source's own time, the shift is decided at the frame's start, and round 1's false sentences are corrected.
+  - R7–R10 (2026-11-01): the drive pad applies every coalesced pointer sample at its own time and stamps a move-made transition as the interval since the previous sample; say only what is true.
+  - R11–R14 (2026-11-01): the pad learns the digitizer's scan period P from in-list spacings, a press after silence is dated max(previous sample, T − P), and a guard covers lists stamped alike.
+  - F3: the slid +1-frame cell is bounded by one sample and is not a stop-rule target. F6: the dispatch-latency tie within 0–30 ms of HOLD_S is the platform's limit, with no margin; HOLD_S never moves. R13: a 60 Hz digitizer at 60 Hz frames never learns P.
+  - R15–R19 (round 5): the pointerdown exemption is kept (touch slop); resampled samples are the F6 class; the docs say exactly that; the cell list is R18; the exemption's reason is pinned.
+  - R20–R23 (round 6): the frame-start assist decides on a throttle timed exactly like the brake.
+  - R24–R27 (round 7, 2026-11-02): the both-pedals disarm reads the student's PHYSICAL other pedal control, not gated by LAW 2's disown; pinned; sentences corrected; the device cells owed.
+
+**The row is NOT closed by this landing.** `sc-turn-left-oncoming:d0017a65` stays OPEN.
+- Every number below was measured in process. The base and round-1 numbers use the real GatedSimInput → ReverseAssist → ReversePedalMapper chain in RuntimeDriver's after-physics order. From round 2 on, they use the real GatedSimInput and `reverseAssistFrameStart` in the product's frame order. From round 3 on, the slide channels also use the real TouchControls mounted through `overlayMount`. Rounds 6 and 7 feed raw keyboard events at their own timeStamps (and, in round 7, a polled gamepad and a TouchInputSource written the way MousePedals writes it).
+- Neither the builders, the verifiers nor the integrators drove anything in a browser or touched a phone.
+- The row stays open until the five device cells are driven (Owed, below). Whether those frames close it is for that wave's judge and verifier.
+- This landing does not change the open-row count (26).
+
+**What was wrong.** The row: `ReverseAssist.update` ran once per render frame, after the physics, on the frame's last `rawBrake`, and added the whole frame delta to whichever state it sampled. So on frames of 0.25 s or longer one sampled frame of a 0.05–0.24 s lift at rest armed LAW 1, and one sampled frame of the re-press counted as the full 0.35 s hold. The car went D → N → R, the flip was labelled «assist», and the held brake became reverse throttle 1.0.
+- The builder's numbers at `219ac1e`, a 0.12 s touch lift at rest: 0/40 sampling phases R at 60 / 30 / 13 / 10 / 5 fps, 20/40 at 4 fps, 13/40 at 0.37 s and 10/40 at 0.5 s. The rig's 0.22 s on / 0.12 s off standstill pulse: 40/40 R at 4 fps, 0.37 s and 0.5 s (the rig-w3d «pulse fused» cells).
+- The round-1 verifier's base probe (`probe-base.txt`): the rig pulse reaches R on fixed frames from 0.23 to 0.50 s; random touch pumping at rest, every press and lift under 0.24 s, reaches R in 693 / 678 / 609 of 960 drives; a 0.2 s key press after a 2 s lift reaches R at 0.09 s frames (4/20 phases) through the keyboard ramp's frame-timed tail; the ruled gesture moves the car 40/40 at every cadence.
+
+**What landed.** This is the builders' description; the verifiers' measurements are under the headings after it.
+- **Timed at the input (R4).** Each source stamps each pedal transition itself: touch and the mouse pads with the pointer event's `timeStamp`; the keyboard with the RAW key's keydown / keyup, not the ramped pedal; a gamepad with the poll that saw the change, bounded below by the poll before it; the rig's step-keyed pad (`stepKeyed: true`, `devrig/rig.ts`) with the physics step it applies the change at. `engine/input.ts` carries the stamps (`SimInput.eventStamp`). From them `GatedSimInput` (LessonScene.tsx) keeps the functional brake's log, which `ReverseAssist` and `StuckStartWatch` each read from their own cursor through `TimedPedal` (`engine/pedalTiming.ts`). A lift is credited `press.earliest − release.at` and a press `now − press.at`, lower bounds of the spans the source observed.
+- **Decided at the frame's start (R5/R6).** `ReverseAssistDriver` steps the assist in a useFrame at priority −1, before rapier's stepper, through `reverseAssistFrameStart`. RuntimeDriver no longer steps it.
+- **The slid drive pad (R7, R8, R11, R12).** `onDriveMove` applies every sample of `getCoalescedEvents()` at its own `clientY` and `timeStamp`. A move-made transition is stamped [max(previous sample, T − P), T]. P is learned only inside one list and kept for the session. The T − P bound is taken only once P is known AND the previous sample is a move (`engine/touch.ts:587`). A sample whose stamp does not advance is bounded by the last earlier distinct stamp, and a list with an equal or backwards pair teaches no P.
+- **Round 5 (R15–R19).** No timing code changed (the round-5 verifier, comment-stripped diff of six files). The exemption's cost is written into touch.ts, pedalTiming.ts, reverseAssist.ts and the ADR; the premise's two conditions (resampled samples, a scan-rate change) into touch.ts, pedalTiming.ts and the ADR. Two pins (six tests): `components/sim/__tests__/pedalStampsOverlay.test.tsx:282` (one test) and `engine/__tests__/reverseAssist-cadence.test.ts` describe «R15 / R19» (:1045, five tests).
+- **Round 6 (R20).** As round 6 built it, `GatedSimInput.throttleLog` was the functional throttle's own source-timed `PedalEdgeLog`, written in the same `refreshFunctionalBrake` with the same channel stamps. Round 7 (R24, next) makes it the student's other pedal control, not gated by the disown. `reverseAssistFrameStart` hands the machine both timings and reads neither `rawBrake` nor `rawThrottle`. The machine reads the throttle log through `PedalLatch`: down if it was down at the previous update, went down at any instant since, is down now, or the ring lost edges. `StuckStartWatch` still reads `rawThrottle` at the frame's end, where it is current. Pinned by `engine/__tests__/reverseAssist-stall-throttle.test.ts` (R21).
+- **Round 7 (R24).** `LessonScene.tsx:1074` is now `const gas = this.remapOn ? brake : throttle;`. The disarm's throttle is the student's other pedal control (W/↑, RT or the touch throttle in D; S/↓, LT or the touch brake in R), source-timed as in round 6 and NOT gated by the disown. The brake log is unchanged, so a disowned control sits in both logs and any press it makes is disarmed. LAW 2 is untouched: `read()` still hands physics zero throttle from a disowned pedal. Pinned by the same file's describe «R24 / R25» (:351 in the patch's tree; the builder's report and the patch's ADR say :347). The file has 14 tests by a count of its it() calls; the builder reported 13. The describe covers:
+  - the verifier's DISOWN path at 60 / 30 / 13 / 10 / 5 / 4 fps, 0.37 s and 0.5 s × five (lift, re-press) pairs × 20 phases (:417);
+  - 60 Hz with stalls of 0.1–0.5 s (:433);
+  - W re-pressed ALONE inside a stall that hid its ramp's fall (:448);
+  - LAW 2 untouched (:471);
+  - the ruled gesture after the flip (:483).
+  The integration adds the MIRROR row (condition 1).
+- **What did not change** (the builders; every round's verifier confirmed it from the diff): every `REVERSE_ASSIST_*` constant, LAW 1, LAW 2's assist / manual scope, every enablement gate (exam, pre-drive, manual box, engine off), every bill, rule and shown string. No protected threshold moved. The patch does not edit the keyboard ramp code that makes the pedal the physics reads (a reading of the diff, not a builder's claim). `engine/input.ts` is +153/−8: the transition stamps and the gamepad read moved into a poll.
+- **Census** (the builder): ReverseAssist and GatedSimInput are constructed only in LessonScene.tsx, and no lessons / scene / traffic / vehicle / orchestrator / traces / runtime file imports the input chain, so no committed trace can change; none was re-recorded.
+
+**Shown text.** None. Only code, code comments (including two in `controlsHelpRows`, which now point at `reverseAssistFrameStart`), tests and ADR prose changed. The reviewed-text manifest was not re-recorded; manifest, caption-truth and keep-right-claim-census are green inside the round-7 scenario run (the builder and the verifier).
+
+**Rounds 1–4, refuted.**
+- **Round 1** credited a span between two updates that both saw it, still a rule about frames. On the verifier's probe the ruled gesture at +2 frames reached R 40/40 but moved the car on that press in only 12 / 26 / 25 / 22 / 31 / 17 / 39 / 28 of 40 phases across the 8 cadences (base 40/40); the rig pulse reached R 20/20 on every fixed frame from 0.26 to 0.45 s; touch pumping reached R in 627 / 529 / 460 of 960.
+- **Round 2** stamped discrete events exactly, but the drive pad worked by SLIDING reached the page as one frame-aligned coalesced pointermove per frame. On the verifier's slide probe: 0.05–0.24 s lifts at rest reached R (0.24 s: 20/40 at 60 Hz, 39/40 at 4 fps); the pulse 40/40 at 0.25 / 0.37 / 0.5 s frames; pumping 528–679 of 960.
+- **Round 3** stamped each slide sample [previous sample, this sample]. A resting thumb sends no samples, so a real 0.3 s lift ending in a rest was credited about 0 s: the ruled gesture reached R and moved in only 9–10 of 40 phases at a 2 px rest and 23–24 at 5 px (base and round 2 had moved). Parent-stamped lists armed lifts of 0.05–0.249 s (NAMED 15 / 40 / 67 / 102 bad; NEARHOLD 405–482).
+- **Round 4** learned P and cured the resting slide (40/40 on the GAP × V grid). But the gesture made by lift-off, re-touch just inside neutral and slide-in stayed at 9–10 / 23–24 of 40, because of the pointerdown exemption. The verifier's model without the exemption gave 40/40 with P learned, but under an 8 px touch-slop model it armed lifts of 0.24–0.2495 s in 245–980 of 980 sweeps at 0.5 px/ms. The integrator ruled R15.
+
+**Round 5, signed off; its landing stopped (2026-11-01).**
+- The round-5 verifier (its N1–N4; own lane, `219ac1e` + the r5 patch): code identical to round 4 in six files with comments removed. Its round-4 probe (`attempts/r4/tmp-verify-r4.test.ts`, sha256 aecef75c…), re-run on r5, gave the round-4 rows on `prodw-tcd-0.02-2`, `prod-tcd-s8`, `g-2-1`, `g-5-0.5`, `parentts`, `resample` and `default`; the builder separately regenerated that probe byte-identical from make.js. `full-tc-tcs` matched on every shared row and added 14 near-threshold rows, all bad 0. That battery's only non-zero row is the ruled F3 +1-frame «60Hz thr1 38 BAD 2», on both slides. Across the other round-5 re-runs the only other non-zero rows are the R15 limit and R16. XPD (the exemption dropped) failed 6 tests on assertion text and 114 passed.
+- At the landing the integrator taught the tools suite the lane's frame-start order and stopped at step 6. Path-follow T6.7b showed two failures (the integrator's runs; the merge verifier read the logs and did not re-run the taught tools):
+  - (a) «the gear went back to R» under resolve-after-handled keys in 19,185 conditions (stop-first 78,020, attempt2 78,070, attempt3 78,400 of 2,165,760 each; worst armed hold 349.9 ms against the 35 ms bound);
+  - (b) an armed press held 0.083 s at poll 0.
+- The merge verifier (V2) reproduced the cause on executed product code, with its own probe through the real GatedSimInput with time-stamped keys and the real `reverseAssistFrameStart`. `reverseAssistFrameStart` passed `rawThrottle`, which only `read()` writes, after the assist. W held, S pressed 0.05 s into a stall: 60 Hz 0.3 s stall D, 0.45 s R at 1.467 s (throttle 0.048), 0.5 s R, 0.6 s R at 1.617 s; 144 Hz 0.45 s R at 1.457 s (0.0198), 0.6 s R at 1.607 s; no stall D. A false R with both pedals down. Verdict REJECT; nothing landed.
+
+**Round 6, refuted.** R20 timed the throttle like the brake. The round-6 verifier reproduced the repair of the stale-throttle false R on its own probe:
+- the R21 grid (30 / 60 / 144 Hz and 0.37 s × stalls of 0.3–1.0 s × 7 shapes): 0 shifts with both pedals down, and no update armed with both down;
+- 8 cadences × stalls × 500 S/W timings: 0/500 in every cell;
+- gamepad RT held across an LT press: 0;
+- S alone still R, with throttle 1.0;
+- XT1 (rawThrottle again): 6 red at the merge verifier's instants;
+- with its own tools copy (`git archive 230c7b8 tools` + the tools patch): path-disarm 9/9 and the builder's restated-proof numbers (T14.6 72 / 108 / 78, T14.7 5 / 75, T14.8 1,446 and 18.83 m against 55.91 m).
+
+It refuted the round on F1: the throttle log's `!disowned` gate used LAW 2's verdict from the LAST read(), which is a frame old. The path: in R holding W, a hand-worked R → D shift with W held, W up, S down after a real lift of 0.26–0.4 s, W down again 0.01–0.1 s later, both held. Measured as shiftToR with both keys down, of 20 phases:
+- at 60 Hz with one stall from 0.15 s after the release: 20/20 (stalls 0.15 / 0.2 / 0.3 s) and 12/20 (0.5 s);
+- with no stall: 10 fps 6 / 2, 5 fps 13 / 11 / 8, 0.37 s 6 / 5 / 3, 0.5 s 9 / 8 / 7 (plus 4 at d 0.1 and 2 at L 0.4);
+- the press stayed armed with both keys down for about 150 ms against the 35 ms bound.
+
+Base 219ac1e gave 0 on every row (a lane regression since round 2). Its V-XT6 model (the gate dropped) gave 0, so the ADR's «XT6 equivalent» was false. The verifier did not run path-follow.
+
+**What the verifier reproduced on round 7.** Its own lane, `219ac1e` + the r7 patch; artefacts in `r7/`.
+- **The round-6 probe, rerun unedited** (`r7/probe-r6-on-r7.txt`): all 45 DISOWN rows 0/20, every row shared with its V-XT6 model output identical, every GRID / CTRL / SWEEP / PAD row identical to its round-6 product output. The only R rows have W up (W pressed after the deciding frame), which is legitimate.
+- **Its round-7 probe** (`r7/tmp-verify-r7.src.ts`; real GatedSimInput with raw keys at their own timeStamps, a polled gamepad, a TouchInputSource written as MousePedals writes it, the real `reverseAssistFrameStart` and ReverseAssist in R5 order):
+  - DISOWN (R → D flip, then a false R), all 9 holder × presser pairings of key / pad / touch: 0 bad of 1,400 each (8 fixed cadences × 5 (L, d) pairs × 20 phases plus 60 Hz with stalls of 0.1–1.0 s), no update armed with both down;
+  - MIRROR (in D holding S, a hand-worked D → R shift with S held, S up, W down after a real lift, S pressed again, both held): 0 bad of 1,400 each;
+  - positive control: the presser ALONE after the flip, at LIFT_S + 2 frames and held, shifts and moves 40/40 in all 18 rows;
+  - mixed sources at rest, in D and in R, with stalls: 0 bad of 800 each;
+  - random fuzz, 8,000 seeds: 895 shifts, 0 decided with both down, 0 updates armed with both down;
+  - sensitivity: on the XT8 model (round 6's line back) DISOWN gives 376–384 (key holder) and 44 (touch holder) bad, MIRROR 336–344 and 44. Pad holders give 0 even there, because the polled pad's disown clears at the polls.
+- **LAW 2 with one control down (its F4).** 20,000 seeded single-control timelines, hashed over selector, disown flag, command and every physics read's throttle and brake, on r7 and on the round-6 line: 19,992 identical. In the 8 that differ, the traces match up to the frame where the round-6 code shifts and r7 does not:
+  - 5 false shifts round 6 made on a disowned control's own press after a lift no read saw: 55723 and 66368 shiftToR on a W-type press in D (the builder's «second false R»); 50718, 62529 and 67670 shiftToD on an S-type press in R (the R-side mirror);
+  - 3 legitimate R → D shifts r7 no longer makes (condition 5).
+- **Mutants of its own**, each restored and sha256-checked:
+  - VM2 (the gate kept in D only): killed, 3 red, the builder's exact XT8 counts (×84, ×72, ×160);
+  - VM4 (the disarm's throttle ignores the remap): killed, 1 red;
+  - VM3 (the latch reads only «down now»): killed, 2 red;
+  - VM1 (the gate kept in R only): SURVIVES (condition 1).
+- **Docs and code.** The ADR «Update 2026-11-02, round 7» and the `reverseAssistFrameStart` doc hold on its measurements: the brake log's frame-old disown can only add a held control, never hide a press. The XT6 correction is true. `reverseAssist-stall-throttle.test.ts` is +201/−4; the removed lines refactor the drive() helper and remove no expectation.
+- **Suites on r7**, one worker:
+  - engine + devrig + components/sim/__tests__ + scene/__tests__: 973/974;
+  - components/sim top level + lesson-ui + vitok + cockpit: 1412/1413;
+  - lessons/__tests__: 126 files, 2,394 pass / 165 skipped;
+  - lessons/scenario/__tests__: 198 files, 4,822 pass / 1 skipped;
+  - tsc: 22 errors, the lane baseline without tools/, none in a lane file.
+  The only reds are environment: tools/ is absent in its lane (ENOENT on lesson-audit.mjs and on road-routes-w59.json).
+- **Tools.** The path-disarm T14.0 engine regexes from the round-6 tools copy match r7's reverseAssist.ts and pedalTiming.ts, 8 of 8. No tools code reads GatedSimInput. The simulators push the physical keys into their throttle log (disarm-sim.mjs:168, path-follow.test.mjs:1144), so they already match R24. Path-disarm and path-follow were NOT re-run in round 7.
+- **Restored clean**: the tree equals base + r7, git status clean, ignored files included; the node_modules junction intact.
+
+**The builders' numbers, not re-measured by a verifier.**
+- Round 7:
+  - XT8 3 red (×84 on the fixed frames, ×72 at 60 Hz with stalls, «W alone shifted the car to R» ×160);
+  - the second false R on the round-6 code, 160 of 180 runs at 60 Hz;
+  - the round-4 verifier's instruments, 34 of 34 configurations;
+  - every earlier mutant still red on assertion text: XT1 9, XT2 2, XT3 1, XT4 1, XT5 1, XT7 9, V6b 1; V1 11, V1b 23, V8 28, V2 22, V3 1, V3b 1, V4 50, V5 1, V7 9; M1 2, M2 6, M4 51, M5 16; X1 42, XC 16, XCe 16, XI 26, XI2 27, XI3 27, XS 27, XB 5, XO 1; XR3 4, XR12 8, XEQ 7, XAX 7, XGAP 1, XPD 6, XEND 1, XMAX 1, XLIST 4 (V6 equivalent; M3 not re-listed);
+  - suites: engine + devrig 475/475, components/sim 754/754, lesson-ui + cockpit 1170/1170, tsc 21;
+  - its lane's taught tools (main tools + the r6 tools patch): path-disarm 9/9 (T14.4 800,640 + 47,520 drives, 0 + 0 shifted, 0 + 0 armed) and path-follow 103 pass / 0 fail / 4 todo.
+- Round 6: path-follow T6.7b (a) 0 shifted on all three re-press paths, (b) worst armed hold 0.0 ms, the ARM_POLL_MS sweep 0 armed. No lane verifier ran the taught path-follow on a round-6 or round-7 lane tree. The landing ran it on the landed tree, and the merge verifier ran the whole tools suite there itself (PROVEN ON 69418cf).
+- Round 5 and before: as in their reports; F6 (8 / 47 / 67 / 93 of 980) is the builder's measurement.
+
+**The conditions, and how each stands.**
+
+**1. PIN (the round-7 verifier's F3): the R-side half of R24 rests on no committed input.** VM1 is `const gas = this.remapOn ? (!disowned && brake) : throttle;` (the disown gate kept on the R side only). It survives every committed suite that could pin it: engine, devrig and components/sim/__tests__, 729/729 (`r7/vm1-suites.log`). On the verifier's probe VM1 brings back the MIRROR false shift. In R after a hand-worked D → R shift with S held, S up, W down after a lift, S pressed again, both held, the assist shifts R → D with both down and leaves a press armed with both down: key holder 336 / 344 / 336 of 1,400, touch holder 44 of 1,400 (`r7/vm1-disown.txt`; r7 itself gives 0). The integration adds a MIRROR row to `engine/__tests__/reverseAssist-stall-throttle.test.ts` describe «R24 / R25», copied from the verifier's `r7/tmp-verify-r7.src.ts`, which VM1 must kill on assertion text. VM1 and XT8 must both die, one at a time, each restored by sha256.
+PINNED AT INTEGRATION: the MIRROR row is on the integration tree, a new `it` at `reverseAssist-stall-throttle.test.ts:510` in describe «R24 / R25» (:351), so the file now has 15 tests by its it() calls (green 15/15 before the mutants and after the restores, the integrator). It is the verifier's probe path (`r7/tmp-verify-r7.src.ts`, MIRROR) for a key holder and a key presser: in D holding S from 0.1 s, the hand-worked D → N → R at 1.0 s, S up at t1, W down at t1 + L, S down again at t1 + L + d, both held, on the 8 fixed cadences × the five (L, d) pairs × 20 phases and at 60 Hz with one stall of 0.1–1.0 s from 0.15 s after the release. It asserts no shiftToD, the selector still R, no update armed with both down and the worst armed hold ≤ 35 ms. Its positive control: W ALONE at LIFT_S + 2 frames after S's lift, held, walks the gate to D, never before HOLD_S, on every fixed cadence × 5 phases. The only helper change is test-only (Run gained `firstDAt`). It drives the real GatedSimInput, `reverseAssistFrameStart` and ReverseAssist with raw keys at their own timeStamps; the only stub is a driveline object copying LessonScene's subscription, with no regex or source grep (the merge verifier).
+  - The integrator's mutants (`D:/knijka-lanes/scratch/ra2-land/PROGRESS.md`, 14:25–14:26), each applied alone at `LessonScene.tsx:1074` and restored byte for byte from `scratch/ra2-land/LessonScene.orig`, sha256 693c8937…d308 checked:
+    - VM1, `const gas = this.remapOn ? (!disowned && brake) : throttle;`: 1 red, the MIRROR row, «the car went R → D with both keys down: 0.37s lift 0.26 S again +0.01 phase 4: D at 4.811 (sel D) | … (×336)», the verifier's key × key count and its first example. VM1 is killed;
+    - XT8, round 6's line `const gas = !disowned && (this.remapOn ? brake : throttle);`: 4 red, «the car went to R with both keys down: 10fps lift 0.26 W again +0.01 phase 1: R at 4.701 …» on the fixed frames, «… 60Hz stall 0.15 phase 0: R at 4.617 … (×72)», «W alone shifted the car to R: … (×160)» and the MIRROR «the car went R → D with both keys down … (×336)».
+  - The merge verifier applied each mutant itself on the staged tree, alone, restoring LessonScene.tsx from a byte copy and checking sha256 693c8937…d308 each time: VM1 1 red of 15 on the same text; XT8 4 red of 15 on the same four texts; and VM4, `const gas = throttle;` (the disarm ignoring the remap; killed with 1 red by the lane verifier), 2 red of 21 across the stall-throttle and frameOrder files: the lane's own «the R-brake (W) gesture no longer reaches D» and the new pin's positive control «W alone after a disowned S no longer walks the gate to D».
+  - Not committed (the integrator): the verifier's touch-holder MIRROR rows (44 of 1,400 under VM1). The describe's drive() helper feeds keys only, and the key row already kills VM1, so they would add input coverage but no kill; they remain an uncommitted probe.
+
+**2. TOOLS: owed since round 2, which lanes cannot run.** Apply `reverseatrest-tools-r6.patch` (sha256 61856460…1188) and run the WHOLE tools suite (`node platform/scripts/tools-tests.mjs`). Path-disarm and path-follow must be green, with T6.7b (a) and (b) at 0 and the restated proofs biting.
+- The comment «FUNCTIONAL THROTTLE» at `tools/mobile/lib/disarm-sim.mjs:170` and `path-follow.test.mjs:1146` was cosmetic (the simulators log the physical keys). On the landing tree as staged it already reads «…AND THE OTHER PEDAL CONTROL'S» (comment only). In product code, two comments still said «functional throttle» for the R24 log: the `throttleTiming()` doc (LessonScene.tsx:1052) and the `PedalLatch` field (reverseAssist.ts:346). At landing, after the byte-compare in main, both were corrected, comment only, to name the other pedal control as R24 and the `throttleLog` doc (LessonScene.tsx:1020) do: «The same for the other pedal control's log (R24: as the student holds it, WHATEVER LAW 2 says of it) — polled first for the same reason.» and «…and the other pedal control, as the student holds it whatever LAW 2's disown says (R24), for the both-pedals disarm (R20).» (integrator decision D3).
+- reverseAssist-audit-harness and touchHintLifetime must be green in this worktree, where tools/ exists. In the verifiers' lanes, which had no tools/, both were ENOENT. In the builder's early lanes, with only `lesson-audit.mjs` copied in, the harness was red on `PARKING_BRAKE_KEY` (imported from `tools/mobile/lib/driveline.mjs`), on base too.
+- The T14.0 question of round 5 (A17) is settled by the tools patch's re-derived pins, which the round-7 verifier found matching the r7 sources 8 of 8.
+- At the landing: the tools tests in the worktree read 2,029 tests, 2,006 pass, 8 fail (1 the standing deck-captions freeze and 7 environment: the `.audit-frames` corpus and playwright are absent there); the patch's tools targets (T6.7 / T6.7a–e, T14.0–T14.8) are green and the restated proofs bite; the main-tree gate decides. reverseAssist-audit-harness is green in the engine + devrig run, where tools/ is present (the integrator); touchHintLifetime (`components/sim/lesson-ui/__tests__/touchHintLifetime.test.ts`) lies under src/components/sim/, whose whole run is green, 100 files, 1,709/1,709 (no log names it).
+
+See PROVEN ON 69418cf.
+
+**3. MERGE.** The lane patch conflicts on 69418cf in one hunk only (the builder): `docs/architecture/07` hunk #1, the ADR-014 «Still frame-timed» bullet (:549 in the lane, :551 on 69418cf). It fails on context because the vru2offset landing added its «Corrected 2026-11-01» sub-bullet above it. It is applied 3-way and the bullet placed by its quoted line. See PROVEN ON 69418cf.
+
+**4. DOCS: the stopped land-ra docs verifier's 17 fixes A1–A17, checked against this lane's text.**
+- A1, A2, A3, A5, A6, A7, A8 and A10 were fixes to the land-ra doc 88 draft, not to the patch. This section is built from that corrected draft and carries them: the headline names the ruled classes and limits; the base and round-1 frame order; the premise's conditions are not in reverseAssist.ts; each mutant with its round; the battery's only non-zero row is F3; ENOENT only in the verifiers' lanes; the gamepad numbers cited to the round-2 report; def2df09 only as a separate open row.
+- A9 and A14 (the ramp sentence and the two layers of the log) apply to the patch's D-4 and round-6 R23 text: corrected in the ADR.
+- A4 and A13 (the 34-configuration re-runs are the builder's) apply to the patch's round-5, round-6 and round-7 «Measured» bullets: attributed in the ADR.
+- A11 and A15 apply to «Update 2026-10-19»'s guarantee and closing sentence: corrected in the ADR. A12's «because» clause is not in the patch.
+- A16: the dates «since 2026-10-19» (ADR-014, D-3) and «stopped being true on 2026-10-19» (D-4) are restamped to the 2026-11-02 landing (the last of them, ADR-014's StuckStartWatch clause at :551, by the merge verifier's D1); «two pins (six tests)» is used above; the placeholders are filled before commit.
+- A17: see condition 2.
+
+**5. RECORDED (the round-7 verifier's F4): 3 legitimate R → D shifts r7 no longer makes, the safe failure.** These are seeds 61232, 65886 and 68348 of the 20,000 single-control timelines. In each, one stall frame of about 0.42–0.54 s held both the release of the other, disowned control and the W press after a 0.36 s lift. PedalLatch counts the throttle as down at any instant since the previous update, so it disarms that press (`r7/dbg61232.dbg`: the stall frame 8.2 → 8.7459 s covers S released at 8.30 s and W pressed at 8.66 s). Round 6 hid it only because it left the disowned control out of the throttle log. The gesture must be repeated. It lies outside the ruled gesture, because the lift is shorter than LIFT_S + 2 frames of that stall, and is not a stop-rule target. The ADR now names that R24 extends the latch's «may disarm more» to disowned controls, and that R24 also removes the R-side false D.
+
+**6. RECORDED, ruled classes, with their numbers (unchanged since round 5).**
+- **F1 of round 5** (found by reading the code, not measured): under the slop model R15 rests on, a thumb put down just inside the brake zone that slides back into neutral by less than the slop is not delivered, so after HOLD_S the assist can shift on a press the student ended sooner. Base behaves the same; it is the F6 / R16 platform class.
+- **The R15 limit**: lift-off, re-touch in neutral, slide in: R and moving in 9–10 of 40 at GAP 2 and 23–24 of 40 at GAP 5 (1 px/ms), on all 8 cadences, whether or not P was learned. Base and round 2 reached R on this gesture, so for this one way of making the gesture the landing is worse than base, by ruling. The no-exemption model gives 40/40 only with P learned.
+- **R16**: under an Android-style resampling model the resting slide's lifts of 0.248 / 0.249 / 0.2495 s arm in 1 / 1 / 2 of 980 sweeps; with ±1 ms jitter the dense slide 1–2 and the resting slide 2–4 of 980; jitter alone 0.
+- **F6** (the builder's measurement): presses of 0.33 / 0.34 / 0.345 / 0.349 s with events dispatched 0–30 ms late shift just after the release in 8 / 47 / 67 / 93 of 980 sweeps, touch and keyboard; 0 when events are heard by the frame that follows them. No verifier ran these rows on touch or keyboard.
+- **R13** (the builder's numbers): a 60 Hz digitizer at 60 Hz frames never learns P; the resting slide's gesture at 60 Hz is 5 / 12 / 24 of 40 at GAP 2 / 5 / 10 px × 1 px/ms; 40/40 once P is learned.
+- **F3**: the slid +1-frame gesture at 60 Hz is R 40, moving 38 (verifier, rounds 3–5). The ruled gesture is the +2-frame one.
+
+**7. The landing re-runs, gated ALONE.** The proof runs src/modules/clips/ (the clip-plan freshness gate), src/modules/sim/engine/, src/components/sim/, src/modules/sim/devrig/, the lessons and scenario directories, and the whole tools suite with the tools patch applied. See PROVEN ON 69418cf.
+
+**Not cured by this landing** (inside the row's own scope, so the row stays open for them as well).
+- **A human's gamepad** is polled: one short lift or press is never credited more than the polls prove, but a pumped trigger can read as one long lift. The round-2 verifier reported the pulse 40/40 R at 0.37 s frames and pumping 461–628 of 960 (its F5 and its log, 2026-10-19 12:13).
+- **The slid drive pad on a browser without `getCoalescedEvents`** is polled the same way: on the round-2 verifier's interval-only model pumping reaches R in 624 / 532 / 459 of 960 and the pulse 40/40 at 0.37 s frames (`r2-slide-intervalonly-out.txt`).
+- **The mouse pedals:** this lane only stamps their discrete transitions; their requestAnimationFrame ramp writes no transition (the round-3 builder). `catalogue-mouse-pedals:def2df09` is a separate open row this lane did not touch.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19; integrator decision D5, 2026-11-02):
+- an unmeasured stretch on the input clock (the round-2 verifier's F6 note): a span crossing several updates can stretch by the jitter between R3F's `clock.getDelta` and the priority −1 callback's `nowMs`; sub-millisecond unless work runs at priority < −1, and the probe never modelled it (`engine/pedalTiming.ts` placeMs);
+- possibly stale, from round-1 code: across an enablement gap (engine off, manual box, drive locked) the assist is not stepped, so a press made during the gap goes unseen and lift spans can join across it. The round-1 verifier called it pre-existing and the same as base, but it was written against ObservedSpan, which round 2 removed, so it must be re-verified on the r7 TimedPedal cursors before it is filed;
+- no cure has been measured for R16 (resampled samples teaching a P below the scan period; 1–4 of 980 near-threshold arms under the model), accepted as the F6 platform class. The round-4 verifier's candidate cure (teach P only from a spacing that recurs, or never from the last sample of a list of three or more) is untested (`r4/resample.txt`).
+- Answered at this landing, so not carried:
+  - VM1 surviving every committed suite: killed by the MIRROR pin (condition 1);
+  - the stale «FUNCTIONAL THROTTLE» tools comment at `disarm-sim.mjs:170` and `path-follow.test.mjs:1146`: corrected at integration, comment only (condition 2);
+  - the lane's ADR text saying more than was reproduced (the dates, the builder's runs given without attribution, M3, the R-side false D, F4's extension of «may disarm more»): corrected in this landing's ADR-017 and ADR-014 text (the edits and their verdicts: `D:/knijka-lanes/scratch/ra2-land/final/adr-edits.json`, `…/adr-ten.md`);
+  - the taught path-follow unmeasured by any verifier: the landing's merge verifier ran the whole tools suite on the landed tree, T6.7 / T6.7a–e green (PROVEN ON 69418cf).
+
+**Owed.**
+- **The device cells, by the ONE STANDARD (2026-10-10).**
+  - (1) sc-turn-left-oncoming, phone L1, the v1 pulsed-standstill rig script (C-EDGE-measured, C-LAST): gear stays D across stalls.
+  - (2) The touch-slide cell, by a human thumb: the ruled gesture by SLIDING with the thumb resting just inside neutral, AND by lift-off / re-touch in neutral / slide in; R and the car moving on that press, or the stated R15 limit. Record:
+    - the distance of the first pointermove from its pointerdown (slop);
+    - the learned P;
+    - whether coalesced stamps are distinct;
+    - the smallest in-list spacing against the scan period;
+    - whether the browser has `getCoalescedEvents`;
+    - whether a short slide out of the brake right after a pointerdown inside it is held back (F1).
+    The slop fact decides whether R15's follow-up lifts the exemption.
+  - (3) PC keyboard at rest in D: W held, S pressed during a forced render stall of at least 0.45 s; gear stays D.
+  - (4) In R holding W: a hand-worked shift to D with W held, lift W, press S after about 0.3 s, press W again and hold both, on a slow or stalling frame; gear stays D.
+  - (5) The round-7 verifier's addition, the mirror: in D holding S, a hand-worked shift to R with S held, lift S, press W after about 0.3 s, press S again and hold both, on a slow or stalling frame; gear stays R.
+  The fifth is owed too (integrator ruling, 2026-11-02): the row stays open until all five are driven. The ADR's Landing bullet names the same five.
+  Whether those frames close d0017a65 is for that wave's judge and verifier.
+- **The founder is told:**
+  - rulings R1–R27, F3, F6 and R13;
+  - that his gesture made by lifting the thumb off and re-touching in neutral now reaches R less often than at base (R15), until the phone shows the slop;
+  - the F6, R16 and F1 residuals;
+  - the polled limits;
+  - F4's lost shifts (the gesture is repeated after a long stall).
+- **Not measured:** any of this on a device; real platform touch slop, resampling, coalesced-stamp behaviour or dispatch latency; the taught path-follow by a lane verifier (only the landing's merge verifier ran it, on the landed tree); the lane's numbers on 69418cf beyond what PROVEN ON 69418cf states.
+
+**PROVEN ON 69418cf** (the integrator's run in the worktree `D:/knijka-lanes/integ-ra2`, log `D:/knijka-lanes/scratch/ra2-land/PROGRESS.md` and its `s-*.log`, one directory at a time. The merge verifier re-ran engine + devrig + components/sim + clips, lessons/scenario/__tests__ and the tools tests itself, one at a time with `--maxWorkers=1`; the other directory runs are the integrator's alone. Other lanes' vitest runs (flooredinvite-impl scenario, endings2-verify components) were on the machine during the gate and the merge verifier could not stop them, so the box was not idle; the landing itself gated alone):
+- Both patch sha256 matched. The lane patch `reverseatrest-result-r7.patch` (e2330064…eaf7, 19 files) went in with `git apply --3way --index --binary`. Only `docs/architecture/07` needed a 3-way merge, and it conflicted in hunk #1, the ADR-014 «Still frame-timed» bullet. The integrator checked with cmp that HEAD's old bullet is byte-identical to the patch's preimage line, kept vru2offset's «Corrected 2026-11-01» sub-bullet and replaced the old bullet with the lane's rewritten one; no conflict marker is left and the file is LF only. Every other file applied cleanly; the 6 new files fell back to direct application, and `LessonScene.tsx` applied beside 230c7b8's comment-only hunk with no overlap. The tools patch (61856460…1188, 3 files: path-disarm.test.mjs, path-follow.test.mjs, lib/disarm-sim.mjs) applied cleanly.
+- The gate patch `D:/knijka-lanes/gate-ra2.patch`, sha256 498ba0797daa2859083f68fda541832e33d88bc34aa1df149e25e40b645b9bc9, 22 files, +4533/−353, 0 CR bytes. The merge verifier found `git diff --cached --binary 69418cf` to hash the same. On a temporary index it applied both patches to 69418cf and compared the blobs of all 197 files under the touched directories: every product file (LessonScene.tsx, TouchControls.tsx, MousePedals.tsx, rig.ts, engine/index.ts, input.ts, pedalTiming.ts, reverseAssist.ts, stuckStart.ts, touch.ts) and every other lane test file is identical. Only three blobs differ: `reverseAssist-stall-throttle.test.ts` (the MIRROR pin, +54 lines, test-only) and the two tools comment blocks (comment only; their «this model has no hand-worked flip» holds by grep). The conflicted ADR hunk matches the lane's bullet except for the two restamped dates. No tools test was taught, and on the compared tree no product change goes beyond the lane; the two D3 comment fixes (below) are made after this compare, comment only.
+- The pin: condition 1 above (`reverseAssist-stall-throttle.test.ts` 15/15; VM1, XT8 and VM4 killed on assertion text).
+- The integrator's directories, all exit 0: engine + devrig 20 files, 476/476 (the lane's 475 + the MIRROR row; reverseAssist-audit-harness green with tools/ present); components/sim 100 files, 1,709/1,709; lessons/__tests__ 127 files, 2,456 passed, 165 skipped; lessons/scenario/__tests__ 203 files, 5,015 passed, 1 skipped (the reviewed-text manifest green inside); orchestrator 41, 528; rules 101, 1,826 (the first foreground try hit the integrator's 590 s cap, exit 124, which is not a test result, and was re-run in the background); traffic 53, 675; runtime 48, 875; scene 47, 787; vehicle 22, 299 (run 1, 21 files and 272/272, had one unhandled vitest-pool error, a forks worker for crosswind.test.ts timing out at start, infrastructure, not an assertion, kept as `s-vehicle-run1-poolstart.log`; the re-run is green); world 135, 2,409; hud 69, 1,388; traces 170, 2,372; src/modules/clips/ 19, 302, the clip-plan freshness gate green with no regeneration.
+- The merge verifier's runs, exit 0: engine + devrig + components/sim + clips 139 files, 2,487/2,487 (= 476 + 1,709 + 302, the integrator's counts, the freshness gate included); lessons/scenario/__tests__ 203 files, 5,015 passed, 1 skipped.
+- Reviewed-text manifest green inside the scenario run, not re-recorded: no shown text moved.
+- tsc: at its baseline, 21 errors, all environment (health/route.ts, lib/db.ts, the admin / auth / learning / outcomes / payments / privacy stores, lesson/progress.ts, sim/lessons/store.ts, sim/traces/attemptStore.ts), none in a touched file.
+- tools-tests (`node platform/scripts/tools-tests.mjs` from the worktree root with the tools patch applied, as wave-cycle.sh gate 4 runs it). In the integrator's run and in the merge verifier's own, the tools tests in the worktree read 2,029 tests, 2,006 pass, 8 fail, 4 todo, 11 skipped, the same 8 failures in both. 1 is the standing deck-captions freeze (1811 → 1822 captions). 7 are environment, the `.audit-frames` corpus and playwright being absent there: build-redrive §9(a), §9(b), §9(d), §9(e) and the file-level failures of count-agreement and finding-reader («could not find .audit-frames/findings»; the merge verifier confirmed it directly with build-redrive.mjs on a ghost lesson, exit 2, nothing written), and lane-evidence («Cannot find module 'playwright'»). In the integrator's re-runs, with the main tree's corpus reachable from cwd `E:\AI driver` (read only, writes to os.tmpdir), those three files gave 89/90; the 90th is count-agreement's `apply-reroute.mjs`, which resolves `.audit-frames` from its own location in the worktree; and lane-evidence gave 10/10 with `KNIJKA_PLAYWRIGHT_ROOT` set. None of the files behind them is touched. In both runs the patch's tools targets (T6.7 / T6.7a–e, T14.0–T14.8) are green: T6.7b's shipped landing 395,520 disarms, 0 shifted back, 0 armed; T14.4 800,640 + 47,520 conditions, 0 shifted, 0 armed. In the integrator's run, T6.7b's re-press paths give 2,165,760 disarms, 0 / 0, worst armed hold 0.0 ms against the 35 ms bound, so (a) and (b) are 0; and the restated proofs bite: the T6.7b previous-frame-ramp mutation 260 shifted back / 358 armed; the ARM_POLL_MS mutation 1,424 / 1,882 armed; T14.6 frame-timed with no gate 108 armed, W then S with no gate 72; T14.7 5 / 75 armed; T14.8 W up then S 1,446 shifted (the builder's and the round-6 verifier's numbers). The 4 todo are the known T9.b / T9.c / poligon bench rows. The main-tree gate decides.
+- The comment fixes (integrator decision D3) are made in main after the byte-compare, comment only: LessonScene.tsx's `throttleTiming()` doc and reverseAssist.ts's `PedalLatch` field (condition 2).
+- Not reported re-run on 69418cf by the integrator or the merge verifier: the round-7 verifier's probe (`r7/tmp-verify-r7.src.ts`) beyond the key-holder MIRROR row the pin copies, its 20,000 single-control timelines (F4), its fuzz, and the round-4 verifier's instruments. The lane's numbers above stand on 69418cf only where a committed test asserts them.
+
+## Landed: the exam path's gate-2 ending says «Стигна края на маршрута» only of a car that arrived, and on an outside anchor neither path's gate-2 ending claims an arrival or a stop. Every ending that pushes a sentence also carries it on the end card, on both lenses (no line while the exam is terminated). After a pedestrian or cyclist strike the product no longer invites the student to drive on. The hold names the one exit and cites ЗДвП чл. 123, ал. 1 by retrieval, the coach's other voices stop, and the in-world route guidance is hidden. The «огледай» glance pings stand down too, through condition C1, built and pinned at integration (N18). Measured in process only. `sc-crossing-dart:1c7a07d8` (major) and `sc-pk-driveway:7fa8b79e` (major) (2026-11-03)
+
+Lane `endings2`, three rounds, built on `230c7b8`. One design carries three items:
+- A, «examend»: the en landing's merge verifier N1, decision D1.
+- B, «endingshown»: the rig-w3l judges held both rows PARTIAL on this.
+- C, «vruafterstrike»: candidate 1 of the en landing's «Recorded, not filed», decision D2.
+
+Rounds and patch.
+- Rounds 1 and 2 were REFUTED by the adversarial verifier, each on item C only (below). Round 3 was SIGNED OFF WITH CONDITIONS on 2026-11-03 at 04:30 (the verifier's PROGRESS.md). The conditions are below.
+- Items A and B held from round 1. The endings, `endingCopy`, `result.ending`, the end-card render and the latch are identical on all 2,434 census cells:
+  - from round 1 to round 2 (the round-2 verifier);
+  - from round 2 to round 3 (the round-3 verifier: 0 field differences on every cell, with the world.goal entries set aside).
+- **The patch.** `endings2-result-r3.patch`: sha256 fbabd5c5…, 38 files (33 modified, 5 added), 0 CR bytes (the builder), +2463/−79 by `git apply --numstat`. It touches no file under docs/ or tools/.
+  - The verifier reset its lane to base and moved the 4 test files round 2 had added out to scratch. It confirmed `git diff base` was empty, then applied the patch cleanly. The tree is 60ad5439, the builder's tree.
+  - The patch is cumulative against `230c7b8`, not against HEAD. The builder checked that `git apply --check` passes on `69418cf`, whose copies of the 33 modified files are byte-identical to 230c7b8's.
+  - The landing's HEAD `6628342` is a TEMP commit on no branch: 69418cf plus the reverseatrest («ra2») landing exactly as it is staged in the main tree's index (gate-ra2.patch 498ba079…, 27 doc and comment edits and the doc 88 sections; tree c1102b20). The ra2 gate has not run. ra2 and this landing go through ONE main-tree gate as ONE commit, as 219ac1e did for pc + ic.
+  - ra2 also edits `LessonScene.tsx` (near :1020–:1080) and `engine/*`, so the patch was applied 3-way. The lane tests, the directories and the whole tools suite were re-run on the landed tree. The reviewed-text manifest was not re-recorded: C1 and the merge moved no unit. See PROVEN ON 6628342.
+
+**Integrator rulings.** These were made under the founder's 2026-10-08 and 2026-10-19 delegations. The founder is told at this landing.
+- N1 (item A, under E1): the exam gate-2 (stoppedStuck) ending says «Стигна края на маршрута…» only when all three hold:
+  - the anchor mode is inside;
+  - `routeEndMark` is non-null;
+  - `routeRunOutArrived(mark, routeApproachFrom(params, pose), pose)` holds.
+  Otherwise it gives a non-arrival sentence. That sentence names no task, and on an outside anchor it claims no stop. Gate 1's no-mark latch does not move.
+- N1b: the lesson gate-2 ending on an outside anchor gets the outside sentence.
+- N2: the ending's sentence is shown in one place, the end card, on both lenses. The toast is still pushed. The count is «exactly once inside [data-hud="end-screen"] on each lens». The next judges' brief must carry N2.
+- N3: the engine stamps the ending it pushes (`endingCopy`), and `LessonResult.ending` carries it. It is client-only: it is not on SimTick, the wire, the store or the server debrief.
+- N4: no new sentence for the completed run-out, an exam termination, an aborted drive or finishSession. No end-card line while `examTermination` is set.
+- N5: a person strike is a scored COLLISION bill with detail pedestrian or cyclist, latched as `personStruckAtSec`. From the bill frame the hold is "personStruck", ranked above crashPinned and offRoad. `crashPinWayOut`, `crashPinCorrective` and `ROUTE_HOLD_S` are unchanged, so E9–E13 cannot move.
+- N6: the duty is named only by the retrieved citation «ЗДвП чл. 123, ал. 1». It is declared once as `PERSON_STRIKE_DUTY.lawRef` and is also the lawRef of the pin ending.
+- N7: the person hold stays for the rest of the drive, the task never returns, and the strings name the exit. Whether a training lesson should END on its own after a person strike (N7b, now Q11) is the founder's question.
+- N8: these are recorded, not changed: the «Разбрах — продължи» resume label, the THEO-3 consequence card, and the COLLISION bill's own toast and debrief.
+- N9: the exam ends at the bill.
+- N10: nothing graded moves, and the off-carriageway mark is byte-identical. The integrator teaches the tools readers at the main-tree gate.
+- N11 (round 2): from the bill frame, the yield voice, the objective notices and the ✓ task flash are not pushed.
+- N12: the armed phase names the exit too.
+- N13: no «в менюто». This ratifies the builder's round-1 deviation: on PC the control is a top-bar button.
+- N14 (round 3): RouteGuidance is HIDDEN, not unmounted, under personStruck only. The route is still derived and still published to the drive rig.
+- N15: a pin-dropped yield-wait case must kill the round-2 survivor W2.
+- N16: a car-control hint under the hold says one cause sentence plus the phase's exit.
+- N17 (2026-11-03): ratifies the builder's round-3 scope extensions under the same predicate: the S1 shadow aid's ribbon, both ribbon-legend surfaces, and the world-edge card's tail. They are narrow: personStruck only, 0 frames under any other hold.
+- N18 (2026-11-03): condition C1 is built at integration. It was built and pinned there (condition 1).
+
+**The rows are NOT closed by this landing.** `sc-crossing-dart:1c7a07d8` and `sc-pk-driveway:7fa8b79e` stay OPEN.
+- Every number below was measured in process: the liveChainReplay census, applyTick drives, and the real RouteGuidance mounted through the R3F reconciler with a stub renderer.
+- Neither the builder, the verifier nor the integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close either row is for that wave's judge and verifier, under N2.
+- This landing does not change the open-row count. vruafterstrike was never filed as a row.
+
+**What was wrong.** The builder reproduced each item on `230c7b8`. The round-1 verifier's own base census matched the builder's with 0 field differences.
+- **Item A, the exam gate-2 sentence.** The stoppedStuck exam branch (base `engine.ts:4185–4207`) pushed «Стигна края на маршрута, затова изпитът…» without reading the anchor mode or whether the car had arrived.
+  - On base, 77 exam cells end on «Стигна», 32 of them with no mark. Of the 35 gate-2 cells, 28 have no mark, 1 is short (sc-park-parallel-exit/mistake-no-room L4, 6.615 m short), 2 are on outside anchors and 4 are past the mark.
+  - The lesson branch said «Спря в края…» on 8 outside-anchor cells. They latched on the region face, 54.16 m from the ring: sc-roundabout-entry and sc-rb-exit-signal mistake-exit-no-signal, L1/2/3/5.
+- **Item B, no ending's sentence reached the student.** Each ending was only a HudEvent. `LessonResult` had no field for it, and `buildLessonResult` copied nothing. The builder confirmed the phone toast drop and the opaque PC scrim by reading the code; the device evidence is rig-w3l's.
+- **Item C, after a person strike.** The banner, card and peek carried the route task, or the pinned card «…Ако не опира, огледай се и тогава потегли».
+  - Over the person cells, the builder counted 27 drive-on stem hits in hold, advisor, banner and peek text, and 23 frames where the follow pill was eligible.
+  - The cause has three parts: `routeHoldForSession` waits `ROUTE_HOLD_S`, `crashPinWayOut` treats a road user as «away», and the pin drops beyond 6 m.
+  - The round-1 verifier's drive-on check over HUD events after a strike found 7 base cells:
+    - 4 are yield-voice Б2 notices on sc-merge-from-property/mistake-walk-through L1/2/3/5;
+    - 3 are objectiveComplete toasts whose task title carries «продължи».
+
+**What landed.** This is the builder's description. The line numbers are the lane's; on the landed tree LessonScene.tsx :3196 / :3221 / :3656 are :3300 / :3325 / :3760, and advisor.ts :1364 is :1381. The verifier's measurements are under their own heading.
+- **Item A** (`finish.ts`, `engine.ts`).
+  - `stoppedStuckEndingCopy(examMode, mode, arrived)` covers five cases. Mode is read from `terminalRescueZone(params)?.mode`. Arrival is E1's predicate, unchanged.
+  - `ROUTE_END_REACHED_EXAM_BG` is one literal, used by gate 1 and by gate 2 on an arrival.
+- **Item B** (`engine.ts`, `types.ts`, `SessionEndScreen.tsx`).
+  - A `pushEnding` helper sits at every ending push site: seven calls for the six ending kinds (openTasks ×2, the two route-end gates, departure, off-network and the crash pin). It stamps `endingCopy` field for field, only on the frame that completes the drive. `buildLessonResult` copies it to `LessonResult.ending`.
+  - SessionEndScreen renders one `<p data-hud="end-ending">` directly under the verdict pill, above the «Незавършен» note. It holds the title, « — », the sentence and, when the ending has a lawRef, a chip in the toast-chip style.
+  - The line is not rendered while `examTermination` is set, and calibrationLocked holds it back.
+  - The same component serves the PC end screen and the phone «Резултат» card.
+- **Item C, the person hold** (`engine.ts`, `advisor.ts`, `LessonPlayShell.tsx`).
+  - `personStruckAtSec` is latched on the first scored terminating COLLISION with a pedestrian or cyclist detail (`isPersonStrikeBill`) and is never cleared.
+  - `RouteHold` gains "personStruck". `personHoldCopy(s)` has two phases, keyed on whether `crashPin` is armed. The exit label is read from `sessionEndControlLabelBg`, which both shell controls also read. Under the person hold the banner lead is shown alone, never with the task.
+  - On any drive with a person strike, the crash-pin ending gains the chip «ЗДвП чл. 123, ал. 1». Its wording and corrective are unchanged.
+  - The StatusDashboard mounts read a separate `offCarriagewayHold`, so the off-carriageway mark does not follow the new hold.
+- **Item C, the coach's other voices (round 2, N11).** `personStruckThisFrame()` is true from the bill frame on. Under it, three channels are not pushed: the yield voice (`engine.ts:3864`), the objective notices (:3513) and the objectiveComplete flash (:3535).
+  - `stepYieldVoice` still folds.
+  - The objective still completes and is graded as before.
+- **Item C, the route guidance (round 3, N14 and N17).**
+  - The predicate `routeGuidanceStandsDown(hold)` (`advisor.ts:959`) is true for "personStruck" only.
+  - RouteGuidance takes a `routeHold` prop. Its root is `<group visible={!routeGuidanceStandsDown(routeHold)}>`, so the ribbon, the chevrons, the marker and its plate «Карай дотук», the ring and the stop bar are hidden. The layout effect still derives the route, and `publishRoadProbeRoute` still publishes it. The hold is not a derivation dependency.
+  - `LessonScene.tsx:3196` passes `routeHold`, and the mount condition stays `lesson.objectives.length > 0`.
+  - `LessonScene.tsx:3221` gives the S1 shadow aid `showRibbon={!routeGuidanceStandsDown(routeHold)}`.
+  - `LessonPlayShell.tsx:6572` gates both ribbon-legend surfaces on the same predicate.
+- **Item C, the car-control hints and the world-edge card (round 3, N16 and N17).**
+  - `personHoldControlHint(s, hint, causeBg)` (`advisor.ts:1364`) returns the same object outside the hold. Under the hold, the title is the cause and the paragraph is the phase's exit peek.
+  - Four handlers are wrapped through it: driveline rejection, reverse-pedal stuck, stuck start and transmission change. Their TTL, cooldown and rate-limit key are unchanged.
+  - `worldEdgeDetailBg(near, exit)` returns the shipped text byte for byte when there is no strike. Under the hold it ends on the person exit instead of «…върни се към синята линия и продължи по маршрута на урока».
+- **What did not change** (the builder): every bill, point, verdict, star, objective status, phase, endedAtSec and gate radius, and every protected number. That includes `ROUTE_RUNOUT_ARRIVE_M` 2.5, `FINISH_STUCK_S` 12, `CRASH_PIN_RADIUS_M` 6, `CRASH_PIN_STUCK_S` 10 and `ROUTE_HOLD_S` 5. Also unchanged: the B15 freeze, `guidanceRoute.ts` and devrig. No protected threshold moved.
+
+**Shown text.** These are the final strings (the builder). Outside a person strike, every item-C sentence is byte-identical to base.
+- **Item A, added:**
+  - exam, inside, not arrived or no mark: «Колата стоя неподвижно при края на маршрута, но не всички задачи се отчетоха, затова изпитът приключва тук и не е издържан. Разборът показва всяка неизпълнена задача и всяка допусната грешка.»
+  - exam, outside: «Колата напусна мястото, където свършва маршрутът, но не всички задачи се отчетоха, затова изпитът приключва тук и не е издържан. Разборът показва всяка неизпълнена задача и всяка допусната грешка.»
+  - lesson, outside: «Колата напусна мястото, където свършва маршрутът, но не всички задачи се отчетоха, затова урокът приключва тук. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път.»
+- **Item A, kept verbatim:** the exam «Стигна края на маршрута…» (now only on an arrival), the lesson inside «Спря в края на маршрута…», and both titles.
+- **Item C, armed phase.** Each length is given with «Прекрати урока» / «Завърши сесията»; a free drive says «Завърши сесията».
+  - card (144/145): «Удари човек — не продължавай с колата. Остани тук и спри урока с „Прекрати урока“. Какво е длъжен водачът след удара, казва ЗДвП чл. 123, ал. 1.»
+  - peek (37/38): «Остани тук и избери „Прекрати урока“.»
+  - lead (60/61, budget 66): «След удара в човек — не продължавай, избери „Прекрати урока“»
+- **Item C, free phase:**
+  - card (131/132): «Удари човек — не продължавай с колата. Спри урока с „Прекрати урока“. Какво е длъжен водачът след удара, казва ЗДвП чл. 123, ал. 1.»
+  - peek (45/46): «Избери „Прекрати урока“ — урокът оттук спира.»
+  - lead (51/52): «След удара в човек — спри и избери „Прекрати урока“»
+- **Under the person hold, the hint titles.** Each paragraph is the phase's exit peek.
+  - «Двигателят е изключен — газта не движи колата»
+  - «Двигателят угасна — газта няма какво да задвижи»
+  - «Лостът е на P — колата е паркирана»
+  - «Лостът е на N — моторът не е свързан с колелата»
+  - «Ръчната спирачка е вдигната — колата е задържана»
+  - «Лостът е на R/D, но педалът още спира»
+  - «Смяната на нивото премести лоста на N|D|P|R» / «…на предавка»
+  - «Двигателят не запали — колата е в предавка» / «…лостът не е на P или N»
+  - «Лостът не влезе в R или P — колата се движи»
+  - «Предавката не влезе без натиснат съединител»
+  - «Лостът вече е в D — в тази посока позиция няма» / «…в P…»
+  - «Лостът вече е на последната предавка (M<n>)»
+  The causes run 34–48 characters.
+- **Under the person hold, the world-edge card** keeps its account of the edge and ends on the exit: walled 269/277 characters (296 as shipped), open 168/176.
+- **Removed under the person hold, with no new text in their place:**
+  - the yield-voice notices, the objective notices and the ✓ flash;
+  - the route guidance;
+  - the S1 shadow ribbon;
+  - both ribbon-legend surfaces;
+  - the «огледай» glance-ping chips, by condition C1, built and pinned at integration (N18). The hold-to-glance buttons stay. See condition 1.
+- No refusal is bare. Each new ending states its reason, and each hold string names the exit (THEO-4). The armed card no longer says «особено ако има пострадал»; the citation still names the duty (ADR-002).
+
+**Rounds 1 and 2, refuted on item C.**
+- **Round 1.** The yield voice still taught a Б2 wait after the strike. On sc-merge-from-property/mistake-walk-through L1/2/3/5:
+  - at 9.15 s: «…тръгваш чак когато никой не приближава.», peek «Спри докрай — до линията.»;
+  - at 17.93 s: «…стигни до линията и спри там пак…».
+  - On sc-crossing-child-ball the same voice called the rest after striking the child a lawful yield.
+  - Conditions: the armed phase named no exit for about 190 s on the obedient drive. The lawful Б2 wait freezes the pin's dwell, so the pin ending comes only at 197.95 s (`obedient-tree.jsonl`: armed rest 189.98 s).
+- **Round 2.** After the strike, «Карай дотук» was still the active goal's sign on 32 of the 47 person cells, under the banner «…не продължавай…». About 22 of them were inside the sign's visible band at the strike pose.
+  - Conditions: mutant W2 survived; it silences the yield voice only while the pin is armed. The car-control hints could still say «…потегли…» / «…тръгваш назад/напред.» on the student's own input, though no committed input reaches them.
+
+**What the verifier reproduced on round 3.** It used its own lane (`230c7b8` + the r3 patch) and its own probes. Log: `D:/knijka-lanes/scratch/endings2-verify/PROGRESS.md`.
+- **Census, 2,434 cells, 0 errors** (`census-tree-r3.jsonl`; against base, `analysis-r3-v.json`):
+  - 0 graded diffs and 0 failures;
+  - 39 ending-text changes, all of the allowed kinds: exam no-mark 28, exam short 1, exam outside 2, lesson outside 8;
+  - 22 lawRef changes, all on person-strike pin cells;
+  - 0 differences between the end card and the pushed ending on either lens;
+  - 35 of 35 K4 exam cells have passed false;
+  - 0 UI changes on any cell without a strike;
+  - the drive-on check after a strike: 7 cells on base, 0 on the tree;
+  - N9 holds: the 6 exam person cells all terminate at the bill, with 0 person-hold frames.
+- **Item B, from round 1, unchanged since** (the round-1 verifier):
+  - on all 681 ending cells, the end-card line equals the pushed event with compact true and with compact false;
+  - there is no line on K7–K10, and none whenever `examTermination` is set;
+  - 0 cells end and terminate the exam on the same frame;
+  - the 4 exam cells that keep «Стигна» arrived 3.66–7.45 m past the mark, at lateral offset 0.
+- **Item C on the 47 person-strike cells, 51,850 person-hold frames:**
+  - round 2's 32 hit cells fell to 0;
+  - 0 frames with the guidance layer drawn, a goal marker shown, the shadow ribbon drawn or a ribbon legend shown; the goal marker is hidden on 41 cells;
+  - the exit is missing on 0 frames;
+  - on none of the 2,434 cells is the guidance hidden under a hold other than personStruck.
+  - The 240 s person hold (228,362 frames) is clean on every count. sc-merge-from-property L1/2/3/5 keep the pin armed to 197.95 s and end with the chip «ЗДвП чл. 123, ал. 1».
+- **The real RouteGuidance mount test** (the builder's, run by the verifier). Under personStruck nothing is drawn. Under crashPinned and offRoad it draws as with no hold. The probe route and the count of route rebuilds are identical. The verifier's X7, which rebuilds the route when the hold changes, dies on «expected 4 to be 1». RouteGuidance has no DOM, portal or callback output that the root group's visibility would miss.
+- **The hints:**
+  - a matrix of 162 cases on every armed and free phase: 9,072 checks, 0 failures (cause as title, exit peek as paragraph, the label named, no drive-on word);
+  - outside the hold, the same object on all 2,434 cells;
+  - the world-edge card is clean in both forms;
+  - every cause is true whenever its hint fires.
+- **Mutants: 10, all killed on assertion text, each restored with a sha256 check:**
+  - W2, its round-2 survivor, now killed by the builder's test (7);
+  - its own X1–X9: X1 the transmission handler unwrapped; X2 a rejection cause that teaches a move; X3 the card used as the hint paragraph; X4 the armed-phase hint unguarded; X5 the shadow ribbon hidden under any hold; X6 the legend hidden under any hold; X7 the hold added to the route effect; X8 the snapshot's exit sentence set to the lead; X9 the root also hidden under offRoad.
+  - In rounds 1 and 2, its V1, V2, V4–V10 and W1, W3–W5 died on assertion text.
+- **Regression on its lane:**
+  - lessons/__tests__: 127/127 files, 2,456 passed;
+  - lessons/scenario/__tests__: 203/203 files, 5,012 passed, 1 skipped (the manifest, caption-truth, keep-right census and endings-chassis among them);
+  - components/sim + hud + modules/sim/__tests__ + lib/content/law: 175/176 files, 3,293 passed. The one failure is touchHintLifetime: ENOENT on tools/, environment only.
+  - modules/clips: 18/19 files, 287 passed. The one failure is whyPanel, which needs docs/. The clip-plan freshness check is green.
+  - tsc: 22 errors, the same set as base.
+  - Manifest, round 2 against round 3: 13,312 → 13,328 strings; every moved unit is in `LessonPlayShell.tsx`.
+- **The builder's numbers, not re-measured by a verifier:** its mutants, 23 in round 1, 8 in round 2 and 20 in round 3, all killed on assertion text. Its own census copies agree with the verifier's figures; the verifier's are the ones quoted.
+
+**The conditions, and how each stands.**
+
+**1. C1 (integrator ruling N18): the «огледай» glance pings after a person strike. BUILT AND PINNED AT INTEGRATION.**
+- On sc-merge-from-property/mistake-walk-through L1/L2/L3, the edge cues (`GlanceEdgePings.tsx`, driven by `advisor.ts` `observeGlancePingsTick`) pulse on both edges on all 11,499 frames from the strike at 6.3 s to the pin ending at 197.93 s. That includes 190 s at rest at the Б2 line, under the banner «След удара в човек — не продължавай, избери „Прекрати урока“».
+- L5 is excluded because the pings render only up to L3. The other 44 person cells show 0 ping frames.
+- The cue is the give-way scan for that very wait. Base shows it too. It is not a stop-rule hit, because «огледай» matches no drive-on word.
+- The condition: pass the scene's existing `routeHold` to `<GlanceEdgePings>` (lane LessonScene.tsx ~:3656; :3760 on the landed tree) and render no ping chips while it is "personStruck". The hold-to-glance buttons stay. Nothing graded reads the pings.
+- The pin it asked for: an applyTick or render test on the sc-merge-from-property L1 tape plus 240 s at rest. It must show 0 ping chips under the hold, and pings unchanged with no strike and under crashPinned or offRoad. The mutant that ignores the gate must go red on assertion text.
+- Evidence: `attempts/r3/tmp-e2v-glance.test.ts`, `r3-glance.jsonl`.
+PINNED AT INTEGRATION: C1 is built (the integrator, ruling N18). It is display only and the one product edit beyond the lane patch. `advisor.ts:976` gains a pure sibling predicate, `glancePingsStandDown(hold)` = `hold === "personStruck"`, exported from `lessons/index.ts`. `GlanceEdgePings.tsx` takes an optional `routeHold` prop (default null) and renders no PingChip while `glancePingsStandDown(routeHold)` (`pingsActive && !glancePingsStandDown(routeHold)`, :172). The ping state machine still runs, and the hold-to-glance buttons stay. `LessonScene.tsx` passes `routeHold={routeHold}` on the only `<GlanceEdgePings>` mount (:3760, the prop at :3767). The merge verifier found these 4 product files the only product difference between the staged tree and the lane patch alone, matching the condition exactly (its V2).
+  - `components/sim/lesson-ui/__tests__/glancePingsStandDown.test.ts`, 6/6 (about 40 s). It runs the real GlanceEdgePings body on a dispatcher that keeps its slots, fed its own tick tap from liveChainReplay of sc-merge-from-property/mistake-walk-through at L1, L2 and L3 plus 240 s at rest, with the per-frame hold from `routeHoldForSession`. Under the hold it shows 0 chip frames, where the same state with no hold pulses on 11,499 frames. Under crashPinned, offRoad and before the strike it is identical to no hold, and so on the clean shadow-correct L1 drive. The buttons are present on every hold frame.
+  - `components/sim/__tests__/personHoldSceneMounts.test.ts` mounts the real ReadyScene through hookHarness over the shipped recipe and district, with the committed shadow-correct trace, and reads the GlanceEdgePings props by component identity.
+  - Mutants, each run alone and restored by sha256 (the integrator):
+    - M1, the gate ignored (`pingsActive`): red at L1, L2 and L3 on «ping chip frames under the person hold: expected 11499 to be +0»;
+    - M2, the predicate widened to every hold: red on «crashPinned: expected true to be false», «frames where crashPinned / offRoad / no hold differ from no hold: expected 23710 to be +0» and, on the clean drive, «expected 3662 to be +0»;
+    - M3, LessonScene no longer passing routeHold: red on «routeHold handed to the pings under personStruck: expected null to be 'personStruck'» (the real ReadyScene mount) and on a source pin in glancePingsStandDown.test.ts.
+  - The merge verifier re-killed M1 on the same text, and its own M3 variant `routeHold={null}` on the same text as M3.
+  - notPinned (the integrator): the rule on any lesson other than sc-merge-from-property L1–L3. The verifier's census found pings after a strike on that cell only (0 ping frames on the other 44 person cells). The predicate-plus-render test is generic, but it is exercised on that tape, a synthetic hold on the same frames and one clean drive. Pings render only up to L3, so L5 is out of scope by construction.
+
+**2. C2: three pins checked source text only. HARDENED AT INTEGRATION: X1, X5 and X6 now die on behaviour; X6 on the phone surface is notPinned, with its reason.**
+- On the lane (the round-3 verifier) these three mutants died only on source-text pins:
+  - X5 (the shadow ribbon hidden under any hold), on the regex over LessonScene source;
+  - X6 (the legend hidden under any hold), on substring checks over LessonPlayShell source;
+  - X1 (the transmission handler unwrapped), on the handler-wiring regex.
+- On the lane no test rendered ShadowCar's ribbon or the shell legend, and none called the handler.
+- The condition: a behavioural check for each, killing its mutant on assertion text. Where that is not feasible in the time, list it under notPinned with the reason.
+PINNED AT INTEGRATION: met behaviourally for all three (the integrator). Every mutant ran alone and was restored by sha256.
+  - X1: `components/sim/lesson-ui/__tests__/shellPersonHoldLive.test.ts`, 4/4, runs the real LessonPlayShell body headless. It drives a 40 km/h pedestrian strike on sc-pe-jaywalker L2 through the shell's own onTick, calls the shell's own onTransmissionChanged and reads the card it raised off the HudToasts element by id. There is also a no-strike control. X1 dies on «expected 'Скоростният лост е на ръчна кутия' to be 'Смяната на нивото премести лоста на п…'».
+  - X5: `components/sim/__tests__/personHoldSceneMounts.test.ts`, 4/4, mounts the real ReadyScene on sc-merge-from-property L1 and L2 under each of personStruck / crashPinned / offRoad / null and reads the S1 ShadowCar's showRibbon and showGhost props by component identity. X5 (`showRibbon={routeHold == null}`) dies on «showRibbon under crashPinned: expected false to be true» (L1 and L2).
+  - X6: shellPersonHoldLive.test.ts sets the shell's HUD snapshot slot to the struck session's snapshotOf, then the same snapshot under crashPinned / offRoad / null, and counts `data-hud="ribbon-legend"` on each render. X6 (`snap.objectiveHold == null`) dies on «legend under crashPinned: expected +0 to be 1». An extra mutant, X6b (the legend gate drops the predicate, `lesson.objectives.length > 0`), dies on «legend under personStruck: expected 1 to be +0».
+  - The merge verifier ran each again itself: X1, X5 and X6 (on the guidanceShown definition) died on the same texts, and its own X6c (the roomy-legend gate drops guidanceShown) on «legend under personStruck: expected 1 to be +0».
+  - notPinned (the integrator): X6 on the phone surface, the compact legend line (legendApplies feeding the overlay queue's priority-10 `legend` candidate). The behavioural kill uses the roomy PC legend panel. guidanceShown feeds both surfaces, so X6 and X6b die either way. The compact path's announcement goes through effects and the overlay queue, which this headless harness does not run, so the phone line itself is not rendered. The existing substring pins in personStrikeHold and shellClipAffordances still cover it by source text. The merge verifier accepted it as recorded (its V4).
+
+**3. MANIFEST.** The lane re-recorded the reviewed-text manifest. In round 3 the dry run showed 32 units moved, all in LessonPlayShell.tsx (the builder). Neither C1 nor the 3-way merge moved a unit, so it was not re-recorded at integration: run as is, `reviewed-text-manifest.test.ts` is green 49/49. The only new text is in comments, and C1 adds no JSX string. The lane's re-recorded manifest (16 files: strings.*.txt, manifest.json and units.source.txt) landed unchanged (the integrator). The merge verifier's lessons run, the manifest inside, is green too. See PROVEN ON 6628342.
+
+**4. TOOLS (N10): the readers a lane cannot run.** The round-1 verifier checked the round-1 items: lesson-audit, path-evidence, path-follow, canary-pills and engprog-look. The round-2 and round-3 items are the builder's alone.
+- `tools/mobile/lesson-audit.mjs` `ROUTE_HOLD_CRASH_PINNED_BG` matches neither person lead. `route-fidelity.test.mjs:237–247` must read both person leads from advisor.ts.
+- LAWFUL_WAIT_RE and the ✓-flash readers no longer see those events after a strike.
+- The `/удар|притисн/` readers and the `/Край на маршрута/` end readers now also match the end card. `data-hud="end-ending"` must be excluded from the debrief-mistake count.
+- The «Спря в края» / «Стигна края» readers on the 39 changed cells must be re-read.
+- `lib/driveline.mjs` STUCK_START_OTHER_RE (:204) and PARKING_BRAKE_CARD_RE (:195) still match the hold-form titles, which keep their leading stems.
+- Any reader that expects the ribbon, the marker, the chevrons, `[data-hud="ribbon-legend"]` or the world-edge text after a person strike must be re-read.
+- At the landing: the tools tests in the worktree read 2,029 tests, 2,006 pass, 8 fail (1 the standing deck-captions freeze, 7 environment: the `.audit-frames` corpus and playwright are absent in a worktree). None of the 8 is in a file named above. No tools test was taught, and neither patch touches tools/. The main-tree gate decides.
+See PROVEN ON 6628342.
+
+**5. THE LANDING RE-RUNS.** On the landed tree the proof ran src/modules/clips/ (the clip-plan freshness gate, green with no regeneration), lessons/ (including scenario/), components/sim/, hud/, engine/ (in the merge verifier's run) and the whole tools suite. Every directory is green, after the test-only re-anchor of `scene/guidance-route-recovery.test.ts`; the tools tests read their known 8 failures (condition 4). See PROVEN ON 6628342.
+
+**Not cured by this landing.**
+- **Gate 1's no-mark latch.** «Стигна края на маршрута…» is still said at the gate-1 latch on routes with no mark (E1 «as before», N1; census only). The builder counts 17 cells. Examples: sc-sig-green-wave/mistake-sprint, 92 m from the passSignal anchor, and sc-rb-ped-exit/mistake-exit-through-ped, 55 m from an outside anchor. Item B makes that sentence permanent on the end card where it was shown.
+- **The lesson inside sentence short of the mark.** «Спря в края на маршрута…» is still said there, and it is now permanent on the end card: sc-park-parallel-exit/mistake-no-room L1/2/3/5, 6.615 m short. It belongs to the open row `sc-mv-uturn-ban:15ed5059` (b). That row's stranded threePointTurn case now reads N1b's outside sentence, so its hand-off must say so.
+- **After a vehicle strike**, the free branch «Ако не опира, огледай се и тогава потегли» is unchanged on 21 vehicle-pin cells.
+- **A training drive whose car rests beyond the pin after a person strike has no ending of its own.** 15 of the 47 person cells did not end within the census (the tape plus a 30 s hold; the round-1 verifier):
+  - 11 where the car drove more than 6 m on and the pin dropped: sc-vu-bikelane-turn L1–3, sc-hz-emergency-stop L1–3/5 and sc-hz-accident-scene L1–3/5;
+  - the 4 sc-merge-from-property cells, which do end, on the crash-pin ending at 197.95 s in the 240 s run.
+  Whether such a drive should end is founder question Q11 (N7b), and it is still his. Until he answers, a training drive after a person strike ends with «Прекрати урока» / «Завърши сесията».
+
+**Recorded, not changed.**
+- The round-1 verifier's N5:
+  - (a) a later static or vehicle bill that re-arms the pin more than 6 m from the person makes «Остани тук» name the wrong place. No committed tape reaches this.
+  - (b) on a free drive the card and peek say «Спри урока…» / «урокът оттук спира» while the control reads «Завърши сесията».
+  - (c) in the THEO-3 sandbox no COLLISION is scored, so no person hold rises there.
+- The advisor-off gap. From L3 the advisor is off by default. With no task title, no surface shows person copy; nothing says «не продължавай» there either.
+- The 150 ms HUD poll (HUD_POLL_MS). Every glass surface, the guidance included, changes at the first poll after the bill frame, so up to 150 ms of it can show after the bill.
+- Shown only on the student's request or out of reach of a strike: the opt-in demo deck «Демонстрация — следвай сянката» and the parked ghost; the crosswind cue «…рязко назад…» (no person-strike lesson has wind); the mouse-pedals card; the pre-drive hints.
+- F12 restated: «exactly one «чл. 123» literal outside the authored scenario templates». Three authored literals exist on base, in templates-hazards2.ts and templates-reels.ts.
+- N8's exceptions after a person strike: the resume label, the THEO-3 card, and the COLLISION toast and debrief.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-03). Several restate items above; they are listed here with the docs agent's evidence, as it stated them except that the first is worded per D4 and the third gives the census horizon (F6).
+- **First, gate 1's no-mark latch.** It says «Стигна края на маршрута…» where the car is not at the route's end, on 17 census cells, for example sc-sig-green-wave/mistake-sprint L2/3/5 (92 m from the passSignal anchor), sc-rb-lane-choice/mistake-outer-lane-far-exit L1–5 (73 m), sc-rb-ped-exit/mistake-exit-through-ped L1–3/5 (55 m, outside anchor, one of them after a pedestrian strike) and sc-park-gap-long/mistake-blind-reverse L1–5 (4.3 m). Item B now shows that sentence on the end card. It sits inside 1c7a07d8's catalogue-wide scope, for the re-drive judge. Evidence: `endings2-r1.json` (build.owed[3]); `D:/knijka-lanes/scratch/endings2-impl/analysis.json`.
+- After a VEHICLE strike the crash-pin hold's free branch «Ако не опира, огледай се и тогава потегли» still invites the student to drive on, against ЗДвП чл. 123, ал. 1, т. 1: 21 vehicle-pin cells (corrective «vehicle»); the person hold does not cover them. Evidence: `endings2-r1.json` (build.owed[4]); `endings2-brief/brief.json` (owed); `endings2-impl/census-tree.jsonl`.
+- A training drive after a person strike has no ending of its own: 15 of the 47 person-strike census cells did not end within the census (above), for example sc-vu-bikelane-turn/mistake-cut-path L1–3, sc-hz-emergency-stop/mistake-late-reaction and sc-hz-accident-scene/mistake-squeeze L1–3/L5 (the car drove away and the pin dropped). Gated on founder question Q11 (N7b). Evidence: `endings2-r1.json` (verify N1; build report §4); `endings2-verify/census-tree.jsonl`.
+- After a person strike the lawful Б2 wait freezes the crash pin's stillness clock (the B15 freeze, dwellUnspendable), so an obedient student on sc-merge-from-property/mistake-walk-through L1/2/3/5 stands armed about 190 s (189.98 s) before the pin ending at 197.95 s, against the 10 s CRASH_PIN_STUCK_S. The exit is now named, but the drive does not end. Evidence: `endings2-r1.json` (verify C1); `endings2-verify/obedient-tree.jsonl`; `r3-person-hold240.jsonl`.
+- Route tasks still complete and count after a person strike: sc-crossing-rain-sprint/mistake-not-yielded L1 («Подмини пътеката и продължи по улицата») and sc-rx-tram-stop-doors/mistake-creep-through L1/L3 end as completed run-outs (K7), and sc-vu-bikelane-turn L1–3 completes «Завий надясно…» after the cyclist strike. N11 silences only the ✓ flash, so this is a grading question. Evidence: `endings2-r1.json` (build report §4, census K7) and `endings2-r2.json` (build report §1); `endings2-verify/census-tree-r3.jsonl`.
+- The advisor-off gap after a person strike (also above): from L3 the advisor is off by default (ADVISOR_DEFAULT_ON_MAX_LEVEL 2, advisor.ts:68). With no task title (the run-out or a free drive) objectiveTitleUnderHold returns null, so no surface shows the person copy or names the exit, and nothing says «не продължавай» there either. Evidence: `endings2-r2.json` (verify N3); `endings2-r3.json` (verify N4).
+- The 150 ms HUD poll (HUD_POLL_MS, LessonPlayShell.tsx:306; also above): every glass surface, the route guidance included, changes only at the first poll after the bill frame, so up to 150 ms of guidance, banner, card or pill can show after a person strike. Evidence: `endings2-r3.json` (verify N2).
+- Person-hold truth edges, no committed tape (also above): (a) a later static or vehicle bill that re-arms the pin more than 6 m from the person makes the armed «Остани тук…» name the wrong place; (b) on a free drive the card and peek say «Спри урока…» / «урокът оттук спира» while the control reads «Завърши сесията». Evidence: `endings2-r1.json` (verify N5(a), N5(b)); `endings2-r2.json` (build report §9).
+- The THEO-3 sandbox: a COLLISION is not scored there, so personStruckAtSec never latches and no person hold rises after a person strike. That contradicts the lane brief's risk 2, which assumed the hold covers the sandbox. What the sandbox shows after a person strike is unmeasured. Evidence: `endings2-r1.json` (verify N5(c)); `endings2-brief/brief.json` (risks, 2).
+- The opt-in demo deck title «Демонстрация — следвай сянката» (TraceTimeline.tsx:270) and the parked ghost still show after a person strike if the student opens them. Minor, on request only. Evidence: `endings2-r2.json` (verify N3); `endings2-r3.json` (verify N4).
+- Instrument: the rig-w3l spec's A3 cell expects «Стигна края» on the completed run-out, which by design pushes no sentence (N4), so that cell cannot pass on a correct product. Evidence: `endings2-r1.json` (build.owed, last item); `endings2-brief/brief.json` (owed, last item).
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's doc 88 as staged for ra2.
+- :15148, the en title's «(the exam path's stoppedStuck ending still says it without that check, below)», and :15236, «…it still does not check arrival». The exam gate-2 sentence is now keyed on arrival and anchor mode (N1), in process.
+- :15328–:15334, «Not cured by this landing: the exam path's gate-2 ending», and :15406, «Lane «examend»». Both are discharged in process; the exam-mode re-drive is still owed.
+- :15347, «For the founder … the hold card's free branch … after a pedestrian or child strike»; :15350, candidate 1; and :15407, «Lane «vruafterstrike»». After a person strike that branch is no longer shown; the person hold replaces it. The vehicle-strike case stays (above).
+
+**PROVEN ON 6628342** (the integrator's run in the worktree `D:/knijka-lanes/integ-e2`, log `D:/knijka-lanes/scratch/e2-land/PROGRESS.md` and, in the same folder, its `s5-*.log`, `tsc.log`, `tools.log`, `tools-env-*.log` and `tools-count-agreement-main.log`; the mutant logs in `scratch/e2-land/mut/`. The merge verifier re-ran the lessons directory with scenario, components/sim + hud + engine + scene + clips and the tools tests itself; engine/ was run by the merge verifier):
+- The lane patch's sha256 matched (fbabd5c5…ddd11f). It went in with `git apply --3way --index --binary`: 38 files, exit 0, no conflicts. Only `LessonScene.tsx` had also changed between the lane base 230c7b8 and HEAD (the staged ra2 edits plus 69418cf). It is the one real 3-way merge and merged cleanly; its 18 changed +/− lines are byte-identical to the lane's, and all four of its hunks landed (the import, the prop doc, RouteGuidance's routeHold and the S1 shadow aid's showRibbon). Five files printed «Falling back to direct application» and then applied cleanly: LessonPlayShell.tsx, objective-banner-task-cap.test.ts, shellClipAffordances.test.ts, toast-why-room.test.ts and manifest.json. HEAD never changed any of them.
+- The gate patch `D:/knijka-lanes/gate-e2.patch`, sha256 0a43c709387b64537a0789f3b3826348bda61a55b47696edba78aeec544bcf6b, 43 files, +3147/−81, 0 CR bytes (every touched file is LF). It holds the lane's 38 files; C1 across 4 files (advisor.ts, lessons/index.ts, GlanceEdgePings.tsx, LessonScene.tsx); 3 new test files (lesson-ui/__tests__/glancePingsStandDown.test.ts, lesson-ui/__tests__/shellPersonHoldLive.test.ts, components/sim/__tests__/personHoldSceneMounts.test.ts); and 1 re-anchored test (modules/sim/scene/guidance-route-recovery.test.ts). It touches nothing outside platform/src. The merge verifier found `git diff --cached --binary 6628342` byte-identical to it. On a temporary index it applied the lane patch alone to 6628342 (tree 6337f3d5): the staged tree 78be134e differs from it in those 8 files only, and every lane-produced file, test files included, is byte-identical.
+- The pins: conditions 1 and 2 above.
+- The re-anchor, test-only. On the first scene run `src/modules/sim/scene/guidance-route-recovery.test.ts` failed to collect («expected -1 to be greater than 73617»). It slices RouteGuidance source up to "\n  return (\n    <group>", and the lane's N14 change rewrote that line to a comment plus `<group visible={!routeGuidanceStandsDown(routeHold)}>`. Its end anchor is now the component's own return, "\n  return (\n", and the file passes 40/40. The merge verifier: the new anchor first matches after useFrame at RouteGuidance.tsx:1671, the same return the old anchor found, so the slice is unchanged. The mutant SC1 (`false && routeLossApplies(goalNow)`) turns it red on its structural regex, in the integrator's run and in the merge verifier's, each restored by sha256. The lane verifier never ran src/modules/sim/scene/. Among the new pins only this test and the extra source pin in glancePingsStandDown.test.ts are source-text checks (the merge verifier).
+- The lane's own tests and two lane mutants (the merge verifier): the 5 lane key files pass 70/70 (endings2-gate2, endingCarrier, session-end-ending-line, personStrikeHold, routeGuidanceStandsDown). Its item-A mutant (`stuckArrived = true || …`) died on «expected 'Стигна края на маршрута…' not to match /Стигна/u», and the r3 verifier's X9 (the root also hidden under offRoad) on «expected [] to deeply equal [18, 19, 19, 20, 21, 22]».
+- The integrator's directories, all green:
+  - the new and changed tests: glancePingsStandDown 6/6, shellPersonHoldLive 4/4, personHoldSceneMounts 4/4, guidance-route-recovery 40/40 after the re-anchor;
+  - lessons/__tests__ 127 files, 2,456 passed, 165 skipped;
+  - lessons/scenario/__tests__ 204 files, 5,025 passed, 1 skipped (manifest, caption-truth, keep-right census and endings2-gate2 among them);
+  - components/sim 106 files, 1,773 passed (touchHintLifetime green, tools/ being present);
+  - orchestrator 41, 528; rules 101, 1,826; traffic 53, 675; runtime 48, 875;
+  - scene 47, 787 after the re-anchor (the first run: 1 failed suite of 47, the one above; the 746 tests that ran passed);
+  - vehicle 22, 299; world 135, 2,409; hud 70, 1,398; traces 170, 2,372;
+  - src/modules/clips/ 19, 302, the clip-plan freshness gate green with no regeneration (no grading change).
+- The merge verifier's runs, all to completion: src/modules/sim/lessons/ including scenario, 331 files, 7,481 passed, 166 skipped, the reviewed-text manifest green inside; and components/sim, hud, engine, scene, clips, app/(dashboard)/simulator, app/dev/popup-rig, devrig and environment, 286 files, 5,108 passed. engine/ is in this run; the integrator's list has no engine/ entry (its V1).
+- Reviewed-text manifest: green 49/49, not re-recorded (condition 3).
+- tsc (`npx tsc --noEmit --incremental false`): at its baseline, 21 errors, all environment (api/health/route.ts 4, lib/db.ts 1, the admin / auth / learning / outcomes / payments / privacy store.ts, lesson/progress.ts, sim/lessons/store.ts 2, sim/traces/attemptStore.ts 1), none in a touched file.
+- tools-tests (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what gate 4/4 of wave-cycle.sh runs): 2,029 tests, 2,006 pass, 8 fail, the same 8 in the merge verifier's own run.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured», frozen 1811 / tree 1822 captions).
+  - 7 are environment, each naming a gitignored or untracked asset that exists only in the main tree: build-redrive §9(a), §9(b), §9(d), §9(e), count-agreement.test.mjs and finding-reader.test.mjs («could not find .audit-frames/findings by walking up from this file or the cwd»; .audit-frames/ is in .gitignore:73), and lane-evidence.test.mjs («could not resolve the playwright package»).
+  - Re-run by the integrator with that environment supplied, read only, the main tree's git status md5 identical before and after: with cwd `E:\AI driver` the worktree's count-agreement + finding-reader + build-redrive gave 89/90, the one red being count-agreement's «apply-reroute.mjs printed no WORKED line» (apply-reroute resolves REPO from its own location and the worktree has no `.audit-frames/reroute.jsonl`); the main tree's own count-agreement.test.mjs (its tools/audit byte-identical to 6628342's) 14/14; lane-evidence with `KNIJKA_PLAYWRIGHT_ROOT="E:/AI driver/tools/clips/headless/"` 10/10, in the merge verifier's run too.
+  - No tools test was taught or edited, and neither patch touches tools/. The main-tree gate decides.
+- The worktree was left staged, with no temporary file and no process running; the merge verifier left HEAD at 6628342 and the staged diff sha unchanged.
+- Not re-run on 6628342 by the integrator or the merge verifier: the lane verifier's 2,434-cell census, its 240 s person hold, its hint matrix, and its mutants beyond those named above. Those numbers are the round-3 verifier's, measured on its own lane (230c7b8 + the r3 patch).
+
+**Owed.**
+- **The rig re-drive, right after the gate**, step-keyed through `/dev/drive-rig` on PC and on the phone lens:
+  - the end card of a stalled sc-follow-distance drive (K1, K2);
+  - the exam gate-2 drives: sc-park-parallel-exit/mistake-no-room L4 (short of the mark), sc-park-perp-rev L4 (no mark), and sc-rb-exit-signal/mistake-exit-no-signal L4 driven away from the ring;
+  - the hz E2 standstill and CUT-R;
+  - a person strike (sc-pe-jaywalker or sc-crossing-child-ball), read at bill +1 s, at +4.9 s and after the hold rises. No ribbon, chevron, marker, «Карай дотук» plate, ribbon legend or glance ping may be painted;
+  - the obedient-student drive: a strike at speed, rest more than 6 m on, stand 120 s or more, read every string, then «Прекрати урока»;
+  - a person bill followed by a static bill;
+  - a manual-tier stall after a hard stop following a person strike, then the gas: the stall cause plus the exit, with no «потегли».
+  The phone end card's first page is longer and must be re-photographed. Whether those frames close 1c7a07d8 or 7fa8b79e is for that wave's judge, under N2.
+- **The founder is told:**
+  - rulings N1–N18;
+  - the «в менюто» drop (N13);
+  - the ratified scope extensions (N17);
+  - Q11: should a training lesson END on its own at rest after a person strike? It is still his; until he answers, such a drive ends with «Прекрати урока» / «Завърши сесията».
+- **Recorded, not built:** the advisor-off gap and the 150 ms HUD poll (above).
+- **Recorded, not filed:** the docs agent's candidates (above), the gate-1 no-mark latch first.
+- **The tools/ tests on the main tree.** The main-tree gate decides.
+- **Not measured:** any of this on a device, and the glass between the bill frame and the first HUD poll.
+- **Not pinned on behaviour** (the two notPinned items, conditions 1 and 2): the C1 rule on any lesson but sc-merge-from-property L1–L3, the only cell where the round-3 census found pings after a strike; and the phone's compact legend line, which only source-text pins cover.

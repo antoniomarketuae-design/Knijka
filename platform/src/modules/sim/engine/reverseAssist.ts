@@ -116,8 +116,10 @@
  * and the two findings become admissible again.
  *
  * Pure state machine — no DOM, no React, fully unit-testable in Node. The
- * live-scene glue (LessonScene's RuntimeDriver) feeds it one frame of
- * FUNCTIONAL pedal state per render frame and executes emitted commands
+ * live-scene glue (LessonScene's `reverseAssistFrameStart`, stepped at the
+ * START of every render frame, before the frame's physics reads — see
+ * 2026-10-19 below) feeds it the frame's FUNCTIONAL pedal state with the
+ * source-timed transitions of its brake, and executes emitted commands
  * through the SAME DrivelineState API as the [ / ] keys (gearUp/gearDown,
  * one gate step at a time: D→N→R / R→N→D), so interlocks, DrivelineEvents,
  * the HUD telltales and the attempt recorder all see canonical selector
@@ -138,6 +140,7 @@
  */
 
 import type { VehicleInput, SelectorPosition, TransmissionMode } from "../vehicle";
+import { PedalLatch, spanReaches, TimedPedal, type PedalTiming, type PlacedStamp } from "./pedalTiming";
 
 /** |speed| below this (km/h) counts as a standstill for the hold rules. */
 export const REVERSE_ASSIST_STANDSTILL_KMH = 0.6;
@@ -153,8 +156,21 @@ export const REVERSE_ASSIST_HOLD_S = 0.35;
  * by accident while coming to rest: the keyboard ramp alone takes 0.2 s to
  * fall from 1 to 0 (input.ts BRAKE_RELEASE_S), so this is a real foot leaving
  * a real pedal. It is also longer than the drive rig's standstill duty cycle
- * (devrig/driveScript.ts STANDSTILL_BRAKE_OFF_S = 0.12 s), so a scripted wait
- * cannot arm it either.
+ * (devrig/driveScript.ts STANDSTILL_BRAKE_OFF_S = 0.12 s).
+ *
+ * CORRECTION 2026-10-18 / 2026-10-19 (sc-turn-left-oncoming:d0017a65): that
+ * last sentence was true only at 60 Hz. Until 2026-10-18 the lift was credited
+ * the WHOLE frame delta of every update that saw the pedal up, so on frames of
+ * 0.25 s or longer (a 4 fps phone, a stall, a GC hitch) the rig's 0.12 s off
+ * phase — sampled by one frame — counted as a lift of 0.25–0.5 s and DID arm:
+ * measured at 219ac1e, 40/40 sampling phases put the car in R at 4 fps, 0.37 s
+ * and 0.5 s frames, and the re-pressed brake drove it backwards. The round-1
+ * repair (the span between two frames that both saw the lift) still armed it
+ * on every frame from 0.26 to 0.45 s (verifier, F2): a frame's reads see only
+ * its end state, so the rig's pad looked lifted from one frame to the next.
+ * Since 2026-10-19 the lift is timed AT THE INPUT (engine/pedalTiming.ts); the
+ * rig's step-keyed pad is stamped at the physics step it applies its change
+ * at, so its 0.12 s lift is 0.12 s on every display and never arms.
  */
 export const REVERSE_ASSIST_LIFT_S = 0.25;
 /** Silence window (s) after any MANUAL selector shift ([ / ], touch sheet,
@@ -164,6 +180,120 @@ export const REVERSE_ASSIST_SUPPRESS_S = 2;
  *  cross this ~25 ms after key-down — see input.ts BRAKE_ATTACK_S). */
 export const REVERSE_ASSIST_PEDAL_ON = 0.1;
 
+/**
+ * ===========================================================================
+ * 2026-10-19 — THE LIFT AND THE PRESS ARE TIMED AT THE INPUT. Read this, and
+ * engine/pedalTiming.ts, before adding a clock here.
+ * ===========================================================================
+ * sc-turn-left-oncoming:d0017a65 (integrator rulings R1–R6, 2026-10-18/19).
+ *
+ * THE DEFECT. This machine is stepped once per RENDER frame with one pedal
+ * sample — the frame's last `rawBrake` — and it used to add the whole frame
+ * delta to whatever that sample showed: `liftS += dt` on a lifted frame,
+ * `holdS += dt` on a pressed one, the press's own rising-edge frame included.
+ * On a slow frame one sample of a 0.05–0.24 s lift at rest counted as a quarter
+ * second of lift (LAW 1 armed) and one sample of the re-press as 0.35 s of
+ * hold: D → N → R, labelled «assist», and the still-held brake became the
+ * reverse accelerator. Measured at 219ac1e, a 0.12 s touch lift at rest: 0/40
+ * phases R at 60/30/13/10/5 fps, 20/40 at 4 fps, 13/40 at 0.37 s frames, 10/40
+ * at 0.5 s. One drive, a different car by display (ADR-014).
+ *
+ * ROUND 1 (2026-10-18) credited only the span between two updates that both
+ * saw a state. That is still a rule about frames, and the verifier refuted it:
+ * a frame's reads see only the input's state at the frame's end, so a lift
+ * between two reads is invisible and a press can be counted whole — the rig's
+ * 0.22 s on / 0.12 s off pulse reached R on every frame from 0.26 to 0.45 s,
+ * and random touch pumping with every press and lift under 0.24 s reached R in
+ * 460–627 of 960 drives.
+ *
+ * THE RULE NOW (R4). The ruled gesture is a lift and a press of the STUDENT'S
+ * INPUT, so their lengths are times on the input's own clock. Every source
+ * stamps every brake transition itself — touch and mouse pads with the
+ * pointer event's timeStamp on a press and a release, the phone's drive pad
+ * SLID by the thumb with every coalesced sample of the move at its own time,
+ * each transition bounded by the sample before (round 3, R7 / R8), the
+ * keyboard with the RAW key's keydown / keyup timeStamp (not the ramp's
+ * output), a gamepad with the poll that saw it (bounded by the poll before),
+ * the drive rig's step-keyed pad with the physics step it applies at — and
+ * GatedSimInput keeps them as the FUNCTIONAL brake's log. This machine reads
+ * the log since its last update: a lift is release → the next press, a press
+ * is press → now, each a LOWER bound of the span the source observed
+ * (engine/pedalTiming.ts says what each source observes). So for the pointer
+ * press / release (on the drive pad, a press the pointerdown itself makes:
+ * the thumb put down inside the brake zone), the keys and the rig's pad a
+ * lift shorter than
+ * REVERSE_ASSIST_LIFT_S never arms and a press shorter than
+ * REVERSE_ASSIST_HOLD_S never shifts, on any frame length, jittered or
+ * stalling; for a coalesced slide the same holds for every lift and press that
+ * spans a sample (its crossings bounded by the scan period the pad learns from
+ * its own coalesced lists, round 4 R11 / R12 — engine/touch.ts), while a slid
+ * lift ending in a resting thumb can be UNDER-credited until that period is
+ * learned, and a lift ended by putting the thumb back down in the NEUTRAL
+ * zone and sliding in is credited only pointerdown − pointerup even once it is
+ * (the pointerdown exemption, kept: round 5, R15 — the ruled gesture made that
+ * way may not reach R); a POLLED source — a human's gamepad, a slide in a browser without
+ * getCoalescedEvents — never over-credits one short lift or press, but can
+ * miss a lift and a press both made between two polls (the stated limit,
+ * ADR-017 «Update 2026-11-01»). Every event source is judged on the events
+ * dispatched when the machine is stepped: a release still queued in the
+ * browser is not yet known, so a press ending within that dispatch latency of
+ * HOLD_S can still shift (the second stated limit, same ADR). The clock is this machine's own input
+ * clock — the sum of the frame deltas it is stepped with — so a paused lesson,
+ * which does not step it, accrues nothing, and a stall credits at most 0.5 s.
+ *
+ * ONE PRESS STILL MOVES THE CAR (R5, the 2026-08-11 ruling). The glue steps
+ * this machine at the START of the frame, before the frame's physics reads, so
+ * the frame on which a held press reaches REVERSE_ASSIST_HOLD_S is the frame
+ * whose physics steps are handed reverse throttle (ReversePedalMapper, source
+ * «assist»). It used to run after them, and with round 1's later shift a press
+ * that ended before the next frame's reads left the car standing in R.
+ *
+ * …AND IT DECIDES ON BOTH PEDALS AS OF THAT INSTANT (R20, 2026-11-01 round 6).
+ * Before the frame's reads, the last read()'s pedals are the PREVIOUS frame's.
+ * Rounds 2–5 read the brake from its source-timed log but left the both-pedals
+ * disarm on that stale throttle: after a render stall, W held one frame before
+ * it read 0.02 (under PEDAL_ON) while S, pressed 0.05 s into a 0.45 s stall,
+ * had already reached HOLD_S on its own key time — D → N → R with both pedals
+ * down, at 60 Hz and 144 Hz alike (landing integrator and merge verifier). The
+ * throttle is now the other pedal control's own source-timed log
+ * (`throttleTiming`), read through a latch (engine/pedalTiming.ts PedalLatch:
+ * down if it was down at ANY instant since the previous update), so a press the
+ * throttle overlapped anywhere in a stall is disarmed by the update that sees
+ * them, whatever the frame rate. The latch can disarm MORE than the overlap its
+ * log records (a throttle lifted just before the brake went down inside one
+ * interval also disarms it) — the safe side; it never disarms less than its
+ * log says.
+ *
+ * …WHATEVER LAW 2 SAYS OF THAT CONTROL (R24, 2026-11-02 round 7). Round 6's log
+ * left out a control while LAW 2 disowned it, and the disown is the LAST
+ * read()'s verdict on the keyboard ramp — a frame old at the frame's start. So
+ * after a hand-worked R → D shift with W held, W lifted, S pressed after a real
+ * lift and W pressed again before any read saw its ramp fall to PEDAL_ON, W was
+ * still «disowned» and not in the log: D → N → R with both keys down (60 Hz
+ * with a 0.15–0.3 s stall 20 of 20 phases; fixed 5 fps 13 of 20; the round-6
+ * verifier). W pressed again ALONE in such a stall shifted too. Two controls
+ * down is never the reverse gesture, whatever role LAW 2 gives them, so the
+ * log is the student's other pedal control as he holds it (LessonScene
+ * GatedSimInput.refreshFunctionalBrake). LAW 2's own job is unchanged.
+ *
+ * WHAT IT COSTS, PLAINLY. A lift must really last REVERSE_ASSIST_LIFT_S on
+ * every display (0.25 s, or longer on a stalling one, where a stall credits at
+ * most 0.5 s). A press shifts on the first frame that STARTS at least
+ * REVERSE_ASSIST_HOLD_S after it began, so a press of HOLD_S + one frame is
+ * sure to shift and move the car on that press: 60 Hz 0.367 s, 0.37 s frames
+ * 0.72 s, 0.5 s frames 0.85 s; the founder's gesture at HOLD_S + two frames has
+ * a frame to spare. The keyboard's lift and press are now the KEY's: the brake
+ * ramp no longer adds its 0.18 s release tail to the lift a key needs, nor its
+ * 25 ms attack to the press.
+ *
+ * Without a log (`brakeTiming` omitted — tools/mobile's simulators, the older
+ * unit tests) the machine is a polled source whose polls are its own updates:
+ * the round-1 observed span, as the degenerate case of the same rule.
+ *
+ * `engine/stuckStart.ts` borrows LAW 1's lift for its brake channel through
+ * the same TimedPedal on the same log, so the hint and the assist agree on what
+ * a lift is (R3).
+ */
 export type ReverseAssistCommand = "shiftToR" | "shiftToD";
 
 /**
@@ -185,31 +315,66 @@ export interface ReverseAssistFrame {
   /** FUNCTIONAL brake pedal 0..1 (post-remap: S/Down in D, W/Up in R). */
   brakePedal: number;
   /** FUNCTIONAL throttle pedal 0..1 — held throttle vetoes the toggle
-   *  (both pedals down is ambiguous input; the assist stays out of it). */
+   *  (both pedals down is ambiguous input; the assist stays out of it).
+   *  Read only when `throttleTiming` is omitted: one sample per update. */
   throttlePedal: number;
   /** Wall-clock frame delta, s (the caller's clamped render dt). */
   dtSec: number;
+  /**
+   * The FUNCTIONAL brake's source-timed transitions (GatedSimInput.brakeTiming,
+   * engine/pedalTiming.ts). When present the pedal is read from it and
+   * `brakePedal` is not; when omitted, `brakePedal` is one sample per update.
+   */
+  brakeTiming?: PedalTiming | null;
+  /**
+   * The other pedal control's source-timed transitions (GatedSimInput.
+   * throttleTiming, 2026-11-01 round 6, R20): the control that is not the
+   * functional brake's own channel, as the student holds it — NOT gated by
+   * LAW 2's disown (R24, round 7). When present the both-pedals disarm reads
+   * the throttle from it — down if it was down at any instant since the
+   * previous update (engine/pedalTiming.ts PedalLatch) — and `throttlePedal`
+   * is not read, so the throttle the disarm sees is as of this update, exactly
+   * as the brake is.
+   */
+  throttleTiming?: PedalTiming | null;
 }
 
 export class ReverseAssist {
-  private holdS = 0;
+  /** The functional brake as this machine reads it: its own input clock, the
+   *  edges since its last update, the standstill lift behind the press. */
+  private readonly pedal = new TimedPedal();
+  /** …and the other pedal control, as the student holds it whatever LAW 2's disown says (R24), for the both-pedals disarm (R20). */
+  private readonly throttle = new PedalLatch();
+  /** Where THIS armed press's hold is counted from — the press's own stamp,
+   *  or the update that resumed it (a gate reopened) — null when none. */
+  private holdFrom: PlacedStamp | null = null;
   private suppressS = 0;
-  /** Seconds the functional brake has been OFF while the car stood still. */
-  private liftS = 0;
-  /** Was the functional brake down last frame? (rising-edge detection) */
-  private pedalDown = false;
   /** LAW 1: may THIS press toggle direction? Set once, at the press, and
    *  cleared by anything that makes the press mean something else. */
   private armed = false;
+
+  /** The arm readout, read off the machine by the audit tools
+   *  (tools/mobile/lib/disarm-sim.mjs, path-follow.test.mjs T6.7b) and by
+   *  telemetry: the hold of the current armed press as of the last update, s. */
+  get holdS(): number {
+    if (this.holdFrom === null) return 0;
+    const now = this.pedal.now(this.holdFrom.clock);
+    return now === null ? 0 : Math.max(0, now - this.holdFrom.at);
+  }
+
+  /** …and the lift at a standstill so far, s. */
+  get liftS(): number {
+    return this.pedal.liftS;
+  }
 
   /** A MANUAL selector shift happened (any non-assist gearUp/gearDown —
    *  keys [ / ], the touch gear sheet, a cockpit hotspot): stay silent for
    *  REVERSE_ASSIST_SUPPRESS_S and drop any accumulated hold. */
   noteManualShift(): void {
     this.suppressS = REVERSE_ASSIST_SUPPRESS_S;
-    this.holdS = 0;
+    this.holdFrom = null;
     this.armed = false;
-    this.liftS = 0;
+    this.pedal.floorNow();
   }
 
   /**
@@ -227,54 +392,70 @@ export class ReverseAssist {
    * manual-shift silence) resets the hold timer; moving or an ambiguous
    * both-pedals frame also disarms the press outright, so it cannot resume.
    * Emitting disarms too: one gesture of the foot toggles direction once.
+   * Both lengths are timed at the input (see the 2026-10-19 note above).
    */
   update(f: ReverseAssistFrame): ReverseAssistCommand | null {
     const stopped = Math.abs(f.speedKmh) < REVERSE_ASSIST_STANDSTILL_KMH;
-    const down = f.brakePedal > REVERSE_ASSIST_PEDAL_ON;
+    this.pedal.step({
+      dtSec: f.dtSec,
+      stopped,
+      sampledDown: f.brakePedal > REVERSE_ASSIST_PEDAL_ON,
+      timing: f.brakeTiming,
+    });
+    const down = this.pedal.down;
+    // Stepped on EVERY update, the silence included, so its cursor is never
+    // behind: was the throttle down at any instant since the last update (R20)?
+    const throttleDown = this.throttle.step(f.throttleTiming, f.throttlePedal > REVERSE_ASSIST_PEDAL_ON);
 
     if (this.suppressS > 0) {
       this.suppressS = Math.max(0, this.suppressS - f.dtSec);
-      this.holdS = 0;
-      this.liftS = 0;
+      // No lift counts time spent in the silence, and a press spanning it
+      // stays unarmed (it has no press edge after the silence).
+      this.pedal.floorNow();
+      this.holdFrom = null;
       this.armed = false;
-      this.pedalDown = down; // a press spanning the silence stays unarmed
       return null;
     }
 
-    if (!down) {
-      // Pedal off. Time spent lifted AT A STANDSTILL is what earns the right
-      // to toggle on the next press; lifting it while still rolling does not.
-      this.liftS = stopped ? this.liftS + f.dtSec : 0;
-      this.holdS = 0;
+    if (this.pedal.releasedThisUpdate || !down) {
+      // Pedal off (or off and on again within this frame): whatever press was
+      // armed is over. Time spent lifted AT A STANDSTILL is what earns the
+      // right to toggle on the next press; lifting it while rolling does not.
+      this.holdFrom = null;
       this.armed = false;
-      this.pedalDown = false;
-      return null;
     }
+    if (!down) return null;
 
-    if (!this.pedalDown) {
-      // Rising edge — the one instant at which a press can be armed.
-      this.armed = stopped && this.liftS >= REVERSE_ASSIST_LIFT_S;
-      this.holdS = 0;
+    if (this.pedal.pressedThisUpdate) {
+      // The press began since the last update — the one moment it can be
+      // armed, on the lift that really preceded it.
+      this.armed = stopped && spanReaches(this.pedal.pressLiftS, REVERSE_ASSIST_LIFT_S);
+      this.holdFrom = this.armed ? this.pedal.pressStamp : null;
     }
-    this.pedalDown = true;
-    this.liftS = 0;
 
     // Moving, or both pedals down: this press is not (or is no longer) an
     // unambiguous request for the other direction. Disarm — a press that has
     // once meant "stop the car" must not become a shift when the car stops.
-    if (!stopped || f.throttlePedal > REVERSE_ASSIST_PEDAL_ON) {
+    if (!stopped || throttleDown) {
       this.armed = false;
-      this.holdS = 0;
+      this.holdFrom = null;
       return null;
     }
     if (!this.armed || (f.selector !== "D" && f.selector !== "R")) {
-      this.holdS = 0;
+      this.holdFrom = null;
       return null;
     }
 
-    this.holdS += f.dtSec;
-    if (this.holdS < REVERSE_ASSIST_HOLD_S) return null;
-    this.holdS = 0;
+    // Counted from the press's own instant — or, if a gate interrupted the
+    // count, from the first update it resumed at (only time watched counts).
+    const clock = this.pedal.pressStamp?.clock ?? "input";
+    if (this.holdFrom === null) {
+      const now = this.pedal.now(clock);
+      if (now === null) return null;
+      this.holdFrom = { clock, at: now, earliest: now };
+    }
+    if (!spanReaches(this.holdS, REVERSE_ASSIST_HOLD_S)) return null;
+    this.holdFrom = null;
     this.armed = false; // one press, one toggle — a fresh lift is required
     return f.selector === "D" ? "shiftToR" : "shiftToD";
   }

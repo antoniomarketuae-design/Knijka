@@ -8,12 +8,15 @@
 // substep on the pedals of that substep's read:
 //
 //  · THE FRAME (read off the product by path-disarm.test.mjs T14.0, as T6.7b's `productFrameOrder` reads it): ONE
-//    `delta` per frame; the physics substeps first — each a `SimInput.read()` then a step of FIXED_DT on the FUNCTIONAL
-//    pedals of that read (in R the swapped ones) — at `substepS` apart; then VehicleRig's read `readX × V` after them;
-//    then the ReverseAssist on the pedals of that last read with `dtSec = min(delta, 0.5)` and the car's forward speed
-//    AFTER this frame's physics (sample.speedKmh = sim.speedKmh); then the render (`renderX × V`). The probe
-//    (__camProbe.speedKmh, CameraRig mounted after RuntimeDriver) publishes that same speed. Two clocks: the ramps
-//    integrate the time between READS, the physics and the assist the frame delta.
+//    `delta` per frame; FIRST the ReverseAssist (since 2026-11-01, lane reverseatrest: ReverseAssistDriver's useFrame
+//    at REVERSE_ASSIST_FRAME_PRIORITY, below rapier's stepper) — handed the PREVIOUS frame's last-read pedals as samples it
+//    does not read — on the car's forward speed as the previous frame's physics left it (sample.speedKmh = sim.speedKmh), `dtSec = min(delta, 0.5)`
+//    and the functional brake's and throttle's source-timed logs (GatedSimInput.brakeTiming / throttleTiming: each key's
+//    own time; since round 6 the both-pedals disarm reads the throttle's, R20); then the physics
+//    substeps — each a `SimInput.read()` then a step of FIXED_DT on the FUNCTIONAL pedals of that read (in R the
+//    swapped ones), on the selector the assist just left — at `substepS` apart; then VehicleRig's read `readX × V`
+//    after them; then the render (`renderX × V`). The probe (__camProbe.speedKmh, CameraRig) publishes this frame's
+//    speed. Two clocks: the ramps integrate the time between READS, the physics and the assist the frame delta.
 //  · THE HUD: StatusDashboard's 100 ms snapshot of the selector and the rounded |v|, visible from the next frame.
 //  · THE HARNESS: lesson-audit.mjs `disarmReverse` on a pc-path leg, call for call — every page read a round trip
 //    (`rttHudMs`, read half-way through, once the page is idle), every key call `rttKeyMs` handled `keyLagX × rttKeyMs`
@@ -118,7 +121,8 @@ let firstPass = { key: null, anchors: null };
  * the machine's own `armed` and `holdS` after every update in D, `landings` the planner's `why` lines.
  */
 export function simulateDisarmOnPhysics(args) {
-  const { RA, ramps, fixedDt, physics, hudPhaseS, rttHudMs, rttKeyMs, keyLagX = 0.5, rttEvalMs = 2, frameS, dist = null, path = "first", rttRepressKeyMs = rttKeyMs, repressLagX = keyLagX, pollMs, flow = "landing", landing = null, frame = PRODUCT_FRAME, harness = HARNESS_DISARM, maxSettleS = 40, landingFlow = {} } = args;
+  const { RA, PT, ramps, fixedDt, physics, hudPhaseS, rttHudMs, rttKeyMs, keyLagX = 0.5, rttEvalMs = 2, frameS, dist = null, path = "first", rttRepressKeyMs = rttKeyMs, repressLagX = keyLagX, pollMs, flow = "landing", landing = null, frame = PRODUCT_FRAME, harness = HARNESS_DISARM, maxSettleS = 40, landingFlow = {}, assistModel = "product" } = args;
+  if (!["product", "throttleRamp", "frameEnd"].includes(assistModel)) throw new Error(`simulateDisarmOnPhysics: unknown assistModel ${JSON.stringify(assistModel)}`);
   if (!["first", "stop-first", "attempt2", "attempt3"].includes(path)) throw new Error(`simulateDisarmOnPhysics: unknown path ${JSON.stringify(path)}`);
   if (!["head", "landing"].includes(flow)) throw new Error(`simulateDisarmOnPhysics: unknown flow ${JSON.stringify(flow)}`);
   if (!Number.isFinite(pollMs)) throw new Error("simulateDisarmOnPhysics: pollMs (lesson-audit.mjs ARM_POLL_MS) is required");
@@ -127,7 +131,7 @@ export function simulateDisarmOnPhysics(args) {
   const LF = { stopFirstWatch: true, finalReadLands: true, ...landingFlow };
   let d = null;
   if (dist) {
-    const key = JSON.stringify({ ...args, RA: null, physics: String(args.physicsKey ?? ""), dist: null, landing: land.label ?? String(land) });
+    const key = JSON.stringify({ ...args, RA: null, PT: null, physics: String(args.physicsKey ?? ""), dist: null, landing: land.label ?? String(land) });
     // `anchors`: place the disturbance at times taken from ANOTHER run's undisturbed timeline — a per-condition
     // comparison of two disarms must disturb both at the same wall time, not each at its own anchor
     let a = args.anchors;
@@ -150,6 +154,28 @@ export function simulateDisarmOnPhysics(args) {
   const w = { t: 0, lastRead: 0, events: [], lastProc: 0, keys: { W: wHeld, S: false }, pW: wHeld ? 1 : 0, pS: 0, selector: "R", flips: "", hudPollAt: -hudPhaseS, hudPending: false, pendGear: "R", pendDial: 0, hudGear: "R", hudDial: 0, probeV: 0, anchors: {}, anchorOpen: false, pastKeys: 0, armedInD: 0, armSince: null, arms: 0, maxHoldS: 0, maxArmPageS: 0, maxKmh: 0, lastWDown: null, landings: [] };
   const ra = new RA.ReverseAssist();
   if (typeof ra.armed !== "boolean" || typeof ra.holdS !== "number") throw new Error("UNREADABLE: ReverseAssist.armed / holdS — the arm readout is read off the machine itself");
+  // THE FUNCTIONAL BRAKE'S SOURCE-TIMED LOG (LessonScene GatedSimInput.brakeLog, since 2026-11-01): the product's own
+  // PedalEdgeLog, one edge per change of the channel that is the brake now — W in R, S in D — stamped with the key's own
+  // time (SimInput.eventStamp: never after now, never before the previous stamp), and restamped at «now» when the remap
+  // flips with the selector. The assist reads it through `brakeTiming`, so a lift and a press are timed by the keys.
+  if (typeof PT?.PedalEdgeLog !== "function") throw new Error("UNREADABLE: pedalTiming.ts PedalEdgeLog — the assist's brake log is the product's own");
+  const brakeLog = new PT.PedalEdgeLog();
+  let lastStampMs = Number.NEGATIVE_INFINITY;
+  const logBrake = (ownMs) => {
+    const atMs = Math.max(ownMs, lastStampMs);
+    lastStampMs = atMs;
+    brakeLog.push({ atMs, earliestMs: ownMs, down: w.selector === "R" ? w.keys.W : w.keys.S });
+    throttleLog.push({ atMs, earliestMs: ownMs, down: w.selector === "R" ? w.keys.S : w.keys.W });
+  };
+  // …AND THE OTHER PEDAL CONTROL'S (GatedSimInput.throttleLog, since 2026-11-01 round 6, R20): the same stamps, the channel
+  // that is the throttle now — S in R, W in D — as the student holds it; since 2026-11-02 round 7 (R24) the product no
+  // longer gates it by LAW 2's disown, and this model has no hand-worked flip, so it was never gated here.
+  // The assist's both-pedals disarm reads it through `throttleTiming` (a latch:
+  // down if it was down at any instant since the previous update), so the throttle it sees is as of its decision, not the
+  // previous frame's ramped pedal — which, after a stall, was the stale value that let W held + S pressed shift to R.
+  const throttleLog = new PT.PedalEdgeLog();
+  logBrake(0);
+  let steps = 0;
   let nF = 0;
   let acc = 0;
   let gi = 0;
@@ -214,22 +240,18 @@ export function simulateDisarmOnPhysics(args) {
     while (w.events.length && w.events[0].at <= start) {
       const e = w.events.shift();
       w.keys[e.key] = e.down;
+      logBrake(e.at * 1000);
     }
-    const n = FR.n[i];
-    for (let j = 0; j < n; j++) {
-      read(start + j * FR.sub[i]);
+    // ONE TURN OF THE ASSIST. `timed`: the product since 2026-10-19 — both functional pedals from their source-timed
+    // logs (round 6, R20: the throttle too); else the frame-timed machine before it (one sample per update).
+    const assistTurn = (speedKmh, timed) => {
       const inR = w.selector === "R";
-      car.step(w.selector, inR ? w.pS : w.pW, inR ? w.pW : w.pS);
-    }
-    read(FR.readAt[i]);
-    const kmh = car.kmh();
-    if (Math.abs(kmh) > w.maxKmh) w.maxKmh = Math.abs(kmh);
-    if (FR.assist[i]) {
-      const inR = w.selector === "R";
-      const cmd = ra.update({ speedKmh: kmh, selector: w.selector, brakePedal: inR ? w.pW : w.pS, throttlePedal: inR ? w.pS : w.pW, dtSec: Math.min(Math.max(FR.delta[i], 0), 0.5) });
+      const clock = { nowMs: start * 1000, stepS: steps * fixedDt };
+      const cmd = ra.update({ speedKmh, selector: w.selector, brakePedal: inR ? w.pW : w.pS, throttlePedal: inR ? w.pS : w.pW, dtSec: Math.min(Math.max(FR.delta[i], 0), 0.5), ...(timed ? { brakeTiming: { log: brakeLog, ...clock } } : {}), ...(timed && assistModel === "product" ? { throttleTiming: { log: throttleLog, ...clock } } : {}) });
       if (cmd) {
         w.selector = cmd === "shiftToD" ? "D" : "R";
         w.flips += w.selector;
+        logBrake(start * 1000);
       }
       if (w.selector === "D" && ra.armed === true) {
         w.armedInD += 1;
@@ -239,7 +261,26 @@ export function simulateDisarmOnPhysics(args) {
         w.maxArmPageS = Math.max(w.maxArmPageS, start - w.armSince);
         w.armSince = null;
       }
+    };
+    // THE ASSIST'S TURN IS THE FIRST OF THE FRAME (LessonScene ReverseAssistDriver, REVERSE_ASSIST_FRAME_PRIORITY < 0,
+    // since 2026-11-01): before the physics substeps read, on the car's speed as the previous frame left it (sampleRef),
+    // the frame's sessionClockAdvance(delta), and BOTH pedals' source-timed logs (the samples it is also handed are the
+    // previous frame's last read, and unread); a command it emits is the selector THIS frame's physics steps on.
+    // `assistModel` (MUTATIONS, never the product): "throttleRamp" — the throttle read from the previous frame's ramp
+    // (the round-5 product, the stale-throttle false R); "frameEnd" — the machine before 2026-10-19, stepped AFTER the
+    // physics on the frame's last-read pedals and its post-physics speed, no logs.
+    if (FR.assist[i] && assistModel !== "frameEnd") assistTurn(w.probeV, true);
+    const n = FR.n[i];
+    for (let j = 0; j < n; j++) {
+      read(start + j * FR.sub[i]);
+      const inR = w.selector === "R";
+      car.step(w.selector, inR ? w.pS : w.pW, inR ? w.pW : w.pS);
     }
+    steps += n;
+    read(FR.readAt[i]);
+    const kmh = car.kmh();
+    if (Math.abs(kmh) > w.maxKmh) w.maxKmh = Math.abs(kmh);
+    if (FR.assist[i] && assistModel === "frameEnd") assistTurn(kmh, false);
     w.probeV = kmh;
     if (w.hudPending) { w.hudGear = w.pendGear; w.hudDial = w.pendDial; w.hudPending = false; }
     if (start - w.hudPollAt >= 0.1 - 1e-9) { w.hudPollAt = start; w.hudPending = true; w.pendGear = w.selector; w.pendDial = Math.round(Math.abs(kmh)); }
@@ -443,8 +484,8 @@ export const planLanding = (tune = DISARM_LANDING, { holdIgnoresGear = false } =
     { label: `plan:${JSON.stringify(tune)}:${holdIgnoresGear}` },
   );
 
-/** MUTATION — the brief's order: W up, THEN S (the same gates and hold); `awaited`: S sent once W's call resolved (default), or the two dispatched back to back. */
-export const liftThenBrakeLanding = (tune = DISARM_LANDING, { awaited = true } = {}) =>
+/** MUTATION — the brief's order: W up, THEN S (the same gates and hold); `awaited`: S sent once W's call resolved (default), or the two dispatched back to back; `holdIgnoresGear`: the hold blind to the gear (round 6, for T14.8). */
+export const liftThenBrakeLanding = (tune = DISARM_LANDING, { awaited = true, holdIgnoresGear = false } = {}) =>
   Object.assign(
     (ctx) => {
       const landed = pathLandingActions({ held: ctx.held, read: ctx.read, firstPress: ctx.firstPress === true, tune });
@@ -456,12 +497,13 @@ export const liftThenBrakeLanding = (tune = DISARM_LANDING, { awaited = true } =
       while (!hold.done) {
         ctx.wait(ctx.pollMs);
         const r = ctx.gearProbe();
-        hold = pathLandingHoldActions({ held: ctx.held, v: r.v, gear: r.gear, sinceLandS: ctx.now() - t0, tune });
+        // `holdIgnoresGear` (round 6): the hold blind to a gear that left D, as planLanding offers it — T14.8 compares the two
+        hold = pathLandingHoldActions({ held: ctx.held, v: holdIgnoresGear ? Math.abs(r.v) : r.v, gear: holdIgnoresGear ? null : r.gear, sinceLandS: ctx.now() - t0, tune });
         ctx.exec(hold.actions);
       }
-      return `MUTATION W-then-S: ${landed.why}`;
+      return hold.alarm ? `MUTATION W-then-S: ${landed.why}; ALARM ${hold.why}` : `MUTATION W-then-S: ${landed.why}`;
     },
-    { label: `lift-then-brake:${JSON.stringify(tune)}:${awaited}` },
+    { label: `lift-then-brake:${JSON.stringify(tune)}:${awaited}:${holdIgnoresGear}` },
   );
 
 /** MUTATION — S down AWAITED before W up (the pair not dispatched together): W is held one more key round trip. */

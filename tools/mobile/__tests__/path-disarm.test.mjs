@@ -44,10 +44,27 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, "..", "..", "..");
 const read = (...p) => readFileSync(resolve(REPO, ...p), "utf8").replace(/\r/g, "");
 const ENGINE = ["platform", "src", "modules", "sim", "engine"];
+/* reverseAssist.ts IMPORTS A VALUE SINCE 2026-11-01 (lane reverseatrest, sc-turn-left-oncoming:d0017a65): `./pedalTiming`,
+ * extensionless as everywhere in platform/src. Node's type stripping does not resolve an extensionless specifier, so the
+ * same resolve rule the physics loader below registers is registered BEFORE the machine is imported. */
+{
+  const { register } = await import("node:module");
+  const hook = [
+    "export async function resolve(specifier, context, next) {",
+    "  if ((specifier.startsWith('./') || specifier.startsWith('../')) && String(context.parentURL).includes('/platform/src/') && !/\\.[cm]?[jt]sx?$/.test(specifier)) {",
+    "    for (const ext of ['.ts', '/index.ts']) { try { return await next(specifier + ext, context); } catch { /* the next form */ } }",
+    "  }",
+    "  return next(specifier, context);",
+    "}",
+  ].join("\n");
+  register(`data:text/javascript,${encodeURIComponent(hook)}`);
+}
 let RA = null;
 let raWhy = null;
 try {
   RA = await import(pathToFileURL(resolve(REPO, ...ENGINE, "reverseAssist.ts")).href);
+  // the functional brake's edge log the scene hands the assist (GatedSimInput.brakeLog), the product's own class
+  RA = { ...RA, PT: await import(pathToFileURL(resolve(REPO, ...ENGINE, "pedalTiming.ts")).href) };
 } catch (err) {
   raWhy = `${err.name}: ${err.message}`;
 }
@@ -130,18 +147,18 @@ const productCar = (P, mode) => () => {
 
 const PATHS = ["first", "stop-first", "attempt2", "attempt3"];
 const HUD_MS = [...DISARM_LATENCIES_MS, ...DISARM_SLOW_HUD_MS];
-const base = () => ({ RA, ramps: productRamps(), fixedDt: FIXED_DT, pollMs: harnessPollMs() });
+const base = () => ({ RA, PT: RA?.PT, ramps: productRamps(), fixedDt: FIXED_DT, pollMs: harnessPollMs() });
 
 /**
  * RUN ONE GRID TWICE, condition by condition: the head disarm and the §10c disarm on the SAME condition, so (c) is a
  * per-condition comparison and never a comparison of distributions. `landing` / `landingFlow` select a mutation.
  */
-const compareGrid = (conds, { physics, physicsKey, landing = planLanding(), landingFlow = {}, withHead = true }) => {
+const compareGrid = (conds, { physics, physicsKey, landing = planLanding(), landingFlow = {}, withHead = true, assistModel = "product" }) => {
   const b = { runs: 0, shifted: 0, armedRuns: 0, maxHoldS: 0, holdAt: null, openArm: 0, asked: 0, ran: 0, notSettled: 0, pastKeys: 0, braked: 0, worse: 0, worstDeltaM: 0, worstAt: null, byKey: {}, shiftEx: [] };
   const common = base();
   let anchorsFor = { key: null, anchors: null };
   for (const c of conds) {
-    const args = { ...common, physics, physicsKey, hudPhaseS: c.hudPhaseS, frameS: 1 / c.hz, rttHudMs: c.rttHudMs, rttKeyMs: c.rttKeyMs, keyLagX: c.keyLagX, rttRepressKeyMs: c.rttRepressKeyMs ?? c.rttKeyMs, repressLagX: c.repressLagX ?? c.keyLagX, path: c.path, dist: c.dist };
+    const args = { ...common, assistModel, physics, physicsKey, hudPhaseS: c.hudPhaseS, frameS: 1 / c.hz, rttHudMs: c.rttHudMs, rttKeyMs: c.rttKeyMs, keyLagX: c.keyLagX, rttRepressKeyMs: c.rttRepressKeyMs ?? c.rttKeyMs, repressLagX: c.repressLagX ?? c.keyLagX, path: c.path, dist: c.dist };
     // ONE CONDITION, ONE WALL CLOCK: a disturbance lands at the time the §10c disarm's undisturbed run puts its anchor,
     // in BOTH runs — each run anchoring on its own timeline would compare two different disturbances
     let anchors;
@@ -205,18 +222,27 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
   it("T14.0 the product facts §10c rests on are where it reads them: the rising-edge arm and the liftS reset, the ramps' shared clock, the pedal priority, the probe's speed and its frame, the shared pause gate, the harness's disarm constants", () => {
     assert.ok(RA?.ReverseAssist, `UNREADABLE: the product's ReverseAssist could not be imported (${raWhy})`);
     const ra = read(...ENGINE, "reverseAssist.ts");
-    // step 4: armed is decided at the rising edge from `stopped` and liftS; liftS is zeroed by any update that sees motion with the pedal up
-    assert.match(ra, /if \(!down\) \{[\s\S]{0,400}?this\.liftS = stopped \? this\.liftS \+ f\.dtSec : 0;/, "UNREADABLE: ReverseAssist no longer resets liftS on an update that sees the car moving with the brake up");
-    assert.match(ra, /if \(!this\.pedalDown\) \{[\s\S]{0,200}?this\.armed = stopped && this\.liftS >= REVERSE_ASSIST_LIFT_S;/, "UNREADABLE: ReverseAssist no longer arms only at the rising edge from `stopped && liftS >= LIFT_S`");
-    assert.match(ra, /if \(!stopped \|\| f\.throttlePedal > REVERSE_ASSIST_PEDAL_ON\) \{\s*\n\s*this\.armed = false;/, "UNREADABLE: ReverseAssist no longer disarms a press on motion or a throttle above PEDAL_ON");
-    assert.match(ra, /this\.holdS \+= f\.dtSec;\s*\n\s*if \(this\.holdS < REVERSE_ASSIST_HOLD_S\) return null;/, "UNREADABLE: the hold that shifts is no longer REVERSE_ASSIST_HOLD_S of an armed press");
+    // step 4: armed is decided at the press's rising edge from `stopped` and the standstill lift behind it; the lift is the
+    // functional brake's TimedPedal (engine/pedalTiming.ts, lane reverseatrest 2026-11-01): timed by the brake's own log,
+    // counted from the standstill, and the standstill is dropped by any update that sees motion
+    assert.match(ra, /this\.pedal\.step\(\{\s*dtSec: f\.dtSec,\s*stopped,\s*sampledDown: f\.brakePedal > REVERSE_ASSIST_PEDAL_ON,\s*timing: f\.brakeTiming,\s*\}\);/, "UNREADABLE: ReverseAssist no longer steps its pedal with this update's standstill and the brake's timed log");
+    const pt = read(...ENGINE, "pedalTiming.ts");
+    assert.match(pt, /if \(!f\.stopped\) this\.still = null;\s*\n\s*else if \(this\.still === null\) this\.still = \{ input: this\.inS, step: this\.stepNowS \};/, "UNREADABLE: TimedPedal no longer drops the standstill (and with it the lift) on an update that sees the car moving");
+    assert.match(pt, /private liftUntil\(clock: PedalClock, end: number\): number \{\s*\n\s*if \(this\.still === null\) return 0;/, "UNREADABLE: TimedPedal's lift no longer begins at the observed standstill");
+    assert.match(ra, /if \(this\.pedal\.pressedThisUpdate\) \{[\s\S]{0,300}?this\.armed = stopped && spanReaches\(this\.pedal\.pressLiftS, REVERSE_ASSIST_LIFT_S\);/, "UNREADABLE: ReverseAssist no longer arms only at the rising edge from `stopped && pressLift >= LIFT_S`");
+    // since round 6 (R20) the throttle is the functional throttle's timed log through a latch (down at any instant since the
+    // last update), or the sample when no log is given
+    assert.match(ra, /const throttleDown = this\.throttle\.step\(f\.throttleTiming, f\.throttlePedal > REVERSE_ASSIST_PEDAL_ON\);/, "UNREADABLE: ReverseAssist no longer reads the throttle from its timed log (or the sample without one)");
+    assert.match(pt, /any = this\.wasDown \|\| lost \|\| log\.down \|\| edges\.some\(\(e\) => e\.down\);/, "UNREADABLE: PedalLatch no longer counts a throttle down at any instant since the last update");
+    assert.match(ra, /if \(!stopped \|\| throttleDown\) \{\s*\n\s*this\.armed = false;/, "UNREADABLE: ReverseAssist no longer disarms a press on motion or a throttle down");
+    assert.match(ra, /if \(!spanReaches\(this\.holdS, REVERSE_ASSIST_HOLD_S\)\) return null;/, "UNREADABLE: the hold that shifts is no longer REVERSE_ASSIST_HOLD_S of an armed press");
     // step 2: both pedals on one read clock, one clamp; S attacks no slower than W releases
     const ramps = productRamps();
     assert.ok(ramps.sAttack <= ramps.wRelease, `BRAKE_ATTACK_S ${ramps.sAttack} > THROTTLE_RELEASE_S ${ramps.wRelease}: at S's rising edge W may have fallen to 0 — §10c step 2 no longer holds; re-derive`);
     // step 3: the pedal priority — a throttle above zero drives and the brake is not read
     const vs = read("platform", "src", "modules", "sim", "vehicle", "VehicleSim.ts");
     assert.match(vs, /\} else if \(input\.throttle > 0\) \{\s*\n\s*if \(speedMs < -0\.5\) \{[\s\S]{0,300}?\} else if \(input\.brake > 0\) \{/, "UNREADABLE: VehicleSim's D branch no longer drives on a throttle above zero before it reads the brake");
-    // the probe the gate reads IS the assist's speed, after the same frame's physics
+    // the probe the gate reads IS the assist's speed: this frame's physics, which the assist reads at the next frame's start
     const cam = read("platform", "src", "components", "sim", "CameraRig.tsx");
     const probeAt = cam.indexOf("__camProbe = {");
     assert.ok(probeAt > 0, "UNREADABLE: CameraRig no longer publishes __camProbe");
@@ -224,12 +250,20 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
     assert.ok(cam.lastIndexOf("useFrame((state, delta) => {", probeAt) > 0, "UNREADABLE: __camProbe is no longer written in CameraRig's useFrame");
     assert.match(read("platform", "src", "modules", "sim", "scene", "vehicleSample.ts"), /out\.speedKmh = sim\.speedKmh;/, "UNREADABLE: the sample the assist reads is no longer VehicleSim's speedKmh");
     const scene = read("platform", "src", "components", "sim", "LessonScene.tsx");
-    const update = scene.indexOf("const cmd = reverseAssist.update({");
-    assert.ok(update > 0 && /speedKmh: sample\.speedKmh,/.test(scene.slice(update, update + 120)), "UNREADABLE: the assist no longer reads sample.speedKmh");
-    const frame = scene.lastIndexOf("useFrame((_, delta) => {", update);
+    // THE ASSIST'S TURN IS THE FIRST OF THE FRAME (lane reverseatrest, 2026-11-01): reverseAssistFrameStart, stepped by
+    // ReverseAssistDriver's useFrame at REVERSE_ASSIST_FRAME_PRIORITY (below rapier's stepper, priority 0: the vitest
+    // components/sim/__tests__/reverseAssistFrameOrder.test.ts pins R3F's and rapier's halves), on the sample's speed as
+    // the previous frame left it, the frame's sessionClockAdvance(delta) and the functional brake's timed log
+    const startFn = scene.indexOf("export function reverseAssistFrameStart(");
+    const update = scene.indexOf("const cmd = s.assist.update({", startFn);
+    assert.ok(startFn > 0 && update > startFn && /speedKmh: s\.speedKmh,/.test(scene.slice(update, update + 120)) && /brakeTiming: s\.input\?\.brakeTiming\(\) \?\? null,/.test(scene.slice(update, update + 400)), "UNREADABLE: reverseAssistFrameStart no longer steps the assist on the speed it is handed and the brake's timed log");
+    const driver = scene.indexOf("function ReverseAssistDriver(");
+    const frame = scene.indexOf("useFrame((_, delta) => {", driver);
     const pausedAt = scene.indexOf("if (paused) return;", frame);
-    const dtAt = scene.indexOf("const dt = sessionClockAdvance(delta);", frame);
-    assert.ok(frame > 0 && pausedAt > frame && dtAt > pausedAt && update > dtAt, "UNREADABLE: RuntimeDriver no longer returns on `paused` before it steps the assist on the frame delta");
+    const callAt = scene.indexOf("reverseAssistFrameStart({", frame);
+    const frameEnd = scene.indexOf("}, REVERSE_ASSIST_FRAME_PRIORITY);", callAt);
+    assert.ok(driver > 0 && frame > driver && pausedAt > frame && callAt > pausedAt && frameEnd > callAt && /speedKmh: sampleRef\.current\.speedKmh,\s*\n\s*dtSec: sessionClockAdvance\(delta\),/.test(scene.slice(callAt, frameEnd)), "UNREADABLE: ReverseAssistDriver no longer returns on `paused` before it steps the assist on the frame delta and the sample's speed, at REVERSE_ASSIST_FRAME_PRIORITY");
+    assert.match(scene, /^export const REVERSE_ASSIST_FRAME_PRIORITY = -\d+;$/m, "UNREADABLE: the assist's frame priority is no longer negative — below rapier's stepper");
     const phys = scene.indexOf("<Physics");
     const physEnd = scene.indexOf("</Physics>", phys);
     const rigAt = scene.indexOf("<VehicleRig", phys);
@@ -238,6 +272,8 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
     assert.ok(phys > 0 && rigAt > phys && driverAt > rigAt && camAt > driverAt && physEnd > camAt, "UNREADABLE: <VehicleRig>, <RuntimeDriver>, <CameraRig> are no longer mounted in that order inside <Physics>");
     assert.match(scene.slice(phys, rigAt), /paused=\{physicsPaused\}/, "UNREADABLE: <Physics> is no longer paused on physicsPaused");
     assert.match(scene.slice(driverAt, camAt), /paused=\{physicsPaused\}/, "UNREADABLE: RuntimeDriver is no longer paused on the same physicsPaused as the physics");
+    const assistAt = scene.indexOf("<ReverseAssistDriver", phys);
+    assert.ok(assistAt > phys && physEnd > assistAt && /paused=\{physicsPaused\}/.test(scene.slice(assistAt, scene.indexOf("/>", assistAt))), "UNREADABLE: <ReverseAssistDriver> is no longer mounted inside <Physics>, paused on the same physicsPaused as the physics");
     // the assist exists only on the automatic box: the manual tier has no gesture to disarm
     assert.match(read("platform", "src", "modules", "sim", "vehicle", "driveline.ts"), /return mode === "advanced" \? "manual" : "automatic";/, "UNREADABLE: which tier is manual");
     // the harness's disarm constants the simulator runs
@@ -443,11 +479,28 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
    *  · both at once (W then S, no gate): the gear SHIFTS back to R;
    *  · the pair awaited key by key instead of dispatched: some conditions roll further than the head disarm ((c));
    *  · the stop-first loop's read not watching the cluster: the stop-first path rolls as far as the head disarm does.
-   * The coast bound's own mutation needs keys past the bound to show anything and is T14.7's. */
-  it("T14.6 mutations: W-then-S arms, no gate arms, both together shift the gear, the awaited pair rolls further than the head disarm, an unwatched stop-first press drives the car tens of metres", () => {
+   * The coast bound's own mutation needs keys past the bound to show anything and is T14.7's.
+   *
+   * RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22). On the product since 2026-10-19 the press is
+   * timed at S's KEY (its source-timed log) and decided at the frame's start, and since round 6 the both-pedals disarm
+   * reads the throttle the same way (R20). On that timing each of §10c's two arguments is, ALONE, enough on a free car:
+   *  · W up then S with the gates kept arms NOTHING — the gate alone carries it (S lands while the car is above the gate,
+   *    and LAW 1 counts a lift only at an observed standstill); the order is load-bearing where no gate can help, a car
+   *    pinned by a body ahead — T14.8, where W-then-S shifts;
+   *  · the gates removed with the order kept arms NOTHING — the order alone carries it (S's key-down lands under a held W,
+   *    and the update that sees them disarms the press: R20's throttle latch);
+   *  · both removed (W then S, no gate) DOES arm — so the grid sees an arm on the new timing, and «W up then S arms
+   *    nothing» is shown to rest on the gate: the gate removed, the same order arms.
+   * «No gate arms» and «both shift» were measured on the FRAME-TIMED machine (one sample per frame, after the physics,
+   * before 2026-10-19); they are kept as claims about that machine (assistModel "frameEnd": the assist after the
+   * physics on the frame's last-read pedals, no logs), where they still bite — so «the order alone carries it» is shown
+   * to rest on the input timing, and the grid shows a shift. «W up then S arms» does NOT bite there any more either: its
+   * arms were the whole-frame lift credit this lane removed in round 1 (that machine's sampled path now counts only the
+   * span two updates both saw), so it is not kept; on a car PINNED by a body ahead W up then S does shift (T14.8). */
+  it("T14.6 mutations: on the input-timed product each of §10c's arguments alone keeps a free car unarmed (W up then S with the gates; no gate with the order) and the two removed together arm; on the frame-timed machine no gate arms and both shift; the awaited pair rolls further than the head disarm; an unwatched stop-first press drives the car tens of metres", () => {
     const physics = () => plantLongitudinal({ fixedDt: FIXED_DT });
     const conds = mutationConds();
-    const run = (landing, landingFlow = {}) => compareGrid(conds, { physics, physicsKey: "plant", landing, landingFlow });
+    const run = (landing, landingFlow = {}, assistModel = "product") => compareGrid(conds, { physics, physicsKey: "plant", landing, landingFlow, assistModel });
     const noGate = { ...DISARM_LANDING, brakeFirstKmh: 0, brakeCoastKmh: 0 };
     const shipped = run(planLanding());
     const lift = run(liftThenBrakeLanding());
@@ -455,12 +508,18 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
     const both = run(liftThenBrakeLanding(noGate));
     const awaited = run(awaitedPairLanding());
     const unwatched = run(planLanding(), { stopFirstWatch: false });
+    // the frame-timed machine (MUTATION of the product's timing: the assist after the physics, one sample per frame)
+    const gatelessFT = run(planLanding(noGate), {}, "frameEnd");
+    const bothFT = run(liftThenBrakeLanding(noGate), {}, "frameEnd");
     const line = (n, x) => `${n}: shifted ${x.shifted}, armed ${x.armedRuns} (worst hold ${(x.maxHoldS * 1000).toFixed(1)} ms), worse than head ${x.worse} (+${x.worstDeltaM.toFixed(3)} m)`;
-    console.log(`T14.6 over ${conds.length} conditions — ${[line("shipped", shipped), line("W up then S (awaited)", lift), line("no gate", gateless), line("W then S, no gate", both), line("pair awaited", awaited), line("stop-first unwatched", unwatched)].join(" · ")}`);
+    console.log(`T14.6 over ${conds.length} conditions — ${[line("shipped", shipped), line("W up then S (awaited)", lift), line("no gate", gateless), line("W then S, no gate", both), line("pair awaited", awaited), line("stop-first unwatched", unwatched), line("frame-timed no gate", gatelessFT), line("frame-timed W then S, no gate", bothFT)].join(" · ")}`);
     assert.deepEqual([shipped.shifted, shipped.armedRuns, shipped.worse], [0, 0, 0], "the shipped landing on the mutation subset");
-    assert.ok(lift.armedRuns > 0, "MUTATION W up then S never armed a press — the order argument is not load-bearing on this grid");
-    assert.ok(gateless.armedRuns > 0, "MUTATION the gate removed never armed a press — the motion argument is not load-bearing on this grid");
-    assert.ok(both.shifted > 0, "MUTATION W then S with no gate never shifted the gear — the grid cannot see a shift");
+    assert.deepEqual([lift.shifted, lift.armedRuns], [0, 0], "W up then S with the gates armed or shifted on the input-timed product — the gate alone no longer carries a free car");
+    assert.deepEqual([gateless.shifted, gateless.armedRuns], [0, 0], "the gates removed, the order kept, armed or shifted on the input-timed product — the order (S's key under a held W) alone no longer carries it");
+    assert.ok(both.armedRuns > 0, "MUTATION W then S with no gate never armed a press on the input-timed product — the grid cannot see an arm");
+    assert.ok(both.maxHoldS < RA.REVERSE_ASSIST_HOLD_S, `W then S with no gate held an armed press ${both.maxHoldS} s on a free car — re-measure (it shifts under contact: T14.8)`);
+    assert.ok(gatelessFT.armedRuns > 0, "MUTATION (frame-timed machine) the gate removed never armed a press — the motion argument is not load-bearing on this grid");
+    assert.ok(bothFT.shifted > 0, "MUTATION (frame-timed machine) W then S with no gate never shifted the gear — the grid cannot see a shift");
     assert.ok(awaited.worse > 0, "MUTATION the awaited pair never rolled further than the head disarm — dispatching in order is not load-bearing for (c)");
     const stopFirst = (x) => Math.max(...Object.entries(x.byKey).filter(([k]) => k.startsWith("stop-first")).flatMap(([, v]) => v.it));
     assert.ok(stopFirst(unwatched) >= 10 && stopFirst(unwatched) > 5 * stopFirst(shipped), `MUTATION the unwatched stop-first press rolled only ${stopFirst(unwatched)} m (watched ${stopFirst(shipped)} m)`);
@@ -473,8 +532,15 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
    *    bound (a 1500 ms call resolving before its key, three times late), a car found just above the flip gate on a
    *    re-press is braked into an armed press when the coast gate is the flip gate, and not with the shipped gate.
    *  · dispatch order — S's key-down reaches the page before W's key-up: path-follow-wiring.test.mjs W-22 pins the
-   *    helpers; here the reversed order is T14.6's W-then-S, which shifts. */
-  it("T14.7 dependencies: ARM_POLL_MS 0 arms nothing; keys handled past the coast bound arm a re-press brake only under a gate below the bound", () => {
+   *    helpers; here the reversed order is T14.6's W-then-S, which shifts.
+   * RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22): the coast bound is NO LONGER a dependency of the
+   * arm. On the input-timed product the re-press brake's S key-down lands under the held re-press W, and since round 6
+   * the both-pedals disarm reads the throttle from its source-timed log (R20), so with keys far past the bound nothing
+   * arms under either gate. The 5 arms this case used to show under the low gate on the round-5 product were the
+   * stale-throttle false R itself (the throttle read from the previous frame's ramp after a long frame); they are kept
+   * as the sensitivity — the same grid with that read put back (assistModel "throttleRamp", everything else the new
+   * timing) arms — and the frame-timed machine arms there too. */
+  it("T14.7 dependencies: ARM_POLL_MS 0 arms nothing; keys handled past the coast bound arm nothing under either gate on the input-timed product, and arm under the low gate when the throttle is read from the previous frame's ramp (the round-5 stale throttle) or by the frame-timed machine", () => {
     const physics = () => plantLongitudinal({ fixedDt: FIXED_DT });
     const conds = [];
     for (const path of PATHS) for (const hudPhaseS of [0, 0.04]) for (const hz of [144, 30, 12]) for (const rttHudMs of [2, 90, 2000]) for (const rttKeyMs of DISARM_LATENCIES_MS) for (const keyLagX of DISARM_KEY_LAG_X) conds.push({ path, hudPhaseS, hz, rttHudMs, rttKeyMs, keyLagX, dist: null });
@@ -489,17 +555,20 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
     // past the coast bound: re-press paths, keys of 1500 ms resolving before they are handled (lag 3 → 4.5 s)
     const slow = [];
     for (const path of ["attempt2", "attempt3", "stop-first"]) for (const hudPhaseS of [0, 0.02, 0.04, 0.06, 0.08]) for (const hz of [144, 60, 30, 12]) for (const rttHudMs of [2, 30, 90, 250]) for (const rttKeyMs of [2, 30]) slow.push({ path, hudPhaseS, hz, rttHudMs, rttKeyMs, rttRepressKeyMs: 1500, keyLagX: 1, repressLagX: 3, dist: null });
-    const past = { lowGate: { shifted: 0, armed: 0 }, shipped: { shifted: 0, armed: 0 } };
-    for (const c of slow) for (const [name, landing] of [["lowGate", planLanding({ ...DISARM_LANDING, brakeCoastKmh: DISARM_LANDING.brakeFirstKmh })], ["shipped", planLanding()]]) {
-      const it = simulateDisarmOnPhysics({ ...common, physics, physicsKey: "plant", hudPhaseS: c.hudPhaseS, frameS: 1 / c.hz, rttHudMs: c.rttHudMs, rttKeyMs: c.rttKeyMs, keyLagX: c.keyLagX, rttRepressKeyMs: c.rttRepressKeyMs, repressLagX: c.repressLagX, path: c.path, flow: "landing", landing });
+    const past = { lowGate: { shifted: 0, armed: 0 }, shipped: { shifted: 0, armed: 0 }, lowGateStale: { shifted: 0, armed: 0 }, lowGateFrameTimed: { shifted: 0, armed: 0 } };
+    const lowGate = planLanding({ ...DISARM_LANDING, brakeCoastKmh: DISARM_LANDING.brakeFirstKmh });
+    for (const c of slow) for (const [name, landing, assistModel] of [["lowGate", lowGate, "product"], ["shipped", planLanding(), "product"], ["lowGateStale", lowGate, "throttleRamp"], ["lowGateFrameTimed", lowGate, "frameEnd"]]) {
+      const it = simulateDisarmOnPhysics({ ...common, assistModel, physics, physicsKey: "plant", hudPhaseS: c.hudPhaseS, frameS: 1 / c.hz, rttHudMs: c.rttHudMs, rttKeyMs: c.rttKeyMs, keyLagX: c.keyLagX, rttRepressKeyMs: c.rttRepressKeyMs, repressLagX: c.repressLagX, path: c.path, flow: "landing", landing });
       if (it.shiftedBack) past[name].shifted += 1;
       if (it.armedInD) past[name].armed += 1;
     }
-    console.log(`T14.7 ARM_POLL_MS 0 over ${conds.length}: shifted ${poll0.shifted}, armed ${poll0.armed}, braked ${poll0.braked} · keys past the coast bound over ${slow.length}: coast gate = flip gate shifted ${past.lowGate.shifted} / armed ${past.lowGate.armed}; shipped gate shifted ${past.shipped.shifted} / armed ${past.shipped.armed}`);
+    console.log(`T14.7 ARM_POLL_MS 0 over ${conds.length}: shifted ${poll0.shifted}, armed ${poll0.armed}, braked ${poll0.braked} · keys past the coast bound over ${slow.length}: coast gate = flip gate shifted ${past.lowGate.shifted} / armed ${past.lowGate.armed}; shipped gate shifted ${past.shipped.shifted} / armed ${past.shipped.armed}; MUTATIONS under the low gate: the throttle from the previous frame's ramp shifted ${past.lowGateStale.shifted} / armed ${past.lowGateStale.armed}, the frame-timed machine shifted ${past.lowGateFrameTimed.shifted} / armed ${past.lowGateFrameTimed.armed}`);
     assert.deepEqual([poll0.shifted, poll0.armed], [0, 0], "ARM_POLL_MS 0 armed or shifted — the poll became a dependency");
     assert.ok(poll0.braked > conds.length / 10, "the poll sweep barely braked");
-    assert.ok(past.lowGate.shifted + past.lowGate.armed > 0, "keys past the coast bound never armed even under a gate below it — this case cannot show the bound is load-bearing");
-    assert.deepEqual([past.shipped.shifted], [0], "the shipped gate shifted with keys past the coast bound");
+    assert.deepEqual([past.lowGate.shifted, past.lowGate.armed], [0, 0], "keys past the coast bound armed or shifted under the low gate on the input-timed product — a re-press brake's press that begins under the held W is no longer disarmed (R20)");
+    assert.ok(past.lowGateStale.armed > 0, "MUTATION the throttle read from the previous frame's ramp never armed past the coast bound under the low gate — this case cannot see the round-5 stale-throttle arm");
+    assert.ok(past.lowGateFrameTimed.armed > 0, "MUTATION (frame-timed machine) keys past the coast bound never armed under the low gate — this case cannot see the arm the bound was derived against");
+    assert.deepEqual([past.shipped.shifted, past.shipped.armed], [0, 0], "the shipped gate shifted or armed with keys past the coast bound");
   });
 
   /* T14.8 THE DEPENDENCY THAT IS NOT A LATENCY: THE CAR MUST BE FREE TO ROLL FORWARD (found 2026-09-17 while re-measuring).
@@ -512,37 +581,55 @@ describe("T14 the disarm's landing on a car that moves (path-follow.mjs §10c)",
    * (3) pins the consequence bound: the hold lifts S at its first read of R or of backward motion (`alarm`) — or had
    * already lifted it on a rest read before the shift was handled — and the reverse it allowed is far shorter than with a
    * hold blind to the gear, which keeps R's accelerator down until maxHoldS. It is a dependency, not a proof: nothing here makes
-   * a contact during the landing safe. */
-  it("T14.8 contact during the landing (a body 0.05–0.6 m ahead): the §10c brake can shift the gear — only with a disturbance and a HUD read slower than 2 ms — the head disarm never does, and the hold's own read releases S, so the reverse is far shorter than a hold blind to the gear allows", () => {
+   * a contact during the landing safe.
+   *
+   * RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22). On the input-timed product the press is timed at
+   * S's KEY and the both-pedals disarm reads the throttle from its source-timed log (R20): S's key-down lands while W's
+   * key is still held, so the §10c landing cannot arm even a car PINNED by a body ahead — the free-car dependency is no
+   * longer load-bearing, and on this grid the §10c landing shifts NOTHING. What carries a pinned car now is the ORDER
+   * (S down before W up): the same contact runs with W lifted before S (MUTATION, liftThenBrakeLanding) DO shift, and
+   * there the consequence bound still holds — the hold's alarm lifts S at its first read of R or of backward motion, so
+   * the reverse is shorter than with a hold blind to the gear. The old claims (the §10c landing shifts under contact,
+   * only with a disturbance and never at a 2 ms HUD read) are kept as claims about the FRAME-TIMED machine (assistModel
+   * "frameEnd"), where they still bite. */
+  it("T14.8 contact during the landing (a body 0.05–0.6 m ahead): on the input-timed product the §10c brake never shifts the gear (S's key lands under the held W) and the head disarm never does; W lifted before S does shift, and its hold's own read releases S, so the reverse is shorter than a hold blind to the gear allows; on the frame-timed machine the §10c brake shifts only with a disturbance and a HUD read slower than 2 ms", () => {
     const common = base();
     const dists = disarmDisturbances();
-    const book = { plan: { runs: 0, shifted: 0, undisturbedShift: 0, fastHudShift: 0, alarmed: 0, worstBackM: 0, at: null }, blind: { shifted: 0, worstBackM: 0 }, head: { shifted: 0 } };
-    const byHud = {};
+    const newBook = () => ({ runs: 0, shifted: 0, armed: 0, undisturbedShift: 0, fastHudShift: 0, alarmed: 0, worstBackM: 0, at: null, byHud: {} });
+    const book = { plan: newBook(), blind: newBook(), head: newBook(), swapped: newBook(), swappedBlind: newBook(), frameTimed: newBook() };
+    const note = (b, r, c) => {
+      b.runs += 1;
+      if (r.armedInD) b.armed += 1;
+      if (!r.shiftedBack) return;
+      b.shifted += 1;
+      if (!c.dist) b.undisturbedShift += 1;
+      if (c.rttHudMs === 2) b.fastHudShift += 1;
+      if (r.landings.some((l) => /ALARM/.test(l))) b.alarmed += 1;
+      const hb = (b.byHud[c.rttHudMs] ??= { shifted: 0, worstBackM: 0 });
+      hb.shifted += 1;
+      hb.worstBackM = Math.max(hb.worstBackM, r.contact.backM);
+      if (r.contact.backM > b.worstBackM) { b.worstBackM = r.contact.backM; b.at = c; }
+    };
     for (const wallM of [0.05, 0.3, 0.6]) for (const hz of [144, 12]) for (const rttHudMs of [2, 90, 250, 2000]) for (const rttKeyMs of [2, 250]) for (const keyLagX of [0.5, 3]) for (const dist of dists) {
+      const c = { wallM, hz, rttHudMs, rttKeyMs, keyLagX, dist };
       const args = { ...common, physicsKey: `wall-${wallM}`, hudPhaseS: 0, frameS: 1 / hz, rttHudMs, rttKeyMs, keyLagX, path: "first", dist };
       const physics = () => plantLongitudinal({ fixedDt: FIXED_DT, wallM });
-      const it = simulateDisarmOnPhysics({ ...args, physics, flow: "landing" });
-      const blind = simulateDisarmOnPhysics({ ...args, physics, flow: "landing", landing: planLanding(DISARM_LANDING, { holdIgnoresGear: true }) });
-      const head = simulateDisarmOnPhysics({ ...args, physics, flow: "head", landing: headLanding });
-      book.plan.runs += 1;
-      if (it.shiftedBack) {
-        book.plan.shifted += 1;
-        if (!dist) book.plan.undisturbedShift += 1;
-        if (rttHudMs === 2) book.plan.fastHudShift += 1;
-        if (it.landings.some((l) => /ALARM/.test(l))) book.plan.alarmed += 1;
-        const hb = (byHud[rttHudMs] ??= { shifted: 0, worstBackM: 0 });
-        hb.shifted += 1;
-        hb.worstBackM = Math.max(hb.worstBackM, it.contact.backM);
-        if (it.contact.backM > book.plan.worstBackM) { book.plan.worstBackM = it.contact.backM; book.plan.at = { wallM, hz, rttHudMs, rttKeyMs, keyLagX, dist }; }
-      }
-      if (blind.shiftedBack) { book.blind.shifted += 1; book.blind.worstBackM = Math.max(book.blind.worstBackM, blind.contact.backM); }
-      if (head.shiftedBack) book.head.shifted += 1;
+      note(book.plan, simulateDisarmOnPhysics({ ...args, physics, flow: "landing" }), c);
+      note(book.blind, simulateDisarmOnPhysics({ ...args, physics, flow: "landing", landing: planLanding(DISARM_LANDING, { holdIgnoresGear: true }) }), c);
+      note(book.head, simulateDisarmOnPhysics({ ...args, physics, flow: "head", landing: headLanding }), c);
+      note(book.swapped, simulateDisarmOnPhysics({ ...args, physics, flow: "landing", landing: liftThenBrakeLanding() }), c);
+      note(book.swappedBlind, simulateDisarmOnPhysics({ ...args, physics, flow: "landing", landing: liftThenBrakeLanding(DISARM_LANDING, { holdIgnoresGear: true }) }), c);
+      note(book.frameTimed, simulateDisarmOnPhysics({ ...args, assistModel: "frameEnd", physics, flow: "landing" }), c);
     }
-    console.log(`T14.8 contact over ${book.plan.runs} runs: §10c shifted ${book.plan.shifted} (undisturbed ${book.plan.undisturbedShift}, at a 2 ms HUD ${book.plan.fastHudShift}; S released by the hold's alarm in ${book.plan.alarmed}), worst reverse after contact ${book.plan.worstBackM.toFixed(2)} m at ${JSON.stringify(book.plan.at)}; by HUD round trip ${JSON.stringify(byHud)} · hold blind to the gear: shifted ${book.blind.shifted}, worst reverse ${book.blind.worstBackM.toFixed(2)} m · head disarm shifted ${book.head.shifted}`);
-    assert.ok(book.plan.shifted > 0, "no contact run shifted — this case cannot show the free-car dependency is load-bearing");
+    const line = (n, b) => `${n}: shifted ${b.shifted} of ${b.runs}, armed ${b.armed} (undisturbed ${b.undisturbedShift}, at a 2 ms HUD ${b.fastHudShift}; S released by the hold's alarm in ${b.alarmed}), worst reverse after contact ${b.worstBackM.toFixed(2)} m at ${JSON.stringify(b.at)}; by HUD round trip ${JSON.stringify(b.byHud)}`;
+    console.log(`T14.8 contact — ${[line("§10c", book.plan), line("§10c, hold blind to the gear", book.blind), line("head disarm", book.head), line("MUTATION W up then S", book.swapped), line("MUTATION W up then S, hold blind to the gear", book.swappedBlind), line("frame-timed machine, §10c", book.frameTimed)].join(" · ")}`);
+    assert.deepEqual([book.plan.shifted, book.plan.armed], [0, 0], "the §10c landing armed or shifted under contact on the input-timed product — S's key-down under the held W no longer disarms the press");
+    assert.deepEqual([book.blind.shifted, book.blind.armed], [0, 0], "the §10c landing with a hold blind to the gear armed or shifted under contact on the input-timed product");
     assert.equal(book.head.shifted, 0, "the head disarm shifted under contact — it presses no S; the simulator is wrong");
-    assert.equal(book.plan.undisturbedShift, 0, "an UNDISTURBED contact run shifted — the exposure is wider than §10c states");
-    assert.equal(book.plan.fastHudShift, 0, "a contact run shifted at a 2 ms HUD read — the exposure is wider than §10c states");
-    assert.ok(book.plan.worstBackM < book.blind.worstBackM, `the alarm does not shorten the reverse (${book.plan.worstBackM} m vs a blind hold's ${book.blind.worstBackM} m)`);
+    assert.ok(book.swapped.shifted > 0, "MUTATION W up then S never shifted under contact — this case cannot show the order is load-bearing for a pinned car");
+    assert.ok(book.swapped.alarmed > 0 && book.swapped.worstBackM < book.swappedBlind.worstBackM, `MUTATION W up then S: the alarm does not shorten the reverse (${book.swapped.worstBackM} m vs a blind hold's ${book.swappedBlind.worstBackM} m; alarmed ${book.swapped.alarmed})`);
+    assert.ok(book.frameTimed.shifted > 0, "MUTATION (frame-timed machine) no contact run shifted — this case cannot show the free-car dependency the frame-timed machine had");
+    assert.equal(book.frameTimed.undisturbedShift, 0, "(frame-timed machine) an UNDISTURBED contact run shifted — the exposure is wider than §10c stated");
+    assert.equal(book.frameTimed.fastHudShift, 0, "(frame-timed machine) a contact run shifted at a 2 ms HUD read — the exposure is wider than §10c stated");
   });
 });

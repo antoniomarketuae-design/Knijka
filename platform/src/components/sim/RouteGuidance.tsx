@@ -54,7 +54,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { VehicleSample } from "@/modules/sim/contracts";
-import { shownObjectiveCapKmh, type LessonSpec } from "@/modules/sim/lessons";
+import {
+  routeGuidanceStandsDown,
+  shownObjectiveCapKmh,
+  type LessonSpec,
+  type RouteHold,
+} from "@/modules/sim/lessons";
 import { publishRoadProbeRoute, type RoadProbeHost } from "@/modules/sim/devrig";
 import {
   LOOKAHEAD_MAX_LEGS,
@@ -993,6 +998,39 @@ export function makeLabelTexture(
   return tex;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AFTER A PERSON STRIKE THE WORLD STOPS POINTING THE ROUTE (lane endings2,
+ * round 3, integrator ruling N14; verifier round-2 finding R2-1).
+ *
+ * THE DEFECT. From the bill frame of a scored COLLISION with a pedestrian or a
+ * cyclist every surface on the glass says «След удара в човек — не
+ * продължавай…» (`personHoldCopy`, lessons/advisor.ts) — and this layer kept
+ * drawing the ribbon, the turn chevron and the goal marker, whose painted plate
+ * reads «Карай дотук» for a reachZone (`guidanceRoute.ts`). Measured on the
+ * round-2 tree: that plate was the active goal's on 32 of the 47 person-strike
+ * census cells, about 22 of them inside its full-strength band (30–56 m) at
+ * the bill pose. The world was teaching the next move of the drive under a
+ * banner that forbids it.
+ *
+ * THE RULE. While the shell's hold is "personStruck" the whole layer is
+ * HIDDEN — the root group's `visible`, which three applies to every descendant:
+ * ribbon, chevron, chevron pool, marker shaft, pool, ring, stop bar, sign post
+ * and plate. It is NOT unmounted: the route is still derived on every
+ * objective change and reroute, `publishRoadProbeRoute` still hands it to the
+ * drive rig exactly as before, the loss watch still runs, and nothing graded
+ * reads this layer. The person hold never clears (`personStruckAtSec` is
+ * latched), so the layer stays hidden for the rest of the drive.
+ *
+ * NARROW. Only "personStruck". `crashPinned` and `offRoad` keep the guidance:
+ * there the recovery IS the way back onto the route (the off-road card says
+ * „върни се на платното"), and the ribbon is what shows where that is. The
+ * predicate is `routeGuidanceStandsDown` in lessons/advisor.ts — one reading
+ * for this layer, the shadow ribbon and the shell's legend — re-exported here.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export { routeGuidanceStandsDown };
+
 export interface RouteGuidanceProps {
   district: RouteDistrictLike;
   lesson: LessonSpec;
@@ -1010,6 +1048,10 @@ export interface RouteGuidanceProps {
    * which is the behaviour every test of this layer had before it existed.
    */
   worldSigns?: readonly WorldSignLike[];
+  /** The shell's `snap.objectiveHold`, passed through the scene's `routeHold`
+   *  prop. Under "personStruck" the layer is hidden, never unmounted
+   *  (`routeGuidanceStandsDown`). Absent means null: the layer as it shipped. */
+  routeHold?: RouteHold | null;
 }
 
 /** Write the derived route into the ribbon's preallocated attribute buffers.
@@ -1026,6 +1068,7 @@ export function RouteGuidance({
   sampleRef,
   spawnStart,
   worldSigns = EMPTY_WORLD_SIGNS,
+  routeHold = null,
 }: RouteGuidanceProps) {
   const graph = useMemo(() => buildRouteGraph(district), [district]);
   const reducedMotion = useMemo(() => prefersReducedMotion(), []);
@@ -1626,7 +1669,12 @@ export function RouteGuidance({
   });
 
   return (
-    <group>
+    // The ONE declared visibility in this layer, and safe to declare: nothing
+    // below writes the root's `visible`, so a re-render cannot stomp an
+    // imperative value (the pattern note at the top of this file). Hiding the
+    // root hides every child whatever its own flag says, while the effects and
+    // the frame subscriber above keep running — `routeGuidanceStandsDown`.
+    <group visible={!routeGuidanceStandsDown(routeHold)}>
       {/* Before the first rebuild effect the buffers are all zeros — that
           rasterizes nothing (zero-area triangles), so no declarative
           drawRange is needed (and none may be declared: a parent re-render

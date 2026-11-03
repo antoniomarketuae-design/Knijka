@@ -65,10 +65,12 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   createGlancePingsState,
   glancePingsEligible,
+  glancePingsStandDown,
   observeGlancePingsTick,
   resetGlancePings,
   type GlancePingPhase,
   type LessonSpec,
+  type RouteHold,
 } from "@/modules/sim/lessons";
 import type { SimTick } from "@/modules/sim/rules";
 import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
@@ -82,6 +84,7 @@ export function GlanceEdgePings({
   tapRef,
   hidden,
   showButtons,
+  routeHold = null,
 }: {
   lesson: LessonSpec;
   cabinRef: RefObject<CabinControls | null>;
@@ -92,6 +95,10 @@ export function GlanceEdgePings({
   /** Non-touch devices: TouchControls is absent, so the subtle glance-button
    *  cluster (and the Q/E key hints on the pings) renders here. */
   showButtons: boolean;
+  /** The scene's `routeHold` (the shell's `snap.objectiveHold`). Under
+   *  "personStruck" no ping chip renders (`glancePingsStandDown`, C1 / N18);
+   *  the buttons stay. Absent means null: the cue as it shipped. */
+  routeHold?: RouteHold | null;
 }) {
   const eligible = useMemo(() => glancePingsEligible(lesson), [lesson]);
   const buttonsPossible = showButtons && lesson.examMode !== true;
@@ -162,7 +169,7 @@ export function GlanceEdgePings({
         }
       `}</style>
 
-      {pingsActive ? (
+      {pingsActive && !glancePingsStandDown(routeHold) ? (
         <>
           <PingChip side="left" phase={pings.left} keyHint={showButtons ? "Q" : null} />
           <PingChip side="right" phase={pings.right} keyHint={showButtons ? "E" : null} />

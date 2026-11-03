@@ -1682,6 +1682,37 @@ export function SessionEndScreen({
         >
           {SESSION_VERDICT_LABEL_BG[verdict]}
         </p>
+        {/* THE ENDING'S OWN SENTENCE, ON THE END CARD — lane endings2,
+            integrator rulings N2–N4. The engine pushed it as a toast on the
+            frame that closed the drive, and no student read it there: the
+            phone drops every toast once the drive ends (its end line points
+            here, «Резултат»), and on PC the opaque end screen opens over the
+            toast column on the same render. So the sentence is carried on the
+            result (`LessonResult.ending`, stamped by the engine as pushed) and
+            said ONCE, here, on both lenses — the title, the sentence, and the
+            citation chip when the ending carries one. Not while the exam
+            protocol card above states a termination (N4: it owns the reason,
+            and a same-frame gate or pin ending must not add a second cause).
+            Absent ending → no line. The calibration hold withholds it with
+            the rest of this card. */}
+        {result.ending !== undefined && result.examTermination === undefined ? (
+          <p
+            data-hud="end-ending"
+            className="-mt-1 max-w-prose text-center text-xs font-semibold leading-relaxed text-muted"
+          >
+            <span className="font-black text-foreground">{result.ending.titleBg}</span>
+            {" — "}
+            {result.ending.explanationBg}
+            {result.ending.lawRef !== undefined ? (
+              <>
+                {" "}
+                <span className="whitespace-nowrap rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
+                  {result.ending.lawRef}
+                </span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {/* „Незавършен" is the one badge with no authored account behind it —
             `failReasons` is empty by definition there (see the block above). */}
         {unfinishedNoteBg !== null ? (

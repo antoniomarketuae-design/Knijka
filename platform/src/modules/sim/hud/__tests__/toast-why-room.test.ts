@@ -1073,7 +1073,7 @@ describe("§5 the shell spends the reading in five places, and the card reports 
   it("2 · the banner under a hold goes to ONE LINE at the last step — its sentence, and the field it reads, untouched", () => {
     // the base's expression, byte for byte: the banner and the follow-hint pill still read one field
     // (lane endings round 2, E5: plus the way out the advisor card names — the third argument)
-    expect(SHELL).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}");
+    expect(SHELL).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)}");
     expect(SHELL).toContain("oneLine={bannerOneLineWhileReading(snap.objectiveHold, toastReader.bannerYields)}");
     expect(SHELL).toMatch(
       /export function bannerOneLineWhileReading\(hold: RouteHold \| null, bannerYields: boolean\): boolean \{\s*return bannerYields && hold !== null;\s*\}/,

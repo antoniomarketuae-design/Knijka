@@ -37,6 +37,7 @@ import {
   CRASH_PIN_DRIVING_KMH,
   YIELD_ROUNDABOUT_APPROACH_M,
   YIELD_STOP_LINE_REACH_M,
+  PERSON_STRIKE_DUTY,
   crashPinWayOut,
   type CrashPinWayOut,
 } from "./finish";
@@ -877,8 +878,12 @@ function heldWaitSec(s: LessonSessionState, wait: YieldWaitState): number | unde
 // THE ROUTE HOLD — the coach may not order a manoeuvre the car cannot make
 // ---------------------------------------------------------------------------
 
-/** Why the route is unreachable from where the car actually is. */
-export type RouteHold = "crashPinned" | "offRoad";
+/**
+ * Why the route is unreachable from where the car actually is — or, since lane
+ * endings2 (N5), why it must not be driven on: "personStruck", the car has
+ * struck a pedestrian or a cyclist on this drive.
+ */
+export type RouteHold = "personStruck" | "crashPinned" | "offRoad";
 
 /**
  * How long a condition must have stood before the coach stops issuing the
@@ -920,6 +925,74 @@ export const ROUTE_HOLD_S = 5;
 export function routeHoldForSession(s: LessonSessionState): RouteHold | null {
   const t = s.lastT;
   if (!Number.isFinite(t)) return null;
+  // ── N5 — AFTER A PERSON STRIKE THE ROUTE IS NOT ISSUED AGAIN (lane endings2)
+  // From the bill frame on — not after ROUTE_HOLD_S: that number is derived for
+  // the claim „pinned" (above), and the person hold claims no pin — and for the
+  // rest of the drive: `personStruckAtSec` is latched on the first scored
+  // COLLISION with a pedestrian or a cyclist and never cleared, so neither a
+  // dropped pin (the car more than CRASH_PIN_RADIUS_M away) nor a later static
+  // or vehicle bill gives the task back. Ranked first: above the pin and above
+  // off-road, whose own card says how to drive back onto the road. Display
+  // only — nothing grades, ends or folds on it; the drive still ends only by
+  // its existing endings or the menu (N7).
+  if (s.personStruckAtSec !== undefined && t >= s.personStruckAtSec) return "personStruck";
+  return routeHoldBelowPersonStrike(s);
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AFTER A PERSON STRIKE THE ROUTE GUIDANCE STANDS DOWN (lane endings2, round
+ * 3, integrator ruling N14; verifier round-2 finding R2-1).
+ *
+ * The one reading of „is the route guidance shown" for every surface that
+ * draws or names it: the in-world layer (RouteGuidance.tsx — ribbon, turn
+ * chevron, goal marker and its painted «Карай дотук» plate), the S1 shadow
+ * ribbon (LessonScene), and the shell's legend that names those lines. Under
+ * "personStruck", and under no other hold, all of them stand down: nothing
+ * painted in the world, and no sentence about it, may teach the next move of a
+ * drive the student must not continue. `crashPinned` and `offRoad` keep the
+ * guidance — there the recovery IS the way back onto the route. Lives here,
+ * beside the hold it reads, because the shell must not import the three.js
+ * layer (the scene is a dynamic import).
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function routeGuidanceStandsDown(routeHold: RouteHold | null | undefined): boolean {
+  return routeHold === "personStruck";
+}
+
+/**
+ * AFTER A PERSON STRIKE THE «огледай» EDGE PINGS STAND DOWN TOO (lane endings2,
+ * round-3 verifier condition C1; integrator ruling N18, 2026-11-03).
+ *
+ * The ping is the give-way scan for the Б1/Б2 mouth ahead — the cue for the
+ * next move of the drive, the visual twin of the yield voice N11 silenced. On
+ * sc-merge-from-property/mistake-walk-through L1–L3 it pulsed on both edges
+ * for the whole ~190 s rest at the Б2 line after the strike, under a banner
+ * that says «не продължавай». Under "personStruck", and under no other hold,
+ * GlanceEdgePings renders no ping chip. Display only: the state machine
+ * (`observeGlancePingsTick`) still runs, nothing graded reads the pings, and
+ * the hold-to-glance BUTTONS stay — they are controls, not advice.
+ */
+export function glancePingsStandDown(routeHold: RouteHold | null | undefined): boolean {
+  return routeHold === "personStruck";
+}
+
+/**
+ * The off-carriageway mark on the StatusDashboard reads THIS (lane endings2,
+ * N10), never `routeHoldForSession(s) === "offRoad"`: the person hold outranks
+ * off-road, and the mark states where the car physically is — so it must stay
+ * byte-identical on every frame, person strike or not. These are the off-road
+ * clauses of `routeHoldForSession` and nothing else, with the pin's
+ * precedence over them as it always was.
+ */
+export function offCarriagewayHoldForSession(s: LessonSessionState): boolean {
+  if (!Number.isFinite(s.lastT)) return false;
+  return routeHoldBelowPersonStrike(s) === "offRoad";
+}
+
+/** `routeHoldForSession` as it stood before the person hold (pin, then off-road). */
+function routeHoldBelowPersonStrike(s: LessonSessionState): "crashPinned" | "offRoad" | null {
+  const t = s.lastT;
   const pinnedForS = s.crashPin === undefined ? null : t - s.crashPin.atSec;
   if (pinnedForS !== null && pinnedForS >= ROUTE_HOLD_S) return "crashPinned";
   // THE CARRIAGEWAY FACT THE GRADER ALREADY COMMITTED TO — see the block below.
@@ -1195,9 +1268,130 @@ export function routeHoldWayOutForSession(s: LessonSessionState): CrashPinWayOut
   return crashPinWayOut(s.crashPin?.impact, s.crashPin?.clear);
 }
 
+/**
+ * THE CONTROL THAT ENDS THE DRIVE, BY ITS OWN LABEL — one function, read by
+ * the shell's two controls (the phone's PlayMenu row and the roomy top bar's
+ * button) and by the person hold's copy below, so the coach can never name a
+ * control under a label the drive does not show. A free drive (no objectives)
+ * is finished, not aborted: «Завърши сесията».
+ */
+export function sessionEndControlLabelBg(lesson: Pick<LessonSpec, "objectives" | "examMode">): string {
+  if (lesson.objectives.length === 0) return "Завърши сесията";
+  return lesson.examMode === true ? "Прекрати изпита" : "Прекрати урока";
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AFTER A PERSON STRIKE — WHAT THE COACH SAYS (lane endings2, integrator
+ * rulings N5 / N6 / N7; doc 88 en landing, «Recorded, not filed» candidate 1).
+ *
+ * THE DEFECT. After a scored COLLISION with a pedestrian or a cyclist the
+ * banner and the follow pill kept the route task for ROUTE_HOLD_S, the pinned
+ * hold then ended «Ако не опира, огледай се и тогава потегли», and once the
+ * car was more than CRASH_PIN_RADIUS_M away the task came back — every
+ * surface invited the student to drive on from a person he had struck.
+ *
+ * THE RULE. From the bill frame for the rest of the drive the hold is
+ * "personStruck" (`routeHoldForSession`), and every surface that would issue
+ * the route says this instead. Two phases, keyed on whether the crash pin is
+ * still armed:
+ *  · ARMED — the car is still at the place of the strike: do not drive on,
+ *    stay, end the lesson with its own control, and the duty is named by its
+ *    citation. ROUND 2 (integrator ruling N12, verifier condition C1): the
+ *    armed phase names the exit too. Round 1 assumed the pin ends the drive
+ *    CRASH_PIN_STUCK_S after rest, and on sc-merge-from-property/mistake-
+ *    walk-through the lawful Б2 wait freezes that dwell (the B15 freeze), so
+ *    the pin stayed armed ~190 s with «Остани тук» and no way out named. The
+ *    peek names it as well: on the phone the advisor row prints the peek and
+ *    hides the card behind «Прочети», and a free drive has no banner lead;
+ *  · NOT ARMED (dropped: the car is more than CRASH_PIN_RADIUS_M away; or never
+ *    armed) — no ending exists for a car resting away from the strike (doc 88
+ *    candidate 5), so the copy names the ONLY exit there is, under the label the
+ *    drive's own control shows (`sessionEndControlLabelBg`). A sentence that
+ *    says „stop" and names no way to stop would be a trap.
+ * Every string is an instruction or a claim true on every frame it is shown:
+ * «Удари човек» is true of both bodies; «не продължавай с колата» is an
+ * instruction, true at rest and in motion; «може да е пострадал» claims no
+ * injury. The duty is NAMED BY CITATION ONLY (ADR-002) — PERSON_STRIKE_DUTY,
+ * retrieved from zdvp.json чл. 123; no text lists ал. 1 т. 2 а)–е).
+ *
+ * «в менюто» IS NOT SAID (integrator ruling N13, 2026-11-02, ratifying the
+ * round-1 deviation from the ruled copy): on the roomy layout the control is a button in the top bar, not a
+ * menu row (the product's own end-screen note says «в лентата» there and «в
+ * менюто» on the phone), so the place would be false on one lens. The label
+ * alone is true on both.
+ *
+ * LENGTHS. The cards stay under the 240 px card column's ~150 characters (see
+ * CRASH_HOLD_CARD_BG); the leads inside the 66-character banner budget; each
+ * peek is one act and its reason or effect.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export interface PersonHoldCopy {
+  cardBg: string;
+  peekBg: string;
+  /** The banner / task-row lead — shown ALONE, never with «: <task>». */
+  leadBg: string;
+}
+
+export function personHoldCopy(s: LessonSessionState): PersonHoldCopy | null {
+  if (s.personStruckAtSec === undefined) return null;
+  const end = sessionEndControlLabelBg(s.lesson);
+  if (s.crashPin !== undefined) {
+    return {
+      cardBg: `Удари човек — не продължавай с колата. Остани тук и спри урока с „${end}“. Какво е длъжен водачът след удара, казва ${PERSON_STRIKE_DUTY.lawRef}.`,
+      peekBg: `Остани тук и избери „${end}“.`,
+      leadBg: `След удара в човек — не продължавай, избери „${end}“`,
+    };
+  }
+  return {
+    cardBg: `Удари човек — не продължавай с колата. Спри урока с „${end}“. Какво е длъжен водачът след удара, казва ${PERSON_STRIKE_DUTY.lawRef}.`,
+    peekBg: `Избери „${end}“ — урокът оттук спира.`,
+    leadBg: `След удара в човек — спри и избери „${end}“`,
+  };
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE CAR-CONTROL HINTS UNDER THE PERSON HOLD (lane endings2, round 3,
+ * integrator ruling N16; verifier round-2 condition C2).
+ *
+ * THE DEFECT. The shell answers four refused or surprising inputs with a hint
+ * toast of its own — `stuckStartHint` (gas pressed on a car that cannot move),
+ * `reverseStuckHint` (the lever moved but the held pedal still brakes),
+ * `transmissionSwitchHint` (the tier pill moved the lever), `rejectionHint`
+ * (a start or a shift the driveline refused). Each one ends by teaching the
+ * next move: «…запали отново и потегли по-плавно…», «…и тръгваш назад/напред».
+ * After a person strike they still fired, unguarded, on the student's own
+ * input — under a banner that says «не продължавай».
+ *
+ * THE RULE. THEO-4 says a refused input is never answered with silence and
+ * always with its reason, so the hint is not dropped. Under the "personStruck"
+ * hold it becomes ONE sentence of the refusal's CAUSE (what the car did and
+ * why — the caller passes it, from the cause table beside each hint) followed
+ * by the person exit sentence of the current phase: the armed or the free
+ * peek of `personHoldCopy`, which names the control by its own label. Nothing
+ * else in the hint survives; no sentence shown under the hold names a move.
+ * Outside the hold the hint is returned untouched — the same object, so every
+ * other frame is byte-identical to what shipped.
+ *
+ * Pure copy selection, read at the moment the input is answered; nothing
+ * graded reads it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function personHoldControlHint<H extends { titleBg: string; explanationBg: string }>(
+  s: LessonSessionState,
+  hint: H,
+  causeBg: string,
+): H {
+  if (routeHoldForSession(s) !== "personStruck") return hint;
+  const copy = personHoldCopy(s);
+  if (copy === null) return hint;
+  return { ...hint, titleBg: causeBg, explanationBg: copy.peekBg };
+}
+
 /** The card the coach shows instead of an unobeyable objective. */
 export function routeHoldAdvisorPrompt(
-  hold: RouteHold,
+  hold: Exclude<RouteHold, "personStruck">,
   // Round 2 (E5): which way is away from the struck body. Defaults to the
   // direction-free advice, true whatever side the body is on.
   wayOut: CrashPinWayOut = "away",
@@ -1241,7 +1435,13 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
   // carriageway or pinned in what it just hit is not waiting for anything; the
   // answer to „what am I supposed to be doing" is the recovery.
   const hold = routeHoldForSession(s);
-  if (hold !== null) return routeHoldAdvisorPrompt(hold, routeHoldWayOutForSession(s));
+  if (hold === "personStruck") {
+    // N5: the person hold's own card — no chip (no key performs „do not drive
+    // on"), and never the pinned card's «…огледай се и тогава потегли».
+    const person = personHoldCopy(s);
+    if (person !== null) return { textBg: person.cardBg, keys: [], peekBg: person.peekBg };
+  }
+  if (hold !== null && hold !== "personStruck") return routeHoldAdvisorPrompt(hold, routeHoldWayOutForSession(s));
 
   if (s.currentObjectiveIndex >= s.objectives.length) {
     // Nothing left to advise — but a live yield is still worth a card, because

@@ -995,7 +995,11 @@ describe("the route-loss policy is wired to the renderer", () => {
   const frameBody = (() => {
     const start = src.indexOf("useFrame((state) => {");
     expect(start).toBeGreaterThan(0);
-    const end = src.indexOf("\n  return (\n    <group>", start);
+    // The component's own return (two-space indent; nothing inside the frame
+    // body sits there). Not `<group>` itself: since lane endings2 r3 (N14) the
+    // root group carries `visible={!routeGuidanceStandsDown(routeHold)}` under a
+    // comment, and the end of the frame body did not move.
+    const end = src.indexOf("\n  return (\n", start);
     expect(end).toBeGreaterThan(start);
     return src.slice(start, end);
   })();

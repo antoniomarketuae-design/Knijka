@@ -822,10 +822,27 @@ describe("T6 the pedal grammar", () => {
  * VehicleSim does not brake while the throttle is above zero, so S inside W brakes nothing there. */
 
 const PLATFORM_ENGINE = resolve(REPO, "platform", "src", "modules", "sim", "engine");
+/* reverseAssist.ts IMPORTS A VALUE SINCE 2026-11-01 (lane reverseatrest, sc-turn-left-oncoming:d0017a65): `./pedalTiming`,
+ * extensionless as everywhere in platform/src. Node's type stripping does not resolve an extensionless specifier, so the
+ * same resolve rule productPhysics below registers is registered BEFORE the machine is imported. */
+{
+  const { register } = await import("node:module");
+  const hook = [
+    "export async function resolve(specifier, context, next) {",
+    "  if ((specifier.startsWith('./') || specifier.startsWith('../')) && String(context.parentURL).includes('/platform/src/') && !/\\.[cm]?[jt]sx?$/.test(specifier)) {",
+    "    for (const ext of ['.ts', '/index.ts']) { try { return await next(specifier + ext, context); } catch { /* the next form */ } }",
+    "  }",
+    "  return next(specifier, context);",
+    "}",
+  ].join("\n");
+  register(`data:text/javascript,${encodeURIComponent(hook)}`);
+}
 let RA = null;
 let raWhy = null;
 try {
   RA = await import(pathToFileURL(resolve(PLATFORM_ENGINE, "reverseAssist.ts")).href);
+  // the functional brake's edge log the scene hands the assist (GatedSimInput.brakeLog), the product's own class
+  RA = { ...RA, PT: await import(pathToFileURL(resolve(PLATFORM_ENGINE, "pedalTiming.ts")).href) };
 } catch (err) {
   raWhy = `${err.name}: ${err.message}`;
 }
@@ -883,12 +900,16 @@ const productPhysics = () => {
  */
 const productPauseModel = () => {
   const scene = readFileSync(resolve(REPO, "platform", "src", "components", "sim", "LessonScene.tsx"), "utf8");
-  const update = scene.indexOf("const cmd = reverseAssist.update({");
-  assert.ok(update > 0, "UNREADABLE: LessonScene.tsx no longer steps reverseAssist.update where this proof looks");
-  const frameStart = scene.lastIndexOf("useFrame((_, delta) => {", update);
+  // since 2026-11-01 (lane reverseatrest) the assist is stepped by reverseAssistFrameStart, called from ReverseAssistDriver's useFrame
+  const update = scene.indexOf("const cmd = s.assist.update({", scene.indexOf("export function reverseAssistFrameStart("));
+  assert.ok(update > 0, "UNREADABLE: LessonScene.tsx no longer steps the assist in reverseAssistFrameStart where this proof looks");
+  const frameStart = scene.indexOf("useFrame((_, delta) => {", scene.indexOf("function ReverseAssistDriver("));
   const pauseReturn = scene.indexOf("if (paused) return;", frameStart);
-  assert.ok(frameStart > 0 && pauseReturn > frameStart && pauseReturn < update, "UNREADABLE: the assist's useFrame no longer returns on `paused` before stepping it");
-  assert.match(scene.slice(update, update + 260), /brakePedal: input\?\.rawBrake \?\? 0,\s*\n\s*throttlePedal: input\?\.rawThrottle \?\? 0,/, "UNREADABLE: the assist no longer reads the last read()'s functional pedals");
+  const call = scene.indexOf("reverseAssistFrameStart({", frameStart);
+  assert.ok(scene.indexOf("function ReverseAssistDriver(") > 0 && frameStart > 0 && pauseReturn > frameStart && call > pauseReturn, "UNREADABLE: the assist's useFrame no longer returns on `paused` before stepping it");
+  // since round 6 (R20) NEITHER pedal is the last read()'s: both come from their source-timed logs, the samples are 0 and unread
+  assert.match(scene.slice(update, update + 400), /brakePedal: 0,\s*\n\s*throttlePedal: 0,[\s\S]{0,80}?brakeTiming: s\.input\?\.brakeTiming\(\) \?\? null,\s*\n\s*throttleTiming: s\.input\?\.throttleTiming\(\) \?\? null,/, "UNREADABLE: the assist no longer reads the brake's and the throttle's timed logs (and no last-read pedal)");
+  assert.doesNotMatch(scene.slice(scene.indexOf("export function reverseAssistFrameStart("), update + 400).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, ""), /rawThrottle|rawBrake/, "reverseAssistFrameStart reads a last-read() pedal again — at the frame's start it is the previous frame's (the round-6 stale-throttle false R)");
   const rig = readFileSync(resolve(REPO, "platform", "src", "components", "sim", "VehicleRig.tsx"), "utf8");
   const read = rig.indexOf("const input = inputRef.current?.read() ?? null;");
   const rigFrame = rig.lastIndexOf("useFrame((_, delta) => {", read);
@@ -905,12 +926,14 @@ const productPauseModel = () => {
  *    subscriber of the subtree: `clamp(delta, 0, 0.5)` into a fixed-step accumulator, every `useBeforePhysicsStep`
  *    callback before each `world.step` — VehicleRig's reads `SimInput.read()` once per substep;
  *  · VehicleRig reads the input again in its render-rate useFrame;
- *  · <VehicleRig> is mounted before <RuntimeDriver> inside <Physics>, and RuntimeDriver steps the ReverseAssist with
- *    `dtSec = sessionClockAdvance(delta)` on the pedals of the last read;
+ *  · SINCE 2026-11-01 (lane reverseatrest, sc-turn-left-oncoming:d0017a65) the ReverseAssist is stepped FIRST in the
+ *    frame: ReverseAssistDriver's useFrame closes on a NEGATIVE REVERSE_ASSIST_FRAME_PRIORITY, so it runs before
+ *    rapier's priority-0 stepper whatever the mount order, with `dtSec = sessionClockAdvance(delta)` on the functional
+ *    brake's and (since round 6, R20) throttle's source-timed logs (`input.brakeTiming()` / `input.throttleTiming()`) —
+ *    not the previous frame's last read, which at a frame's start is a whole stall old after a stall;
  *  · the substep is tuning.ts FIXED_DT, and <Physics timeStep={FIXED_DT}>.
- * TWO NAMED ASSUMPTIONS, NOT PINNED: none of those useFrame calls passes a renderPriority (all 0, so mount order
- * decides), and the subtree mounts in ONE commit (a Suspense boundary resolving VehicleRig later would subscribe it
- * AFTER RuntimeDriver — the assist would then run on the physics substep reads of its frame, or the previous frame's).
+ * ONE NAMED ASSUMPTION, NOT PINNED: the subtree mounts in ONE commit (a Suspense boundary resolving VehicleRig later
+ * would subscribe its render-rate read after the other priority-0 subscribers). The assist no longer depends on it.
  */
 let frameOrderRead = null;
 const productFrameOrder = () => {
@@ -945,17 +968,22 @@ const productFrameOrder = () => {
   const scene = readFileSync(resolve(REPO, "platform", "src", "components", "sim", "LessonScene.tsx"), "utf8").replace(/\r/g, "");
   const phys = scene.indexOf("<Physics");
   const rigAt = scene.indexOf("<VehicleRig", phys);
-  const driverAt = scene.indexOf("<RuntimeDriver", phys);
+  const assistAt = scene.indexOf("<ReverseAssistDriver", phys);
   const physEnd = scene.indexOf("</Physics>", phys);
-  assert.ok(phys > 0 && rigAt > phys && driverAt > rigAt && physEnd > driverAt, "UNREADABLE: <VehicleRig> is no longer mounted before <RuntimeDriver> inside <Physics> — the assist may run before VehicleRig's read");
+  assert.ok(phys > 0 && rigAt > phys && assistAt > phys && physEnd > assistAt, "UNREADABLE: <VehicleRig> and <ReverseAssistDriver> are no longer mounted inside <Physics>");
   const physProps = scene.slice(phys, scene.indexOf("<DistrictWorld", phys));
   assert.match(physProps, /timeStep=\{FIXED_DT\}/, "UNREADABLE: <Physics timeStep> is no longer FIXED_DT");
   assert.doesNotMatch(physProps, /updatePriority|updateLoop="independent"/, "<Physics> now sets its own update priority or loop — the physics step is no longer an ordinary priority-0 subscriber; re-derive the frame order");
-  const update = scene.indexOf("const cmd = reverseAssist.update({");
-  const driverFrame = scene.lastIndexOf("useFrame((_, delta) => {", update);
-  const dtAt = scene.indexOf("const dt = sessionClockAdvance(delta);", driverFrame);
-  assert.ok(update > 0 && driverFrame > 0 && dtAt > driverFrame && dtAt < update, "UNREADABLE: RuntimeDriver no longer steps the assist in the useFrame that takes sessionClockAdvance(delta)");
-  assert.match(scene.slice(update, update + 300), /dtSec: dt,/, "UNREADABLE: the assist's dtSec is no longer the frame's sessionClockAdvance(delta)");
+  // THE ASSIST'S TURN IS THE FIRST OF THE FRAME (lane reverseatrest, 2026-11-01): ReverseAssistDriver's useFrame, closed by a
+  // NEGATIVE REVERSE_ASSIST_FRAME_PRIORITY, runs before rapier's stepper (priority 0, sorted ascending — pinned above), so it
+  // steps the assist on both pedals' source-timed logs (round 6, R20: the throttle too), with dtSec = sessionClockAdvance(delta)
+  const driver = scene.indexOf("function ReverseAssistDriver(");
+  const driverFrame = scene.indexOf("useFrame((_, delta) => {", driver);
+  const call = scene.indexOf("reverseAssistFrameStart({", driverFrame);
+  const closeAt = scene.indexOf("}, REVERSE_ASSIST_FRAME_PRIORITY);", call);
+  assert.ok(driver > 0 && driverFrame > driver && call > driverFrame && closeAt > call && /dtSec: sessionClockAdvance\(delta\),/.test(scene.slice(call, closeAt)), "UNREADABLE: ReverseAssistDriver no longer steps the assist in the useFrame that takes sessionClockAdvance(delta), at REVERSE_ASSIST_FRAME_PRIORITY");
+  assert.match(scene, /^export const REVERSE_ASSIST_FRAME_PRIORITY = -\d+;$/m, "UNREADABLE: the assist's frame priority is no longer negative — it may no longer run before rapier's stepper");
+  assert.equal(scene.split("reverseAssistFrameStart({").length - 1, 1, "UNREADABLE: the assist is stepped from more than one place");
   const tuning = readFileSync(resolve(REPO, "platform", "src", "modules", "sim", "vehicle", "tuning.ts"), "utf8");
   const fd = tuning.match(/^export const FIXED_DT = 1 \/ (\d+);\r?$/m);
   assert.ok(fd, "UNREADABLE: tuning.ts FIXED_DT");
@@ -1000,8 +1028,8 @@ const armHoldBoundS = (ramps) => {
  * `delta = state.clock.getDelta()` at the frame start and runs the priority-0 useFrame subscribers in mount order —
  * rapier's FrameStepper first: `clamp(delta, 0, 0.5)` into a fixed-step accumulator, one VehicleRig
  * `useBeforePhysicsStep` → `SimInput.read()` per substep; then VehicleRig's subtree and its own render-rate `read()`;
- * then RuntimeDriver steps the ReverseAssist with `dtSec = sessionClockAdvance(delta)` on the pedals of the LAST read;
- * then the render. input.ts integrates each read over the wall time since the PREVIOUS READ, clamped at MAX_RAMP_DT_S.
+ * then the render. SINCE 2026-11-01 the ReverseAssist runs BEFORE all of them (ReverseAssistDriver, negative priority),
+ * with `dtSec = sessionClockAdvance(delta)` on both pedals' source-timed logs (the brake's since 2026-10-19, the throttle's since round 6, R20). input.ts integrates each read over the wall time since the PREVIOUS READ, clamped at MAX_RAMP_DT_S.
  * TWO CLOCKS: the assist's hold grows by the frame delta, the pedals by the time between reads. They agree frame by
  * frame only while every frame's last read sits at the same offset from its start; a frame whose last read came late
  * (a long task before VehicleRig's read — a mirror pass, a physics catch-up) hands the NEXT frame a delta far longer
@@ -1028,9 +1056,10 @@ const growDisarmFrames = (need) => {
 /**
  * ONE DISARM, frame by frame, the car standing still throughout (the WORST case for LAW 1 — motion only
  * ever disarms a press). THE WORLD, under `clock: "product"` (the default since 2026-09-17): the frames above; each
- * processes the key events handled before it began, ramps both pedals at its reads (input.ts), and — unless a pause
- * covers it — hands the FUNCTIONAL pedals of its last read to the product's ReverseAssist with the frame delta, and
- * executes its command; the HUD snapshots the selector every 100 ms and paints it a frame later. A key event or a page
+ * processes the key events handled before it began (each logged on the functional brake's and throttle's edge logs at its own time),
+ * then — unless a pause covers it — hands the brake's and (round 6, R20) the throttle's source-timed logs to the
+ * product's ReverseAssist with the frame delta and executes its command (since 2026-11-01: the assist is first in the
+ * frame), then ramps both pedals at its reads (input.ts) on the selector the assist left; the HUD snapshots the selector every 100 ms and paints it a frame later. A key event or a page
  * evaluate that arrives while a frame is running is handled at that frame's end (`idleAt`). Under `clock: "same"`
  * (the model until 2026-09-17, `simulateDisarmSame`, kept for reconciliation) every frame is instantaneous and its
  * ramps and its assist share ONE dt — the structure in which the two clocks cannot come apart.
@@ -1077,7 +1106,8 @@ const simulateDisarm = (args) => {
   const { clock = "product" } = args;
   if (clock === "same") return simulateDisarmSame(args);
   if (clock !== "product") throw new Error(`simulateDisarm: unknown clock ${JSON.stringify(clock)}`);
-  const { ramps, hudPhaseS, rttHudMs, rttKeyMs, keyLagX = 0.5, rttEvalMs, frameS, dist = null, landing, path = "first", rttRepressKeyMs = rttKeyMs, repressLagX = keyLagX, pollMs = harnessArmPollMs(), frame = PRODUCT_FRAME, fixedDt = productFrameOrder().fixedDt } = args;
+  const { ramps, hudPhaseS, rttHudMs, rttKeyMs, keyLagX = 0.5, rttEvalMs, frameS, dist = null, landing, path = "first", rttRepressKeyMs = rttKeyMs, repressLagX = keyLagX, pollMs = harnessArmPollMs(), frame = PRODUCT_FRAME, fixedDt = productFrameOrder().fixedDt, assistModel = "product" } = args;
+  if (!["product", "throttleRamp", "frameEnd"].includes(assistModel)) throw new Error(`simulateDisarm: unknown assistModel ${JSON.stringify(assistModel)}`);
   const ON = RA.REVERSE_ASSIST_PEDAL_ON;
   if (!["first", "stop-first", "attempt2", "attempt3"].includes(path)) throw new Error(`simulateDisarm: unknown path ${JSON.stringify(path)}`);
   // a disturbance is placed where the UNDISTURBED run of this very case put its anchor
@@ -1100,6 +1130,27 @@ const simulateDisarm = (args) => {
   const ra = new RA.ReverseAssist();
   if (typeof ra.armed !== "boolean") throw new Error(`UNREADABLE: ReverseAssist.armed is ${typeof ra.armed} — this proof reads whether a press is armed off the machine itself`);
   if (typeof ra.holdS !== "number") throw new Error(`UNREADABLE: ReverseAssist.holdS is ${typeof ra.holdS} — this proof reads how long an armed press has been held off the machine itself`);
+  // THE FUNCTIONAL BRAKE'S SOURCE-TIMED LOG (LessonScene GatedSimInput.brakeLog, since 2026-11-01): the product's own
+  // PedalEdgeLog, one edge per change of the channel that is the brake now — W in R, S in D — stamped with the key's own time
+  // (SimInput.eventStamp: never after now, never before the previous stamp), restamped at «now» when the remap flips with
+  // the selector. Keyboard edges are on the input clock, so the step clock (stepS) is not modelled.
+  if (typeof RA.PT?.PedalEdgeLog !== "function") throw new Error("UNREADABLE: pedalTiming.ts PedalEdgeLog — the assist's brake log is the product's own");
+  const brakeLog = new RA.PT.PedalEdgeLog();
+  let lastStampMs = Number.NEGATIVE_INFINITY;
+  const logBrake = (ownMs) => {
+    const atMs = Math.max(ownMs, lastStampMs);
+    lastStampMs = atMs;
+    brakeLog.push({ atMs, earliestMs: ownMs, down: w.selector === "R" ? w.keys.W : w.keys.S });
+    throttleLog.push({ atMs, earliestMs: ownMs, down: w.selector === "R" ? w.keys.S : w.keys.W });
+  };
+  // …AND THE OTHER PEDAL CONTROL'S (GatedSimInput.throttleLog, since 2026-11-01 round 6, R20): the same stamps, the channel
+  // that is the throttle now — S in R, W in D — as the student holds it; since 2026-11-02 round 7 (R24) the product no
+  // longer gates it by LAW 2's disown, and this model has no hand-worked flip, so it was never gated here.
+  // The assist's both-pedals disarm reads it through `throttleTiming` (a latch:
+  // down if it was down at any instant since the previous update), so the throttle it sees is as of its decision, not the
+  // previous frame's ramped pedal — which, after a stall, was the stale value that let W held + S pressed shift to R.
+  const throttleLog = new RA.PT.PedalEdgeLog();
+  logBrake(0);
   // ── THE FRAME SCHEDULE: generated ahead of the world when an idle time must be known, never changed once made.
   // Held in typed arrays — the object-per-frame form ran this proof four times slower — in ONE module buffer, so a run
   // must not start inside another: the undisturbed first pass returns before this run touches it, and a landing
@@ -1179,21 +1230,21 @@ const simulateDisarm = (args) => {
     while (w.events.length && w.events[0].at <= start) {
       const e = w.events.shift();
       w.keys[e.key] = e.down;
+      logBrake(e.at * 1000);
     }
-    // the substep reads, then VehicleRig's: two saturating linear ramps compose exactly unless a clamp cuts one of them
-    if (F.sub[i] && (start - w.lastRead > ramps.maxDt || readAt - start > ramps.maxDt)) read(start);
-    read(readAt);
-    const inR = w.selector === "R";
-    const brakePedal = inR ? w.pedal.W : w.pedal.S;
-    const throttlePedal = inR ? w.pedal.S : w.pedal.W;
-    if (!inR && brakePedal > ON && throttlePedal <= ON) w.violations += 1;
-    if (F.assist[i]) {
+    // ONE TURN OF THE ASSIST. `timed`: the product since 2026-10-19 — both functional pedals from their source-timed logs
+    // (round 6, R20: the throttle too); else the frame-timed machine before it (one sample per update).
+    const assistTurn = (timed, ramGap) => {
+      const inR = w.selector === "R";
+      const brakePedal = inR ? w.pedal.W : w.pedal.S;
+      const throttlePedal = inR ? w.pedal.S : w.pedal.W;
       const dtSec = Math.min(Math.max(F.delta[i], 0), 0.5);
-      // the two clocks apart: the assist's dt against the ramp credit since the previous frame's last read
-      const gap = dtSec - Math.min(readAt - w.prevFrameRead, ramps.maxDt);
+      // the two clocks apart: the assist's dt against the ramp credit of the read it runs on
+      const gap = dtSec - ramGap;
       if (gap > w.maxDtGapS) w.maxDtGapS = gap;
-      const cmd = ra.update({ speedKmh: 0, selector: w.selector, brakePedal, throttlePedal, dtSec });
-      if (cmd) { w.selector = cmd === "shiftToD" ? "D" : "R"; w.flips.push(w.selector); }
+      const clock = { nowMs: start * 1000, stepS: null };
+      const cmd = ra.update({ speedKmh: 0, selector: w.selector, brakePedal, throttlePedal, dtSec, ...(timed ? { brakeTiming: { log: brakeLog, ...clock } } : {}), ...(timed && assistModel === "product" ? { throttleTiming: { log: throttleLog, ...clock } } : {}) });
+      if (cmd) { w.selector = cmd === "shiftToD" ? "D" : "R"; w.flips.push(w.selector); logBrake(start * 1000); }
       if (w.selector === "D" && ra.armed === true) {
         w.armedInD += 1;
         if (w.arm.since === null) { w.arm.since = start; w.arm.episodes += 1; }
@@ -1202,13 +1253,26 @@ const simulateDisarm = (args) => {
         w.arm.maxPageS = Math.max(w.arm.maxPageS, start - w.arm.since);
         w.arm.since = null;
       }
-    }
+    };
+    // THE ASSIST FIRST (since 2026-11-01): before this frame's reads, on BOTH functional pedals' source-timed logs (the
+    // samples it is also handed are the previous frame's last read, and unread); a command it emits is the selector this
+    // frame's reads are swapped for. `assistModel` (MUTATIONS, never the product): "throttleRamp" — the throttle read from
+    // the previous frame's ramp (the round-5 product, the stale-throttle false R); "frameEnd" — the machine before
+    // 2026-10-19, stepped AFTER this frame's reads on their pedals, no logs.
+    if (F.assist[i] && assistModel !== "frameEnd") assistTurn(true, Math.min(w.prevFrameRead - w.prevPrevFrameRead, ramps.maxDt));
+    // the substep reads, then VehicleRig's: two saturating linear ramps compose exactly unless a clamp cuts one of them
+    if (F.sub[i] && (start - w.lastRead > ramps.maxDt || readAt - start > ramps.maxDt)) read(start);
+    read(readAt);
+    if (w.selector !== "R" && w.pedal.S > ON && w.pedal.W <= ON) w.violations += 1;
+    if (F.assist[i] && assistModel === "frameEnd") assistTurn(false, Math.min(readAt - w.prevFrameRead, ramps.maxDt));
+    w.prevPrevFrameRead = w.prevFrameRead;
     w.prevFrameRead = readAt;
     if (w.hud.pending) { w.hud.gear = w.hud.pending; w.hud.pending = null; }
     if (start - w.hud.pollAt >= 0.1 - 1e-9) { w.hud.pollAt = start; w.hud.pending = w.selector; }
     w.t = start;
   };
   w.prevFrameRead = 0;
+  w.prevPrevFrameRead = 0;
   const stepTo = (until) => { while (startOf(gi) <= until) process(gi++); };
   let now = 0;
   const held = { W: wHeld, S: false, steer: null };
@@ -1657,8 +1721,8 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
     const adversary = [];
     for (let p = 0; p <= 10; p++) for (const hz of [144, 120, 240]) for (const [afterFrames, L] of [[3, 2.5], [4, 2.5], [3, 3.0]]) adversary.push({ hudPhaseS: p / 100, frameS: 1 / hz, rttHudMs: 250, rttKeyMs: 1, rttEvalMs: 1, keyLagX: 0.5, dist: { kind: "stall", anchor: "S-down", afterFrames, L } });
     // shifts, and runs in which the machine held a press ARMED in D (the step before a shift)
-    const count = (cases, landing) => cases.reduce((n, g) => {
-      const r = simulateDisarm({ ramps, ...g, landing });
+    const count = (cases, landing, assistModel = "product") => cases.reduce((n, g) => {
+      const r = simulateDisarm({ ramps, ...g, landing, assistModel });
       return { shifted: n.shifted + (r.flips !== "D" ? 1 : 0), armed: n.armed + (r.armedInD ? 1 : 0) };
     }, { shifted: 0, armed: 0 });
     const advShipped = count(adversary, (ctx) => shippedLanding(ctx));
@@ -1669,20 +1733,35 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
     const firstShipped = count(sub, (ctx) => firstLanding(ctx, { wallTimeout: true }));
     const swapped = count(sub, (ctx) => shippedLanding(ctx, { swapRelease: true }));
     const liftBrake = count(sub, liftThenBrake);
+    // RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22). On the input-timed product (the press timed at
+    // S's key, the assist at the frame's start, both pedals from their source-timed logs — R20) the adversary's stall, the
+    // first landing's order and the swapped release no longer shift or arm: S's key-down lands under a held W, which the
+    // update that sees them disarms, however long the stall. What they were demonstrated against is the FRAME-TIMED machine
+    // (the assist after the physics, one sample per frame — assistModel "frameEnd"), where they are kept and still bite;
+    // lift-then-brake still shifts on the product itself. (The adversary's own SHIFT needed the whole-frame hold credit this
+    // lane removed in round 1; on the frame-timed machine as it now is, its stall arms the first landing.)
+    const advFirstFT = count(adversary, (ctx) => firstLanding(ctx, { wallTimeout: true }), "frameEnd");
+    const firstOrderFT = count(sub, (ctx) => firstLanding(ctx), "frameEnd");
+    const firstShippedFT = count(sub, (ctx) => firstLanding(ctx, { wallTimeout: true }), "frameEnd");
+    const swappedFT = count(sub, (ctx) => shippedLanding(ctx, { swapRelease: true }), "frameEnd");
     const line = (c) => `${c.shifted} shifted / ${c.armed} armed`;
-    console.log(`T6.7b: shipped landing — ${full.length} disarms, ${shifted} shifted back, ${armedRuns} with a press armed in D, ${violating} with a read of S > PEDAL_ON at W ≤ PEDAL_ON; the adversary's stall ${line(advShipped)} of ${adversary.length} (the first landing as shipped: ${line(advFirst)}); mutations over ${sub.length}: first landing (frame span) ${line(firstOrder)}, first landing as shipped ${line(firstShipped)}, release swapped ${line(swapped)}, lift-then-brake ${line(liftBrake)}`);
+    console.log(`T6.7b: shipped landing — ${full.length} disarms, ${shifted} shifted back, ${armedRuns} with a press armed in D, ${violating} with a read of S > PEDAL_ON at W ≤ PEDAL_ON; the adversary's stall ${line(advShipped)} of ${adversary.length} (the first landing as shipped: ${line(advFirst)}); mutations over ${sub.length}: first landing (frame span) ${line(firstOrder)}, first landing as shipped ${line(firstShipped)}, release swapped ${line(swapped)}, lift-then-brake ${line(liftBrake)}; on the FRAME-TIMED machine: the adversary's stall on the first landing ${line(advFirstFT)}, first landing (frame span) ${line(firstOrderFT)}, first landing as shipped ${line(firstShippedFT)}, release swapped ${line(swappedFT)}`);
     assert.equal(shifted, 0, `the shipped landing shifted the gear back: ${bad.join(" | ")}`);
     assert.equal(armedRuns, 0, "the shipped landing left a press ARMED in D — one hold away from R, whether or not this grid held it long enough");
     assert.equal(violating, 0, "a read had S above PEDAL_ON with W at or below it — the enclosure is broken even where the gear held");
     assert.deepEqual(advShipped, { shifted: 0, armed: 0 }, "the adversary's stall shifts or arms the shipped landing");
-    assert.ok(advFirst.shifted > 0, "the adversary's stall no longer shifts the first landing — this simulator cannot see what was demonstrated against it");
-    assert.ok(firstOrder.shifted > 0, "MUTATION: the first landing's ORDER (W lifted on frame evidence, S held) never shifted — the grid cannot see a pause or a late key");
-    assert.ok(firstShipped.shifted >= firstOrder.shifted, "MUTATION: the wall-clock timeout shifted less than the frame span");
-    assert.ok(swapped.shifted > 0, "MUTATION: the release order swapped (W up, then S up) never shifted — the proof cannot fail");
-    assert.ok(liftBrake.shifted > 0, "MUTATION: lift-then-brake never shifted — the proof cannot fail");
+    // on the input-timed product: the press under a held W is disarmed by the update that sees them — none of these arm
+    for (const [name, c] of [["the adversary's stall on the first landing", advFirst], ["first landing (frame span)", firstOrder], ["first landing as shipped", firstShipped], ["release swapped", swapped]]) assert.deepEqual(c, { shifted: 0, armed: 0 }, `${name} shifted or armed on the input-timed product — a press that began under a held W is no longer disarmed`);
+    // its SHIFT needed the whole-frame hold credit round 1 removed (a 2.5 s stall credited 0.5 s of hold in one update); the
+    // frame-timed machine's sampled path now counts only the span two updates both saw, so the stall ARMS the press there
+    assert.ok(advFirstFT.armed > 0, "(frame-timed machine) the adversary's stall no longer arms the first landing — this simulator cannot see what was demonstrated against it");
+    assert.ok(firstOrderFT.shifted > 0, "MUTATION (frame-timed machine): the first landing's ORDER (W lifted on frame evidence, S held) never shifted — the grid cannot see a pause or a late key");
+    assert.ok(firstShippedFT.shifted >= firstOrderFT.shifted, "MUTATION (frame-timed machine): the wall-clock timeout shifted less than the frame span");
+    assert.ok(swappedFT.shifted > 0, "MUTATION (frame-timed machine): the release order swapped (W up, then S up) never shifted — the proof cannot fail");
+    assert.ok(liftBrake.shifted > 0, "MUTATION: lift-then-brake never shifted on the input-timed product — the proof cannot fail");
     // the armed readout is not blind: every mutation is seen holding a press ARMED in D. (Not «≥ shifted»: one frame
     // of ≥ REVERSE_ASSIST_HOLD_S arms and emits inside a single update, and emitting disarms — that shift is counted above.)
-    for (const [name, c] of [["first landing", firstOrder], ["first landing as shipped", firstShipped], ["release swapped", swapped], ["lift-then-brake", liftBrake]]) assert.ok(c.armed > 0, `${name}: ${line(c)} — the armed readout never saw a press the mutation armed`);
+    for (const [name, c] of [["first landing (frame-timed)", firstOrderFT], ["first landing as shipped (frame-timed)", firstShippedFT], ["release swapped (frame-timed)", swappedFT], ["lift-then-brake", liftBrake]]) assert.ok(c.armed > 0, `${name}: ${line(c)} — the armed readout never saw a press the mutation armed`);
   });
 
   /* T6.7b ON A W PRESSED AGAIN (2026-09-17, third pass). An adversary refuted §10b's «the S press can never arm»
@@ -1768,7 +1847,26 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
       if (a.flips !== "D") mut.shifted += 1;
       mut.maxHoldS = Math.max(mut.maxHoldS, a.maxHoldS);
     }
+    // THE ADVERSARY'S ARM, RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22). On the input-timed product
+    // the re-pressed W is down at S's key and the both-pedals disarm reads the throttle from its source-timed log (R20), so
+    // the press is disarmed by the update that sees them: on this grid nothing arms under EITHER key semantics, and §10b's
+    // disclosed resolve-before-handled hole (4,950–5,260 shifts per path, 277.8 ms) is closed. «This path can see the
+    // adversary's arm» is kept as a MUTATION that bites on the new timing: the same paths with the throttle read from the
+    // previous frame's ramp (assistModel "throttleRamp" — the round-5 product, everything else as shipped), over the
+    // mutation sub-grid (undisturbed, and with the landing integrator's 0.6 s render stall anchored at the re-press
+    // W-down, 0–3 frames after it), arm — and, after the stall, shift under resolve-after-handled keys.
+    const stale = Object.fromEntries(PATHS.map((p) => [p, { runs: 0, shifted: 0, shiftedAfter: 0, armed: 0, armedAfter: 0, maxHoldAfterS: 0 }]));
+    const STALE_DISTS = [null, ...[0, 1, 3].map((afterFrames) => ({ kind: "stall", anchor: "W-down", afterFrames, L: 0.6 }))];
+    for (const path of PATHS) for (const hudPhaseS of [0, 0.04]) for (const hz of [144, 12]) for (const rttHudMs of LATENCIES_MS) for (const rttKeyMs of LATENCIES_MS) for (const rttRepressKeyMs of [2, 250]) for (const rttEvalMs of [2]) for (const keyLagX of KEY_LAG_X) for (const dist of STALE_DISTS) {
+      const a = simulateDisarm({ ramps, path, hudPhaseS, frameS: 1 / hz, rttHudMs, rttKeyMs, rttRepressKeyMs, rttEvalMs, keyLagX, dist, landing: (ctx) => shippedLanding(ctx), assistModel: "throttleRamp" });
+      const x = stale[path];
+      x.runs += 1;
+      if (a.flips !== "D") { x.shifted += 1; if (keyLagX <= 1) x.shiftedAfter += 1; }
+      if (a.armedInD) { x.armed += 1; if (keyLagX <= 1) x.armedAfter += 1; }
+      if (keyLagX <= 1) x.maxHoldAfterS = Math.max(x.maxHoldAfterS, a.maxHoldS);
+    }
     const ms = (s) => `${(s * 1000).toFixed(1)} ms`;
+    for (const [p, x] of Object.entries(stale)) console.log(`T6.7b re-press MUTATION the throttle from the previous frame's ramp (round 5) ${p}: ${x.runs} disarms, ${x.shifted} shifted back (after-handled ${x.shiftedAfter}), ${x.armed} armed (after-handled ${x.armedAfter}), worst armed hold after-handled ${ms(x.maxHoldAfterS)}`);
     for (const [p, b] of Object.entries(books)) console.log(`T6.7b re-press ${p}: ${b.runs} disarms, ${b.shifted} shifted back (after-handled ${b.shiftedAfter}, early ${b.shiftedEarly}), ${b.armedRuns} with a press armed in D (${b.armedEarly} with a key call resolving BEFORE its key was handled, ${b.armedAfter} after), worst armed hold ${ms(b.maxHoldS)} (bound ${ms(bound)}, REVERSE_ASSIST_HOLD_S ${ms(RA.REVERSE_ASSIST_HOLD_S)}) at ${JSON.stringify(b.holdAt)}, longest page-clock arm ${ms(b.maxArmPageS)} at ${JSON.stringify(b.pageAt)}`);
     console.log(`T6.7b re-press MUTATION lift-then-brake: ${mut.shifted} of ${mut.runs} shifted, worst armed hold ${ms(mut.maxHoldS)}`);
     for (const [p, b] of Object.entries(books)) {
@@ -1820,8 +1918,11 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
       );
       assert.equal(b.armedAfter, 0, `${p}: a press armed with every key call resolving after its key was handled — the ARM_POLL_MS dependency no longer buys «nothing arms»: ${bad.join(" | ")}`);
       assert.equal(b.violAfter, 0, `${p}: a read had S above PEDAL_ON with W at or below it under resolve-after-handled keys`);
-      // not vacuous: the adversary's arm IS reproduced where it can happen, so (b) is measured on real arms
-      assert.ok(b.armedEarly > 0, `${p}: no press armed anywhere on the grid — this path cannot see the arm the adversary demonstrated, and (b) was never exercised`);
+      // R20 closes §10b's disclosed hole on this grid: nothing arms or shifts under resolve-BEFORE-handled keys either
+      assert.deepEqual([b.shiftedEarly, b.armedEarly], [0, 0], `${p}: a press armed or shifted under resolve-BEFORE-handled keys on the input-timed product — the press that begins under the re-pressed W is no longer disarmed: ${badEarly.join(" | ")}`);
+      // not vacuous: the adversary's arm IS reproduced where it can happen — on the round-5 stale-throttle read
+      const x = stale[p];
+      assert.ok(x.armed > 0 && x.shiftedAfter > 0, `${p}: MUTATION the throttle from the previous frame's ramp did not both arm and shift under resolve-after-handled keys (${x.armed} armed, ${x.shiftedAfter} shifted after-handled) — this path cannot see the arm the adversary demonstrated, nor the round-5 false R`);
     }
     assert.ok(mut.shifted > 0 && mut.maxHoldS > bound, `MUTATION: lift-then-brake on the re-press paths (${mut.shifted} shifted, worst hold ${ms(mut.maxHoldS)}) — the hold readout or the shift cannot be seen`);
   });
@@ -1832,8 +1933,15 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
    * credits W more than that much ramp, and from PEDAL_ON × THROTTLE_ATTACK_S on W is above PEDAL_ON at S's rising
    * edge — vetoed (reverseAssist.ts:265-268). The HUD read's own round trip only adds to the wait, which is why the
    * measured edge sits below the derived bound; the bound is what is asserted. Nothing here holds under
-   * resolve-before-handled keys, where (b) is the property. path-follow-wiring.test.mjs W-17c pins the constant. */
-  it("T6.7b ARM_POLL_MS: on the re-press paths nothing arms under resolve-after-handled keys at every poll ≥ PEDAL_ON × THROTTLE_ATTACK_S, presses DO arm with the wait shortened below it, (a) holds at every poll, and lesson-audit.mjs's poll is above the bound", () => {
+   * resolve-before-handled keys, where (b) is the property. path-follow-wiring.test.mjs W-17c pins the constant.
+   * RESTATED 2026-11-01 (lane reverseatrest, round 6; integrator R22): the wait is NO LONGER load-bearing. The argument
+   * above is about W's RAMP at S's rising edge; the input-timed product reads both pedals from their source-timed logs
+   * (the press at S's key, the throttle at W's key — R20), and W's key-down precedes S's, so the update that sees the
+   * press disarms it at EVERY poll, 0 ms included, under either key semantics. «Presses DO arm with the wait shortened»
+   * is kept as a MUTATION that bites on the new timing: the throttle read from the previous frame's ramp (assistModel
+   * "throttleRamp", the round-5 product) arms at the shortest poll. lesson-audit.mjs's poll staying above the bound is
+   * kept: it is the harness's margin for the frame-timed machine and costs nothing. */
+  it("T6.7b ARM_POLL_MS: on the re-press paths nothing arms under either key semantics at EVERY poll on the input-timed product, (a) holds at every poll, presses DO arm at the shortest poll when the throttle is read from the previous frame's ramp, and lesson-audit.mjs's poll is above the bound", () => {
     assert.ok(RA?.ReverseAssist, `UNREADABLE: the product's ReverseAssist could not be imported (${raWhy})`);
     const ramps = productRamps();
     const boundMs = armHoldBoundS(ramps) * 1000;
@@ -1858,9 +1966,18 @@ describe("T6.7 the disarm's landing (path-follow.mjs §10b «W ENCLOSES S»)", (
     for (const r of table) {
       assert.equal(r.shifted, 0, `(a) poll ${r.pollMs} ms: the gear went back to R`);
       assert.ok(r.maxHoldS <= boundMs / 1000 + 1e-12, `(b) poll ${r.pollMs} ms: an armed press held ${r.maxHoldS} s`);
-      if (r.pollMs >= boundMs - 1e-9) assert.equal(r.after, 0, `poll ${r.pollMs} ms ≥ the bound: a press armed under resolve-after-handled keys`);
+      assert.deepEqual([r.after, r.early], [0, 0], `poll ${r.pollMs} ms: a press armed on the input-timed product (${r.after} resolve-after-handled, ${r.early} resolve-before-handled)`);
     }
-    assert.ok(table.some((r) => r.pollMs < boundMs && r.after > 0), "MUTATION: no poll below the bound armed a press under resolve-after-handled keys — the sweep cannot show that «nothing arms» rests on the wait");
+    // MUTATION that bites on the new timing: the round-5 stale-throttle read, at the shortest poll
+    const stale = { runs: 0, after: 0, early: 0, shifted: 0 };
+    for (const path of ["stop-first", "attempt2", "attempt3"]) for (const hudPhaseS of [0, 0.04]) for (const hz of [144, 60, 30, 12]) for (const rttHudMs of LATENCIES_MS) for (const rttKeyMs of LATENCIES_MS) for (const rttRepressKeyMs of LATENCIES_MS) for (const rttEvalMs of LATENCIES_MS) for (const keyLagX of KEY_LAG_X) {
+      const a = simulateDisarm({ ramps, path, hudPhaseS, frameS: 1 / hz, rttHudMs, rttKeyMs, rttRepressKeyMs, rttEvalMs, keyLagX, pollMs: polls[0], landing: (ctx) => shippedLanding(ctx), assistModel: "throttleRamp" });
+      stale.runs += 1;
+      if (a.flips !== "D") stale.shifted += 1;
+      if (a.armedInD) stale[keyLagX <= 1 ? "after" : "early"] += 1;
+    }
+    console.log(`T6.7b ARM_POLL_MS MUTATION the throttle from the previous frame's ramp, poll ${polls[0]} ms: ${stale.runs} disarms, ${stale.after} armed resolve-after-handled / ${stale.early} resolve-before-handled, ${stale.shifted} shifted`);
+    assert.ok(stale.after > 0, "MUTATION: the throttle read from the previous frame's ramp armed nothing at the shortest poll under resolve-after-handled keys — the sweep cannot see an arm");
   });
 
   /* T6.7c WHAT THE ORDERING COSTS. With both pedals full and the car at rest, S's key comes up first and W's one key

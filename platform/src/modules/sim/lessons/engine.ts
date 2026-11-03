@@ -121,7 +121,10 @@ import {
   crashPinImpact,
   createFinishGate,
   openTasksEndingCopy,
+  PERSON_STRIKE_DUTY,
+  ROUTE_END_REACHED_EXAM_BG,
   routeDepartedEndingCopy,
+  stoppedStuckEndingCopy,
   routeEndMark,
   routeFinishZone,
   offNetworkEndingCopy,
@@ -1732,6 +1735,22 @@ function countRedsMet(evalStates: ReadonlyArray<ObjectiveEvalState>): number {
 }
 
 /**
+ * THE PERSON-STRIKE BILL — lane endings2 (integrator rulings N5, N11). A
+ * scored, session-terminating violation whose struck body is a pedestrian or a
+ * cyclist: the same filter the crash pin's impact reads. It latches
+ * `LessonSessionState.personStruckAtSec` (display only), and from that frame
+ * on the coach's teaching channels fall silent (`personStruckThisFrame` in
+ * `applyTick`). Nothing graded reads it.
+ */
+function isPersonStrikeBill(e: ScorableEvent): boolean {
+  return (
+    e.kind === "violation" &&
+    e.terminateSession === true &&
+    (e.detail === "pedestrian" || e.detail === "cyclist")
+  );
+}
+
+/**
  * Did this scored event record contact with a HUMAN BODY? (round 10,
  * 2026-08-24 — `objectives.ts vruWaitHonoured` holds the frame.)
  *
@@ -2735,7 +2754,42 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let mistakeHitAt = prev.mistakeExperienceHitAtSec;
   let mistakeMoment: TeachMoment | undefined;
   const hudEvents: HudEvent[] = [];
+  // Lane endings2 (N2 / N3): EVERY ending sentence goes through this — it is
+  // pushed as the HUD event it always was AND stamped, field for field, as the
+  // session's `endingCopy`, which `buildLessonResult` carries to the end card.
+  // Called only on the frame an ending completes the drive (each site sets
+  // `phase = "completed"` beside it), so the stamp is that frame's. Not graded,
+  // not on SimTick, the wire, the store or the server debrief.
+  let endingCopy = prev.endingCopy;
+  const pushEnding = (e: { kind: "lesson"; titleBg: string; explanationBg: string; lawRef?: string }): void => {
+    hudEvents.push(e);
+    endingCopy = {
+      titleBg: e.titleBg,
+      explanationBg: e.explanationBg,
+      ...(e.lawRef !== undefined ? { lawRef: e.lawRef } : {}),
+    };
+  };
   const scoredEvents: ScorableEvent[] = [];
+  /**
+   * Lane endings2, round 2 (integrator ruling N11; verifier finding R1) —
+   * AFTER STRIKING A PERSON NOTHING THE COACH SAYS TEACHES THE NEXT MOVE OF THE
+   * DRIVE. True from the frame of the person-strike bill (the frame
+   * `personStruckAtSec` latches on below, through the same `isPersonStrikeBill`)
+   * for the rest of the drive. Read only by the three coach channels that teach
+   * the route — the objective's own notices, the task-complete flash and the
+   * yield voice — which are not pushed on such a frame. Round 1 withdrew the
+   * route from the banner, the card, the peek and the pill, and the yield voice
+   * still said, over «Остани тук…», «…тръгваш чак когато никой не приближава.»
+   * / «Спри докрай — до линията.» (sc-merge-from-property/mistake-walk-through)
+   * and «Защо чакаш: пешеходец на пътеката — Правилно е да чакаш тук…» over a
+   * child just struck (sc-crossing-child-ball/mistake-collision). Display only:
+   * every bill, verdict, objective and the yield voice's own state still fold
+   * exactly as before; a teach moment, a violation toast and an ending are not
+   * this channel and are untouched. Called after the rule loop, so the bill of
+   * this very frame is already in `scoredEvents`.
+   */
+  const personStruckThisFrame = (): boolean =>
+    prev.personStruckAtSec !== undefined || scoredEvents.some(isPersonStrikeBill);
   const teachMoments: TeachMoment[] = [];
   /** Queue a card for this frame's pause and move the pause slot to this frame. */
   const notePause = (m: TeachMoment): void => {
@@ -3455,7 +3509,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         prev.lesson.postedLimitKmh,
         ctx,
       );
-      if (notice !== null) hudEvents.push(notice);
+      // N11: the objective's notices teach the task the person hold withdrew.
+      if (notice !== null && !personStruckThisFrame()) hudEvents.push(notice);
 
       if (!step.done) {
         objectives[currentIndex] = {
@@ -3474,7 +3529,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         completedAtSec: tick.t,
         ...(step.detail !== undefined ? { detail: step.detail } : {}),
       };
-      hudEvents.push({ kind: "objectiveComplete", titleBg: current.spec.titleBg });
+      // N11: no ✓ flash (the phone's praise row) for a route task after a
+      // person strike — the task still completes; only its celebration waits
+      // for the debrief. Three such titles say «…и продължи…».
+      if (!personStruckThisFrame()) hudEvents.push({ kind: "objectiveComplete", titleBg: current.spec.titleBg });
       // Round 15: a capped mark credited SHORT of itself is still decided where the car crosses it.
       const watchHere = taskCapMarkWatchOnCompletion(prev, current.params, step.evalState, currentIndex, tick);
       if (watchHere !== undefined) completedMarkWatch = watchHere;
@@ -3800,7 +3858,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ringEntryPaidFor: tick.roundaboutEntryPaidFor,
     });
     yieldVoice = voice.state;
-    for (const n of voice.notices) hudEvents.push(n);
+    // N11: the voice keeps folding (its state is unchanged), but after a person
+    // strike it says nothing — a lawful-wait lesson over a struck person
+    // teaches the next move of the drive.
+    if (!personStruckThisFrame()) for (const n of voice.notices) hudEvents.push(n);
   }
 
   let finishGate = prev.finishGate;
@@ -4181,7 +4242,23 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     if (gateEnding === "openTasks") {
       phase = "completed";
       endedAtSec = tick.t;
-      hudEvents.push(openTasksEndingCopy(examMode));
+      pushEnding(openTasksEndingCopy(examMode));
+    } else if (gateEnding === "routeEnd" && stoppedStuck) {
+      phase = "completed";
+      endedAtSec = tick.t;
+      // ── N1 / N1b — GATE 2 SAYS WHAT GATE 2 MEASURED (lane endings2) ────────
+      // Keyed on the anchor's mode and on E1's arrival predicate, unchanged
+      // (finish.ts `stoppedStuckEndingCopy` has the five cases and why each is
+      // true on its latch frame). The mark is non-null only for a reachZone
+      // terminal, so an arrival is only possible on an inside anchor; the
+      // approach axis is the route's own (`routeApproachFrom`), exactly as the
+      // stalled run-out reads it.
+      const rescueMode = terminalRescueZone(params)?.mode === "outside" ? "outside" : "inside";
+      const stuckMark = routeEndMark(params);
+      const stuckArrived =
+        stuckMark !== null &&
+        routeRunOutArrived(stuckMark, routeApproachFrom(params, tick.position), tick.position);
+      pushEnding(stoppedStuckEndingCopy(examMode, rescueMode, stuckArrived));
     } else if (gateEnding === "routeEnd") {
       phase = "completed";
       endedAtSec = tick.t;
@@ -4191,18 +4268,15 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // Kept inside the violation catalog's own length band (median 186
       // chars, max 319): this is a HUD toast on a 390 px phone, and the
       // detail belongs in the debrief that opens a second later.
-      hudEvents.push({
+      //
+      // Gate 1 only — an arrival, or the no-mark latch (E1 «as before»); gate
+      // 2 is the branch above.
+      pushEnding({
         kind: "lesson",
         titleBg: examMode ? "Край на изпитния маршрут" : "Край на маршрута",
         explanationBg: examMode
-          ? "Стигна края на маршрута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка."
-          : stoppedStuck
-            // B2/B3: the car has been standing still at the end of the route
-            // with the task open. Say that plainly — the student has been
-            // sitting there wondering what the simulator wants, and the honest
-            // answer is that it did not register and he is not trapped here.
-            ? "Спря в края на маршрута, но задачата тук не се отчете — затова урокът приключва, вместо да те държи на място. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път."
-            : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
+          ? ROUTE_END_REACHED_EXAM_BG
+          : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
       });
     }
     // O30's own termination, with its own sentence — never either of the two
@@ -4214,7 +4288,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     if (phase !== "completed" && finishDepartureGate?.reachedAtSec != null) {
       phase = "completed";
       endedAtSec = tick.t;
-      hudEvents.push(routeDepartedEndingCopy(examMode));
+      pushEnding(routeDepartedEndingCopy(examMode));
     }
     // E2's ending (the clock is above): the SAME sentence as E1's at-rest exit —
     // one state, one sentence. Checked after every gate, so a frame on which a
@@ -4226,7 +4300,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     ) {
       phase = "completed";
       endedAtSec = tick.t;
-      hudEvents.push(openTasksEndingCopy(examMode));
+      pushEnding(openTasksEndingCopy(examMode));
     }
   }
 
@@ -4242,10 +4316,17 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // keeps its ten points and every unreached objective stays unreached.
   // ---------------------------------------------------------------------
   let crashPin = prev.crashPin;
+  // Lane endings2 (N5): the first scored COLLISION bill whose detail is a person
+  // — the same filter the pin's impact reads below — latched and never cleared.
+  // Display only (the "personStruck" route hold and the pin ending's chip).
+  let personStruckAtSec = prev.personStruckAtSec;
   {
     const crashed = scoredEvents.some(
       (e) => e.kind === "violation" && e.terminateSession === true,
     );
+    if (personStruckAtSec === undefined && scoredEvents.some(isPersonStrikeBill)) {
+      personStruckAtSec = tick.t;
+    }
     // ── P2: THE STANDSTILL TEST WAS UNSIGNED, ALONE IN THIS GATE ─────────────
     // Filed against `finish.ts` CRASH_PIN_STUCK_S on 2026-08-17 and left open
     // as „another lane's file"; this is that lane. The test read
@@ -4460,7 +4541,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     // file could already speak say «край на маршрута», which is exactly what
     // has NOT happened here — telling a student he reached the end of a route
     // he drove off is the false sentence this ending exists to avoid.
-    hudEvents.push(offNetworkEndingCopy(examMode));
+    pushEnding(offNetworkEndingCopy(examMode));
   }
   if (
     phase === "driving" &&
@@ -4479,7 +4560,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     // one standing free of it alike (finish.ts `crashPinEndingCopy`, lane
     // endings / integrator ruling E3); its corrective is the one true of THIS
     // crash — keyed on the impact the pin recorded (round 2, ruling E6).
-    hudEvents.push(crashPinEndingCopy(examMode, crashPin.impact));
+    // …and, on a drive that struck a person at any point (N5 / N6), the duty's
+    // citation as the ending's chip — whatever the LAST impact was.
+    pushEnding(crashPinEndingCopy(examMode, crashPin.impact, personStruckAtSec !== undefined));
   }
 
   // A13: exam sessions TERMINATE the moment the official limits are crossed
@@ -4711,6 +4794,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // student reversed out and drove away), which the additive spread above
       // cannot express over `...prev` — so it is written unconditionally.
       crashPin,
+      // Lane endings2: both additive, both written only once they exist.
+      ...(personStruckAtSec !== undefined ? { personStruckAtSec } : {}),
+      ...(endingCopy !== undefined ? { endingCopy } : {}),
       // Same reason, same shape: every frame back on a road must clear it, and
       // `...prev` cannot express a field returning to null.
       offNetworkSinceSec: offNet.sinceSec,
@@ -5094,6 +5180,10 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // and was graded for — the debrief's evidence against unscoped praise.
     // Absent when none, the same shape rule.
     ...((state.taskCapBreaches ?? []).length > 0 ? { taskCapBreaches: state.taskCapBreaches } : {}),
+    // Lane endings2 (N2 / N3): the ending sentence the drive was closed on, for
+    // the end card. Client-only display metadata — `finishLessonPayload` never
+    // sends it, and a server-rebuilt result has none. Absent = no line.
+    ...(state.endingCopy !== undefined ? { ending: { ...state.endingCopy } } : {}),
   };
 }
 

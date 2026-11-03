@@ -119,6 +119,8 @@ import {
 import {
   driveAxisFromPadY,
   PadPointer,
+  PadSampleClock,
+  pointerSamples,
   releaseTouchControls,
   shouldRemapReversePedals,
   steerFromDrag,
@@ -2154,6 +2156,11 @@ export function TouchControls({
   // drifted apart without anything noticing.
   const steerPad = usePadPointer();
   const drivePad = usePadPointer();
+  /** R8 (2026-11-01): the drive pad's previous pointer sample, so a pedal
+   *  transition a SLIDE makes is stamped as the interval since it (touch.ts,
+   *  «A SLIDING THUMB IS OBSERVED IN SAMPLES»). Same lazy-state discipline as
+   *  the pads: one instance per mount, never replaced. */
+  const [driveClock] = useState(() => new PadSampleClock());
   const steerKnobRef = useRef<HTMLDivElement | null>(null);
   const driveKnobRef = useRef<HTMLDivElement | null>(null);
 
@@ -2478,20 +2485,24 @@ export function TouchControls({
   }, []);
 
   const driveApply = useCallback(
-    (clientY: number) => {
+    (clientY: number, atMs?: number, sinceMs?: number) => {
       const dy = clientY - driveCentreY.current;
       const axis = driveAxisFromPadY(clientY, driveCentreY.current);
       // Exactly one channel is ever held: both pedals down is ambiguous input
-      // and would also veto ReverseAssist's standstill hold.
+      // and would also veto ReverseAssist's standstill hold. `atMs` is the
+      // pointer sample's timeStamp: the assist times a lift and a press by the
+      // thumb, not by the frame that next reads them (engine/pedalTiming.ts).
+      // `sinceMs` is the previous sample's, for a sample of a slide (R8): the
+      // crossing happened somewhere between the two.
       if (axis > 0) {
-        touch.releaseBrake();
-        touch.setThrottle(axis);
+        touch.releaseBrake(atMs, sinceMs);
+        touch.setThrottle(axis, atMs, sinceMs);
       } else if (axis < 0) {
-        touch.releaseThrottle();
-        touch.setBrake(-axis);
+        touch.releaseThrottle(atMs, sinceMs);
+        touch.setBrake(-axis, atMs, sinceMs);
       } else {
-        touch.releaseThrottle();
-        touch.releaseBrake();
+        touch.releaseThrottle(atMs, sinceMs);
+        touch.releaseBrake(atMs, sinceMs);
       }
       // Same discipline as the wheel: announced from the axis the pedals were
       // just driven from, in every one of the three branches above, including
@@ -2516,11 +2527,11 @@ export function TouchControls({
 
   /** Take the pad: read where „middle" is, then obey the thumb immediately. */
   const driveBegin = useCallback(
-    (padEl: Element, clientY: number) => {
+    (padEl: Element, clientY: number, atMs?: number, sinceMs?: number) => {
       seatDriveCentre(padEl);
       const knob = driveKnobRef.current;
       if (knob) knob.style.transition = "none";
-      driveApply(clientY);
+      driveApply(clientY, atMs, sinceMs);
     },
     [driveApply, seatDriveCentre],
   );
@@ -2530,15 +2541,26 @@ export function TouchControls({
       if (!drivePad.claim(e.pointerId)) return;
       capturePointer(e.currentTarget, e.pointerId);
       drivePadRef.current = e.currentTarget;
-      driveBegin(e.currentTarget, e.clientY);
+      // A pointerdown is a discrete event at its own time: exact.
+      const st = driveClock.begin(e.timeStamp);
+      driveBegin(e.currentTarget, e.clientY, st.atMs, st.sinceMs);
     },
-    [driveBegin, drivePad],
+    [driveBegin, drivePad, driveClock],
   );
 
   const onDriveMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
+      // R7 (2026-11-01): a move is frame-aligned and coalesced — EVERY sample
+      // the browser kept is applied, in order, each at its own clientY and
+      // timeStamp, so a lift or a press made inside one frame is still seen;
+      // R8: each is stamped as the interval since the previous sample; R11 /
+      // R12: the list is stamped as ONE list, so the pad learns the
+      // digitizer's scan period from it and bounds a crossing after silence
+      // by it (touch.ts PadSampleClock.sampleList).
+      const samples = pointerSamples(e.nativeEvent ?? e);
       if (drivePad.owns(e.pointerId)) {
-        driveApply(e.clientY);
+        const stamps = driveClock.sampleList(samples);
+        samples.forEach((sample, i) => driveApply(sample.clientY, stamps[i]!.atMs, stamps[i]!.sinceMs));
       } else if (adoptable(drivePad, e, visible)) {
         // …and the same on the pedals, where a stranded axis is the one that
         // OVERWRITES the keyboard's brake rather than merely failing to add to
@@ -2546,10 +2568,18 @@ export function TouchControls({
         // `onDriveEnd`).
         capturePointer(e.currentTarget, e.pointerId);
         drivePadRef.current = e.currentTarget;
-        driveBegin(e.currentTarget, e.clientY);
+        // No sample of an adopted pointer was seen by this pad: its first
+        // sample's interval is open (touch.ts PadSampleClock).
+        driveClock.end();
+        const stamps = driveClock.sampleList(samples);
+        samples.forEach((sample, i) => {
+          const st = stamps[i]!;
+          if (i === 0) driveBegin(e.currentTarget, sample.clientY, st.atMs, st.sinceMs);
+          else driveApply(sample.clientY, st.atMs, st.sinceMs);
+        });
       }
     },
-    [driveApply, driveBegin, drivePad, visible],
+    [driveApply, driveBegin, drivePad, driveClock, visible],
   );
 
   /**
@@ -2645,8 +2675,10 @@ export function TouchControls({
   const onDriveEnd = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!drivePad.release(e.pointerId)) return;
-      touch.releaseThrottle();
-      touch.releaseBrake();
+      // A pointerup / cancel is a discrete event at its own time: exact.
+      driveClock.end();
+      touch.releaseThrottle(e.timeStamp);
+      touch.releaseBrake(e.timeStamp);
       driveAxisRef.current = 0;
       publishAxisAria(drivePadRef.current, driveAxisAria(0, reverseGestureRef.current));
       const knob = driveKnobRef.current;
@@ -2656,7 +2688,7 @@ export function TouchControls({
         knob.style.borderColor = "var(--accent)";
       }
     },
-    [touch, drivePad],
+    [touch, drivePad, driveClock],
   );
 
   const cabin = () => cabinRef.current;

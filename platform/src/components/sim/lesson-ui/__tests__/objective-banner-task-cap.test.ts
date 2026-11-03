@@ -254,11 +254,12 @@ describe("the class — every capped objective in the catalogue", () => {
 
 describe("the shell reads the rule at both call sites", () => {
   // Lane endings round 2 (E5): the hold's third argument is the way out the advisor card names.
+  // Lane endings2 (N5): the fourth is the person hold's lead, printed ALONE in place of the task.
   it("the banner mount prints the capped line under the route hold", () => {
     const mounts = jsxPropsOf(SHELL_SRC, "ObjectiveBanner");
     expect(mounts).toHaveLength(1);
     expect(mounts[0]!.titleBg).toBe(
-      "objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)",
+      "objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)",
     );
   });
 
@@ -272,12 +273,12 @@ describe("the shell reads the rule at both call sites", () => {
 
   it("MUTATION — the mount reverted to the bare title is rejected", () => {
     const mutated = SHELL_SRC.replace(
-      "titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}",
-      "titleBg={objectiveTitleUnderHold(snap.objectiveTitle, snap.objectiveHold, snap.objectiveHoldWayOut)}",
+      "titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)}",
+      "titleBg={objectiveTitleUnderHold(snap.objectiveTitle, snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)}",
     );
     expect(mutated).not.toBe(SHELL_SRC);
     expect(jsxPropsOf(mutated, "ObjectiveBanner")[0]!.titleBg).not.toBe(
-      "objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)",
+      "objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)",
     );
   });
 });

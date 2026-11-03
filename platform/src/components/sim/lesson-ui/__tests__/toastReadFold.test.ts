@@ -305,8 +305,9 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
 
   it("IN THE SHELL: the sentence's expression is the base's — ONE field for the banner and the follow-hint pill — and the one-line form is a second prop", () => {
     const shell = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
-    // Round 2 (E5): the same ONE field, now with the way out the advisor card names.
-    expect(shell).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut)}");
+    // Round 2 (E5): the same ONE field, now with the way out the advisor card names —
+    // and (lane endings2, N5) the person hold's lead.
+    expect(shell).toContain("titleBg={objectiveTitleUnderHold(bannerObjectiveLineBg(snap), snap.objectiveHold, snap.objectiveHoldWayOut, snap.objectiveHoldPersonLeadBg)}");
     expect(shell).toContain("oneLine={bannerOneLineWhileReading(snap.objectiveHold, toastReader.bannerYields)}");
     // the only `truncate` in the banner is the one-line arm's
     const banner = readFileSync(resolve(__dirname, "../../../../modules/sim/hud/ObjectiveBanner.tsx"), "utf8");
