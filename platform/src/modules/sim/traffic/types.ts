@@ -798,6 +798,15 @@ export interface StagedVehicleSpec {
    */
   playerGuard?: boolean;
   /**
+   * THE FOOTPRINT LINE GUARD (contracts.ts
+   * `StagedActorPathSpec.playerGuardFootprint`; traffic/staged.ts
+   * `footprintGuardAlongM`): the player guard's corridor is this actor's own
+   * line against the student's chassis box, not his centre within
+   * `GUARD_LATERAL_M`. Same window, standoff, gain and brake; the centre
+   * corridor stands while the student's heading is unknown. Absent = today.
+   */
+  playerGuardFootprint?: true;
+  /**
    * ONE RUN (sc-ln-obstacle-meeting:114706e0) — the actor drives its script
    * ONCE, retires off-scene (FR-B5-EXIT) and FR-B5-RETURN never brings it
    * back round. It is guard 2 of staged.ts's RETURN_CLEAR_M block — the one

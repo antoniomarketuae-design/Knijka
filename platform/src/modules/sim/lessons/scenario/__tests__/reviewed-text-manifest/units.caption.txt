@@ -470,9 +470,9 @@ sc-vp-telltale-red/shadow-correct	efb5f39aca2f 24fb34d2d5c7 75387aa3499c bfcf54d
 sc-vp-telltale/mistake-ignore	1e458e3c9303 604192090a60 cdc9c496ef7c f8aed0cf895c
 sc-vp-telltale/mistake-panic-stop	e26fb342f6fa 8599e3d26073 db1d2c19bce0 01017d93d4a2
 sc-vp-telltale/shadow-correct	b6a2f3a49ddf 1f763ba6b978 f8d22d5930a2 27938af21ec5
-sc-vu-bikelane-turn/mistake-cut-path	374f7e7539ec e35d4a6f17d8 2ae5806777a7 5b20a94a7bd6
+sc-vu-bikelane-turn/mistake-cut-path	374f7e7539ec e35d4a6f17d8 2aa1eded7602 5b20a94a7bd6
 sc-vu-bikelane-turn/mistake-only-behind	374f7e7539ec 0fa93e9af817 7f5ad9e62708 609a3cc71f84
-sc-vu-bikelane-turn/shadow-correct	76081d1ab2d5 6717e7c05344 89980ca047f2 b401f20621a3 4cbe160418a9
+sc-vu-bikelane-turn/shadow-correct	76081d1ab2d5 6717e7c05344 5e592d2d3aaa b401f20621a3 4cbe160418a9
 sc-vu-blindspot-moto/mistake-mirror-only	232421672a07 8f086bf4d87e ea6d2cf9c16f 4cacf24bf7d2
 sc-vu-blindspot-moto/mistake-no-indicator	7ade3ca7903f 8727d74628a4 1302a78eedbc 141fb453ccd0 8d800b4ddba7
 sc-vu-blindspot-moto/shadow-correct	2aeced01140b 2a0ba67b6bdd 5dec3cb1c82f 57b0bc451ccb 82c3bc530250 7a68fd7e55fa 2a4c23b97d08 f8cc259d7bac

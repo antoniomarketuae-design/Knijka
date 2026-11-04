@@ -942,9 +942,8 @@ const VBL_CF_Y = -8.26; // westbound rider line (lane center − 4.2)
 
 /**
  * THE WITH-FLOW RIDER — the classic curb cyclist going the driver's own
- * direction (the sc-vu-cyclist-hook recipe, reused). Holds ~26 m short of the
- * mouth curb-side; released as the driver closes; cruises STRAIGHT through the
- * junction as the driver overtakes then turns across it. Adjudicated by the
+ * direction, the rider the lesson's REAR check (right mirror, right shoulder)
+ * exists for. Adjudicated by the
  * shipped CyclistRightHookRunner (prioritySituation "cyclist-right-hook"); a
  * CYCLIST to every reader (the bill, the shell, the rear badge, the near-miss
  * stat and the graded cyclistNear query) because its runner casts it one —
@@ -964,8 +963,35 @@ const VBL_CF_Y = -8.26; // westbound rider line (lane center − 4.2)
  * mistake-cut-path his runner billed the hook while he rode ahead-left of the
  * car, off a line the car never crossed. The world, measured
  * (vu-bikelane-wf-rider-line.test.ts): y −6.66 from his spawn to the mouth on
- * every rung; the shadow still yields to him, 13.03–15.20 m closest live
- * across L1–L5 (14.26 m in the recorder).
+ * every rung.
+ *
+ * HE COMES FROM BEHIND (sc-vu-bikelane-turn:9141072b clause (a), lane
+ * vbltiming; integrator rulings T1–T4, 2026-11-01/02). Until then he was held
+ * 30 m short of the node and cruised at 3.0 m/s, so on every rung of every
+ * demo he was AHEAD of the car — +13.84 (L1) … +16.04 m (L2) in front of its
+ * centre at the shadow's rest, never behind it (rig-w3n: min lead +9.56 m,
+ * everBehind false) — and instruction 3, the objective and the moment
+ * «Огледало и рамо назад — движещият се направо велосипедист» sent the student
+ * to look behind for a rider who was never there. Now:
+ *   · HOLD −73.5 (x −73.5): behind the car's release point, so the car passes
+ *     him STANDING at t 7.48, x −73.4, 41.8 km/h — before the earliest release
+ *     (L2, t 8.38). No near-miss can open on a rider at rest, and from then on
+ *     he is behind the car: no follow episode.
+ *   · CRUISE 5.0 m/s (18 km/h): on the shadow he is 12.06 (L2) … 15.72 m (L1)
+ *     behind its centre at its rest (t 17.60, x −20.04), on its right, and
+ *     passes the STANDING car at t 20.02–20.75; both riders are ≥ 8 m past the
+ *     mouth ≥ 6.9 s before its turn latches (33.33). On the cut-path he
+ *     catches the car slowing for the turn from behind on its right and is cut
+ *     off: the hook at 22.60 with him behind-right of the car on every rung.
+ *   · `playerGuardFootprint` (contracts.ts): the player guard every staged
+ *     rider carries braked for a student whose CENTRE was within 3.0 m of his
+ *     line — wider than his own 2.6 m — so a student standing in his lane held
+ *     him ≈ 6 m behind for as long as he stood (measured: rest x −26.04 against
+ *     the car at −20.04, < 0.1 m/s until it moved off). With the field he brakes
+ *     for the student's BODY on his line: a car standing in its lane (1.75 m
+ *     clear of it) is passed, a car turned across the track is stopped short
+ *     of. This rider only (F10's census and vbl-footprint-guard.test.ts M3).
+ * Numbers: lessons/scenario/__tests__/vbl-wf-timing.test.ts, every rung.
  */
 const VBL_RIDER_WF: CyclistRightHookSpec = {
   id: "sc-vbl-rider-wf",
@@ -975,10 +1001,14 @@ const VBL_RIDER_WF: CyclistRightHookSpec = {
   actor: {
     // Eastbound through the junction: vu-n-w → vu-n-c → vu-n-e.
     pathNodes: ["vu-n-w", "vu-n-c", "vu-n-e"],
-    hold: { nodeIndex: 1, offsetM: -30 }, // curb-side, 30 m short of vu-n-c
-    cruiseSpeedMps: 3.0, // ~11 km/h — a city cyclist; overtaken below the follow floor
+    hold: { nodeIndex: 1, offsetM: -73.5 }, // curb-side, 73.5 m short of vu-n-c — BEHIND the car's release point (see above)
+    cruiseSpeedMps: 5.0, // 18 km/h — a city cyclist who catches a car slowing for the turn
     extraRightOffsetM: VBL_THROUGH_Y - VBL_WF_Y, // +2.6 — right of travel = SOUTH: the with-flow line y −6.66 (see above)
     colorIndex: 1,
+    // The footprint line guard (contracts.ts `playerGuardFootprint`): he
+    // brakes for the student's BODY on his line, not for a car standing in its
+    // own lane 1.75 m clear of it — so the student who waits is passed.
+    playerGuardFootprint: true,
   },
   junctionNodeIndex: 1,
   releaseDistM: 60,
@@ -999,9 +1029,11 @@ const VBL_RIDER_WF: CyclistRightHookSpec = {
  * StagedActorPathSpec; lane npcstep round 4). Until then the opt-out was the
  * negative sign of this offset (the A11 marker is offset > 0) — the graded
  * queries now read the cast's kind, «cyclist», so the sign no longer says
- * anything. Held ~36 m short of the mouth so it
- * arrives ~2.4 s AFTER the with-flow rider — the driver clears one, then the
- * other, then turns.
+ * anything. Held 30 m short of the node on the east arm (unchanged by lane
+ * vbltiming, ruling T3): on the shadow it crosses the mouth FIRST, ≥ 8 m past
+ * it at t 18.57–19.33 while the car stands at x −20, and the with-flow rider
+ * — released behind the car — follows ≈ 7 s later (25.63–26.37); the driver
+ * lets both pass, then turns.
  */
 const VBL_RIDER_CF: CyclistRightHookSpec = {
   id: "sc-vbl-rider-cf",

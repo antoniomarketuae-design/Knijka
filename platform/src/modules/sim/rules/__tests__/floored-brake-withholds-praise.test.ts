@@ -105,11 +105,13 @@ interface Run {
   flooredFrames: number[];
   /** The causeless ledger's accrual on each frame (> 0 = an episode accruing). */
   accruing: number[];
+  /** Frames on which the causeless ledger credited emergency-grade braking (`lastQualAt === t`). */
+  credited: number[];
 }
 
 function run(tp: Tape): Run {
   let s = createRuleEngine();
-  const out: Run = { clean: [], violations: [], flooredFrames: [], accruing: [] };
+  const out: Run = { clean: [], violations: [], flooredFrames: [], accruing: [], credited: [] };
   for (const f of tp.ticks) {
     const r = reduceTick(s, f);
     s = r.state;
@@ -119,6 +121,7 @@ function run(tp: Tape): Run {
     }
     if (s.harshBrake.flooredAt === f.t) out.flooredFrames.push(f.t);
     if (s.harshBrake.activeSince !== null && s.harshBrake.qualifiedSec > 0) out.accruing.push(f.t);
+    if (s.harshBrake.activeSince !== null && s.harshBrake.lastQualAt === f.t) out.credited.push(f.t);
   }
   return out;
 }
@@ -283,7 +286,12 @@ describe("the payout waits while a causeless episode is accruing (F1)", () => {
     }
   });
 
-  it("CONTROL — a 0.2 s 9 m/s² blip is never floored; a payout falling inside it waits only until the pedal is off (stated in frames), and one away from it is paid to the frame", () => {
+  // MOVED 2026-11-01, BOUNDED 2026-11-02 (`sc-follow-tailgater:63c0c28c`, the integrator's P3 and round-2 Q1), and
+  // for this reason only: the payout now also waits in the release after an emergency-grade burst (F1 extended across
+  // the bridge, so no praise is minted between the bursts of a pump — rules/engine.ts „ONE BRAKE CHECK, ONE RECORD"),
+  // but never longer than `harshBrakeSustainSec` after the chain's LAST CREDITED frame. A lone blip is a chain of one:
+  // still un-floored, un-named and paid — on the first moving frame that lies the sustain behind its last credit.
+  it("CONTROL — a 0.2 s 9 m/s² blip is never floored; a payout falling inside it waits only until its last credited frame lies the sustain behind (stated in frames), and one away from it is paid to the frame", () => {
     const away = tape({ cruiseKmh: 30, endSec: 70, brakeAt: 12, decel: 9, forSec: 0.2 });
     const ra = run(away);
     expect(ra.flooredFrames).toEqual([]);
@@ -294,13 +302,14 @@ describe("the payout waits while a causeless episode is accruing (F1)", () => {
     const due = owed(inside);
     expect(ri.flooredFrames).toEqual([]);
     expect(ri.clean.length).toBe(due.length);
-    const lastAccruing = ri.accruing[ri.accruing.length - 1]!;
-    // deferred to the first frame after the episode stops accruing: never more
-    // than the blip (12 frames) plus the reading window (3 frames)
-    expect(ri.clean[0]).toBeCloseTo(lastAccruing + H, 9);
+    const lastCredited = ri.credited[ri.credited.length - 1]!;
+    // deferred to the first moving frame on which the blip's last credited frame lies `harshBrakeSustainSec` behind
+    // (an exact tie held): never more than the blip (12 frames) plus the reading window (3 frames) plus the sustain
+    // (24 frames) past the frame it was due
+    expect(ri.clean[0]).toBeCloseTo(lastCredited + CFG.harshBrakeSustainSec, 9);
     const deferFrames = Math.round((ri.clean[0]! - due[0]!) * 60);
     expect(deferFrames).toBeGreaterThan(0);
-    expect(deferFrames).toBeLessThanOrEqual(15);
+    expect(deferFrames).toBeLessThanOrEqual(15 + 24);
     expect(ri.clean.slice(1)).toEqual(due.slice(1));
   });
 });

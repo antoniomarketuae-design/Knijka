@@ -357,6 +357,9 @@ export {
   serializeRuleEvents,
   // Round 3 of the 2026-09-25 task-cap ruling (R4): the blown task ceilings.
   serializeTaskCapBreaches,
+  // 2026-11-01 (sc-follow-tailgater:63c0c28c, QUESTION 10): the brake checks the ledger saw and did not bill.
+  serializeUnbilledHardBrakes,
+  type WireUnbilledHardBrake,
   type FinishLessonWire,
   type GradedFinishWire,
   type WireCoachedMistake,

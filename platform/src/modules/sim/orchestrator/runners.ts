@@ -1727,6 +1727,11 @@ export class CyclistRightHookRunner implements EventRunner {
         // (contracts.ts `gradedOnlyByOwnRunner`) — this runner grades the
         // actor alone. Absent on every rider but the counter-flow one.
         ...(s.actor.gradedOnlyByOwnRunner === true ? { gradedOnlyByOwnRunner: true as const } : {}),
+        // The authored footprint line guard (contracts.ts
+        // `playerGuardFootprint`, lane vbltiming) — forwarded exactly as the
+        // opt-out above. Absent on every rider but sc-vu-bikelane-turn's
+        // with-flow one: every other rider keeps the centre corridor.
+        ...(s.actor.playerGuardFootprint === true ? { playerGuardFootprint: true as const } : {}),
       });
       if (!view) throw new Error(`staged event ${s.id}: cyclist path failed to stage`);
     } else {

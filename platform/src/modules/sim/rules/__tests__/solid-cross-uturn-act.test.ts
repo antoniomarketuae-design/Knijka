@@ -2172,7 +2172,7 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     expect(corrective!("CROSSED_SOLID_LINE", "no-such-act")).toBe(pooled);
   });
 
-  it("CENSUS: two acts in the catalogue have their own corrective — the U-turn, and (since 2026-10-08) the return in front of an overtaken vehicle — and no other card moved", () => {
+  it("CENSUS: three acts in the catalogue have their own corrective — the right hook on a cyclist (since lane vbltiming), the U-turn, and (since 2026-10-08) the return in front of an overtaken vehicle — and no other card moved", () => {
     const withOwn: string[] = [];
     for (const [code, acts] of Object.entries(rules.PER_ACT_COPY)) {
       for (const [detail, copy] of Object.entries(acts ?? {})) {
@@ -2186,7 +2186,13 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     // LANE_ENTRY_FORCED_BRAKING advice («…пусни я да мине и влез в пролуката
     // ЗАД нея») is the lane-drop act's own and is wrong for a driver who has
     // just overtaken — `lane-entry-act-copy.test.ts` pins the act's row.
-    expect(withOwn).toEqual([`CROSSED_SOLID_LINE|${UTURN}`, "LANE_ENTRY_FORCED_BRAKING|overtakeReturn"]);
+    // RESTATED by lane vbltiming (sc-vu-bikelane-turn:9141072b, integrator
+    // ruling T5(a)): FAILED_TO_YIELD «cyclist-right-hook» now has its own
+    // corrective — the pooled one ends «На кръгово гледаш НАЛЯВО» and tells a
+    // right-turner to look for the junction's priority traffic, not for the
+    // rider going straight on his right (`vbl-hook-situation-copy.test.ts`
+    // pins the row). Was [U-turn, overtakeReturn].
+    expect(withOwn).toEqual(["FAILED_TO_YIELD|cyclist-right-hook", `CROSSED_SOLID_LINE|${UTURN}`, "LANE_ENTRY_FORCED_BRAKING|overtakeReturn"]);
   });
 });
 

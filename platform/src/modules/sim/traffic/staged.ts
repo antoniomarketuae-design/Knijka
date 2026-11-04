@@ -18,6 +18,7 @@
  * (the orchestrator's timing is responsible for plausibility).
  */
 
+import { PLAYER_HALF_LENGTH_M, PLAYER_HALF_WIDTH_M } from "../collision";
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
 import { DEFAULT_TRAFFIC_CONFIG, vehicleHalfLengthM } from "./types";
 import { playerShedThisStep } from "./vehicles";
@@ -771,6 +772,100 @@ function playerGuarded(agent: StagedVehicleAgent): boolean {
 }
 
 /**
+ * The footprint line guard's lateral half-width, m: the cyclist PROXY's
+ * half-width inside the vulnerable-pass body allowance —
+ * `VULNERABLE_PASS_BODY_ALLOWANCE_M` 1.25 (runtime/worldRuntime.ts, «0.85 hero
+ * + 0.4 proxy») less the hero's half-width `PLAYER_HALF_WIDTH_M` 0.85. Not a
+ * new number: the width the product already gives a rider's body. Kept here as
+ * a literal because traffic/ may not import the runtime; the pair is pinned
+ * equal by lessons/scenario/__tests__/vbl-footprint-guard.test.ts.
+ */
+export const FOOTPRINT_LINE_HALF_WIDTH_M = 0.4;
+
+/**
+ * THE FOOTPRINT LINE GUARD (sc-vu-bikelane-turn:9141072b, lane vbltiming;
+ * integrator ruling T1(b), confirmed 2026-11-02) — read ONLY for an actor whose
+ * spec authors `playerGuardFootprint: true` (the with-flow rider of
+ * sc-vu-bikelane-turn, nobody else).
+ *
+ * WHY. Step 2's spec-guard is a FOLLOWING guard: it brakes for a student whose
+ * CENTRE is within `GUARD_LATERAL_M` 3.0 m of the actor's heading line. A rider
+ * on the curb line 2.6 m right of the car's lane centre is inside that corridor
+ * whenever the car is ahead of him in its own lane — so a student who stands
+ * at the mouth to let him pass holds him ≈ `GUARD_STOP_SHORT_M` 6 m behind his
+ * own centre for as long as he stands (measured on the committed shadow at
+ * hold −73.5 / 5.0 m/s: rest x −26.04 against the car at −20.04, < 0.1 m/s
+ * until the car moves off, recorder seed 7 and L1–L3). The lesson's rear check
+ * then finds a rider who can never pass.
+ *
+ * WHAT. The rider's own line — his heading through his centre — against the
+ * student's BODY: the chassis box (`PLAYER_HALF_LENGTH_M` 2.02 ×
+ * `PLAYER_HALF_WIDTH_M` 0.85) placed on the student's centre with the per-agent
+ * derived heading (`playerDirX/Y`, latched while he moves). The actor brakes
+ * for the NEAREST point of that box that lies within
+ * `FOOTPRINT_LINE_HALF_WIDTH_M` of his line and ahead of him: the returned
+ * `along` feeds the same window, standoff, gain and brake cap as step 2. A car
+ * standing in its lane 1.75 m clear of his line is not on it, and he passes;
+ * a car turned part-way across the track has its corner on his line, and he
+ * stops short of the corner (a centre-only corridor narrow enough to let him
+ * pass would strike it: a car at 135° whose centre is 1.86 m off his line has
+ * its front-right corner 0.17 m past it).
+ *
+ * Returns the along-line distance, m, from the actor's centre to the nearest
+ * such point (0 when the box covers his own position on the line), or
+ * Infinity when no part of the box is on his line ahead of him. `rel` is the
+ * student's centre relative to the actor, `f` the actor's unit heading, `p`
+ * the student's unit heading. Pure; no allocation.
+ */
+export function footprintGuardAlongM(
+  relX: number,
+  relY: number,
+  fx: number,
+  fy: number,
+  px: number,
+  py: number,
+): number {
+  const w = FOOTPRINT_LINE_HALF_WIDTH_M;
+  // The student's right-of-travel normal, (py, −px).
+  const qx = py;
+  const qy = -px;
+  let aMin = Infinity;
+  let aMax = -Infinity;
+  // The four corners in order round the box, in the actor's frame:
+  // along = r·f, cross = r × f (positive = right of the actor's travel).
+  let prevA = 0;
+  let prevC = 0;
+  for (let i = 0; i <= 4; i++) {
+    const k = i % 4;
+    const sl = k === 0 || k === 3 ? -PLAYER_HALF_LENGTH_M : PLAYER_HALF_LENGTH_M;
+    const sw = k < 2 ? -PLAYER_HALF_WIDTH_M : PLAYER_HALF_WIDTH_M;
+    const rx = relX + sl * px + sw * qx;
+    const ry = relY + sl * py + sw * qy;
+    const a = rx * fx + ry * fy;
+    const c = rx * fy - ry * fx;
+    if (i > 0) {
+      // Where the edge (prev → this) crosses the strip's two borders.
+      for (const b of [-w, w]) {
+        if ((prevC - b) * (c - b) < 0) {
+          const u = (b - prevC) / (c - prevC);
+          const ab = prevA + u * (a - prevA);
+          if (ab < aMin) aMin = ab;
+          if (ab > aMax) aMax = ab;
+        }
+      }
+    }
+    if (i < 4 && Math.abs(c) <= w) {
+      if (a < aMin) aMin = a;
+      if (a > aMax) aMax = a;
+    }
+    prevA = a;
+    prevC = c;
+  }
+  if (aMax <= 0) return Infinity;
+  return aMin > 0 ? aMin : 0;
+}
+
+/**
  * FR-B5-REACH (2026-08-31, sc-follow-tailgater:41a625d1) — A 16 m WINDOW IS
  * NOT A GUARD FOR A CAR DOING 61 КМ/Ч.
  *
@@ -1293,9 +1388,12 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //    delta taken while he was ABOVE the stopped bar is trusted, so creep and
   //    float never rewrite the direction he actually arrived on.
   //
-  //    Reads nothing and decides nothing on its own — `reentryClearAt` (1b) is
-  //    the only consumer, and for every actor it never refuses this is dead
-  //    weight of four numbers and six flops.
+  //    Reads nothing and decides nothing on its own. Two consumers:
+  //    `reentryClearAt` (1b), and — for an actor that authors
+  //    `playerGuardFootprint` only (the with-flow rider of
+  //    sc-vu-bikelane-turn, lane vbltiming) — the footprint line guard of step
+  //    2 (`footprintGuardAlongM`). For every other actor that 1b never refuses
+  //    this is dead weight of four numbers and six flops.
   if (env.hasPlayer) {
     if (
       env.playerSpeedMps > HOLD_LIT_SPEED_MPS &&
@@ -1439,8 +1537,24 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       ? Math.abs(cross)
       : Math.abs(cross - (agent.latTarget - agent.lat));
     const corridorM = specGuarded ? GUARD_LATERAL_M : agent.laneWidthM / 2;
-    if (along > 0 && along < guardWindowM(agent) && lateral < corridorM) {
-      const guardTarget = Math.max(0, (along - GUARD_STOP_SHORT_M) * GUARD_APPROACH_GAIN);
+    // THE FOOTPRINT LINE GUARD (`StagedVehicleSpec.playerGuardFootprint`,
+    // sc-vu-bikelane-turn:9141072b lane vbltiming) — for the ONE actor that
+    // authors it, and only once the student's heading is known, the corridor
+    // is his own line against the student's BODY (`footprintGuardAlongM`);
+    // otherwise this is the centre corridor above, unchanged.
+    const footprint =
+      specGuarded &&
+      spec.playerGuardFootprint === true &&
+      (agent.playerDirX !== 0 || agent.playerDirY !== 0);
+    const guardAlong = footprint
+      ? footprintGuardAlongM(relX, relY, fx, fy, agent.playerDirX, agent.playerDirY)
+      : along;
+    if (
+      footprint
+        ? guardAlong < guardWindowM(agent)
+        : along > 0 && along < guardWindowM(agent) && lateral < corridorM
+    ) {
+      const guardTarget = Math.max(0, (guardAlong - GUARD_STOP_SHORT_M) * GUARD_APPROACH_GAIN);
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;

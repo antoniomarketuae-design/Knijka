@@ -463,12 +463,62 @@ function drive(
   );
 }
 
-/** The verifier's cell: sc-vu-bikelane-turn L1, the cut-path demo followed on
- *  rapier, the driver carrying on after a crash. */
+/**
+ * The verifier's cell: sc-vu-bikelane-turn L1, a car driven into a staged
+ * rider on rapier, the driver carrying on after the crash.
+ *
+ * RESTATED by lane vbltiming (sc-vu-bikelane-turn:9141072b clause (a),
+ * integrator ruling T4). WAS: the committed cut-path demo followed on rapier,
+ * which drove through the with-flow rider (from grid point 1051) and then the
+ * counter-flow rider (from 1137). The re-timed cut-path is the right hook on a
+ * rider coming from behind and touches NO rider — his footprint guard holds him
+ * short of the car's body (vbl-wf-timing.test.ts G6: min air 0.94 … 3.81 m) —
+ * so it can no longer be this cell. A cell needs a touch: the car is driven up
+ * the through road on the line y = −5.9, 0.76 m inside the with-flow rider's
+ * line (−6.66) — less than the half-widths of the two bodies — at 20 км/ч, into
+ * him STANDING at his hold x −73.5 (the director releases him only once the car
+ * is within ≈ 56 m of the node). One rider is struck; the counter-flow rider's
+ * name and kind stay pinned by the census of casts above.
+ */
 function bikelane(deltas: readonly number[]): RiderRow {
-  const trace = demoTrace("sc-vu-bikelane-turn", "mistake-cut-path.trace.json");
-  const max = Math.ceil(trace.samples[trace.samples.length - 1].tSec * 60) + 300;
-  return drive("sc-vu-bikelane-turn", 1, trace, followTape(trace, { afterCrash: "carry-on" })(), max, deltas);
+  const tape = demoTrace("sc-vu-bikelane-turn", "shadow-correct.trace.json");
+  const s0 = tape.samples[0];
+  const line: Array<{ x: number; y: number }> = [{ x: s0.x, y: s0.y }];
+  for (let x = s0.x + 2; x <= -110; x += 2) line.push({ x, y: s0.y + ((x - s0.x) / (-110 - s0.x)) * (-5.9 - s0.y) });
+  for (let x = -108; x <= -30; x += 2) line.push({ x, y: -5.9 });
+  const synthetic = { ...tape, samples: line.map((p, i) => ({ ...s0, ...p, tSec: i })) } as ScenarioTrace;
+  const control = followPath(synthetic, { holdAtY: s0.y, goStep: 0, cruiseKmh: 20 })();
+  return drive("sc-vu-bikelane-turn", 1, { ...tape, samples: [s0] } as ScenarioTrace, control, 1500, deltas);
+}
+
+/**
+ * THE COUNTER-FLOW RIDER'S STRIKE (integrator condition C2, landing of lane
+ * vbltiming, 2026-11-04). The restated cell above strikes the with-flow rider
+ * only, and on rapier the standing rider BLOCKS the car (measured: it rests at
+ * x −76.3, the session ends 12 s later), so one drive cannot reach the second
+ * rider. The rapier + ear pin of a strike on the `gradedOnlyByOwnRunner`
+ * counter-flow rider (npc 1001, «cyclist», graded) is therefore restored by a
+ * SECOND synthetic line, driven on its own: up the car's lane (y −4.06) to
+ * x −40, across onto the line y −8.0 by x −20 (0.26 m inside his line −8.26)
+ * and on east at 20 км/ч. Both riders are released as the car passes ≈ 60 m
+ * from the node; the with-flow rider rides behind a car he cannot catch, and
+ * the counter-flow rider, riding west into it, is held by his guard and struck
+ * STANDING. MEASURED at 60 Hz on the landing tree (and the same on 30 Hz,
+ * 13 fps, 0.37 s and the w69 phone cadence): reports at grid points
+ * 1405–1407 and 1416, all «sc-vbl-rider-cf»; ear [1406 cyclist npc 1001
+ * graded at 20.0 km/h, 1416 cyclist npc 1001 graded at 1.05 km/h — the car's
+ * rebound re-touch of the same body]; ONE COLLISION row, t 23.42, 10 points.
+ */
+function bikelaneCf(deltas: readonly number[]): RiderRow {
+  const tape = demoTrace("sc-vu-bikelane-turn", "shadow-correct.trace.json");
+  const s0 = tape.samples[0];
+  const line: Array<{ x: number; y: number }> = [{ x: s0.x, y: s0.y }];
+  for (let x = s0.x + 2; x <= -40; x += 2) line.push({ x, y: s0.y });
+  for (let x = -38; x <= -20; x += 2) line.push({ x, y: s0.y + ((x + 40) / 20) * (-8.0 - s0.y) });
+  for (let x = -18; x <= 40; x += 2) line.push({ x, y: -8.0 });
+  const synthetic = { ...tape, samples: line.map((p, i) => ({ ...s0, ...p, tSec: i })) } as ScenarioTrace;
+  const control = followPath(synthetic, { holdAtY: s0.y, goStep: 0, cruiseKmh: 20 })();
+  return drive("sc-vu-bikelane-turn", 1, { ...tape, samples: [s0] } as ScenarioTrace, control, 2600, deltas);
 }
 
 /**
@@ -491,13 +541,13 @@ function child(deltas: readonly number[]): RiderRow {
 const rowsOf = (r: RiderRow, kind: string) => r.rows.filter((x) => x[1] === kind);
 
 describe("the chassis into a staged rider's shell — one touch is one kind under one name, and one row", () => {
-  it("sc-vu-bikelane-turn L1, the cut-path demo carried on (the verifier's cell): the sentinel and the shell report each rider struck as ONE cyclist — no «vehicle» report, one cyclist row per rider", () => {
+  it("sc-vu-bikelane-turn L1, a car driven into the with-flow rider and carried on (the verifier's cell): the sentinel and the shell report the rider struck as ONE cyclist — no «vehicle» report, one cyclist row", () => {
     const r = bikelane([1 / 60]);
     note(`[bikelane 60 Hz] clock ${r.shellClock} reports ${JSON.stringify(r.reports)} ear ${JSON.stringify(r.ear)} rows ${JSON.stringify(r.rows)} closed ${r.closedAt}`);
-    const rider = r.reports.filter(([, , id]) => id === "sc-vbl-rider-cf");
+    const rider = r.reports.filter(([, , id]) => id === "sc-vbl-rider-wf");
     // Both reporters spoke: the sentinel on the grid, the ear a step later.
     expect(rider.length).toBeGreaterThanOrEqual(1);
-    expect(r.ear.some(([, kind, npcId, graded]) => npcId === 1001 && kind === "cyclist" && graded)).toBe(true);
+    expect(r.ear.some(([, kind, npcId, graded]) => npcId === 1000 && kind === "cyclist" && graded)).toBe(true);
     // One kind, one name: every report about a vehicle-class body in this
     // drive is the named cyclist — never an anonymous «vehicle».
     expect(r.reports.filter(([, w]) => w === "vehicle")).toEqual([]);
@@ -513,19 +563,45 @@ describe("the chassis into a staged rider's shell — one touch is one kind unde
     // row at t 18.27; this tree — reports from 1051 «sc-vbl-rider-wf» (to 1069)
     // then from 1137 «sc-vbl-rider-cf», ear [1052 npc 1000 graded, 1138 npc 1001
     // graded], rows at t 17.52 and 18.95. One row per body struck, each body
-    // heard once by the ear.
+    // heard once by the ear. (History: since lane vbltiming the cell is the
+    // driven line above, not the cut-path demo — see `bikelane`.)
     expect(rowsOf(r, "vehicle")).toEqual([]);
     const struck = [...new Set(r.reports.map(([, , id]) => id))];
-    expect(struck).toEqual(["sc-vbl-rider-wf", "sc-vbl-rider-cf"]);
-    expect(r.ear.map(([, kind, npcId, graded]) => `${kind}:${npcId}:${graded}`)).toEqual(["cyclist:1000:true", "cyclist:1001:true"]);
+    // RESTATED (lane vbltiming): was [wf, cf] / ear [1000, 1001] on the old
+    // cut-path; the driven line strikes the with-flow rider alone.
+    expect(struck).toEqual(["sc-vbl-rider-wf"]);
+    expect(r.ear.map(([, kind, npcId, graded]) => `${kind}:${npcId}:${graded}`)).toEqual(["cyclist:1000:true"]);
     expect(rowsOf(r, "cyclist").length).toBe(struck.length);
+
+    // C2 (landing vt): …and the SECOND line, into the counter-flow rider
+    // (`bikelaneCf`), so the cell again pins both strikes and both ears.
+    const c = bikelaneCf([1 / 60]);
+    note(`[bikelane-cf 60 Hz] clock ${c.shellClock} reports ${JSON.stringify(c.reports)} ear ${JSON.stringify(c.ear)} rows ${JSON.stringify(c.rows)} closed ${c.closedAt}`);
+    expect(c.reports.filter(([, w]) => w === "vehicle"), "a report about the counter-flow rider's body called it a vehicle").toEqual([]);
+    expect(c.reports.filter(([, w, id]) => w === "cyclist" && id !== "sc-vbl-rider-cf"), "the counter-flow line struck someone else, or a report stayed anonymous").toEqual([]);
+    expect(rowsOf(c, "vehicle")).toEqual([]);
+    expect(rowsOf(c, "cyclist").length, "one COLLISION row for the counter-flow rider").toBe(1);
+    // The rig's ear heard the counter-flow rider's shell — and only it.
+    expect(
+      c.ear.map(([, kind, npcId, graded]) => `${kind}:${npcId}:${graded}`),
+      "the rig's ear did not hear the counter-flow rider's shell as a graded cyclist (npc 1001)",
+    ).toEqual(c.ear.length > 0 ? c.ear.map(() => "cyclist:1001:true") : ["cyclist:1001:true"]);
+    // The cell's pin as it stood before lane vbltiming: both riders struck, both heard.
+    expect([...new Set([...r.reports, ...c.reports].map(([, , id]) => id))]).toEqual(["sc-vbl-rider-wf", "sc-vbl-rider-cf"]);
+    expect([...new Set([...r.ear, ...c.ear].map(([, kind, npcId, graded]) => `${kind}:${npcId}:${graded}`))]).toEqual([
+      "cyclist:1000:true",
+      "cyclist:1001:true",
+    ]);
   }, 600_000);
 
   it("…and on every cadence the same reports, the same ear, the same rows, the same sheet", () => {
     const ref = bikelane([1 / 60]);
+    const refCf = bikelaneCf([1 / 60]);
     for (const [name, deltas] of CADENCES) {
       const r = bikelane(deltas);
       expect({ cadence: name, ...r }).toEqual({ cadence: name, ...ref });
+      const c = bikelaneCf(deltas);
+      expect({ cadence: name, line: "counter-flow", ...c }).toEqual({ cadence: name, line: "counter-flow", ...refCf });
     }
   }, 900_000);
 

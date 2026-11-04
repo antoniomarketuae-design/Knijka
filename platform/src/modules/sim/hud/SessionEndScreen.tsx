@@ -1383,16 +1383,21 @@ export function SessionEndScreen({
     // mark too short to bill leaves no row of any code, and without this the
     // card would print an unscoped ✓ the «Разбор» below scopes.
     const taskCapBreaches = result.taskCapBreaches ?? [];
+    // 2026-11-01 (QUESTION 10, P4): the brake checks the ledger saw and did not
+    // bill — the «Разбор» below scopes every CLEAN_DRIVING row on such a drive,
+    // and the card's ✓ row must carry the same rider.
+    const unbilledHardBrakes = result.unbilledHardBrakes ?? [];
     return summary.commendations.map((c) =>
       commendationRiderBg(
         summary,
-        commendationRiderFlags(summary, c, lessonMistakes, coachedMistakes, taskCapBreaches),
+        commendationRiderFlags(summary, c, lessonMistakes, coachedMistakes, taskCapBreaches, unbilledHardBrakes),
         lessonMistakes,
         coachedMistakes,
         taskCapBreaches,
+        unbilledHardBrakes,
       ),
     );
-  }, [summary, result.lessonMistakes, result.coachedMistakes, result.taskCapBreaches]);
+  }, [summary, result.lessonMistakes, result.coachedMistakes, result.taskCapBreaches, result.unbilledHardBrakes]);
   /**
    * Does ANY praise on this card stand unqualified? A card on which not one
    * does is not a certificate surface, and its heading stops being painted in

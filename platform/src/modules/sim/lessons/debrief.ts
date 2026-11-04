@@ -67,6 +67,7 @@ import {
   type ConditionalPenalty,
   type ControlPointsFigure,
   type OffenceBilling,
+  type UnbilledHardBrake,
   type ViolationCode,
   type ViolationEvent,
 } from "../rules";
@@ -412,6 +413,22 @@ export function buildDebrief(
    * точките», «внимавай за учебния момент»).
    */
   const adaptationTaught = adaptationBreachTaught(context.coachedMistakes ?? []);
+  /**
+   * …AND THE BRAKE CHECK THE LEDGER SAW AND DID NOT BILL — founder QUESTION 10
+   * (delegated 2026-10-19; the integrator's P4–P6), `sc-follow-tailgater:
+   * 63c0c28c` / `e47a45c1`. A causeless emergency-grade brake that the 35 км/ч
+   * floor alone acquitted (floored) or whose bursts each fell short of the
+   * sustain while together holding it (pumped): rightly no point, and — read
+   * off the result, never re-derived (`LessonResult.unbilledHardBrakes`) —
+   * now NAMED below, with the catalogue's own copy. Every sentence that holds
+   * the drive up reads it: the verdict's superlative becomes a reservation,
+   * the «Какво се получи добре» fallback is withheld (the taskCapBroken /
+   * ADR-009 precedent: WITHHELD, not scoped), and every CLEAN_DRIVING row is
+   * scoped. Empty on every drive without one, which is therefore
+   * byte-identical.
+   */
+  const unbilledHardBrakes = result.unbilledHardBrakes ?? [];
+  const unbilledHardBrakeOnDrive = unbilledHardBrakes.length > 0;
 
   // -- verdict ---------------------------------------------------------------
   /**
@@ -594,15 +611,25 @@ export function buildDebrief(
     // Round 3 (R4): a passed drive that blew a task cap on the way (a fresh
     // approach later honoured it) is not what the examiner wants to see either.
     if (taskCapBroken) reservations.push(TASK_CAP_RESERVATION_BG);
-    const pointsAt = summary.score.totalPoints > 0 || coachedKinds > 0 || closestNearMiss !== null;
-    const where = unscoredPointerBg(summary.score.totalPoints > 0, coachedKinds, closestNearMiss);
+    // 2026-11-01 (QUESTION 10, P5): a brake check the ledger saw and did not bill is not what the examiner wants
+    // to see either — and it brings its own pointer, so the task-cap-only arm below is never reached by it.
+    if (unbilledHardBrakeOnDrive) reservations.push(unbilledHardBrakeReservationBg(unbilledHardBrakes.length));
+    const pointsAt =
+      summary.score.totalPoints > 0 || coachedKinds > 0 || closestNearMiss !== null || unbilledHardBrakeOnDrive;
+    const where = unscoredPointerBg(
+      summary.score.totalPoints > 0,
+      coachedKinds,
+      closestNearMiss,
+      unbilledHardBrakes.length,
+    );
+    const withThem = withThemBg(summary.score.totalPoints > 0, coachedKinds, closestNearMiss, unbilledHardBrakes.length);
     lines.push(
       reservations.length === 0
         ? `${head} Точно това иска да види изпитващият.`
         : `${head} Но „издържан“ не значи „чисто“: ${reservations.join("; ")}. ` +
           (pointsAt
             ? `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — прочети ${where} ` +
-              `и повтори урока с тях наум.`
+              `и повтори урока ${withThem} наум.`
             : `Изпитващият гледа цялото каране, а не само дали запасът е стигнал — ${TASK_CAP_PRACTICE_BG}.`),
     );
   } else if (summary.passed && hits.length > 0) {
@@ -832,7 +859,9 @@ export function buildDebrief(
     // Round 3 (R4): «…, не за карането» is false on a drive whose task was
     // refused BECAUSE of the driving — through its mark over the ceiling.
     if (taskCapBroken) reservations.push(TASK_CAP_RESERVATION_BG);
-    const pointsAt = coachedKinds > 0 || closestNearMiss !== null;
+    // 2026-11-01 (QUESTION 10, P5): the same reservation, with its own pointer.
+    if (unbilledHardBrakeOnDrive) reservations.push(unbilledHardBrakeReservationBg(unbilledHardBrakes.length));
+    const pointsAt = coachedKinds > 0 || closestNearMiss !== null || unbilledHardBrakeOnDrive;
     const sheetBg = "По изпитния лист нямаш нито една наказателна точка (0 при допустими 9)";
     lines.push(
       reservations.length === 0
@@ -840,7 +869,8 @@ export function buildDebrief(
         : `${sheetBg} — оценката е за ${forWhat}. Но чистият лист не значи чисто каране: ` +
           `${reservations.join("; ")}. ` +
           (pointsAt
-            ? `Прочети ${unscoredPointerBg(false, coachedKinds, closestNearMiss)} и повтори урока с тях наум.`
+            ? `Прочети ${unscoredPointerBg(false, coachedKinds, closestNearMiss, unbilledHardBrakes.length)} и повтори урока ` +
+              `${withThemBg(false, coachedKinds, closestNearMiss, unbilledHardBrakes.length)} наум.`
             : // Only the task-cap reservation: the corrective is the foot's
               // «Какво да упражниш» line, which prints on an unfinished route
               // and not on an aborted one — so it is said here only then, and
@@ -988,7 +1018,12 @@ export function buildDebrief(
     // bend overspeed withholds it too, on every drive — the founder's answer to
     // round 3's C2 question. «Учебни моменти» says what happened (THEO-4).
     !taskCapBroken &&
-    !adaptationTaught
+    !adaptationTaught &&
+    // 2026-11-01 (QUESTION 10, P5): and on a drive carrying a brake check the ledger saw and did not bill — the
+    // taskCapBroken / ADR-009 precedent: a compliment scoped to the sheet under «Какво се получи добре» would read
+    // the floor's (or the sustain's) acquittal back as an achievement, and «задръж това ниво» would invite him to
+    // repeat it. Withheld, not rewritten; the named block and the headline say what happened (THEO-4).
+    !unbilledHardBrakeOnDrive
   ) {
     goodBlock.push("");
     /**
@@ -1512,6 +1547,67 @@ export function buildDebrief(
     );
   }
 
+  // -- the brake check the ledger saw and did not bill (QUESTION 10) ----------
+  /**
+   * NAMED ONCE, NEVER BILLED — founder QUESTION 10 (delegated 2026-10-19; the
+   * integrator's P6), `sc-follow-tailgater:63c0c28c` and `:e47a45c1`.
+   *
+   * MEASURED through the live rung chain on this tree: rig-w3e PUMP245 (the
+   * pad's full pedal 0.2 s, off 0.1 s, full to rest at the лепка from 24 км/ч —
+   * two bursts of 0.200 and 0.300 s of emergency-grade credit, the bursts' mean
+   * 8.7–8.9 m/s²) and TASF348 (a full-pedal stop from 34 км/ч, floored 52 grid
+   * points): no point — rightly — and the debrief then said nothing at all
+   * about either, under «…Точно това иска да види изпитващият.» and «…задръж
+   * това ниво». A brake the product saw and kept to itself is the bare verdict
+   * THEO-4 forbids, in its silent form.
+   *
+   * NOT INSIDE «Учебни моменти»: that section's closing sentence («При
+   * повторение вече влиза в изпитния лист») is false here — a repeat is not
+   * billed either. So this is its own block, one bullet per record (one chain,
+   * one record — `rules/engine.ts` „ONE BRAKE CHECK, ONE RECORD"), in time
+   * order, then the catalogue's why / right action / rule ONCE.
+   *
+   * EVERY CLAUSE IS TRUE ON EVERY DRIVE IT PRINTS ON:
+   *  · «симулаторът не видя пред теб причина» and not «без причина»: the cause
+   *    ledger can miss a real cause, and the sentence must stay true when it
+   *    does;
+   *  · floored: the floor-lift is the only path to a bill under the floor and
+   *    it did not bill — the sentence says it did not register a car close
+   *    behind that had to brake hard, never that no car behind braked (an
+   *    ambient follower publishes no report);
+   *  · pumped: «нито един тласък поотделно не задържа рязкото спиране {S} s» is
+   *    the ledger's own «no window held the sustain with its mean» — a window
+   *    that did floors or bills, and such a chain has no pumped record; the
+   *    last clause IS the chain's mean over the bursts. It describes the
+   *    emergency-grade credit, not how long the pedal was down (PUMP245's
+   *    second press lasted ~0.68 s). Under the floor it states the floor rule
+   *    GENERALLY: a pump carries no floored record, so a report inside it bills
+   *    nothing and «този път не отчете» could be false.
+   * {S} and {F} are the lesson's own config carried on the record; {X} is what
+   * the speedometer showed when the brake began, rounded down, and never a
+   * figure at or over the floor beside «Под {F} км/ч» (a judged-under-floor
+   * record prints its judged onset then). The title, the why, the right action
+   * and the rule are RETRIEVED from VIOLATIONS.HARSH_BRAKING_NO_CAUSE
+   * (ADR-002); its explanationBg («…изпитващите отбелязват точно това») is not
+   * true of an unbilled brake and is not printed. Nothing is billed, scored
+   * or starred, and the drive itself shows no new card.
+   */
+  if (unbilledHardBrakeOnDrive) {
+    const copy = VIOLATIONS.HARSH_BRAKING_NO_CAUSE;
+    lines.push("");
+    lines.push(
+      unbilledHardBrakes.length === 1
+        ? "Рязко спиране, което не влезе в точките:"
+        : "Рязки спирания, които не влязоха в точките:",
+    );
+    for (const rec of [...unbilledHardBrakes].sort((a, b) => a.sinceSec - b.sinceSec)) {
+      lines.push(`• ${copy.titleBg} — ${unbilledHardBrakeSentenceBg(rec)}`);
+    }
+    lines.push(`  → Защо е важно: ${copy.peekBg}`);
+    lines.push(`  → Правилното действие: ${copy.correctiveBg}`);
+    lines.push(`  → Правило: ${copy.lawRef}`);
+  }
+
   // -- near misses (A15 — session fact, nothing graded) -----------------------
   /**
    * …AND IT NAMES THE MARGIN NOW. The paragraph gave a COUNT and sent the
@@ -1755,7 +1851,14 @@ export function buildDebrief(
               // through its task's mark over the ceiling — the very reason the
               // task stayed open — is the praise the ruling forbids.
               `Какво да упражниш: ${TASK_CAP_PRACTICE_BG}.`
-            : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
+            : unbilledHardBrakeOnDrive
+              ? // 2026-11-01 (QUESTION 10): «карането беше чисто» is the fallback's praise on a drive carrying a
+                // brake check the ledger did not bill; the right action is in the named block above (its number agrees
+                // with the block's heading).
+                unbilledHardBrakes.length === 1
+                ? "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — правилното действие при рязкото спиране е по-горе."
+                : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — правилното действие при рязките спирания е по-горе."
+              : "Какво да упражниш: повтори урока и завърши всички задачи от маршрута — карането беше чисто по изпитния лист.",
     );
   }
 
@@ -1971,12 +2074,75 @@ function unscoredPointerBg(
   hasBilledMistakes: boolean,
   coachedKinds: number,
   closestNearMiss: SessionNearMiss | null,
+  /** 2026-11-01 (QUESTION 10): the brake checks the ledger did not bill — the named block prints on exactly > 0. */
+  unbilledHardBrakes = 0,
 ): string {
   return `${joinBg([
     ...(hasBilledMistakes ? ["грешките"] : []),
     ...(coachedKinds > 0 ? ["учебните моменти"] : []),
     ...(closestNearMiss !== null ? ["разминаванията на косъм"] : []),
+    ...(unbilledHardBrakes === 1 ? ["рязкото спиране"] : unbilledHardBrakes > 1 ? ["рязките спирания"] : []),
   ])} по-долу`;
+}
+
+/**
+ * «с тях» / «с него» — agreeing with what `unscoredPointerBg` pointed at. Every
+ * other clause it can name is plural; one named brake check alone is not.
+ */
+function withThemBg(
+  hasBilledMistakes: boolean,
+  coachedKinds: number,
+  closestNearMiss: SessionNearMiss | null,
+  unbilledHardBrakes: number,
+): string {
+  const others = hasBilledMistakes || coachedKinds > 0 || closestNearMiss !== null;
+  return !others && unbilledHardBrakes === 1 ? "с него" : "с тях";
+}
+
+/** The headline's reservation for the brake checks the ledger saw and did not bill (QUESTION 10, P5). */
+function unbilledHardBrakeReservationBg(n: number): string {
+  return n === 1
+    ? "имаше рязко спиране, за което симулаторът не видя причина — то не влезе в точките"
+    : `имаше ${n} рязки спирания, за които симулаторът не видя причина — те не влязоха в точките`;
+}
+
+/** «0,4» — the Bulgarian decimal comma, for a number carried on the record. */
+function bgDecimal(n: number): string {
+  return String(n).replace(".", ",");
+}
+
+/**
+ * {X}: what the speedometer showed when the brake began, rounded down — EXCEPT
+ * that a record the ledger judged under the floor never prints a figure at or
+ * over it (a 35.3 → 34.8 anchor prints 34, never «при 35 км/ч» beside «Под 35
+ * км/ч»); it prints its judged onset, rounded down, then.
+ */
+function unbilledHardBrakeShownKmh(rec: UnbilledHardBrake): number {
+  const shown = Math.floor(rec.shownKmh);
+  return rec.onsetKmh < rec.floorKmh && shown >= rec.floorKmh ? Math.floor(rec.onsetKmh) : shown;
+}
+
+/** The bullet's sentence for one record — see the named block in `buildDebrief`. */
+function unbilledHardBrakeSentenceBg(rec: UnbilledHardBrake): string {
+  const x = unbilledHardBrakeShownKmh(rec);
+  const f = bgDecimal(rec.floorKmh);
+  const sus = bgDecimal(rec.sustainSec);
+  if (rec.form === "floored") {
+    return (
+      `при ${x} км/ч натисна спирачката рязко, а симулаторът не видя пред теб причина за това. ` +
+      `Под ${f} км/ч симулаторът таксува такова спиране само ако отчете, че кола точно зад теб е трябвало да спре ` +
+      `рязко заради него; този път не отчете такава, затова то не влезе в точките.`
+    );
+  }
+  return (
+    `при ${x} км/ч натисна спирачката рязко на тласъци, а симулаторът не видя пред теб причина за това. ` +
+    `Нито един тласък поотделно не задържа рязкото спиране ${sus} s, затова никой от тях не се брои за рязко ` +
+    `спиране — но заедно те отнеха скоростта толкова рязко, колкото едно рязко спиране.` +
+    (rec.onsetKmh < rec.floorKmh
+      ? ` Под ${f} км/ч дори рязко спиране, задържано ${sus} s, влиза в точките само ако симулаторът отчете, ` +
+        `че кола точно зад теб е трябвало да спре рязко заради него.`
+      : "")
+  );
 }
 
 /**
@@ -2297,6 +2463,8 @@ function commendationLines(result: LessonResult): string[] {
   const coachedMistakes = result.coachedMistakes ?? [];
   // Round 3 (R4): the caps the drive blew, for the same question.
   const taskCapBreaches = result.taskCapBreaches ?? [];
+  // 2026-11-01 (QUESTION 10, P4): the brake checks the ledger saw and did not bill.
+  const unbilledHardBrakes = result.unbilledHardBrakes ?? [];
   const seen = new Map<string, { count: number; contradicted: boolean; unclean: boolean }>();
   for (const c of result.summary.commendations) {
     // ONE derivation, two surfaces — see `commendationRiderFlags`. The card
@@ -2308,6 +2476,7 @@ function commendationLines(result: LessonResult): string[] {
       lessonMistakes,
       coachedMistakes,
       taskCapBreaches,
+      unbilledHardBrakes,
     );
     const prev = seen.get(c.titleBg);
     if (prev === undefined) seen.set(c.titleBg, { count: 1, contradicted, unclean });
@@ -2326,7 +2495,14 @@ function commendationLines(result: LessonResult): string[] {
   const rest = [...seen.entries()].filter(([title]) => !LESSON_ACT_PRAISE_TITLES.has(title));
   return [...lessonAct, ...rest.slice(0, MAX_COMMENDATION_LINES)]
     .map(([title, g]) => {
-      const rider = commendationRiderBg(result.summary, g, lessonMistakes, coachedMistakes, taskCapBreaches);
+      const rider = commendationRiderBg(
+        result.summary,
+        g,
+        lessonMistakes,
+        coachedMistakes,
+        taskCapBreaches,
+        unbilledHardBrakes,
+      );
       // The dash is this medium's punctuation — see COMMENDATION_CONTRADICTED_BG.
       return `• ${title}${g.count > 1 ? ` ×${g.count}` : ""}${rider === null ? "" : ` — ${rider}`}`;
     });
@@ -2423,6 +2599,15 @@ export function commendationRiderFlags(
    * the record of it (`LessonResult.taskCapBreaches`).
    */
   taskCapBreaches: readonly { objectiveId: string }[] = [],
+  /**
+   * THE BRAKE CHECKS THE LEDGER SAW AND DID NOT BILL — 2026-11-01 (QUESTION 10,
+   * P4; `LessonResult.unbilledHardBrakes`). OPTIONAL and empty by default,
+   * like the three before it. The windows that held the brake were withheld by
+   * the reducer; the ones before and after it stand, and on such a drive
+   * „чисто каране" is not true of the lesson — so every remaining CLEAN_DRIVING
+   * row is scoped, on the bullet AND the card.
+   */
+  unbilledHardBrakes: readonly unknown[] = [],
 ): CommendationRiders {
   return {
     contradicted:
@@ -2442,7 +2627,9 @@ export function commendationRiderFlags(
         coachedMistakes.some((m) => m.code === TASK_CAP_CODE) ||
         // Round 4 (founder ruling «Yes, same as speeding»): a taught weather or
         // bend overspeed scopes the praise too, on any drive.
-        adaptationBreachTaught(coachedMistakes)),
+        adaptationBreachTaught(coachedMistakes) ||
+        // 2026-11-01 (QUESTION 10, P4): a brake check the ledger saw and did not bill.
+        unbilledHardBrakes.length > 0),
   };
 }
 
@@ -2499,10 +2686,14 @@ export function commendationRiderBg(
   coachedMistakes: readonly { code: string }[] = [],
   /** The task ceilings the drive blew — see `commendationRiderFlags`; empty by default. */
   taskCapBreaches: readonly { objectiveId: string }[] = [],
+  /** The brake checks the ledger did not bill — see `commendationRiderFlags`; empty by default. */
+  unbilledHardBrakes: readonly unknown[] = [],
 ): string | null {
   const parts: string[] = [];
   if (flags.contradicted) parts.push(COMMENDATION_CONTRADICTED_BG);
-  if (flags.unclean) parts.push(cleanDrivingScopeBg(summary, lessonMistakes, coachedMistakes, taskCapBreaches));
+  if (flags.unclean) {
+    parts.push(cleanDrivingScopeBg(summary, lessonMistakes, coachedMistakes, taskCapBreaches, unbilledHardBrakes));
+  }
   return parts.length === 0 ? null : parts.join(" — ");
 }
 
@@ -2527,11 +2718,34 @@ function cleanDrivingScopeBg(
   coachedMistakes: readonly { code: string }[] = [],
   /** The task ceilings the drive blew — see `commendationRiderFlags`; empty by default. */
   taskCapBreaches: readonly { objectiveId: string }[] = [],
+  /** The brake checks the ledger did not bill — see `commendationRiderFlags`; empty by default. */
+  unbilledHardBrakes: readonly unknown[] = [],
 ): string {
   const opasni = summary.score.opasniCount;
   const taughtTask = coachedMistakes.some((m) => m.code === TASK_CAP_CODE);
   const taughtCond = coachedMistakes.some((m) => m.code === "SPEED_TOO_FAST_FOR_CONDITIONS");
   const taughtCurve = coachedMistakes.some((m) => m.code === "SPEED_TOO_FAST_FOR_CURVE");
+  // 2026-11-01 (QUESTION 10, P4): ITS OWN FRAME, only where nothing else can be said — a sheet with no row, no
+  // ADR-009 hit, no cap or speed breach. «метрите без нито едно нарушение» would be true there only by the sheet,
+  // and «има и отбелязани грешки» would point at a block that does not print; what made „чисто" false on this drive
+  // is the brake check, and the praise is for the stretches without it. Anywhere else the branches below win: the
+  // опасни, the hit and the speed breach are true on those drives, and so is their frame.
+  if (
+    unbilledHardBrakes.length > 0 &&
+    summary.mistakes.length === 0 &&
+    lessonMistakes.length === 0 &&
+    taskCapBreaches.length === 0 &&
+    !taughtTask &&
+    !taughtCond &&
+    !taughtCurve
+  ) {
+    return unbilledHardBrakes.length === 1
+      ? "но само на отделни отсечки от маршрута: в същия урок имаше рязко спиране, за което симулаторът не видя " +
+          "причина. Похвалата е за отсечките без него, не за урока — „чисто каране“ се брои чак когато ЦЯЛОТО каране е такова."
+      : `но само на отделни отсечки от маршрута: в същия урок имаше ${unbilledHardBrakes.length} рязки спирания, за ` +
+          "които симулаторът не видя причина. Похвалата е за отсечките без тях, не за урока — „чисто каране“ се брои " +
+          "чак когато ЦЯЛОТО каране е такова.";
+  }
   const alsoBg =
     opasni === 1
       ? "в същия урок има и опасна грешка"

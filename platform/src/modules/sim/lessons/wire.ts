@@ -22,11 +22,13 @@ import {
   actCopy,
   buildSessionSummary,
   COMMENDATIONS,
+  DEFAULT_RULE_CONFIG,
   VIOLATIONS,
   makeCommendation,
   makeViolation,
   type CommendationCode,
   type ScorableEvent,
+  type UnbilledHardBrake,
   type ViolationCode,
 } from "../rules";
 import { PRE_DRIVE_STEPS, type PreDriveStepId } from "../procedures";
@@ -177,6 +179,27 @@ export interface WireTaskCapBreach {
   t: number;
 }
 
+/**
+ * One causeless emergency-grade brake the harsh-brake ledger saw and did NOT
+ * bill — floored or pumped (2026-11-01, `sc-follow-tailgater:63c0c28c`,
+ * founder QUESTION 10; `lessons/types.ts LessonResult.unbilledHardBrakes`).
+ * Times and speeds, never copy; the sustain and the floor it is described
+ * with are NOT taken from the client — the server reads them off the lesson
+ * it recompiles.
+ *
+ * TRUST. It moves no point, verdict, star or objective. A FORGED row can only
+ * name a brake against the student's own debrief and scope his own praise
+ * (self-harm); an OMITTED row restores the debrief this lane replaced — the
+ * same footing as `taskCapBreaches` and `coachedMistakes` omissions.
+ */
+export interface WireUnbilledHardBrake {
+  form: "floored" | "pumped";
+  sinceSec: number;
+  atSec: number;
+  shownKmh: number;
+  onsetKmh: number;
+}
+
 export interface FinishLessonWire {
   lessonId: string;
   startedAtMs: number;
@@ -200,6 +223,11 @@ export interface FinishLessonWire {
    * older clients and on every drive that never blew a graded cap.
    */
   taskCapBreaches?: WireTaskCapBreach[];
+  /**
+   * The brake checks the ledger saw and did not bill (WireUnbilledHardBrake
+   * above). Absent on older clients and on every drive without one.
+   */
+  unbilledHardBrakes?: WireUnbilledHardBrake[];
   /**
    * S1 (scenario sessions): ids of the template's rubric observation moments
    * the student's recorded glances covered (lessons/scenario/observation.ts
@@ -237,6 +265,8 @@ const MAX_COACHED_MISTAKES_WIRE = 100;
 const MAX_CODE_LEN = 64;
 /** Task-cap breach list cap — one row per latch; a lesson authors a handful of caps. */
 const MAX_TASK_CAP_BREACHES_WIRE = 64;
+/** A causeless brake check is a pedal application: a drive cannot hold more than a few dozen. */
+const MAX_UNBILLED_HARD_BRAKES_WIRE = 64;
 const MAX_OBJECTIVE_ID_LEN = 64;
 
 // ---------------------------------------------------------------------------
@@ -318,6 +348,17 @@ export function serializeNearMisses(
  * and the ACT is kept (see WireCoachedMistake); the cap matches the engine's,
  * so a capped state serializes whole.
  */
+/** 2026-11-01 (QUESTION 10): the brake checks the ledger did not bill — see WireUnbilledHardBrake. */
+export function serializeUnbilledHardBrakes(records: ReadonlyArray<UnbilledHardBrake>): WireUnbilledHardBrake[] {
+  return records.slice(0, MAX_UNBILLED_HARD_BRAKES_WIRE).map((r) => ({
+    form: r.form,
+    sinceSec: r.sinceSec,
+    atSec: r.atSec,
+    shownKmh: r.shownKmh,
+    onsetKmh: r.onsetKmh,
+  }));
+}
+
 /** Round 3 (R4): the blown task ceilings, as ids and times — see WireTaskCapBreach. */
 export function serializeTaskCapBreaches(
   breaches: ReadonlyArray<{ objectiveId: string; t: number }>,
@@ -406,6 +447,9 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   const taskCapBreaches = parseTaskCapBreaches(o.taskCapBreaches);
   if (taskCapBreaches === "invalid") return null;
 
+  const unbilledHardBrakes = parseUnbilledHardBrakes(o.unbilledHardBrakes);
+  if (unbilledHardBrakes === "invalid") return null;
+
   const observedMomentIds = parseObservedMomentIds(o.observedMomentIds);
   if (observedMomentIds === "invalid") return null;
 
@@ -421,6 +465,7 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   if (nearMisses !== null) wire.nearMisses = nearMisses;
   if (coachedMistakes !== null) wire.coachedMistakes = coachedMistakes;
   if (taskCapBreaches !== null) wire.taskCapBreaches = taskCapBreaches;
+  if (unbilledHardBrakes !== null) wire.unbilledHardBrakes = unbilledHardBrakes;
   if (observedMomentIds !== null) wire.observedMomentIds = observedMomentIds;
 
   const attemptTrace = parseAttemptTrace(o.attemptTrace, o.lessonId);
@@ -650,6 +695,23 @@ function parseCoachedMistakes(value: unknown): WireCoachedMistake[] | null | "in
       row.detail = c.detail;
     }
     out.push(row);
+  }
+  return out;
+}
+
+function parseUnbilledHardBrakes(value: unknown): WireUnbilledHardBrake[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > MAX_UNBILLED_HARD_BRAKES_WIRE) return "invalid";
+  const out: WireUnbilledHardBrake[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return "invalid";
+    const b = item as Record<string, unknown>;
+    if (b.form !== "floored" && b.form !== "pumped") return "invalid";
+    if (!isFiniteNum(b.sinceSec) || b.sinceSec < 0 || b.sinceSec > MAX_SESSION_SEC) return "invalid";
+    if (!isFiniteNum(b.atSec) || b.atSec < b.sinceSec || b.atSec > MAX_SESSION_SEC) return "invalid";
+    if (!isFiniteNum(b.shownKmh) || b.shownKmh < 0 || b.shownKmh > 400) return "invalid";
+    if (!isFiniteNum(b.onsetKmh) || b.onsetKmh < 0 || b.onsetKmh > 400) return "invalid";
+    out.push({ form: b.form, sinceSec: b.sinceSec, atSec: b.atSec, shownKmh: b.shownKmh, onsetKmh: b.onsetKmh });
   }
   return out;
 }
@@ -911,6 +973,17 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
       .map((o) => o.id),
   );
   const taskCapBreaches = (wire.taskCapBreaches ?? []).filter((b) => cappedIds.has(b.objectiveId));
+  /**
+   * 2026-11-01 (QUESTION 10): the brake checks the ledger saw and did not bill.
+   * The sustain and the floor they are described with are THIS lesson's — the
+   * server's own recompiled rung — never the client's.
+   */
+  const ruleCfg = { ...DEFAULT_RULE_CONFIG, ...lesson.ruleConfig };
+  const unbilledHardBrakes: UnbilledHardBrake[] = (wire.unbilledHardBrakes ?? []).map((r) => ({
+    ...r,
+    sustainSec: ruleCfg.harshBrakeSustainSec,
+    floorKmh: ruleCfg.harshBrakeMinSpeedKmh,
+  }));
 
   const result: LessonResult = {
     lessonId: lesson.id,
@@ -929,6 +1002,7 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     ...(coachedMistakes.length > 0 ? { coachedMistakes } : {}),
     ...(lessonMistakes.length > 0 ? { lessonMistakes } : {}),
     ...(taskCapBreaches.length > 0 ? { taskCapBreaches } : {}),
+    ...(unbilledHardBrakes.length > 0 ? { unbilledHardBrakes } : {}),
     /*
      * The near-misses the drive recorded, for the DEBRIEF the student reads
      * (task-cap lane, round 9 — found by the payload census once it drove the

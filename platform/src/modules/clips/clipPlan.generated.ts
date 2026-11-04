@@ -876,7 +876,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vu-bikelane-turn",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-vu-bikelane-turn/mistake-cut-path.trace.json",
-    "faultTimeSec": 15.55,
+    "faultTimeSec": 22.58,
     "requiredActors": [],
     "governingControl": {
       "kind": "none",

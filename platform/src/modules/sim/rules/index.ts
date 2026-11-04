@@ -81,6 +81,7 @@ export {
    * conviction explained with the right-hand rule).
    */
   FAILED_TO_YIELD_SITUATION_COPY,
+  FAILED_TO_YIELD_SITUATION_CYCLIST_RIGHT_HOOK,
   FAILED_TO_YIELD_SITUATION_ROUNDABOUT,
   makeCommendation,
   makeViolation,
@@ -332,6 +333,14 @@ export {
   conditionsSpeedEnvelope,
   // sc-mv-uturn-ban:e98407b1 clause 4: where the drive's turn-rounds began (the ADR-013 tracker's own record).
   uTurnPlaceRecord,
+  // 2026-11-01 (sc-follow-tailgater:63c0c28c, P7): a causeless emergency-grade brake the harsh-brake ledger saw and
+  // did not bill — the record the reducer finalized last, and the one a chain still open at the drive's end leaves.
+  lastUnbilledHardBrake,
+  unbilledHardBrakeOfChain,
+  // round 2 (2026-11-02, Q1): the bridge hold on the CLEAN_DRIVING payout, bounded by the chain's last credited frame.
+  brakeCheckBridgeHolds,
+  type UnbilledHardBrake,
+  type UnbilledHardBrakeForm,
   type AdaptationSettleTick,
   type ConditionsCause,
   type KinSettleTick,

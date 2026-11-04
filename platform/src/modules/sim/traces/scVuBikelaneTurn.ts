@@ -7,13 +7,17 @@
  * ambient traffic (seed 7).
  *
  * The trace gate replays exactly these through the production stack:
- *   - shadow: ZERO violations + YIELDED_TO_PRIORITY (waited BOTH the with-flow
- *     rider and the counter-flow rider past the mouth, THEN turned right);
+ *   - shadow: ZERO violations + YIELDED_TO_PRIORITY (passed the STANDING
+ *     with-flow rider with 2.80 m of centre lateral — the vulnerable-pass
+ *     commendation — then stood off the core while the counter-flow rider from
+ *     ahead and the with-flow rider from behind both crossed the mouth, THEN
+ *     turned right);
  *   - „Завой само с поглед назад" grades EXACTLY FAILED_TO_YIELD + COLLISION
  *     (checked only behind, turned into the counter-flow rider from ahead — the
  *     hook on the CF runner + an authored contact beat);
- *   - „Отрязване на колелото по алеята" grades EXACTLY FAILED_TO_YIELD (cut the
- *     with-flow rider off in the mouth — the classic right hook, no contact).
+ *   - „Отрязване на колелото по алеята" grades EXACTLY FAILED_TO_YIELD (the
+ *     with-flow rider catches the slowing car from behind on its right and it
+ *     turns across his line — the classic right hook, no contact).
  *
  * GEOMETRY, pinned to content/world/vu-bikelane-v1.json + the template's
  * constants (the vu-bikelane-districts battery asserts every one against the
@@ -27,9 +31,11 @@
  *
  * Runner windows (orchestrator/runners.ts CyclistRightHookRunner, per rider):
  *  · RELEASE when the driver is within releaseDistM (60 ± seed jitter) of the
- *    junction and approaching — both riders roll then, staggered by their hold
- *    offsets so the with-flow rider crosses the mouth ~2.4 s before the
- *    counter-flow one;
+ *    junction and approaching — both riders roll then (t 8.32–9.12 across
+ *    L1–L5), the counter-flow one from 30 m beyond the node, the with-flow one
+ *    from 73.5 m short of it, i.e. from BEHIND the car, which has just passed
+ *    him standing (lane vbltiming): on the shadow the counter-flow rider
+ *    crosses the mouth first and the with-flow rider ≈ 7 s later;
  *  · HOOK (FAILED_TO_YIELD): a turnStarted "right" within 40 m of the junction
  *    while THAT rider is < CYCLIST_CLEAR_ARC_M (8 m) past the mouth AND within
  *    dangerRadiusM (9 m) of the driver;
@@ -52,6 +58,11 @@ export const SC_VU_BIKELANE_TURN_ID = "sc-vu-bikelane-turn";
 /** Eastbound through-lane center / southbound stem lane center. */
 const THROUGH_Y = -4.06;
 const STEM_X = -4.06;
+/** The shadow's line past the STANDING with-flow rider (x −73.5, y −6.66):
+ *  0.2 m left of the lane centre = 2.80 m of centre lateral, over the
+ *  vulnerable-pass tracker's 2.75 m norm (VULNERABLE_PASS_SAFE_LATERAL_M,
+ *  ≈ 1.5 m edge to edge). */
+const PASS_Y = -3.86;
 
 /** The right turn (east → south, ~90°) onto the stem — the vu-cyclist-hook arc,
  *  from the core-edge hold at x = −20, extended down the 90 m stem to the
@@ -81,10 +92,24 @@ export function scVuBikelaneTurnShadowScript(): DriveScript {
       },
       { kind: "glance", mirror: "right" },
       // Approach eastbound; the riders release as the driver closes within 60 m.
-      { kind: "drive", points: [[-130, THROUGH_Y], [-62, THROUGH_Y]], targetKmh: 42, stopAtEnd: false },
+      // The with-flow rider stands on the cycle track at x −73.5 until then:
+      // the car passes him STANDING, and gives him room — PASS_Y, 2.80 m of
+      // centre lateral while alongside (|along| ≤ 5.5: car x −79 … −68),
+      // back on the lane centre by x −62.
+      {
+        kind: "drive",
+        points: [[-130, THROUGH_Y], [-86, THROUGH_Y], [-81, PASS_Y], [-67, PASS_Y], [-62, THROUGH_Y]],
+        targetKmh: 42,
+        stopAtEnd: false,
+      },
       {
         kind: "annotation",
-        textBg: "По алеята кара велосипедист направо, а насреща идва второ колело — и двете имат предимство.",
+        // Shown at x −62 (t ≈ 8.5): the with-flow rider the car has just passed
+        // stands — or has just set off — 11.5 m behind it on the right; the
+        // counter-flow rider is still beyond the mouth (lane vbltiming: an
+        // observation, no law — the old «кара… направо… и двете имат
+        // предимство» described a rider who was not yet riding).
+        textBg: "Подминахме велосипедиста на алеята — сега той е отзад вдясно, а насреща по алеята ще дойде второ колело.",
       },
       { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "right" },
@@ -158,13 +183,34 @@ export function scVuBikelaneTurnMistakeOnlyBehindScript(): DriveScript {
 // ---------------------------------------------------------------------------
 // Mistake demo 2 — „Отрязване на колелото по алеята" (FAILED_TO_YIELD)
 //
-// The classic right hook on the WITH-FLOW rider: the driver overtakes it, then
-// cuts right across it while it is still in the mouth (< 8 m past, within the
-// danger radius) — a refused priority (prioritySituation "cyclist-right-hook"
-// violated), with NO contact (the 2.6 m curb line stays outside the 2.2 m
-// contact radius; the counter-flow rider is still 12 m out and never hooks).
+// The classic right hook on the WITH-FLOW rider COMING FROM BEHIND (lane
+// vbltiming, integrator ruling T4): the driver passes him standing at x −73.5,
+// slows for the turn (15 km/h, a 7.5 km/h dip at x −40 … −37, then 12.5) and
+// never stops; the rider, released behind, catches the car on its right, and
+// it turns across his line as he arrives — a refused priority
+// (prioritySituation "cyclist-right-hook" violated) at the turn latch, t 22.60,
+// with the rider behind-right of the car on every rung (fwd −1.18 … −2.44 m,
+// within 4.74 … 8.19 m of its centre). NO contact: his footprint line guard
+// brakes him short of the car's body once it is on his line (from t 21.60).
+// The counter-flow rider has crossed the mouth before the car enters the
+// junction core (t 19.25), so the runtime right-hand rule bills nothing and
+// the hook is this demo's FIRST FAILED_TO_YIELD; the dip is what makes that
+// so — at ≤ 8 km/h outside the core the car comes in prepared to stop and
+// clear of crossing traffic, and without it the with-flow rider, released by
+// the guard after the hook, is read as a conflict from the right of the
+// southbound car and billed a second time (24.65–24.97, measured).
 // The same-code sibling of demo 1's hook, but on the rider you SAW.
 // ---------------------------------------------------------------------------
+
+/** The re-timed cut-path (lane vbltiming): its speeds and switch points. */
+const CUT_SLOW_KMH = 15;
+/** The brief slowing to a crawl at x −40 … −37 — 40 m from the node, inside
+ *  the junction's observation zone and outside its 18 m core. */
+const CUT_DIP_TO_X = -37;
+const CUT_DIP_KMH = 7.5;
+const CUT_CRAWL_KMH = 12.5;
+const CUT_TURN_FROM_X = -18;
+const CUT_TURN_KMH = 13;
 
 export function scVuBikelaneTurnMistakeCutPathScript(): DriveScript {
   return {
@@ -178,16 +224,21 @@ export function scVuBikelaneTurnMistakeCutPathScript(): DriveScript {
       { kind: "drive", points: [[-130, THROUGH_Y], [-62, THROUGH_Y]], targetKmh: 42, stopAtEnd: false },
       {
         kind: "annotation",
-        textBg: "Велосипедистът по алеята е плътно вдясно и още не е преминал… но колата не спира.",
+        // Shown at x −62 (t ≈ 8.5): the rider stands — or has just set off —
+        // 11.5 m BEHIND the car on its right, not «плътно вдясно» beside it
+        // (lane vbltiming: re-worded as what is on the road at that frame).
+        textBg: "Велосипедистът по алеята остана отзад вдясно и ще продължи направо покрай устието… а колата не спира.",
       },
-      // Roll to the mouth sub-20 (no follow grading), then cut right across the
-      // with-flow rider while it is still alongside within the danger radius.
-      { kind: "drive", points: [[-62, THROUGH_Y], [-34, THROUGH_Y]], targetKmh: 26, stopAtEnd: false },
-      { kind: "drive", points: [[-34, THROUGH_Y], [-18, THROUGH_Y]], targetKmh: 16, stopAtEnd: false },
+      // Slow for the turn as the shadow does (15 km/h to x −40), then roll on at
+      // a crawl that never stops — and the with-flow rider, released behind,
+      // catches the car on its right; it turns across his line as he arrives.
+      { kind: "drive", points: [[-62, THROUGH_Y], [-40, THROUGH_Y]], targetKmh: CUT_SLOW_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[-40, THROUGH_Y], [CUT_DIP_TO_X, THROUGH_Y]], targetKmh: CUT_DIP_KMH, stopAtEnd: false },
+      { kind: "drive", points: [[CUT_DIP_TO_X, THROUGH_Y], [CUT_TURN_FROM_X, THROUGH_Y]], targetKmh: CUT_CRAWL_KMH, stopAtEnd: false },
       {
         kind: "drive",
-        points: [[-18, THROUGH_Y], [-11, THROUGH_Y], [-6, -6.0], [STEM_X, -11], [STEM_X, -28], [STEM_X, -48]],
-        targetKmh: 16,
+        points: [[CUT_TURN_FROM_X, THROUGH_Y], [-11, THROUGH_Y], [-6, -6.0], [STEM_X, -11], [STEM_X, -28], [STEM_X, -48]],
+        targetKmh: CUT_TURN_KMH,
       },
       { kind: "indicator", setting: "off" },
       { kind: "pause", sec: 2.0, brake: true },

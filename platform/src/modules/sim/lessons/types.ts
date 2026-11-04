@@ -21,6 +21,7 @@ import type {
   SessionSummary,
   SeverityClass,
   SimTick,
+  UnbilledHardBrake,
   Vec2,
 } from "../rules";
 import type { PreDriveMachine } from "../procedures";
@@ -2194,6 +2195,16 @@ export interface LessonSessionState {
    */
   taskCapBreaches?: TaskCapBreach[];
   /**
+   * EVERY CAUSELESS EMERGENCY-GRADE BRAKE THE HARSH-BRAKE LEDGER SAW AND DID
+   * NOT BILL — floored or pumped (2026-11-01, `sc-follow-tailgater:63c0c28c`;
+   * founder QUESTION 10; the integrator's P7). Appended, immutably, on the
+   * tick the reducer finalized one (`harshBrake.recordSeq` advanced; rules/
+   * engine.ts „ONE BRAKE CHECK, ONE RECORD"). Nothing is graded off it: the
+   * debrief names it, withholds the clean-driving invitation and scopes the
+   * praise. Absent when empty.
+   */
+  unbilledHardBrakes?: UnbilledHardBrake[];
+  /**
    * FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11 — „it states 2 tasks and it is
    * only 1 task"). Session time of the first tick that DESCRIBED THE VEHICLE:
    * the first one carrying motion, or a position different from the one the
@@ -2670,6 +2681,19 @@ export interface LessonResult {
    * every drive that honoured its caps keeps today's shape and today's praise.
    */
   taskCapBreaches?: TaskCapBreach[];
+  /**
+   * The causeless emergency-grade brakes the harsh-brake ledger saw and did
+   * NOT bill — floored or pumped (2026-11-01, `sc-follow-tailgater:63c0c28c`,
+   * founder QUESTION 10; P7) — `LessonSessionState.unbilledHardBrakes` plus a
+   * chain still open when the drive ended, carried to both debrief sites and
+   * across the wire (`FinishLessonWire.unbilledHardBrakes`). Nothing is graded
+   * off it: no point, verdict, star or objective. The debrief names each one
+   * with the catalogue's own HARSH_BRAKING_NO_CAUSE copy, withholds the
+   * «Какво се получи добре» fallback, reserves the headline and scopes every
+   * CLEAN_DRIVING row (bullet and card). Absent when none — every stored row
+   * from before it and every drive without one is byte-identical.
+   */
+  unbilledHardBrakes?: UnbilledHardBrake[];
 }
 
 /**

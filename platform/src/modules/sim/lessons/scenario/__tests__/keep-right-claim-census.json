@@ -188,6 +188,10 @@
   "Велосипедистът е далеч зад теб — прибери се плавно вдясно.": {
    "class": "other"
   },
+  "Велосипедистът по алеята остана отзад вдясно и ще продължи направо покрай устието… а колата не спира.": {
+   "class": "other",
+   "why": "sc-vu-bikelane-turn cut-path demo caption (lane vbltiming): where the with-flow cyclist is (behind, to the right, on the cycle track) — a position, not the car's lane duty"
+  },
   "Велосипедът е превозно средство и мястото му е на велоалеята или възможно най-вдясно на платното — не на тротоара, дори когато има такъв.": {
    "class": "other",
    "why": "the cyclist's / e-scooter rider's place on the road (чл. 80, чл. 80а), not the car's lane"
@@ -1653,6 +1657,10 @@
   },
   "Този път всичко изглежда изрядно: връщане назад за място и ляв мигач.": {
    "class": "other"
+  },
+  "Той се движи от дясната ти страна — край десния бордюр или по велоалеята вдясно — и завоят ти пресича пътя му.": {
+   "class": "other",
+   "why": "FAILED_TO_YIELD «cyclist-right-hook» card (lane vbltiming): the cyclist rides on the right side of the road (the curb or the track) — where HE is, the reason the right-turner must let him pass (чл. 35, ал. 2); asserts no keep-right duty for the car"
   },
   "Току-що изпреварихме и сме в лявата лента.": {
    "class": "other"

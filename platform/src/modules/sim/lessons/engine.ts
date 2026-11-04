@@ -36,6 +36,7 @@ import {
   conditionsSpeedEnvelope,
   createRuleEngine,
   isScorableEvent,
+  lastUnbilledHardBrake,
   makeCommendation,
   parseSpeedMeasurement,
   reduceTick,
@@ -44,6 +45,7 @@ import {
   settleUnpaidSpeedingTeach,
   settleUnpaidTaskTeach,
   taskCapBillLineKmh,
+  unbilledHardBrakeOfChain,
   uTurnPlaceRecord,
   violationPeekBg,
   type ConditionsCause,
@@ -55,6 +57,7 @@ import {
   type SimTick,
   type TaskCapArrival,
   type TaskSpeedCap,
+  type UnbilledHardBrake,
   type ActAmendment,
   type ViolationCode,
   type ViolationEvent,
@@ -4682,6 +4685,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // same as speeding»). Round 14: the cap's settlement reads only the stamp, so
   // the flags are kept exactly as on the same drive with no cap.
   const weatherRecord = rules.conditionsSpeed.emitted;
+  // 2026-11-01 (P7): the brake check the reducer finalized on this tick, if any — see `unbilledHardBrakes` below.
+  const unbilledHardBrake =
+    rules.harshBrake.recordSeq !== prev.rules.harshBrake.recordSeq ? lastUnbilledHardBrake(rules.harshBrake) : null;
   // Round 15: a watch set on this frame replaces the carried one (which was for an earlier objective's mark).
   const nextMarkWatch = completedMarkWatch ?? capStep.watch;
 
@@ -4766,6 +4772,12 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ...(stopLineWatch !== undefined ? { stopLineWatch } : {}),
       ...(capStep.breach !== undefined
         ? { taskCapBreaches: [...(prev.taskCapBreaches ?? []), capStep.breach] }
+        : {}),
+      // 2026-11-01 (sc-follow-tailgater:63c0c28c, P7): a causeless emergency-grade brake the ledger saw and did not
+      // bill, finalized by the reducer on this tick (`recordSeq` advanced) — appended, never edited. Every drive
+      // without one never writes the field.
+      ...(unbilledHardBrake !== null
+        ? { unbilledHardBrakes: [...(prev.unbilledHardBrakes ?? []), unbilledHardBrake] }
         : {}),
       ...(posedAtSec !== undefined ? { posedAtSec } : {}),
       // Monotone and additive: written only once a named body has been touched.
@@ -5140,6 +5152,15 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     state.events,
     state.coachedMistakes ?? [],
   );
+  // 2026-11-01 (sc-follow-tailgater:63c0c28c, P7): a chain still open when the drive ended is closed with it — no
+  // bill can reach it any more (the floor-lift needs a report on a later tick, and there is none).
+  const openBrakeCheck: UnbilledHardBrake | null = state.rules.harshBrake.chainOpen
+    ? unbilledHardBrakeOfChain(state.rules.harshBrake, state.rules.config, true)
+    : null;
+  const unbilledHardBrakes: UnbilledHardBrake[] = [
+    ...(state.unbilledHardBrakes ?? []),
+    ...(openBrakeCheck !== null ? [openBrakeCheck] : []),
+  ];
 
   return {
     lessonId: state.lesson.id,
@@ -5184,6 +5205,10 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     // the end card. Client-only display metadata — `finishLessonPayload` never
     // sends it, and a server-rebuilt result has none. Absent = no line.
     ...(state.endingCopy !== undefined ? { ending: { ...state.endingCopy } } : {}),
+    // 2026-11-01 (sc-follow-tailgater:63c0c28c, P7): the brake checks the ledger saw and did not bill — the
+    // session's finalized list, plus the chain still open when the drive ended (nothing can bill it any more).
+    // Absent when none, the same shape rule.
+    ...(unbilledHardBrakes.length > 0 ? { unbilledHardBrakes } : {}),
   };
 }
 

@@ -449,8 +449,8 @@
       "family": "vru",
       "demo": "mistake[1] mistake-cut-path",
       "reverses": false,
-      "worstRadiusM": 1.333,
-      "atSec": 17.95
+      "worstRadiusM": 1.278,
+      "atSec": 22.3
     },
     {
       "lesson": "sc-vu-bikelane-turn",

@@ -94,9 +94,14 @@ describe("sc-vu-bikelane-turn — the with-flow rider rides the south track (vru
       it(`L${level} ${name}: from spawn to the mouth the with-flow rider holds y ${WITH_FLOW_Y} ± ${TOL_M} (right of the car's lane centre ${THROUGH_LANE_Y}); the counter-flow rider holds ${COUNTER_FLOW_Y}`, () => {
         const { poses } = run(name, level);
         const wf = poses.filter((p) => p.wf !== null && p.wf.x <= 0).map((p) => ({ t: +p.t.toFixed(3), x: +p.wf!.x.toFixed(2), y: +p.wf!.y.toFixed(3) }));
-        // He is staged from the first frame, 30 m short of the junction.
+        // He is staged from the first frame, 73.5 m short of the junction —
+        // RESTATED by lane vbltiming (sc-vu-bikelane-turn:9141072b clause (a),
+        // ruling T2): was −30 (≈ x −30), which put him ahead of the car on
+        // every rung of every demo; the new hold puts him behind the car's
+        // release point, so the car passes him standing and meets him from
+        // behind (vbl-wf-timing.test.ts).
         expect(wf.length).toBeGreaterThan(0);
-        expect(wf[0].x).toBeCloseTo(-30, 0);
+        expect(wf[0].x).toBeCloseTo(-73.5, 0);
         const offLine = wf.filter((p) => Math.abs(p.y - WITH_FLOW_Y) > TOL_M);
         expect(offLine.slice(0, 3), `${offLine.length} of ${wf.length} frames off the with-flow line`).toEqual([]);
         expect(wf.every((p) => p.y < THROUGH_LANE_Y)).toBe(true);
@@ -124,20 +129,23 @@ describe("sc-vu-bikelane-turn — the with-flow rider rides the south track (vru
     }, 120_000);
   }
 
-  // C1 (integration of lane vru2offset): the one hook the with-flow runner
-  // still BILLS on the tree — L2 mistake-cut-path, FAILED_TO_YIELD
-  // «cyclist-right-hook» @18.20 — is billed on a rider the car really cut:
-  // AHEAD of the car's centre, inside the southbound stem lane the car turns
-  // into (x within [STEM_WEST_X, 0]), on the with-flow line, and within half a
-  // stem-lane width of the car's line ahead (measured: fwd 3.61 m, left
-  // 1.24 m, rider at (−2.21, −6.66)). At the authored −2.6 the same bill fell
-  // on a rider at (−2.21, −1.46), 5.83 m LEFT of the car — the wrong bill.
-  it("L2 mistake-cut-path: the with-flow runner's FAILED_TO_YIELD is billed with the rider AHEAD of the car, inside the stem lane it turns into", () => {
+  // C1 (integration of lane vru2offset), RESTATED by lane vbltiming
+  // (sc-vu-bikelane-turn:9141072b clause (a); integrator ruling T4). WAS: the
+  // L2 hook @18.20 billed on a rider AHEAD of the car inside the stem lane
+  // (fwd 3.61 m, left 1.24 m, rider at (−2.21, −6.66)) — the one rung where the
+  // with-flow runner billed at all; on the others the car drove into him first.
+  // The re-timed cut-path makes the hook the right hook on a rider COMING FROM
+  // BEHIND: L2 @22.60, the rider on his line behind-right of the car, short of
+  // the stem lane and the mouth (measured: fwd −1.18 m, left −4.59 m, rider at
+  // (−10.66, −6.66), held there by his footprint guard), within dangerRadiusM
+  // 9 of it — the bill the lesson's rear check exists for. Every rung:
+  // vbl-wf-timing.test.ts G6.
+  it("L2 mistake-cut-path: the with-flow runner's FAILED_TO_YIELD is billed with the rider BEHIND-RIGHT of the car, on his line, short of the mouth", () => {
     const STEM_WEST_X = -8.125;
-    const STEM_HALF_W = 8.125 / 2;
+    const DANGER_M = 9;
     const { out, poses } = run("mistake-cut-path", 2);
     const wfBills = out.outcomes.filter((o: StagedEventOutcome) => o.eventId === "sc-vbl-rider-wf" && o.detail === "violation");
-    expect(wfBills.map((o) => +o.tSec.toFixed(2))).toEqual([18.2]);
+    expect(wfBills.map((o) => +o.tSec.toFixed(2))).toEqual([22.6]);
     const t = wfBills[0].tSec;
     const hook = out.session.events
       .filter((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD" && Math.abs(e.t - t) < 0.05)
@@ -160,9 +168,10 @@ describe("sc-vu-bikelane-turn — the with-flow rider rides the south track (vru
       left: +(-dx * fy + dy * fx).toFixed(2),
     };
     const where = JSON.stringify(rider);
-    expect(rider.fwd, `rider not AHEAD of the car at the bill: ${where}`).toBeGreaterThan(0);
-    expect(rider.at[0] >= STEM_WEST_X && rider.at[0] <= 0, `rider not inside the stem lane's x-span [${STEM_WEST_X}, 0]: ${where}`).toBe(true);
+    expect(rider.fwd, `rider not BEHIND the car at the bill: ${where}`).toBeLessThan(0);
+    expect(rider.left, `rider not on the car's RIGHT at the bill: ${where}`).toBeLessThan(0);
+    expect(rider.at[0], `rider already in the stem lane's x-span at the bill: ${where}`).toBeLessThan(STEM_WEST_X);
     expect(Math.abs(rider.at[1] - WITH_FLOW_Y), `rider not on the with-flow line ${WITH_FLOW_Y}: ${where}`).toBeLessThanOrEqual(TOL_M);
-    expect(Math.abs(rider.left), `rider off the car's line ahead (beyond half a stem lane, ${STEM_HALF_W} m): ${where}`).toBeLessThanOrEqual(STEM_HALF_W);
+    expect(Math.hypot(rider.fwd, rider.left), `rider beyond dangerRadiusM ${DANGER_M} of the car: ${where}`).toBeLessThanOrEqual(DANGER_M);
   }, 120_000);
 });

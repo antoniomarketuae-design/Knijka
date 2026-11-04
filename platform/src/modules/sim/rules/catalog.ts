@@ -3028,6 +3028,8 @@ export const WRONG_WAY_ROAD_COPY: Record<
  * lane is answering (`sc-roundabout-entry:fe081cf1`, „the body text is cut").
  */
 export const FAILED_TO_YIELD_SITUATION_ROUNDABOUT = "roundabout";
+/** The CyclistRightHookRunner's situation (orchestrator/runners.ts). */
+export const FAILED_TO_YIELD_SITUATION_CYCLIST_RIGHT_HOOK = "cyclist-right-hook";
 
 export const FAILED_TO_YIELD_SITUATION_COPY: Record<
   string,
@@ -3037,7 +3039,9 @@ export const FAILED_TO_YIELD_SITUATION_COPY: Record<
   // characters against the pooled row's 204. A second situation added without a
   // summary would put the −10 card straight back behind «↓ ОЩЕ 20+ РЕДА», and
   // `tsc` says so before a sweep photographs it (`sc-roundabout-entry:fe081cf1`).
-  { titleBg: string; explanationBg: string; lawRef: string; peekBg: string }
+  // `correctiveBg` is OPTIONAL: a row that authors none keeps the pooled
+  // advice (`violationCorrectiveBg` reads the act's first, the pooled second).
+  { titleBg: string; explanationBg: string; lawRef: string; peekBg: string; correctiveBg?: string }
 > = {
   [FAILED_TO_YIELD_SITUATION_ROUNDABOUT]: {
     titleBg: "Влизане без пропускане",
@@ -3050,6 +3054,53 @@ export const FAILED_TO_YIELD_SITUATION_COPY: Record<
     // sentence; the articles, the Б1/Б2 step and the чл. 48 contrast stay one
     // «ЗАЩО» tap away, whole.
     peekBg: "Колата в кръга има предимство и идва отляво.",
+  },
+  // THE RIGHT HOOK ON A CYCLIST, named as itself — sc-vu-bikelane-turn:9141072b
+  // (lane vbltiming, integrator ruling T5(a), confirmed 2026-11-02). Until this
+  // row the hook bill printed the POOLED card: a paragraph about junctions
+  // without signals («пропускаш идващите отдясно»), a corrective ending «На
+  // кръгово гледаш НАЛЯВО», and «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1» — none of
+  // which is the duty a right-turner owes the rider going straight beside him
+  // (rig-w3n, V2-CUT-pc-L1 debriefText).
+  //
+  // ONE ROW, EVERY SITE THAT BILLS IT. Only CyclistRightHookRunner emits this
+  // situation (orchestrator/runners.ts), and it bills it on a right turn begun
+  // while a rider who goes straight is within its danger radius and not yet
+  // past the junction: the curb riders of sc-vu-cyclist-hook and its siblings
+  // (templates-vru.ts), the lesson l3-cyclist-right-hook and the exam
+  // ex-cyclist-right-hook (specs.ts), the exam V1 slots (examBankData.ts), and
+  // both riders of sc-vu-bikelane-turn — the with-flow one coming from BEHIND
+  // and the counter-flow one coming from AHEAD-right on the two-way track. So
+  // every sentence below is true of all of them: the rider goes straight, had
+  // not yet gone past where the student turned, and rides on the RIGHT side of
+  // the road the student turns toward (the curb line, or the track on that
+  // side) — a claim about the road, not about the car's frame, which at the
+  // latch has already swung ≥ 55°; the look ahead-right is CONDITIONAL on a
+  // two-way track (a curb site has none). Pinned site by site in
+  // lessons/scenario/__tests__/vbl-hook-situation-copy.test.ts.
+  //
+  // RETRIEVED LAW ONLY (ADR-002), the template's own quotes
+  // (templates-vru2.ts SC_VU_BIKELANE_TURN header) as the approved bank item
+  // q-predimstvo-062 words them: чл. 35, ал. 2 — the right-turner «е длъжен да
+  // пропусне пътните превозни средства, преминаващи от дясната му страна»; чл. 5,
+  // ал. 2, т. 1 — «да бъде внимателен и предпазлив към уязвимите участници в
+  // движението… и водачите на двуколесни пътни превозни средства». чл. 25, ал. 2
+  // is NOT cited: it is the adjacent-LANE duty and is not shown to hold at the
+  // curb sites. The «Правилото» block (rules/offences.ts, keyed by code) still
+  // quotes чл. 50, ал. 1 on this card — a named contradiction carried to the
+  // copy lane, not edited here.
+  [FAILED_TO_YIELD_SITUATION_CYCLIST_RIGHT_HOOK]: {
+    titleBg: "Непропускане на велосипедист",
+    explanationBg:
+      "Зави надясно, докато велосипедист, който продължава направо, още не беше подминал мястото на завоя. Той се движи от дясната ти страна — край десния бордюр или по велоалеята вдясно — и завоят ти пресича пътя му. ЗДвП чл. 35, ал. 2 задължава завиващия надясно да пропусне преминаващите от дясната му страна, а по чл. 5, ал. 2, т. 1 към водачите на двуколесни превозни средства си длъжен да бъдеш внимателен и предпазлив — при контакт губи той, не ти.",
+    lawRef: "ЗДвП чл. 35, ал. 2; чл. 5, ал. 2, т. 1",
+    // The decision in one line. ONE body line is all the peek leaves under
+    // this two-line title (`violation-title-fits-peek.test.ts`: 25 chars at
+    // the tight end of the band) — «Велосипедистът, който кара направо, минава
+    // пръв.» wrapped to three; this is the corrective's own last instruction.
+    peekBg: "Пусни велосипедиста пръв.",
+    correctiveBg:
+      "Преди десен завой провери дясното огледало и погледни през дясното рамо за велосипедист, който идва отзад, а ако велоалеята е двупосочна — и напред-надясно за този, който идва срещу теб. Пропусни го да премине и завий едва след това.",
   },
 };
 

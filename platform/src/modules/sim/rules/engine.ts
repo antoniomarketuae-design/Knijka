@@ -693,6 +693,146 @@ export interface RuleEngineState {
     flooredBilled: boolean;
     followerForcedAt: number | null;
     followerAnswerSec: number;
+    /**
+     * THE BRAKE CHECK THE LEDGER SAW AND DID NOT BILL (2026-11-01 ·
+     * `sc-follow-tailgater:63c0c28c`, founder QUESTIONS 4 and 10, delegated
+     * 2026-10-19; the integrator's P1–P12) — see „ONE BRAKE CHECK, ONE RECORD"
+     * at the detector. Nothing here bills, scores or stars anything.
+     *
+     * The PEDAL APPLICATION (`app…`): from the frame a causeless application
+     * opens (`activeSince` was null) to its release or its cause. `appPeak…`:
+     * the window of that application that holds its PEAK emergency-grade
+     * credit — its credit, its span (anchor → last qualifying frame), the speed
+     * it shed over that span (m/s), its anchor, its judged onset and the
+     * reading the speedometer showed when it began (`appPeakSince` null: the
+     * application has no credited frame).
+     *
+     * The CHAIN (`chain…`): consecutive causeless applications, from the first
+     * credited frame, each release between them shorter than the sustain and no
+     * cause arm between them. Sums over the CLOSED credited applications' peak
+     * windows; `chainClosed` once its release reached the sustain or a cause arm
+     * closed it (it may still wait for the floor-lift on a floored application).
+     * `chainLastCreditAt`: the chain's last credited frame (round 2: the payout
+     * waits only within the sustain of it).
+     *
+     * The FINALIZED record (`record…`): written whole when a chain is finalized
+     * with a floored-unbilled or pumped application and no bill; `recordSeq`
+     * advances by one per record so the lesson session can append it.
+     * Flat primitives on purpose: this block is shallow-copied per tick.
+     */
+    appOpen: boolean;
+    appOpenedAt: number | null;
+    appShownKmh: number;
+    appPeakQ: number;
+    appPeakSpan: number;
+    appPeakDrop: number;
+    appPeakSince: number | null;
+    appPeakOnsetKmh: number;
+    appPeakShownKmh: number;
+    appPumpedAt: number | null;
+    appFlooredOnsetKmh: number | null;
+    chainOpen: boolean;
+    chainClosed: boolean;
+    chainApps: number;
+    chainSumPeakQ: number;
+    chainSumSpan: number;
+    chainSumDrop: number;
+    chainReleasedAt: number | null;
+    chainSince: number | null;
+    chainShownKmh: number;
+    chainOnsetKmh: number;
+    chainPumpedAt: number | null;
+    chainFlooredSince: number | null;
+    chainFlooredAt: number | null;
+    chainFlooredOnsetKmh: number;
+    chainBilled: boolean;
+    chainLastCreditAt: number | null;
+    /**
+     * Round 3 (the integrator's Q7 — the round-2 verifier's Fix P, kept exact
+     * across a later floored frame): a chain that turns out to have a CAUSE was
+     * never a causeless brake check and leaves the praise exactly as if it had
+     * not happened. From the frame the chain opens, the streak is also kept as
+     * if the chain's own holds and pumped resets did not exist —
+     * `chainShadowCleanM` (the metres, reset only by what resets the streak
+     * without the chain: a bill, a task latch, a floored frame) and
+     * `chainShadowOwed` (the payouts that streak minted less the ones this one
+     * minted since the chain opened). `chainPumpReset`: a pumped frame of the
+     * chain reset the streak. A chain finalized with NO record and NOT billed
+     * after a pumped reset hands the streak back as
+     * `chainShadowCleanM + chainShadowOwed × cleanDrivingDistanceM` (its
+     * metres, plus every payout it would have paid by now and did not).
+     * Nothing else reads them; they go with the chain.
+     */
+    chainPumpReset: boolean;
+    chainShadowCleanM: number;
+    chainShadowOwed: number;
+    /**
+     * Round 5 (Q10b): the chain holds a LATE cause arm's fold of a
+     * pumped-then-FLOORED open application as floored, and has closed (since
+     * round 7, Q10f, by its release standing the sustain, as the control's
+     * does — see `chainFoldHeld`) (its floor read off the
+     * ledger before the cause arm nulled it, kept in `chainFloored*`). Its
+     * no-cause control would still wait on the floor-lift, so the record waits
+     * too: a close follower's report the floor-lift would have attributed to
+     * that floor (on or after `chainFlooredSince`, by `chainFlooredAt` plus the
+     * report's own answer time) drops it — the control would have billed that
+     * brake and named nothing — and a new pedal window or the drive's end
+     * finalizes it, as they finalize the control's.
+     */
+    chainFoldPending: boolean;
+    /**
+     * Round 7 (Q10f — the round-6 verifier's Fix S): a LATE cause arm folded the
+     * open application into the chain and the pedal is still down. Its no-cause
+     * control keeps that application open until it releases, so the chain stays
+     * OPEN here too (not closed on the fold frame); the folded application's
+     * release starts the bridge (`chainReleasedAt`) exactly as the control's
+     * release arm does, so a short release and a firm re-press join the SAME
+     * chain. Cleared by that release (or with the chain).
+     */
+    chainFoldHeld: boolean;
+    /**
+     * Round 7 (Q10f): the folded application FLOORED and its floor is live —
+     * where the control's `flooredSince` would still stand. A close follower's
+     * report the floor-lift would attribute to it drops the record (the control
+     * would bill that brake and name nothing); a new application spends it (as
+     * a new window spends the control's); at the chain's close it goes on to
+     * `chainFoldPending`, where Fix R and the drop apply. A cause arm between
+     * applications still ends the chain.
+     */
+    chainFoldFloorLive: boolean;
+    /**
+     * Round 7 (Q10g, found by the differential fuzz): the folded application's
+     * WINDOW as its no-cause control's ledger still holds it — its anchor
+     * (`null` once the control would have re-anchored or released), its onset
+     * and its credit, read off the ledger as they stood before the cause arm
+     * nulled them. No frame after a late cause is credited (it would be the
+     * cause's), but the control's window goes on judging its mean: while that
+     * mean stays emergency-grade over a floored credit, the control keeps
+     * marking floored frames (its `flooredAt` advances, and F2 resets the
+     * streak on each). Here the same frames advance `chainFlooredAt` (the
+     * record's «at» and the floor-lift's window) and reset the streak as a
+     * pumped frame does (restorable by Q7 if the chain leaves no record).
+     */
+    chainFoldAnchorAt: number | null;
+    chainFoldOnsetKmh: number;
+    chainFoldQ: number;
+    /**
+     * Round 3 (Q8 — the round-2 verifier's Fix F): the payout is owed and base
+     * would ALREADY have paid it — a frame with the streak at the distance, no
+     * breach awaiting its sustain and F1 not accruing, held only by the chain's
+     * bridge. While latched, F1 holds that deferred payout only while a
+     * credited frame of the chain lies within the sustain behind it. Cleared by
+     * the payout and by any reset of the streak.
+     */
+    bridgeDeferredPayout: boolean;
+    recordSeq: number;
+    recordForm: UnbilledHardBrakeForm | null;
+    recordSince: number;
+    recordAt: number;
+    recordShownKmh: number;
+    recordOnsetKmh: number;
+    recordSustainSec: number;
+    recordFloorKmh: number;
   };
   /** First-move-off observation check (PK-05; config-gated). */
   moveOff: { restSeen: boolean; done: boolean };
@@ -919,6 +1059,163 @@ const IDLE_EPISODE: EpisodeState = {
   qualifiedSec: 0,
   lastQualAt: null,
 };
+
+/**
+ * The two forms of a causeless emergency-grade brake the harsh-brake ledger
+ * saw and did not bill (2026-11-01, `sc-follow-tailgater:63c0c28c`; P1):
+ *  · `floored` — an application the ledger recorded as floored (emergency-
+ *    grade by every gate, `harshBrakeMinSpeedKmh` alone acquitted it) and
+ *    nothing billed — not the floor-lift, not a bill from over the floor;
+ *  · `pumped` — a chain of two or more causeless applications whose bursts are
+ *    each under the sustain but TOGETHER hold it, with an emergency-grade mean
+ *    over the bursts (gaps excluded), none floored or billed.
+ */
+export type UnbilledHardBrakeForm = "floored" | "pumped";
+
+/**
+ * One such brake check, as the lesson carries it to its result
+ * (`LessonResult.unbilledHardBrakes`). `shownKmh` is the reading the
+ * speedometer showed when the brake that holds the credit began (the sample
+ * before its anchor; the anchor's own speed when the window is a re-anchor
+ * inside the application); `onsetKmh` the speed the ledger judged against the
+ * floor. `sustainSec` / `floorKmh` are the LESSON'S config, carried so the
+ * debrief never prints a literal.
+ */
+export interface UnbilledHardBrake {
+  form: UnbilledHardBrakeForm;
+  sinceSec: number;
+  atSec: number;
+  shownKmh: number;
+  onsetKmh: number;
+  sustainSec: number;
+  floorKmh: number;
+}
+
+const IDLE_HARSH_BRAKE_APP = {
+  appOpen: false,
+  appOpenedAt: null,
+  appShownKmh: 0,
+  appPeakQ: 0,
+  appPeakSpan: 0,
+  appPeakDrop: 0,
+  appPeakSince: null,
+  appPeakOnsetKmh: 0,
+  appPeakShownKmh: 0,
+  appPumpedAt: null,
+  appFlooredOnsetKmh: null,
+} as const satisfies Partial<RuleEngineState["harshBrake"]>;
+
+const IDLE_HARSH_BRAKE_CHAIN = {
+  chainOpen: false,
+  chainClosed: false,
+  chainApps: 0,
+  chainSumPeakQ: 0,
+  chainSumSpan: 0,
+  chainSumDrop: 0,
+  chainReleasedAt: null,
+  chainSince: null,
+  chainShownKmh: 0,
+  chainOnsetKmh: 0,
+  chainPumpedAt: null,
+  chainFlooredSince: null,
+  chainFlooredAt: null,
+  chainFlooredOnsetKmh: 0,
+  chainBilled: false,
+  chainLastCreditAt: null,
+  chainPumpReset: false,
+  chainShadowCleanM: 0,
+  chainShadowOwed: 0,
+  chainFoldPending: false,
+  chainFoldHeld: false,
+  chainFoldFloorLive: false,
+  chainFoldAnchorAt: null,
+  chainFoldOnsetKmh: 0,
+  chainFoldQ: 0,
+} as const satisfies Partial<RuleEngineState["harshBrake"]>;
+
+/**
+ * THE RECORD A CHAIN LEAVES WHEN IT IS FINALIZED — `null` when it leaves none.
+ * ONE CHAIN = ONE RECORD (P1): a chain any application of which was billed has
+ * none (the bill is its treatment); else a floored-unbilled application makes
+ * it `floored`; else pumped frames make it `pumped`. `includeOpenApp`: the
+ * drive ended with an application still open — it is closed with the drive
+ * (nothing can bill it any more). A cause arm never reaches here with the
+ * application it voided: C3 exempts that application whole.
+ */
+export function unbilledHardBrakeOfChain(
+  hb: RuleEngineState["harshBrake"],
+  cfg: Pick<RuleEngineConfig, "harshBrakeSustainSec" | "harshBrakeMinSpeedKmh">,
+  includeOpenApp: boolean,
+): UnbilledHardBrake | null {
+  if (hb.chainBilled) return null;
+  const openFloored = includeOpenApp && hb.appOpen && hb.flooredSince !== null && !hb.flooredBilled;
+  const openPumped = includeOpenApp && hb.appOpen && hb.appPumpedAt !== null;
+  const floored = hb.chainFlooredSince !== null || openFloored;
+  const pumped = hb.chainPumpedAt !== null || openPumped;
+  if (!floored && !pumped) return null;
+  // The chain's first credited application — a closed one, or the open one.
+  const since = hb.chainSince ?? hb.appPeakSince ?? hb.flooredSince ?? 0;
+  const shownKmh = hb.chainSince !== null ? hb.chainShownKmh : hb.appPeakShownKmh;
+  const firstOnsetKmh = hb.chainSince !== null ? hb.chainOnsetKmh : hb.appPeakOnsetKmh;
+  const flooredOnsetKmh =
+    hb.chainFlooredSince !== null ? hb.chainFlooredOnsetKmh : (hb.appFlooredOnsetKmh ?? hb.onsetKmh);
+  return {
+    form: floored ? "floored" : "pumped",
+    sinceSec: since,
+    atSec: floored
+      ? (hb.chainFlooredSince !== null ? hb.chainFlooredAt : hb.flooredAt) ?? since
+      : (openPumped ? hb.appPumpedAt : hb.chainPumpedAt) ?? since,
+    shownKmh,
+    onsetKmh: floored ? flooredOnsetKmh : firstOnsetKmh,
+    sustainSec: cfg.harshBrakeSustainSec,
+    floorKmh: cfg.harshBrakeMinSpeedKmh,
+  };
+}
+
+/**
+ * THE BRAKE CHECK'S BRIDGE HOLD ON THE CLEAN_DRIVING PAYOUT (round 2,
+ * 2026-11-02 · `sc-follow-tailgater:63c0c28c`; the integrator's Q1 — the round-1
+ * verifier's direction N1). Beside brakeledger's F1 (a causeless window still
+ * accruing, read at the praise block), the payout waits while a brake check is
+ * STILL BEING JUDGED across a release: the chain is open, its release has not
+ * stood the sustain (`chainClosed` false), nothing billed it — and ONLY within
+ * `harshBrakeSustainSec` of the chain's LAST CREDITED frame (`heldFor`: the
+ * exact tie has stood). So every deferral has a credited frame within the
+ * sustain before it, and a gentle stop that once touched the harsh line holds
+ * nothing past that.
+ *
+ * …and only once the chain has credited a SPAN: the peak windows so far (the
+ * closed applications' and the open one's) span more than zero. A window whose
+ * only credited frame is its own anchor (a one-reading speed step) sheds no
+ * speed over a span — it can add credit to a pump, never span or drop — and on
+ * the task-cap census's 0.1 s cadence every such step would otherwise defer its
+ * payout by the sustain (V13's 125 → 110 step; P121, P271, P653, R31, R150 and
+ * R155 of the two-sided census, measured), which Q2 forbids.
+ */
+export function brakeCheckBridgeHolds(
+  hb: RuleEngineState["harshBrake"],
+  t: number,
+  cfg: Pick<RuleEngineConfig, "harshBrakeSustainSec">,
+): boolean {
+  if (!hb.chainOpen || hb.chainClosed || hb.chainBilled || hb.chainLastCreditAt === null) return false;
+  if (heldFor(t - hb.chainLastCreditAt, cfg.harshBrakeSustainSec)) return false;
+  const open = hb.appOpen && hb.appPeakSince !== null;
+  return hb.chainSumSpan + (open ? hb.appPeakSpan : 0) > 0;
+}
+
+/** The record the reducer finalized last (`recordSeq` advanced), read off its flat fields. */
+export function lastUnbilledHardBrake(hb: RuleEngineState["harshBrake"]): UnbilledHardBrake | null {
+  if (hb.recordSeq === 0 || hb.recordForm === null) return null;
+  return {
+    form: hb.recordForm,
+    sinceSec: hb.recordSince,
+    atSec: hb.recordAt,
+    shownKmh: hb.recordShownKmh,
+    onsetKmh: hb.recordOnsetKmh,
+    sustainSec: hb.recordSustainSec,
+    floorKmh: hb.recordFloorKmh,
+  };
+}
 
 /** See `RuleEngineState.taskAct`. Replaced, never mutated in place. */
 export interface TaskCapAct {
@@ -2507,6 +2804,17 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
       flooredBilled: false,
       followerForcedAt: null,
       followerAnswerSec: 0,
+      ...IDLE_HARSH_BRAKE_APP,
+      ...IDLE_HARSH_BRAKE_CHAIN,
+      bridgeDeferredPayout: false,
+      recordSeq: 0,
+      recordForm: null,
+      recordSince: 0,
+      recordAt: 0,
+      recordShownKmh: 0,
+      recordOnsetKmh: 0,
+      recordSustainSec: 0,
+      recordFloorKmh: 0,
     },
     moveOff: { restSeen: false, done: false },
     lastHazardEventAt: null,
@@ -8237,6 +8545,22 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // and every wobble. `__tests__/false-positives.test.ts` is the contract and is
   // unmoved, and so are the 247 rules/orchestrator/traces files around it.
   const causelessBraking = accelMps2 <= -BRAKING_LINE_MPS2 && noBrakeCause && !s.harshBrake.causeSeen;
+  // Read by „ONE BRAKE CHECK, ONE RECORD" below the floor-lift: the window as
+  // it stood before this frame, the reading of the frame before it, and
+  // whether either of the ledger's two bills fired on this frame.
+  const hbWindowBefore = s.harshBrake.activeSince;
+  const hbPrevReadingKmh = s.prevSpeedKmh;
+  // …and the floored record as it stood before this frame (Q10b): the cause
+  // arm below nulls it, and a LATE cause must not take it with it.
+  const hbFlooredSinceBefore = s.harshBrake.flooredSince;
+  const hbFlooredAtBefore = s.harshBrake.flooredAt;
+  // …and the window's credit as it stood before this frame (Q10g: a late
+  // cause's fold keeps the window its control still judges).
+  const hbQualifiedBefore = s.harshBrake.qualifiedSec;
+  let hbBilledNow = false;
+  // Q10g: a frame on which the folded window's no-cause control marks a
+  // floored frame (read by the praise block, as a pumped frame is).
+  let hbFoldFlooredNow = false;
   if (causelessBraking) {
     const openWindow = s.harshBrake.activeSince;
     const heldSec = openWindow === null ? 0 : t - openWindow;
@@ -8345,6 +8669,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     ) {
       if (s.harshBrake.onsetKmh >= cfg.harshBrakeMinSpeedKmh) {
         s.harshBrake.emitted = true;
+        hbBilledNow = true;
         events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
       } else {
         // Causeless and emergency-grade by every gate — the floor ALONE
@@ -8431,7 +8756,403 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     ) {
       hb.flooredBilled = true;
       if (hb.activeSince !== null) hb.emitted = true;
+      hbBilledNow = true;
       events.push(makeViolation("HARSH_BRAKING_NO_CAUSE", t));
+    }
+  }
+
+  // ONE BRAKE CHECK, ONE RECORD (2026-11-01 · `sc-follow-tailgater:63c0c28c`,
+  // critical; founder QUESTIONS 4 and 10 as ruled 2026-10-19 and delegated;
+  // the integrator's P1–P12). NOTHING HERE BILLS, SCORES OR STARS ANYTHING.
+  //
+  // WHAT WAS MEASURED. rig-w3e PUMP245 (65be020), re-measured through the live
+  // rung chain on this tree: at the лепка, 24.43 км/ч on the speedometer, the
+  // pad's brake 1.00 for 12 grid points, 0 for 6, 1.00 to rest. The ledger
+  // above saw TWO applications — the first credited 0.200 s at emergency grade
+  // before its release, the second 0.300 s (the car's own full-pedal decel
+  // falls under 7 m/s² below ~9 км/ч) — and rightly billed neither: the 0.4 s
+  // sustain is CONTINUOUS (QUESTION 4: not a defect). But the pedal had shed
+  // the speed as one emergency stop does, and «Чисто и спокойно каране» was
+  // minted 11 s later from the 250 m holding it: the «Браво» toast, «Похвали ✓»
+  // and «Какво се получи добре», under «…Точно това иска да види
+  // изпитващият.» Same for a floored brake (`e47a45c1`): brakeledger withheld
+  // its praise, and the debrief then invited him to «задръж това ниво».
+  //
+  // THE ONE FACT, in this ledger's own fields and config (P1/P2; no new
+  // threshold, every number read from `cfg`):
+  //  · FLOORED-UNBILLED — an application that left a floored record
+  //    (`flooredSince` still set when it closed) and that nothing billed — not
+  //    over the floor, not the floor-lift, which can still bill it after the
+  //    release (so the chain waits while `flooredSince` stands). A record the
+  //    CAUSE ARM voided inside its own application is never one: the ledger
+  //    then saw a cause (C3);
+  //  · PUMPED — a CHAIN of ≥ 2 causeless applications (each opened from a
+  //    closed window, each released), none floored or billed, no cause arm
+  //    between them and every release between them shorter than
+  //    `harshBrakeSustainSec` (ADR-016 Update E2's «a brake that is over»).
+  //    For each application only the window holding its PEAK credit counts —
+  //    never two windows of one application across a re-anchor, which is the
+  //    ledger's own domain. The chain is pumped on a qualifying frame when the
+  //    bursts' credit TOGETHER holds the sustain (`heldFor`), so do their spans,
+  //    and the speed they shed over those spans is emergency-grade on the mean
+  //    (`harshBrakeDecelMps2`, exclusive, with the tie tolerance) — the GAPS
+  //    EXCLUDED: off the pedal the release arm allows only decel under the
+  //    braking line, so a mean taken with the gaps acquits any pump released
+  //    for more than ~0.57 × its burst.
+  // Bursts released for at least the sustain are separate brakes that are over
+  // (P2's stated narrowing), and a modulated brake that never releases is one
+  // application, the ledger's own: neither is in the fact.
+  //
+  // ONE CHAIN = ONE RECORD: a bill anywhere in it → none (the bill is its
+  // treatment); else a floored-unbilled application → `floored`; else pumped
+  // frames → `pumped`. The record is finalized when the chain closes and
+  // nothing can bill it any more, and the lesson session appends it
+  // (`recordSeq`); the praise below reads the chain.
+  {
+    const hb = s.harshBrake;
+    const sus = cfg.harshBrakeSustainSec;
+    const finalizeChain = (): void => {
+      const rec = unbilledHardBrakeOfChain(hb, cfg, false);
+      if (rec !== null) {
+        hb.recordSeq += 1;
+        hb.recordForm = rec.form;
+        hb.recordSince = rec.sinceSec;
+        hb.recordAt = rec.atSec;
+        hb.recordShownKmh = rec.shownKmh;
+        hb.recordOnsetKmh = rec.onsetKmh;
+        hb.recordSustainSec = rec.sustainSec;
+        hb.recordFloorKmh = rec.floorKmh;
+      } else if (!hb.chainBilled && hb.chainPumpReset) {
+        // Q7 (round 3, the verifier's Fix P): a chain finalized with NO record
+        // and NOT billed after a pumped reset — a cause arm voided its pumped
+        // application whole, so the ledger saw a cause and it was never a
+        // causeless brake check. The streak is handed back as it would stand
+        // had the chain not been judged at all: its metres and every payout
+        // that streak would have minted by now and this one has not.
+        s.cleanDistanceM = Math.max(
+          0,
+          hb.chainShadowCleanM + hb.chainShadowOwed * cfg.cleanDrivingDistanceM,
+        );
+      }
+      Object.assign(hb, IDLE_HARSH_BRAKE_CHAIN);
+    };
+    // Q10b: a close follower's report on THIS frame that the floor-lift would
+    // have attributed to the folded floor (the floor-lift's own window, read
+    // off the floor the fold kept).
+    const foldReportAttributes = (): boolean =>
+      hb.followerForcedAt === t &&
+      hb.chainFlooredSince !== null &&
+      hb.chainFlooredAt !== null &&
+      hb.followerForcedAt >= hb.chainFlooredSince &&
+      hb.followerForcedAt <= hb.chainFlooredAt + hb.followerAnswerSec;
+    // …which its no-cause control would have BILLED: that control names
+    // nothing, so neither does this chain (the cause arm has already exempted
+    // the bill — nothing here bills). A CLOSED chain is finalized with no
+    // record, as a voided chain is (Q7's restore included). An OPEN one (Q10f:
+    // the folded application still held, or in its short release) is the
+    // control's chain the floor-lift has just billed, which stays open and
+    // takes in every later application of the same brake check — so this one
+    // stays open too, marked as that billed chain (`chainBilled`: its treatment
+    // is the control's bill, so it leaves no record), and closes as the
+    // control's does. Still nothing here bills (Q10e: the bill never moves
+    // against base).
+    const dropFold = (): void => {
+      hb.chainFlooredSince = null;
+      hb.chainFlooredAt = null;
+      hb.chainPumpedAt = null;
+      hb.chainFoldFloorLive = false;
+      if (hb.chainOpen && !hb.chainClosed) {
+        // Q7's restore, here and once: the chain leaves no record and nothing
+        // here bills, so the streak stands as base's (Q10e: the praise of a
+        // drive the late cause left unbilled is base's, not the billed
+        // control's).
+        if (!hb.chainBilled && hb.chainPumpReset) {
+          s.cleanDistanceM = Math.max(0, hb.chainShadowCleanM + hb.chainShadowOwed * cfg.cleanDrivingDistanceM);
+          hb.chainPumpReset = false;
+        }
+        // …and a floored mark the folded window made on this very frame goes
+        // with the floor it marked (found by the round-7 restore probe: it
+        // reset the streak after the restore, one grid point off base).
+        hbFoldFlooredNow = false;
+        hb.chainBilled = true;
+      } else finalizeChain();
+    };
+    // Q10g: one frame of the folded window as its no-cause control's ledger
+    // judges it (the mean gate, the re-anchor and the floored mark — the
+    // ledger's own tests above, on the window the cause arm nulled). Nothing is
+    // credited and nothing bills.
+    const foldWindowStep = (): void => {
+      const a = hb.chainFoldAnchorAt;
+      if (a === null) return;
+      const span = t - a;
+      const held = heldFor(span, sus);
+      const mean = held && (hb.chainFoldOnsetKmh - speed) / 3.6 > cfg.harshBrakeDecelMps2 * span * (1 + HARSH_BRAKE_TIE_TOLERANCE);
+      if (held && !mean) {
+        // the control re-anchors: its new window holds no credit
+        hb.chainFoldAnchorAt = null;
+        return;
+      }
+      if (
+        mean &&
+        heldFor(hb.chainFoldQ, sus) &&
+        hb.chainFoldOnsetKmh < cfg.harshBrakeMinSpeedKmh &&
+        hb.chainFlooredSince !== null &&
+        !hb.chainBilled
+      ) {
+        hb.chainFlooredAt = t;
+        hbFoldFlooredNow = true;
+      }
+    };
+    // A closed chain that waited on the floor-lift is final the moment the
+    // ledger can no longer bill it: its floored record is gone (a new
+    // application, or a cause arm after its release), or it was billed.
+    if (hb.chainOpen && hb.chainClosed && hb.chainFoldPending) {
+      // Q10b: the folded floor waits as its no-cause control's would — until
+      // a new pedal window opens (which spends the control's floored record)
+      // or the drive ends; an attributable report drops it.
+      // Q10c (Fix R): the control spends its floored record on the FIRST
+      // braking frame after a release — a new pedal application opens a new
+      // window whatever lies ahead. Here the cause is still in reach, so that
+      // re-press runs through the cause arm and opens no window; it is read
+      // off the pedal instead (the previous frame's sticky cause had been
+      // reset by a release, and this frame brakes). Checked BEFORE the drop:
+      // a report from then on is not the floor-lift's, as in the control.
+      // It covers round 5's «a new causeless pedal window» too, which is
+      // dropped here as dead: `causelessBraking` needs `noBrakeCause`, and
+      // then `s.harshBrake.causeSeen` is still `prev`'s (only a cause sets it
+      // before that line), so it implies this condition (mutant mW9, the old
+      // branch never taken, survived as equivalent).
+      if (!prev.harshBrake.causeSeen && accelMps2 <= -BRAKING_LINE_MPS2) finalizeChain();
+      else if (foldReportAttributes()) dropFold();
+    } else if (hb.chainOpen && hb.chainClosed && (hbBilledNow || hb.chainBilled || hb.flooredSince === null)) {
+      if (hbBilledNow) hb.chainBilled = true;
+      finalizeChain();
+    }
+    if (causelessBraking) {
+      if (hbWindowBefore === null && !hb.appOpen) {
+        // A NEW PEDAL APPLICATION. After a release of the sustain or longer the
+        // last chain is over (its release arm closed it); otherwise it goes on.
+        Object.assign(hb, IDLE_HARSH_BRAKE_APP);
+        hb.appOpen = true;
+        hb.appOpenedAt = t;
+        hb.appShownKmh = hbPrevReadingKmh ?? speed;
+        if (hb.chainOpen) hb.chainReleasedAt = null;
+        // Q10f: a new application spends a folded floor, as a new window spends
+        // the control's floored record (`flooredSince`).
+        hb.chainFoldHeld = false;
+        hb.chainFoldFloorLive = false;
+        hb.chainFoldAnchorAt = null;
+      }
+      if (hb.lastQualAt === t && hb.activeSince !== null) {
+        if (!hb.chainOpen) {
+          Object.assign(hb, IDLE_HARSH_BRAKE_CHAIN);
+          hb.chainOpen = true;
+          // Q7: the streak as it stands when the chain opens (this frame's
+          // metres are added by the praise block, to both).
+          hb.chainShadowCleanM = s.cleanDistanceM;
+        }
+        hb.chainLastCreditAt = t;
+        if (hb.qualifiedSec >= hb.appPeakQ) {
+          hb.appPeakQ = hb.qualifiedSec;
+          hb.appPeakSpan = t - hb.activeSince;
+          hb.appPeakDrop = (hb.onsetKmh - speed) / 3.6;
+          hb.appPeakSince = hb.activeSince;
+          hb.appPeakOnsetKmh = hb.onsetKmh;
+          // What the speedometer showed when THIS window's brake began: the
+          // reading before the pedal when the window is the application's
+          // own; its anchor's speed when it is a re-anchor inside it.
+          hb.appPeakShownKmh = hb.activeSince === hb.appOpenedAt ? hb.appShownKmh : hb.onsetKmh;
+        }
+      }
+      if (hb.flooredAt === t && hb.appFlooredOnsetKmh === null) hb.appFlooredOnsetKmh = hb.onsetKmh;
+      if (hbBilledNow && hb.chainOpen) hb.chainBilled = true;
+      // THE PUMPED TEST — on a qualifying frame of the open application, over
+      // the closed applications' peak windows and this one's.
+      if (
+        hb.chainOpen &&
+        !hb.chainBilled &&
+        hb.chainFlooredSince === null &&
+        hb.flooredSince === null &&
+        hb.chainApps >= 1 &&
+        hb.appPeakSince !== null &&
+        hb.lastQualAt === t
+      ) {
+        const sumQ = hb.chainSumPeakQ + hb.appPeakQ;
+        const sumSpan = hb.chainSumSpan + hb.appPeakSpan;
+        const sumDrop = hb.chainSumDrop + hb.appPeakDrop;
+        if (
+          heldFor(sumQ, sus) &&
+          heldFor(sumSpan, sus) &&
+          sumDrop > cfg.harshBrakeDecelMps2 * sumSpan * (1 + HARSH_BRAKE_TIE_TOLERANCE)
+        ) {
+          hb.appPumpedAt = t;
+        }
+      }
+    } else if (accelMps2 > -BRAKING_LINE_MPS2) {
+      if (hb.appOpen) {
+        // The application closes on its release.
+        hb.appOpen = false;
+        if (hb.chainOpen) {
+          if (hb.appPeakSince !== null) {
+            if (hb.chainSince === null) {
+              hb.chainSince = hb.appPeakSince;
+              hb.chainShownKmh = hb.appPeakShownKmh;
+              hb.chainOnsetKmh = hb.appPeakOnsetKmh;
+            }
+            hb.chainApps += 1;
+            hb.chainSumPeakQ += hb.appPeakQ;
+            hb.chainSumSpan += hb.appPeakSpan;
+            hb.chainSumDrop += hb.appPeakDrop;
+          }
+          if (hb.appPumpedAt !== null) hb.chainPumpedAt = hb.appPumpedAt;
+          if (hb.flooredSince !== null && !hb.flooredBilled && hb.chainFlooredSince === null) {
+            hb.chainFlooredSince = hb.flooredSince;
+            hb.chainFlooredOnsetKmh = hb.appFlooredOnsetKmh ?? hb.onsetKmh;
+          }
+          if (hb.flooredSince !== null && !hb.flooredBilled) hb.chainFlooredAt = hb.flooredAt;
+          hb.chainReleasedAt = t;
+        }
+      }
+      // Q10f: the late-cause-folded application releases here — its release
+      // starts the bridge, as the control's release arm starts it above.
+      if (hb.chainFoldHeld) {
+        hb.chainFoldHeld = false;
+        hb.chainFoldAnchorAt = null;
+        if (hb.chainOpen) hb.chainReleasedAt = t;
+      }
+      if (hbBilledNow && hb.chainOpen) hb.chainBilled = true;
+      if (hb.chainFoldFloorLive && hb.chainOpen && !hb.chainClosed && foldReportAttributes()) {
+        // A report the floor-lift would attribute to the live folded floor: the
+        // control bills that brake and names nothing (nothing here bills).
+        dropFold();
+      } else if (hb.chainOpen && !hb.chainClosed && hb.chainReleasedAt !== null && heldFor(t - hb.chainReleasedAt, sus)) {
+        // The release has stood the sustain: the brake check is over.
+        hb.chainClosed = true;
+        if (hb.chainFoldFloorLive && !hb.chainBilled) {
+          // Q10f: a live folded floor waits on the floor-lift as the control's
+          // closed chain does (Fix R and the drop, above).
+          hb.chainFoldFloorLive = false;
+          hb.chainFoldPending = true;
+        } else if (hb.chainBilled || hb.chainFlooredSince === null || hb.flooredSince === null) finalizeChain();
+      }
+    } else {
+      // A CAUSE ARM. Inside an application it exempts that application whole
+      // (C3) — its credit, its pumped frames and (the ledger has just nulled
+      // it) its floored record go with it; between applications it ends the
+      // chain. Either way the chain closes here — except a late-cause fold
+      // (Q9/Q10b), which keeps it open as its control does (Q10f, below).
+      //
+      // Q9 (round 4, the verifier's Fix V): …except a PUMPED open application
+      // whose chain's last credited frame has already stood the sustain. A cause
+      // that comes into reach only then cannot have caused the bursts — the
+      // brake check was causeless when it happened (its credit was over before
+      // the cause existed). It is folded into the chain as pumped, as its
+      // release would have folded it, and the chain's record is named. C3 is
+      // narrowed for the RECORD only: the ledger above has already exempted the
+      // application from the bill, and nothing here bills. A cause within the
+      // sustain of the last credit still exempts the application whole.
+      //
+      // Q10b (round 5): the fold gives the form the brake check's NO-CAUSE
+      // control gives — a late cause changes NOTHING about the brake check.
+      // An application that FLOORED (a pumped one whose second burst then held
+      // the sustain alone from under the floor, or a single floored stop) is a
+      // floored record there — its release arm keeps the floor and the floored
+      // form wins — so it is folded as floored here, its floor read off the
+      // ledger as it stood BEFORE this frame's cause arm nulled it
+      // (`hbFlooredSinceBefore` / `hbFlooredAtBefore`). Its control would still
+      // wait on the floor-lift, so this record waits too (`chainFoldPending`).
+      // Folding it as pumped (round 4) printed «Нито един тласък поотделно не
+      // задържа…» over a burst that held the sustain; voiding it (the
+      // verifier's Fix W, declined) would leave a causeless emergency-grade
+      // brake that only the floor acquits without its record. A pumped
+      // application that never floored is folded as pumped (round 4).
+      const appFloored = hb.appFlooredOnsetKmh !== null && hbFlooredSinceBefore !== null && !hb.flooredBilled;
+      // Q10g (round 7, found by the differential fuzz): the fact covers EVERY
+      // open application of an open chain, not only one that pumped or floored,
+      // and a billed chain too — a late cause changes nothing about the brake
+      // check, so the application is folded exactly as its release would fold
+      // it (its peak window, if it has one; its pumped frames; its floor) and
+      // the chain goes on as the control's does. Round 6 voided an application
+      // that had only credited and ended the chain (or ended a billed chain), so
+      // a short release and a re-press began a NEW chain where the control's
+      // re-press joined the old one: a pumped record the control has, missing;
+      // a floored record the control's billed chain absorbs, named; a floored
+      // record whose «при … км/ч» and start are the re-press's, not the brake
+      // check's.
+      const lateCause =
+        hb.chainOpen && !hb.chainClosed && hb.chainLastCreditAt !== null && heldFor(t - hb.chainLastCreditAt, sus);
+      const appWasOpen = hb.appOpen;
+      let folded = false;
+      let foldedFloored = false;
+      if (appWasOpen && lateCause) {
+        if (hb.appPeakSince !== null) {
+          if (hb.chainSince === null) {
+            hb.chainSince = hb.appPeakSince;
+            hb.chainShownKmh = hb.appPeakShownKmh;
+            hb.chainOnsetKmh = hb.appPeakOnsetKmh;
+          }
+          hb.chainApps += 1;
+          hb.chainSumPeakQ += hb.appPeakQ;
+          hb.chainSumSpan += hb.appPeakSpan;
+          hb.chainSumDrop += hb.appPeakDrop;
+        }
+        folded = true;
+        if (hb.appPumpedAt !== null) hb.chainPumpedAt = hb.appPumpedAt;
+        if (appFloored) {
+          // as the release arm folds a floored application
+          if (hb.chainFlooredSince === null) {
+            hb.chainFlooredSince = hbFlooredSinceBefore;
+            hb.chainFlooredOnsetKmh = hb.appFlooredOnsetKmh as number;
+          }
+          hb.chainFlooredAt = hbFlooredAtBefore;
+          foldedFloored = true;
+        }
+      }
+      if (hb.appOpen) Object.assign(hb, IDLE_HARSH_BRAKE_APP);
+      // Q10f (round 7, the round-6 verifier's Fix S): the fold does NOT close
+      // the chain. Its no-cause control keeps the application open until it
+      // releases and then runs the bridge (a short release and a re-press join
+      // the same chain; a release of the sustain closes it), so the chain stays
+      // open here, held (`chainFoldHeld`) until the folded application's
+      // release starts that bridge; a folded floor stays live
+      // (`chainFoldFloorLive`) where the control's floor would — a report the
+      // floor-lift would attribute drops it. Round 6 closed the chain on the
+      // fold frame, so a re-press inside the bridge opened a SECOND chain: two
+      // bullets for one brake check, a pumped record beside the bill of the
+      // same brake check, a payout a second early.
+      if (folded) {
+        hb.chainFoldHeld = true;
+        if (foldedFloored) hb.chainFoldFloorLive = true;
+        hb.chainReleasedAt = null;
+        hb.chainFoldAnchorAt = hbWindowBefore;
+        hb.chainFoldOnsetKmh = hb.onsetKmh;
+        hb.chainFoldQ = hbQualifiedBefore;
+        foldWindowStep();
+        if (hb.chainFoldFloorLive && foldReportAttributes()) dropFold();
+      } else if (hb.chainFoldHeld) {
+        // The rest of the late cause's braking, pedal still down: the cause
+        // changes nothing about the brake check.
+        foldWindowStep();
+        if (hb.chainFoldFloorLive && foldReportAttributes()) dropFold();
+      } else if (lateCause) {
+        // Q10g: a NEW pedal application under a late cause, in the chain's
+        // short release — the control's re-press opens a new application that
+        // joins the chain (and spends a live floor), so this one does too; the
+        // cause arm credits nothing of it (C3), as a gentle re-press credits
+        // nothing in the control.
+        hb.chainReleasedAt = null;
+        hb.chainFoldHeld = true;
+        hb.chainFoldFloorLive = false;
+        hb.chainFoldAnchorAt = null;
+      } else if (hb.chainOpen && !hb.chainFoldPending) {
+        // A cause arm inside an application it voids, or between
+        // applications: the chain ends here. (A chain already waiting on a
+        // folded floor keeps waiting through the rest of the cause's braking —
+        // the cause changes nothing about it.)
+        hb.chainFoldFloorLive = false;
+        hb.chainClosed = true;
+        finalizeChain();
+      }
     }
   }
 
@@ -8737,16 +9458,96 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
    * frame, stand. A brake billed over the floor, or by the floor-lift above,
    * already resets through its violation.
    */
+  /*
+   * …AND A PUMPED BRAKE CHECK VOIDS IT TOO, AND THE HOLD SPANS ITS RELEASES
+   * (2026-11-01, `sc-follow-tailgater:63c0c28c`; P3 — see „ONE BRAKE CHECK, ONE
+   * RECORD" at the detector). rig-w3e PUMP245, through the live rung chain on
+   * this tree: two causeless bursts of 0.200 and 0.300 s of emergency-grade
+   * credit split by a 0.1 s release, neither floored, the chain's mean over the
+   * bursts 8.7–8.9 m/s² — and «Чисто и спокойно каране» at 38.55 s from the
+   * 250 m holding them. F1 held the payout only while ONE window accrued, so
+   * nothing held it in the release between the bursts either.
+   *  · A PUMPED FRAME RESETS THE STREAK, as a floored frame does (F2/F3).
+   *  · THE PAYOUT WAITS WHILE THE BRAKE CHECK IS STILL BEING JUDGED — F1, or
+   *    the chain's bridge (`brakeCheckBridgeHolds`: open, its release short of
+   *    the sustain, unbilled, a credited span) — and NEVER LONGER THAN
+   *    `harshBrakeSustainSec` AFTER ITS LAST CREDITED FRAME (round 2, Q1: the
+   *    round-1 hold lasted to the release's sustain, so one credited frame at
+   *    the start of a gentle causeless stop held CLEAN_DRIVING 7.28 s, until the
+   *    car had stopped and driven off — the verifier's sc-sp-harsh-brake drive).
+   *    The accrual never stops. A lone sub-sustain blip is a chain of one: its
+   *    payout lands on the first moving frame that lies the sustain behind its
+   *    last credit, and it is never named or withheld.
+   * Windows paid before the chain and after its last pumped or floored frame
+   * stand; the debrief scopes them on a drive that carries a record.
+   */
+  /*
+   * ROUND 3 (2026-11-02; the integrator's Q7 and Q8 — the round-2 verifier's
+   * Fix P and Fix F):
+   *  · Q7: while a chain is open its SHADOW streak runs beside this one as if
+   *    the chain were not judged (`chainShadowCleanM` / `chainShadowOwed`:
+   *    reset by a bill, a task latch or a floored frame, never by a pumped
+   *    frame; paid under F1 alone, no bridge); a chain finalized with no record
+   *    and no bill after a pumped reset (a cause arm voided it) hands that
+   *    streak back at the detector. The verifier's Fix P saved the metres at
+   *    the first pumped reset and added them back; the shadow is the same on
+   *    its tapes and stays exact when a floored frame (which wipes the base
+   *    streak too) or a base payout falls between the pump and the cause.
+   *  · Q8: once the payout is owed and base would ALREADY have paid it — the
+   *    streak at the distance, no breach awaiting its sustain, F1 not accruing,
+   *    only the bridge holding (`bridgeDeferredPayout`) — F1 holds that payout
+   *    further only while the chain's last credited frame lies within the
+   *    sustain (`heldFor`, the exact tie has stood) behind it. Every held frame
+   *    of a deferred payout then has a credited frame of the open chain within
+   *    the sustain before it. Cleared by the payout and by any reset.
+   */
   const flooredFresh = s.harshBrake.flooredAt === t;
-  const causelessBrakeAccruing = s.harshBrake.activeSince !== null && s.harshBrake.qualifiedSec > 0;
-  if (events.some((e) => e.kind === "violation") || taskLatchFresh || flooredFresh) {
+  // (Q10g: a floored frame the late-folded window's control marks resets the
+  // streak as a pumped frame does — restorable by Q7 if no record is left.)
+  const pumpedFresh = s.harshBrake.appPumpedAt === t || hbFoldFlooredNow;
+  const baseReset = events.some((e) => e.kind === "violation") || taskLatchFresh || flooredFresh;
+  const f1Accruing = s.harshBrake.activeSince !== null && s.harshBrake.qualifiedSec > 0;
+  const causelessBrakeAccruing =
+    f1Accruing &&
+    !(
+      s.harshBrake.bridgeDeferredPayout &&
+      (s.harshBrake.chainLastCreditAt === null ||
+        heldFor(t - s.harshBrake.chainLastCreditAt, cfg.harshBrakeSustainSec))
+    );
+  const brakeCheckHolds = brakeCheckBridgeHolds(s.harshBrake, t, cfg);
+  const streakAccrues = !billedAndUncorrected && !s.terminated && moving && s.prevT !== null;
+  if (s.harshBrake.chainOpen) {
+    // Q7: the chain's shadow streak — what resets, accrues and pays without
+    // the chain (base F1, unbounded; no bridge; no pumped reset).
+    const hb = s.harshBrake;
+    if (baseReset) {
+      hb.chainShadowCleanM = 0;
+    } else if (streakAccrues) {
+      hb.chainShadowCleanM += (speed / 3.6) * Math.min(t - (s.prevT as number), 2);
+      if (hb.chainShadowCleanM >= cfg.cleanDrivingDistanceM && !breachAwaitingSustain && !f1Accruing) {
+        hb.chainShadowCleanM -= cfg.cleanDrivingDistanceM;
+        hb.chainShadowOwed += 1;
+      }
+    }
+  }
+  if (baseReset || pumpedFresh) {
+    if (!baseReset && s.harshBrake.chainOpen) s.harshBrake.chainPumpReset = true;
+    s.harshBrake.bridgeDeferredPayout = false;
     s.cleanDistanceM = 0; // any fresh mistake resets the streak
-  } else if (!billedAndUncorrected && !s.terminated && moving && s.prevT !== null) {
+  } else if (streakAccrues) {
     // Clamp dt so a pause/resume time jump can't fabricate a huge distance.
-    s.cleanDistanceM += (speed / 3.6) * Math.min(t - s.prevT, 2);
+    s.cleanDistanceM += (speed / 3.6) * Math.min(t - (s.prevT as number), 2);
     if (s.cleanDistanceM >= cfg.cleanDrivingDistanceM && !breachAwaitingSustain && !causelessBrakeAccruing) {
-      s.cleanDistanceM -= cfg.cleanDrivingDistanceM;
-      events.push(makeCommendation("CLEAN_DRIVING", t));
+      if (!brakeCheckHolds) {
+        s.cleanDistanceM -= cfg.cleanDrivingDistanceM;
+        s.harshBrake.bridgeDeferredPayout = false;
+        if (s.harshBrake.chainOpen) s.harshBrake.chainShadowOwed -= 1;
+        events.push(makeCommendation("CLEAN_DRIVING", t));
+      } else {
+        // Only the bridge holds it: base F1 is not accruing here (or the latch
+        // already stands), so base would already have paid (Q8).
+        s.harshBrake.bridgeDeferredPayout = true;
+      }
     }
   }
 

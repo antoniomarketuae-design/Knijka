@@ -75,36 +75,31 @@ describe("sc-vu-bikelane-turn — mistake demos grade their exact codes (doc 76 
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
   });
 
-  it("„Отрязване на колелото по алеята“: the cut, and the rider it actually hits", () => {
-    // B81 — this demo does not cut ACROSS the counter-flow rider, it drives
-    // THROUGH him. MEASURED on the committed script with exact body geometry
-    // (the rider is boxed on the bicycle rig, 1.8 × 0.46 m): first overlap
-    // t 18.38 s, 56 consecutive frames, deepest 0.031 m of interpenetration at
-    // t 18.43, combined closing speed 16.2 km/h. CyclistRightHookRunner had
-    // convicted the hook at t 18.20 — 0.18 s earlier — and retired, so its
-    // contact branch never ran again. Now the sentinel outlives it and the
-    // strike on a vulnerable road user is billed.
-    //
-    // TWO STRIKES SINCE lane vru2offset (sc-vu-bikelane-turn:9141072b,
-    // integrator ruling V1 — the demo script is kept): the with-flow rider was
-    // authored 2.6 m NORTH of the car's lane (y −1.46, offset −2.6), so this
-    // script's turn never reached his line and only the counter-flow rider was
-    // struck. On the south track (y −6.66, offset +2.6) he is where the card
-    // says, and the same turn runs into him first. MEASURED on this script
-    // (the sentinel's own actorId on every collision report):
-    //   · t 18.13 — COLLISION, the WITH-FLOW rider (sc-vbl-rider-wf): car
-    //     (−6.22, −5.92) turning across his line, rider (−3.36, −6.66) riding
-    //     straight east; reports on 5 consecutive frames to 18.20. His runner
-    //     resolves «collision» and bills no hook (it had billed one at 18.20,
-    //     with him ahead-LEFT at (−3.16, −1.46), off a line the car never crossed);
-    //   · t 18.38 — COLLISION, the COUNTER-FLOW rider (sc-vbl-rider-cf), as
-    //     before (B81); his runner's hook at 18.20 stays on the sheet.
-    // COPY DEBT (copy lane): the card still names the priority fault alone.
+  it("„Отрязване на колелото по алеята“: the right hook on the rider coming from behind — exactly FAILED_TO_YIELD, no rider touched", () => {
+    // RESTATED by lane vbltiming (sc-vu-bikelane-turn:9141072b clause (a),
+    // integrator rulings T3/T4). WAS (lane vru2offset, ruling V1): this script
+    // drove THROUGH both riders — COLLISION on the with-flow rider at 18.13
+    // (his runner resolved «collision» and billed no hook) and on the
+    // counter-flow rider at 18.38 (B81), with the counter-flow runner's hook
+    // at 18.20 and the runtime right-hand rule on the counter-flow rider at
+    // 15.55 first; strike list [wf, cf]; outcomes [wf:collision, cf:violation].
+    // NOW, MEASURED on the re-timed script (recorder, seed 7): the car passes
+    // the with-flow rider standing at x −73.5, slows for the turn without
+    // stopping, and he catches it from behind on its right; it turns across his
+    // line — FAILED_TO_YIELD «cyclist-right-hook» at 22.58, his runner
+    // «violation» — while his footprint guard holds him short of the car's
+    // body (min air 1.73 m to the 0.4 m proxy). The counter-flow rider crossed
+    // the mouth before the car entered the core (19.25), so the right-hand rule
+    // bills nothing and his runner credits «yielded» at 27.03 (the commendation
+    // at 32.10 is that credit). No rider is touched: the strike list is empty.
     const drive = drives.get("mistake-cut-path")!;
     const codes = [...new Set(violationCodes(drive))].sort();
-    expect(codes).toEqual(["COLLISION", "FAILED_TO_YIELD"]);
-    expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(2);
-    // Which body each strike is: the sentinel's actorId, in the order struck.
+    expect(codes).toEqual(["FAILED_TO_YIELD"]);
+    expect(
+      drive.ruleEvents
+        .filter((e) => e.kind === "violation")
+        .map((e) => `${e.code}:${(e as { detail?: string }).detail ?? ""}`),
+    ).toEqual(["FAILED_TO_YIELD:cyclist-right-hook"]);
     const struck: string[] = [];
     recordScVuBikelaneTurnDrive(district, "mistake-cut-path", {
       onTick: (tick) => {
@@ -115,10 +110,10 @@ describe("sc-vu-bikelane-turn — mistake demos grade their exact codes (doc 76 
         }
       },
     });
-    expect(struck).toEqual(["sc-vbl-rider-wf", "sc-vbl-rider-cf"]);
+    expect(struck).toEqual([]);
     expect(drive.outcomes.map((o) => `${o.eventId}:${o.detail}`)).toEqual([
-      "sc-vbl-rider-wf:collision",
-      "sc-vbl-rider-cf:violation",
+      "sc-vbl-rider-wf:violation",
+      "sc-vbl-rider-cf:yielded",
     ]);
     expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");

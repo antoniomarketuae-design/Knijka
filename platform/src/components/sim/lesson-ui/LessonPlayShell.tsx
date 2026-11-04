@@ -153,6 +153,7 @@ import {
   serializeNearMisses,
   serializeRuleEvents,
   serializeTaskCapBreaches,
+  serializeUnbilledHardBrakes,
   taskCapReleased,
   teachChipBg,
   teachStakeBg,
@@ -1596,6 +1597,12 @@ export function finishLessonPayload(args: {
     // praises such a drive unscoped. Ids and times only (WireTaskCapBreach).
     ...(r.taskCapBreaches !== undefined && r.taskCapBreaches.length > 0
       ? { taskCapBreaches: serializeTaskCapBreaches(r.taskCapBreaches) }
+      : {}),
+    // 2026-11-01 (sc-follow-tailgater:63c0c28c, QUESTION 10): the brake checks the ledger saw and did not bill,
+    // so the SERVER debrief — the text the student reads — names them and holds nothing up over them. Times and
+    // speeds only (WireUnbilledHardBrake); the sustain and the floor are the server's own lesson config.
+    ...(r.unbilledHardBrakes !== undefined && r.unbilledHardBrakes.length > 0
+      ? { unbilledHardBrakes: serializeUnbilledHardBrakes(r.unbilledHardBrakes) }
       : {}),
     ...(args.observedMomentIds !== undefined ? { observedMomentIds: args.observedMomentIds } : {}),
     ...(args.attemptTrace !== undefined ? { attemptTrace: args.attemptTrace } : {}),

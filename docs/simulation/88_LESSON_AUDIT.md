@@ -16189,3 +16189,708 @@ See PROVEN ON 6628342.
 - **The tools/ tests on the main tree.** The main-tree gate decides.
 - **Not measured:** any of this on a device, and the glass between the bill frame and the first HUD poll.
 - **Not pinned on behaviour** (the two notPinned items, conditions 1 and 2): the C1 rule on any lesson but sc-merge-from-property L1–L3, the only cell where the round-3 census found pings after a strike; and the phone's compact legend line, which only source-text pins cover.
+
+## Wave C verdicts — 2026-11-03
+
+This run retired 2 row(s). Their evidence frames were driven at (unattributable: 2 of 2) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`479127bc1552`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 10 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 14 |
+
+**Open list: 26 → 24**, out of 1559 filed across the whole programme (1533 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3o: the first drives of the ra2 and e2 landings at `479127b` — `sc-hz-brake-dont-swerve:870904d4` and `sc-rb-busy-gap:7bbdd45e` CLOSED; `sc-crossing-dart:1c7a07d8`, `sc-pk-driveway:7fa8b79e` and `sc-turn-left-oncoming:d0017a65` PARTIAL (integrator note, 2026-11-03)
+
+Workflow `rig-wave-w3o` (wf_2a466172-396, relaunched on the new account after the 11-03 switch) ran at `479127b` (health attested `479127b`, db ok). It used the channel C-step pad, named starts, a DRIVE LEDGER and, for the first time, a STATED pose tolerance across lenses (1e-6 on poses; exact on graded and decision fields). The five specs were drafted and critic-reviewed by `F/draft-rig-w3o.js` and served to the captures as sha-checked files (`S/rig-w3o/<lesson>/<id8>/SPEC.txt`), because the embedded script exceeded the 512 KB workflow limit. Journal: `handoff-2026-10-08/reports/rig-w3o-journal.jsonl`.
+
+- **`870904d4` CLOSED — verifier refuted=false.** Every FORM cell (B1 PC L3 ×2, phone L3, PC L1; B2) ends 720 grid points after rest on «Край на маршрута — Оставащите задачи вече не могат да бъдат изпълнени в този опит…», on the end card exactly once on both lenses, with no «Стигна», no pinned car named and no «Прекрати урока». The rig-w3n refutation (a last-bit headingDeg difference after the rest) is answered by the stated tolerance. Clause (2), the banner still asking for the task, is the Q3 display row: RECORDED.
+- **`7bbdd45e` CLOSED — verifier refuted=false.** All eight drives (R1, R2 train, R3; PC and phone) match their PC pair from N through rest + 2 s; at least one phone train drive had base-oracle R (the drive had power); the phone shows the crash-pin ending on its end card exactly once and is never force-closed. The verifier recomputed the gear runs from the raw dumps itself.
+- **`1c7a07d8` PARTIAL.** The arrival / non-arrival sentences are true on every admissible cell (A1–A3, X2, X3; PC and phone; «Стигна» only within the run-out); clause (2), the beginner getting less road, is CLOSED. Held by ONE cell: X1 (sc-park-parallel-exit L4 ending on gate 2 inside, not arrived) was inadmissible — its tape's authored contact with npc 3002 billed COLLISION and terminated the exam. G (the gate-1 no-mark latch) was ruled OUTSIDE this row (e2 D4's recorded candidate). Owed: one admissible X1 drive.
+- **`7fa8b79e` PARTIAL.** The product is right on all six admissible pin endings (C1 free, C4 pressed, C6 vehicle; PC and phone): the E3 wording and its E10 corrective on the end card exactly once. Held by the C4 phone pair's precedence DEPARTURE (Δk 8 > [0, 4]), which the judge traced to the CAPTURE: the frozen PK-REAR bytes gate the engage press on a frame-timed look-key loop (ADR-017 «key edges stay frame-timed»); re-aligned, every event, contact, pin step and ending is exact-equal. Owed: a C4 pair with a step-keyed engage (or PK-REAR-K).
+- **`d0017a65` PARTIAL.** Cells (1), (3), (4) and (5) are MET on the device: through 465–512 ms stall frames, with base-oracle power on both trains, the gear stays D at rest, a lift-and-press never shifts to R, and the both-pedals disarm reads the physical pedal. The row stays open on cell (2) alone, the touch-slide by a human thumb, which no rig can drive (integrator ruling 2026-11-02).
+- **Open list: 26 → 24 (3 critical, 19 major, 2 minor).**
+
+## Wave C verdicts — 2026-11-03
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`479127bc1552`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 9 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 14 |
+
+**Open list: 24 → 23**, out of 1559 filed across the whole programme (1535 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3p: `sc-pk-driveway:7fa8b79e` CLOSED on a re-judge under integrator ruling W3P-1; `sc-crossing-dart:1c7a07d8` PARTIAL on the indicator auto-cancel (integrator note, 2026-11-04)
+
+Workflow `rig-wave-w3p` (wf_89ac28ea-a44, relaunched after the 11-03 app restart) ran at `479127b` for the two cells rig-w3o left owed; its specs were drafted and critic-reviewed by `F/draft-rig-w3p.js` (journals `handoff-2026-10-08/reports/rig-w3p-journal.jsonl`, `draft-rig-w3p-journal.jsonl`).
+
+- **`7fa8b79e` CLOSED — re-judge under W3P-1, verifier refuted=false** (`w3p-followups` wf_da3f49a0-c9d; `w3p-rejudge-journal.jsonl`). All four C4-K drives (engage keyed on the step count) are admissible and show the E3 line with the reversing corrective once on the end card; PHONE r1 vs PC r1 Δk 2, PC r2 = PC r1 bit-identical. The w3p judge held PHONE r2 (Δk 6) against a range of [0, 5] counted on the frame that made the shift. **Integrator ruling W3P-1 (2026-11-03):** a shift the reverse assist decides at a frame start (the ra2 landing, rulings F3/F4) has the stated range Δk ∈ [0, n − 1], n = the grid points brought by the phone frame in which the shift condition first held. The verifier confirmed this is the spec's own (2c)(d) text («lands at the first frame start after the hold is reached, so on the phone up to (the grid points that frame brought − 1) points later») and the ra2 design; n = 7 on both phones, so Δk 2 and 6 are inside [0, 6]; every exact field is equal on the re-aligned axis. The re-judge's evidence path was trimmed to the bare frame it named before posting.
+- **`1c7a07d8` PARTIAL.** X1-K PC L4 and PHONE L4 are both admissible and show the e2 N1 sentence once on the end card (the chain-state question was ruled MET). Held by a pair departure at step 2014 in the INDICATOR: its auto-cancel runs on the frame-timed cabin clock (`scene/cabin.ts` ~:724, «call once per render frame»), so the phone cancels one grid point later. RECORDED as the candidate «autocancelgrid» (founder 10-19: no new triage round; a candidate, not filed). Next: rig w3q, an X1 drive that cancels the indicator by key before the auto-cancel can fire.
+- **Open list: 24 → 23 (3 critical, 18 major, 2 minor).**
+
+## Wave C verdicts — 2026-11-03
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`479127bc1552`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 14 |
+
+**Open list: 23 → 22**, out of 1559 filed across the whole programme (1536 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3q: `sc-crossing-dart:1c7a07d8` CLOSED on an X1-KC pair with no departure (integrator note, 2026-11-04)
+
+Workflow `rig-wave-w3q` (wf_bbea9fc8-0fe) ran at `479127b` for the one cell rig-w3p left owed. Its spec was drafted and critic-reviewed by `w3p-followups` (wf_da3f49a0-c9d) and built by `S/rig-w3/build-w3q.mjs` (journals `handoff-2026-10-08/reports/rig-w3q-journal.jsonl` and `w3p-followups-journal.jsonl`).
+
+- **Cell X1-KC** is X1-K with one count-keyed key added. The left indicator is cancelled by a Comma key requested at the leg-2 move-off + 250 grid points (count 1944), ahead of the frame-timed auto-cancel (+320). The pinned controller change: the trace law carries `keysAtCount`, and the pad runs a `moving` key under the `onlyIfIndicator` guard. A law recomputation over rig-w3p's dumps gave 0 mismatches and identical commands, with exactly one request added.
+- **The early cancel is a recorded departure from ЗДвП чл. 26.** At the cancel the car is still moving left; it reaches rest at 2092. No key cancel that beats the auto-cancel can avoid this. The spec states the departure, nothing in the product bills it, the judge recorded it, and it is not cited as good practice. Nothing here cures or rules on the auto-cancel itself, which stays rig-w3p's candidate «autocancelgrid».
+- **`1c7a07d8` CLOSED, verifier refuted=false.** PC L4 and PHONE L4 are both admissible on (a)–(g). There is no contact, no rule event and no examTermination. Each drive ends at step 2812 on gate 2: anchor inside, 6.325 m from the mark, not arrived, at 0.001 km/h. The e2 N1 sentence «Край на изпитния маршрут — Колата стоя неподвижно при края на маршрута, но не всички задачи се отчетоха, …» appears once on each end card. «Стигна» appears on no surface. The pair has no DEPARTURE: poses differ by at most 5.68e-14°, and the gear and indicator differ only inside their key windows. The judge ruled explicitly, as the spec asked, that a departure-free X1-KC pair meets rig-w3p's first arm. Clause (2) and the carried cells from rig-w3o and rig-w3p stand.
+- **Recorded, not this row** (triage candidates; founder 10-19: no new triage round):
+  - The orange clean-sheet note «тук не пише „Неиздържан“» sits directly under an ending line saying the exam «не е издържан», on both lenses.
+  - At rest, the banner keeps asking for the task 2 that can no longer be earned (the endings lane's Q3 class).
+  - On the phone, the first РЕЗУЛТАТ tap did not open the card.
+- **Open list: 23 → 22 (3 critical, 17 major, 2 minor).**
+
+## Landed: «Чисто и спокойно каране» is no longer paid inside a pumped causeless brake check: two or more bursts, each shorter than the 0.4 s sustain, whose credit and span together hold the sustain and whose gap-excluded mean is emergency-grade. A brake check that the student's own ledger saw and did not bill, pumped or floored, is now named in the debrief with the retrieved rule. On such a drive the debrief gives a reservation in place of «Точно това иска да види изпитващият» and does not print «…задръж това ниво». Nothing billed or graded moves. Measured in process only. `sc-follow-tailgater:63c0c28c` (critical) (2026-11-04)
+
+Lane `flooredinvite` ran seven rounds, built on `230c7b8` (the en commit). One design carries two items:
+- the row itself: rig-w3e's pumped brake check, PUMP245;
+- founder question 10, together with integrator ruling B3. The founder delegated question 10 on 2026-10-19, and it was decided as «name a floored stop, without a bill». B3 withdraws «задръж това ниво» on a floored drive; it was owed by the brakeledger landing (its condition 4).
+
+The founder's questions and the lane's rulings have similar labels, so this section keeps them apart. **Founder question 4** (2026-10-19, delegated) keeps the 0.4 s continuous sustain, so a pumped brake check whose bursts are each under it is not billed, and rules that no praise may be paid over it. **Founder question 10** (2026-10-19, delegated) is the decision above. **Lane rulings** P1–P12 and Q1–Q10i are the integrator's, made inside this lane.
+
+Rounds and patch.
+- The adversarial verifier REFUTED rounds 1–6 (below). It SIGNED OFF round 7 WITH CONDITIONS on 2026-11-03 at 17:29Z (the verifier's PROGRESS.md). The conditions are below.
+- **The patch.** `flooredinvite-result-r7.patch`: sha256 a9c2f51f…5945, 41 files, +4953/−30, 0 CR bytes, and every touched file LF in base (the builder).
+  - The 41 files are 9 product files, 16 test-side files and the 16 files of the reviewed-text manifest. The landing commit also carries the integrator's own pins, named under PINNED AT INTEGRATION; 41 is the patch's count.
+  - The product files: `rules/engine.ts`, `rules/index.ts`, `lessons/types.ts`, `lessons/engine.ts`, `lessons/index.ts`, `lessons/wire.ts`, `lessons/debrief.ts`, `hud/SessionEndScreen.tsx` and `lesson-ui/LessonPlayShell.tsx`.
+  - Round 7 itself changed one product file, `rules/engine.ts` (final sha256 10ff85ac…), plus rules tests and the cause-void chassis test.
+- **The verifier's own apply.** It returned its lane to base and moved the 13 files that round 6 had added out to scratch, so `git diff base` was empty. It then applied the patch with `git apply --binary` (tag patched-r7). `git diff base patched-r7 --binary` hashes to the patch's own sha. engine.ts is sha256 10ff85ac.
+- **Against HEAD.** The patch is cumulative against `230c7b8`, not against HEAD. The builder checked that `git apply --cached --check --binary` passes on `69418cf`.
+  - Between `230c7b8` and `479127b`, HEAD changed 21 of the 41 files, through the ra2 and e2 landings (`git diff --name-only 230c7b8 479127b`): LessonPlayShell.tsx, SessionEndScreen.tsx, lessons/engine.ts, lessons/index.ts, lessons/types.ts, and all 16 manifest files.
+  - HEAD changed none of rules/, lessons/debrief.ts or lessons/wire.ts.
+  - The named block and the reservation live in the debrief. e2's ending line lives on the end card. This lane touches the end card only through the card rider on the «Похвали» row. The merge is under PROVEN ON 479127b.
+
+**Integrator rulings.** The integrator made these between 2026-11-01 and 2026-11-03, under the founder's 2026-10-08 and 2026-10-19 delegations. The founder is told at this landing.
+- **P1–P12, the design.**
+  - P1: one fact, one treatment. «A causeless emergency-grade brake the ledger saw but did not bill» means floored-and-unbilled, or pumped.
+  - Every threshold is the ledger's own: read from the lesson's cfg or from its existing constants (BRAKING_LINE_MPS2, HARSH_BRAKE_TIE_TOLERANCE). There is no new literal and no new threshold.
+  - P5: the «Какво се получи добре» fallback is WITHHELD, not scoped.
+  - P6: the named block sits outside «Учебни моменти». It prints the retrieved peek, corrective and law chip once.
+  - P8: XP follows the withheld commendation.
+  - P10: nothing graded moves. No bill, point, verdict, star, objective, gate or protected number.
+  - P2's stated narrowing: bursts separated by a release of the sustain or longer are separate brakes that are over, and their praise stands.
+- **Q1–Q3 (round 2).**
+  - Q1: the payout is held only within the sustain of the open chain's last credited frame (the bounded bridge).
+  - Q2: task-cap-round3.test.ts and taskCapReference.ts stay byte-identical to base.
+  - Q3: every pumped chain's sentence must be true; keyboard-tap slowing is measured on the product chassis.
+- **Q4–Q6 (the round-2 re-judge).**
+  - Q4: the bound is per held frame. Each frame on which the tree holds a payout that base would have paid lies within the sustain of a credited frame of an open causeless chain. Base's own F1 hold is unchanged.
+  - Q5: a payout owed in the release of a chain that is later billed is not owed.
+  - Q6: a stated limit (below).
+- **Q7–Q9.**
+  - Q7: the shadow restore (the verifier's Fix P). A chain that closes unbilled with no record gives back the streak its pumped frames reset.
+  - Q8: the latch `bridgeDeferredPayout` (the verifier's Fix F).
+  - Q9: the late-cause fold (the verifier's Fix V).
+- **Q10b–Q10g.**
+  - Q10b: the fold gives the form that the no-cause control gives, pumped or floored. The verifier's Fix W was declined.
+  - Q10c: Fix R.
+  - Q10d: the single-floored fold is kept.
+  - Q10e: bills never move against base, and that rule binds ahead of equality with the control.
+  - Q10f: Fix S.
+  - Q10g: the differential fuzz is the acceptance instrument.
+- **Q10h and Q10i (2026-11-03):** conditions 1 and 2 below.
+
+**The row is NOT closed by this landing.** `sc-follow-tailgater:63c0c28c` stays OPEN.
+- Every number below was measured in process: on the reducer, on the live rung chain, and on the product chassis through rapierContactDrive.
+- No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier. The judge must be told founder question 4: the pumped brake check stays unbilled, and no praise may be paid over it.
+- `sc-follow-tailgater:e47a45c1` was already CLOSED by rig-w3l. That wave recorded its clause (5), the headline and «задръж това ниво» over a floored drive, as owed to this lane. This landing builds clause (5) in process and reopens nothing.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **The row (rig-w3e, at `65be020`).** The car brake-checked the лепка, glued 4.79 m behind: 0.2 s of full pedal, 0.1 s off, then full pedal to a 1.97 s standstill. The brake was not billed and not coached. Both lenses showed «ИЗДЪРЖАН» ★★★ with the unscoped «Чисто и спокойно каране».
+- **The builder's first test, red on `230c7b8`** (`probes/w3e-base.json`): PUMP245 at L3 and L4, on PC cadence and on the phone-cadence feed.
+  - No violation, no follower report and no floored frame.
+  - The student's qualifiedSec peaked at 0.300.
+  - CLEAN_DRIVING was paid at 38.550 s on PC and 40.333 s on the phone, under the headline «…Точно това иска да види изпитващият.», with «• Чисто и спокойно каране».
+- **The cause (the builder).** The student's causeless ledger in `rules/engine.ts` judges one window at a time.
+  - Its release arm zeroes qualifiedSec. So a pump whose bursts are each under the sustain never bills, which is lawful under founder question 4, and it leaves no flooredAt.
+  - brakeledger's F1 held the payout only while ONE window was accruing. F2 and F3 reset the streak only on a floored frame. So the 250 m that held the pump was paid.
+  - The toast, the «Похвали ✓» row, the debrief bullet and the +10 XP all come from that one commendation.
+- **B3 and founder question 10.** On a floored drive the debrief had no fact to read. It printed the headline superlative and the sheet-scoped «…чисто каране без нито едно нарушение по изпитния лист — задръж това ниво.»
+  - The builder's example is TASF348 at `230c7b8`, PC and phone L1. It floored (onset 34.16 km/h, 52 floored grid points, q 0.8167), had no CLEAN_DRIVING, and printed that fallback.
+
+**What landed.** This is the builder's description, checked against the round-7 code. The verifier's measurements are under their own heading.
+- **The record** (`rules/engine.ts`). `UnbilledHardBrake`, `UnbilledHardBrakeForm`, `unbilledHardBrakeOfChain` and `lastUnbilledHardBrake` are exported from `rules/index.ts`.
+  - Flat primitive fields on `state.harshBrake` track the pedal application (app*), the chain of applications (chain*) and the finalized record (record*).
+  - One brake check is one chain and gives one record. A billed chain gives none.
+  - **Floored:** an application that set flooredAt and was never billed. It is finalized only once nothing can bill it any more. The chain waits while the ledger's floored record stands, because the floor-lift can still bill it. That lasts until a new pedal application spends the record, a cause clears it, or the drive ends (a chain still open at the drive's end is read then). A bill in the meantime leaves no record.
+  - **Pumped:** two or more applications, none floored or billed, whose peak windows together hold the sustain in credit and in span. Their gap-excluded mean must be over cfg.harshBrakeDecelMps2 × (1 + HARSH_BRAKE_TIE_TOLERANCE). Every «held» is tested with `heldFor`.
+  - A chain closes when its release has stood the sustain, or on a cause arm that voids its open application or falls between applications. A bill does not close it: it marks the chain billed, which ends the bridge hold and leaves no record. A cause within the sustain of the chain's last credit voids the open application whole, as before.
+- **The praise.**
+  - A pumped frame resets the 250 m streak, as a floored frame does.
+  - The payout waits under the bounded bridge (Q1, Q4) and the Q8 latch; the accrual never waits.
+  - Q5 and the Q7 restore apply.
+- **A cause that comes late:** a cause that enters reach the sustain or more after the chain's last credited frame (`heldFor`, so the exact tie counts as late; Q9, Q10b, Q10d).
+  - It folds the application into the chain, with the form the no-cause control gives, instead of voiding it.
+  - A folded floored record waits for the floor-lift. A report that the floor-lift would attribute drops it.
+  - Fix R (Q10c): a pending record is finalized on the first braking frame after a release (`accelMps2 <= -BRAKING_LINE_MPS2` with the previous frame's cause cleared). That is the frame on which the control spends its floored record.
+  - Fix S (Q10f, round 7): the fold no longer closes the chain on the fold frame.
+    - The chain stays open until the folded application releases. Then the normal bridge runs, so a short release and a re-press join the SAME chain.
+    - The folded floor stays live until a new application, a drop or the close.
+    - New flat fields: `chainFoldHeld` and `chainFoldFloorLive`.
+  - Three deviations from the literal Fix S were forced by the differential fuzz (condition 2):
+    - D1, `dropFold`: a drop on an OPEN chain marks it chainBilled, record-only, runs Q7's restore once and keeps the chain open.
+    - D2, the cause arm: the fold covers every open application of a chain whose last credit has stood the sustain. A new application under a late cause that is still in reach joins the chain.
+    - D3, `foldWindowStep`: the folded window's shadow judges the control's mean, re-anchor and floored mark. It adds the fields `chainFoldAnchorAt`, `chainFoldOnsetKmh` and `chainFoldQ`.
+- **The surfaces.**
+  - `LessonResult.unbilledHardBrakes` and the session state (lessons/types.ts, lessons/engine.ts).
+  - The wire (lessons/wire.ts) and the finish payload (LessonPlayShell.tsx).
+  - The card rider (SessionEndScreen.tsx).
+  - The debrief (lessons/debrief.ts):
+    - the named block;
+    - one reservation in both verdict branches, with its pointer clause;
+    - the withheld fallback (B3);
+    - the T1 rider, which scopes any CLEAN_DRIVING paid elsewhere on the drive;
+    - the unfinished-route footer.
+  - There is no live in-drive card, no toast and no new ScorableEvent.
+- **What did not change** (the builder). No bill, point, verdict, star, XP rule, objective or gate moved. These stand unmoved: 0.4 s, 7 m/s², the 35 km/h floor, BRAKING_LINE_MPS2, the tie tolerance, the 250 m, and the ledger's own floored record and floor-lift. The verifier found task-cap-round3.test.ts and taskCapReference.ts with an empty diff against base. No protected threshold moved.
+
+**What the student sees.** These are the builder's strings, built in rounds 1–2; round 7 changed none.
+- **The heading:** «Рязко спиране, което не влезе в точките:». With more than one record: «Рязки спирания, които не влязоха в точките:».
+- **The floored bullet:** «• Рязко спиране без причина — при {X} км/ч натисна спирачката рязко, а симулаторът не видя пред теб причина за това. Под {F} км/ч симулаторът таксува такова спиране само ако отчете, че кола точно зад теб е трябвало да спре рязко заради него; този път не отчете такава, затова то не влезе в точките.»
+- **The pumped bullet:** «• Рязко спиране без причина — при {X} км/ч натисна спирачката рязко на тласъци, а симулаторът не видя пред теб причина за това. Нито един тласък поотделно не задържа рязкото спиране {S} s, затова никой от тях не се брои за рязко спиране — но заедно те отнеха скоростта толкова рязко, колкото едно рязко спиране.» Under the floor it adds the floor clause.
+- **Then, once, retrieved from VIOLATIONS.HARSH_BRAKING_NO_CAUSE (ADR-002):** «→ Защо е важно: …», «→ Правилното действие: …», «→ Правило: ЗДвП чл. 20, ал. 1».
+- **The reservation:** «имаше рязко спиране, за което симулаторът не видя причина — то не влезе в точките», with a plural form.
+  - On a passed drive it follows «Но „издържан“ не значи „чисто“:», in place of «Точно това иска да види изпитващият.».
+  - On the other sheet-clean branch it follows «Но чистият лист не значи чисто каране:».
+- **The rider frame** («но само на отделни отсечки от маршрута: в същия урок имаше рязко спиране…») and the unfinished-route footer.
+- **PUMP245** (the builder's round-1 numbers; its named test was reproduced by the round-7 verifier):
+  - no CLEAN_DRIVING inside the pump on PC or on the phone, so no toast, no «Похвали ✓», no bullet and no +10 XP;
+  - one pumped record, «при 24 км/ч»;
+  - the sheet stays 0 т., «ИЗДЪРЖАН» ★★★.
+- **TASF348:** one floored record, «при 34 км/ч», and no fallback.
+- **Round 7's split cell** (the builder, `probes/r7/debrief-split.json`, Y230): one floored bullet «при 28 км/ч», the clamped judged onset of 28.06. The chain's first reading was 54.4. Round 6 printed two bullets for the same brake check.
+- **A drive with no record** gets base's debrief, to the frame.
+
+**Rounds 1–6, refuted.** Each was refuted on the verifier's own probes (its PROGRESS.md).
+- **Round 1.** The hold covered the whole pedal application.
+  - On the product car (sc-sp-harsh-brake L3/L1, a 3-step full-pedal bite, then brake 0.25 to rest), with no record, CLEAN_DRIVING moved from 22.05 s to 29.333 s (+7.28 s).
+  - On reducer tapes, payouts were delayed 6.3 s or lost.
+  - task-cap-round3 and taskCapReference had been edited.
+- **Round 2.**
+  - On the product car with keyboard taps (50 km/h, ten 0.2 s taps), CLEAN_DRIVING was delayed 3.12–4.98 s, with no record and no bill.
+  - On a chain billed by its second press, base's payout in the release was lost.
+  - Re-judged under Q4–Q6, PUMPVOID broke it. The pumped reset was never undone when a cause arm then voided the chain: in all 16 reducer cells the payouts moved 7.8–15.1 s and one of three was lost.
+  - F1TAIL held frames up to 0.87 s past the last credit on the chassis.
+- **Round 3. PUMPTAILVOID:** a cause arriving at the end of a gentle tail voided a pump.
+  - Payouts came 1.37–2.47 s late, with up to 97 held frames past the bound.
+  - On the chassis, Y250 moved from 18.983 to 19.650 and Y256 from 18.750 to 20.050.
+- **Round 4. FLOORTAILVOID:** Fix V folded a pumped-then-FLOORED application as pumped, in 40 of 40 cells. So the pumped bullet's «Нито един тласък поотделно не задържа … 0,4 s» was false.
+- **Round 5.** A follower's report after a re-press under the cause dropped the pending floored record that the no-cause control keeps: 420 of 720 reducer cells and 30 of 30 chassis cells.
+- **Round 6.** The late-cause fold closed the chain early, so a firm re-press formed a second chain.
+  - These differed from the control: 144 of 192 short split cells, 48 of 48 long PB cells, and 36 of 54 chassis cells.
+  - PB printed a pumped record beside the bill of the same brake check.
+  - The verifier's mutant M3 (Fix R with a strict `<` at −2) survived.
+
+**What the verifier reproduced on round 7.** It worked on its own lane (`230c7b8` + the r7 patch, engine.ts 10ff85ac) with its own probes. Log: `D:/knijka-lanes/scratch/flooredinvite-verify/PROGRESS.md`. Outputs: `probes/r7/`.
+- **The builder's tests.**
+  - The 9 rules files pass 111/111.
+  - The scenario files pass 82/82: the named test (PUMP245 at L3/L4 on PC and phone, named with no praise inside the pump; TASF348 named), the gap sweep, the keyboard taps, and the cause-void chassis including the Q10f cells.
+- **Its earlier instruments, re-run on round 7.**
+  - v7-split, 192 short and 192 long cells: 0 record differences from the control, 0 bills that differ from base, and 0 CLEAN_DRIVING times that differ from the control.
+  - v7chassis-split, 54 cells on the product car: 0 differences.
+  - v6-repress, v5-floortail, and v4-p3 and v4-tail with their aggregates: byte-identical to its Fix S runs.
+  - v6chassis-repress-rel8: byte-identical to its Fix R run.
+  - The round-1 chassis drive (chassis1) and the p1 tapes: unchanged, paid on base's frames.
+- **Its own differential fuzz, zzV8Fuzz.** It uses 1–3 late pulses per drive, pulses that may start inside a release or before a re-press, tails of −2 to −7 m/s², a speed wobble of 0, 0.06 or 0.12 km/h, speeds of 20–90 km/h, and 0–3 close-follower reports. It ran 12,000 seeds, 10,878 of them with a late pulse (`v8fuzz-a.json`, `v8fuzz-b.json`):
+  - 0 bills differ from base, and there are 0 novel defects;
+  - 4,000 runs carried a record and matched the control;
+  - 4 cells fall in the Q10e limit;
+  - 521 are classed INHERITED (condition 1). The 10 cells its first classifier flagged are classed apart from them and are the same class on inspection;
+  - 79 are classed CAUSE_BILLED_ITS_OWN_ACT and fall outside the comparison.
+- **Census.** It ran the builder's census instrument on its own tree. The 2,434 rows are byte-identical to the builder's census-tree-r7.jsonl. Against the builder's census-base.jsonl there are 0 field differences (graded fields, commendations, debrief, rubric) and 0 records. No committed drive carries a record.
+- **Mutants.** It ran eight of its own, one at a time. All were killed on assertion text with 0 timeouts, and engine.ts was restored to sha 10ff85ac after each:
+  - M1: the folded release does not start the bridge.
+  - M2: the late-cause new-application branch is removed.
+  - M3: lateCause uses a strict `>` (killed on «j 9: tie at L 648: expected [] to deeply equal ['pumped']»).
+  - M5: the open drop does not mark chainBilled.
+  - M6: a new application does not spend the live folded floor.
+  - M7: Fix R uses a strict `<`. This was its round-6 condition, now closed; killed on «single false R 0.45 t0 10.5: expected [] to deeply equal ['floored']».
+  - M8: the shadow's floored mark does not reset the streak.
+  - M9: the shadow's anchor is nulled (10 tests red).
+- **Regression on its lane.**
+  - rules/: 107/107 files, 1,903/1,903.
+  - lessons/__tests__: 127/127 files, 2,456 passed, 165 skipped.
+  - hud + clips: 88/89 files, 1,678/1,678. whyPanel fails with ENOENT because the lane has no docs/.
+  - The targeted scenario readers (brake-ledger-live-chain, follow-tailgater*, the reviewed-text manifest, caption-truth, keep-right-claim-census): 9 files, 228/228.
+  - tsc: 22 errors, the baseline, none in a lane file.
+  - NOT re-run by the verifier: the full lessons/scenario/__tests__ directory and lesson-ui/.
+- **The builder's numbers, not re-measured by a verifier.**
+  - Its fuzz: 25,001 seeds, 10,000 of them classified on the final engine, with 0 defects and 0 bills ≠ base.
+  - lessons/scenario/__tests__: 206/206 files, 5,084 passed, 1 skipped.
+  - lesson-ui: 827/828. The failure is touchHintLifetime: ENOENT on tools/.
+  - The tape-family census: 14 files, 240/240, with 112 record lines, all floored and none pumped.
+  - Its round-7 mutants: 30 of 33 killed on assertion text. The builder argued the other three EQUIVALENT: mD2c (a billed chain not folded), mD3c (the shadow never re-anchors) and mD3e (the shadow's floor mark without the onset test). The verifier's report does not adjudicate those three.
+
+**The conditions, and how each stands.**
+
+**1. C1, the class INHERITED_BASE_PRAISE_NO_RECORD. INTEGRATOR RULING Q10h (2026-11-03): ACCEPTED as inherited and RECORDED. It is not a defect of this lane.**
+- **The round-7 stop clause.** On a late-cause drive, the CLEAN_DRIVING payouts must equal those of its no-cause control, outside the Q10e limit.
+- **Where it is not met.** This class covers 521 of the verifier's 10,878 runs, plus its 10 flagged cells (the builder: 879 of its 10,000 seeds). In it:
+  - the control is billed HARSH;
+  - neither drive carries a record, and the bills are equal;
+  - a later CLEAN_DRIVING differs from the control's by 0.02–0.48 s.
+- **Why it is base's own behaviour.** In all 521 of the verifier's cells, the tree's late-cause drive equals base's late-cause drive, and the tree's control equals base's no-cause drive.
+  - On the cells the verifier inspected (its 10 flagged cells and the seeds in `v8fuzz-dbg-dump.json`), the streak traces show identical resets. The only difference is base's `billedAndUncorrected` accrual, which depends on whether a cause is present. Seeds 106880 and 105370 pay at 34.55 on the tree, equal to base's late-cause drive, against 35.033 on the control, equal to base's.
+  - Making the late-cause drive match the control would move a no-record payout against base, and the standing rule forbids that.
+- **The verifier's 10 flagged cells** are this class combined with Q5's sub-case. Base pays CLEAN_DRIVING 0.2–0.6 s before the same chain's HARSH bill, and the tree withholds that payout on both drives; after the bill the tree equals base. The builder found 7 such seeds, at 0.38–0.57 s.
+- A separate lane follows only if the founder wants one.
+PINNED AT INTEGRATION: a new narrow test, `rules/__tests__/unbilled-brake-inherited-praise.test.ts` (the integrator). It is the one file of the landing outside the lane patch. It replays five of the round-7 verifier's fuzz cells, seeds 100040, 100200, 103026, 103124 and 103228, and asserts on each: no record, bills equal to base, the late-cause drive's praise equal to base's own late-cause praise, the control's praise equal to base's no-cause praise, and the late drive's praise different from the control's.
+  - It calls the real `reduceTick` and `createRuleEngine`, with no stub and no regex (the merge verifier).
+  - Mutant MQ10h: in the cause branch, keep activeSince when the brake is emitted, which makes the late-cause drive's praise match the no-cause control (the merge verifier's form: `if (!emitted) activeSince = null`). It turned the test 5/5 red on «the late drive's praise is base's own late-cause praise: expected [ 34.45 ] to deeply equal [ 34.233333 ]». rules/engine.ts was restored to sha 10ff85ac, and the test is green 5/5. The merge verifier ran the mutant again itself and it died on the same text.
+  - The lane mutants M2, M5 and M9 leave the pin green, as expected: they act on records (the integrator's log).
+  - Its numbers are base's own. The merge verifier swapped HEAD `479127b`'s rules/engine.ts in and ran a probe copy of the pin's tapes against it: base gives exactly the pinned baseCtl, baseLate and bills on all 5 cells, and so does the integrated engine. The engine was restored to sha 10ff85ac and the probe file was moved out of the tree.
+
+**2. C2, the round-7 deviations and the state size. INTEGRATOR RULING Q10i (2026-11-03): CONFIRMED.**
+- Q10f allowed two flat booleans. The build adds `chainFoldHeld` and `chainFoldFloorLive`, plus three fields for D3: `chainFoldAnchorAt` (number|null), `chainFoldOnsetKmh` and `chainFoldQ`. It also makes the deviations D1–D3 above.
+- Each was forced by the differential fuzz under THE FACT. Each field is a flat primitive, and every threshold it is judged against is the ledger's own, with no new threshold, so stop (f) is not reached.
+- Each is pinned in the lane. These mutants were killed on assertion text: the verifier's M2, M5, M6, M8 and M9, and the builder's mD1/mD1b/mD1c, mD2a/mD2b/mD2d and mD3a/mD3b/mD3d.
+  - The builder's pin files are `rules/__tests__/unbilled-brake-fold-split.test.ts` (6 tests) and `unbilled-brake-late-cause-fuzz-cells.test.ts`. The latter has 19 tests: 17 committed fuzz seeds with the control's record and praise inline, one Q10e-limit test with base's praise, and the 22-cell open-drop pin with base's praise inline.
+- Round 6's condition, Fix R's exact −2.0 boundary, is pinned in `unbilled-brake-floor-tail-void.test.ts` and closed by the verifier's M7.
+PINNED AT INTEGRATION: D1, D2 and D3 were re-executed on the integrated tree against the lane's 8 rules files (the integrator). Each mutant ran alone, rules/engine.ts was restored to sha 10ff85ac after each, and there were 0 timeouts:
+  - M5 (D1, a drop on an OPEN chain is not marked chainBilled): 2 red, «FF lane R 0.15 t0 22.70: the control bills the floor and names nothing»;
+  - M2 (D2, the late-cause new-application branch removed): 1 red (seed 112), «the control's record: form, onset, shown, since, at»;
+  - M8 (D3, the shadow's mark does not reset the streak): 2 red, «the praise: expected [ 43.2 ] to deeply equal [ 43.21666666666667 ]»;
+  - M9 (D3, `chainFoldAnchorAt` forced to null): 10 red on assertion text.
+  - The merge verifier ran the lane verifier's M6 (a new application does not spend the live folded floor), which the integrator had not re-run. It was killed on «FF gentle re-press lane R 0.1 t0 22.70: expected [] to deeply equal [ { form: 'floored', …(4) } ]», and the engine was restored to sha 10ff85ac.
+  - notPinned: the builder's three survivors mD2c, mD3c and mD3e. The integrator lists them as equivalent mutants: on every reachable input they give the shipped code's output, so no test can kill them. Its reason rests on the builder's EQUIVALENT classification; the round-7 verifier's report does not adjudicate the three (above).
+
+**3. RECORDED, each as the rulings state it.**
+- **The Q10e limit.** A close follower's report lands inside the floor-lift window after a late cause, with no re-press. The control is billed. The tree names nothing and bills nothing, as base does.
+  - The verifier: 4 cells. Praise equals base's in all 4 and differs from the control's in 1 (42.633 against 42.700).
+  - The builder: 43 cells. Praise equals base's in all 43 and differs from the control's in 6.
+- **EXCLUDED_CAUSE_COVERS_A_LATER_CREDIT** (the builder: 1,576 cells) is outside the comparison by definition: the cause's reach covers a later credited frame.
+- **HARSH_BRAKING_NO_CAUSE.lawRef** is «ЗДвП чл. 20, ал. 1», while content/law states the duty directly at чл. 24, ал. 1. The named block prints the catalogue's chip, as ADR-002 requires. This is a triage candidate, carried forward.
+- **Founder question 4.** A pump that makes the лепка brake hard stays unbilled, because the floor-lift reads only floored records.
+- **P2.** Bursts separated by a release of the sustain or longer keep the praise.
+- **Q6, a stated limit of Q1's bound.** Inside a chain that is pumped later and whose credits are more than the sustain apart, CLEAN_DRIVING can be minted before the pumped frame. The live toast fires there; the card and the debrief scope it through the T1 rider.
+  - The round-2 builder measured this on a reducer pump: praise minted inside the chain at 34 of 73 offsets.
+  - It was not re-measured in round 7.
+- **Stored drives** from before the lane carry no record and replay their old debrief. No backfill.
+- **The verdict card** (ИЗДЪРЖАН, ★★★, XP) carries no reservation. Whether a named brake caps the stars is the founder's question.
+- **Not pinned at integration** (the integrator's notPinned, with its reasons):
+  - the Q10e limit (43 cells) and EXCLUDED_CAUSE_COVERS_A_LATER_CREDIT (1,576 cells): recorded, not pinned. The limit cells already pay praise equal to base, and the excluded cells are outside the comparison by definition. Neither is a lane defect to mutate against.
+  - the lawRef, founder question 4's unbilled pump, P2's bursts and the absent backfill for stored drives: recorded conditions or rulings carried forward. Pinning them would need a product or ruling change, which is out of scope for a tests-only landing.
+
+**4. TOOLS: the readers a lane cannot run.** None of what they read changed (the builder). The main-tree gate runs:
+- lesson-audit.mjs's «Похвали» reader (:11557 / :11626);
+- path-canary.test.mjs:307;
+- wrong-leg-profiles.test.mjs :4445 / :4608;
+- lesson-audit.mjs :10945–11079 («Рязко спиране без причина», unchanged).
+- At the landing the tools tests in the worktree read 2,029 tests, 2,006 pass, 8 fail: 1 the standing deck-captions freeze and 7 the worktree environment, in build-redrive, count-agreement, finding-reader and lane-evidence. Re-run with the resources, those 7 pass (count-agreement on the main tree). No tools test was taught, and the patch touches no tools file. The main-tree gate decides.
+See PROVEN ON 479127b.
+
+**5. THE LANDING RE-RUNS.**
+- The proof owes three runs:
+  - src/modules/clips/, the clip-plan freshness gate (the builder reports that no fault time moved);
+  - the full lessons/scenario/__tests__ directory;
+  - lesson-ui/.
+  The round-7 verifier ran neither of the last two.
+- The reviewed-text manifest must be re-recorded if the merge moves a unit. Both e2 and this lane re-recorded it on their own bases.
+- At integration all three ran green on the integrated tree (`479127b` + gate-fi.patch, in `D:/knijka-lanes/integ-fi`):
+  - src/modules/clips/: 19 files, 302 passed, the clip-plan freshness gate green with no regeneration (the integrator); clips is also in the merge verifier's rules + hud + clips run;
+  - lessons/scenario/__tests__: 208 files, 5,107 passed, 1 skipped, in the integrator's run (4,468 s) and in the merge verifier's (4,668 s);
+  - components/sim/, which holds lesson-ui/: 107 files, 1,779 passed (the integrator), and inside the merge verifier's lessons/__tests__ + components/sim run (234 files, 4,235 passed, 165 skipped).
+- The manifest's generated files (manifest.json and units.source.txt) conflicted in the 3-way merge, so the integrator re-recorded it: fingerprint 9e2d93bb, 487 units, 13,364 strings, 49/49 green. Every strings.*.txt is byte-equal to HEAD with the lane patch merged in, so no shown string moved. In units.source.txt the advisor and engine rows are HEAD's (e2) and the debrief row is the lane's. The vbltiming landing, integrated on top of this one, re-records the manifest's derived «source» summary again (its section).
+See PROVEN ON 479127b.
+
+**Not cured by this landing.**
+- These are not named, and their praise stands:
+  - bursts separated by a release of the sustain or longer (P2);
+  - a modulated brake check that never releases and never holds one window for the sustain.
+- Q6's in-chain toast (above).
+- The A3 40-frame progressive brakes of brakeledger's condition 3 are still unmeasured.
+- No live card names an unbilled brake check during the drive. The student reads about it only in the debrief.
+- The LLM / tutor grounding of the new block is out of scope.
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's doc 88 at drafting.
+- :12752, rig-w3e: «Independent of that answer, the praise on such a drive is a false sentence and is in triage.»
+  - In process, the praise is withdrawn and the brake check is named.
+  - Founder question 4 (2026-10-19) answered the two-burst question: not billed, and no praise.
+- :15048, brakeledger's «What the student sees on a floored drive». Its «After: the debrief prints … — задръж това ниво.» no longer holds on a drive with a record. The fallback is withheld, and the named block and the reservation print.
+- :15073–:15077, brakeledger's condition 4: B3, «OWED, lane «flooredinvite»» and «Founder question 10 stays open». These are built in process, and question 10 was decided under the founder's 2026-10-19 delegation.
+- :15101, the owed item «Lane «flooredinvite»», and :15102, «question 10 stays his». Both are discharged in process.
+- :15449, rig-w3l: e47a45c1's clause (5) «stays RECORDED and is owed to lane «flooredinvite»». Built in process.
+- :15489, rig-w3m, which held 63c0c28c back because this lane «has not landed». It has now landed.
+
+ADR-016 carries this landing's update and its three corrections in this commit.
+
+**PROVEN ON 479127b** (the integrator's run in the worktree `D:/knijka-lanes/integ-fi`, log `D:/knijka-lanes/scratch/fi-land/PROGRESS.md`. The first integrator was stopped by the 2026-11-03 app restart during step 5, after lessons/__tests__ was green (18:40Z): its vitest was killed by PID, and the worktree was checked with 41 files staged, the new pin untracked and rules/engine.ts at sha 10ff85ac with no mutant in it. A fresh integrator resumed at 21:11Z at lessons/scenario/__tests__ and staged the pin. The merge verifier ran lessons/scenario/__tests__, rules + hud + clips, lessons/__tests__ + components/sim, the lane's key tests, tsc and the tools tests itself.)
+- **The apply.** The lane patch's sha256 matched (a9c2f51f…5945, checked again on resume). It was applied 3-way on `479127b`.
+  - The one real conflict was `lessons/engine.ts`, in buildResult's result spread: ours (the e2 landing) adds the optional `ending` field, theirs adds the optional `unbilledHardBrakes`. The two fields are independent and optional, so both were kept.
+  - The SessionEndScreen, LessonPlayShell and wire.ts hunks were checked and do not overlap.
+  - The generated manifest files also conflicted and were re-recorded (condition 5). Every other file applied cleanly.
+- **The gate patch.** `D:/knijka-lanes/gate-fi.patch`, sha256 1a2eafc20f4ded50d0561c97c3e0ad29daf884f271f54c0fb6f7b672751c179f, 42 files, +5092/−30, 0 CR bytes. No touched file is CRLF in the repo, and the patch reverse-applies cleanly to the index. The 42 files are the patch's 41 plus the Q10h pin.
+  - The merge verifier found `git diff --cached --binary 479127b` byte-identical to it.
+  - It rebuilt the lane's 3-way merge in a temporary index on `479127b`. 38 of the 42 staged blobs are byte-equal to what the patch produces on its own. The other four are `lessons/engine.ts` (the git merge-file result with only the 3 marker lines removed), `units.source.txt` (HEAD's file with the lane's debrief row), `manifest.json` (re-recorded) and the new pin. There is no other product or tools change.
+  - rules/ is byte-identical between `230c7b8` and `479127b`, so the lane verifier's measurements still apply (the merge verifier).
+  - e2's end-card ending line and the lane's debrief block and card rider do not overlap (the merge verifier).
+- **The pins:** conditions 1 and 2 above. What is not pinned, and why, is under condition 2 and condition 3.
+- **The lane's key tests** (the merge verifier): 15 files, 235/235. They are rules unbilled-brake* and floored-brake-withholds-praise; scenario unbilled-brake* (named, gap sweep, keyboard taps, cause-void chassis); the hud card rider; lesson-ui finish-payload; and the reviewed-text manifest.
+- **The integrator's directories**, one at a time, all green and exit 0:
+  - lessons/__tests__: 127 files, 2,456 passed, 165 skipped (the first integrator);
+  - lessons/scenario/__tests__: 208 files, 5,107 passed, 1 skipped (4,468 s);
+  - components/sim: 107 files, 1,779 passed. The first try was cut by the integrator's own 590 s timeout (exit 124), which is not a result; the rerun passed;
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 108 files, 1,908, the new pin included; traffic 53, 675; runtime/__tests__ 48, 875;
+  - scene 47, 787; vehicle 22, 299; world 135, 2,409; hud/__tests__ 71, 1,401; traces 170, 2,372;
+  - src/modules/clips/: 19 files, 302 passed, the clipPlan freshness gate green with no regeneration.
+- **The merge verifier's own runs**, one vitest at a time with --maxWorkers=1, every set to completion with exit 0:
+  - lessons/scenario/__tests__: 208 files, 5,107 passed, 1 skipped (4,668 s);
+  - rules, hud and clips in one run: 198 files, 3,611;
+  - lessons/__tests__ and components/sim in one run: 234 files, 4,235 passed, 165 skipped.
+- **Reviewed-text manifest:** re-recorded, 49/49 (condition 5).
+- **tsc** (`npx tsc --noEmit --incremental false`): at its baseline, 21 errors, all environment errors in the Prisma stores, db.ts and api/health (admin, auth, learning, lesson/progress, outcomes, payments, privacy, sim/lessons/store, traces/attemptStore). None is in a touched file. The merge verifier counted the same 21.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what gate 4/4 of wave-cycle.sh runs): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo, exit 1 (2,027 s). The merge verifier's own run gave the same 8.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»). Its numbers, frozen 1811 / tree now 1822, are the same in the en-land, ra2-land and e2-land gate logs, before this lane (the merge verifier).
+  - 7 come from the worktree environment and match earlier landings (cs, ns, en, e2, cdt). build-redrive §9(a), (b), (d) and (e), count-agreement.test.mjs and finding-reader.test.mjs fail because a git worktree has no .audit-frames/findings; lane-evidence.test.mjs fails because playwright cannot be found there.
+  - Re-run read only with the resources supplied: finding-reader + build-redrive with cwd `E:/AI driver`, 76/76; lane-evidence with `KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/`, 10/10; count-agreement from the worktree with the main tree as cwd, 13/14, the one red «apply-reroute.mjs printed no WORKED line», which comes from running across two trees (as in en-land); and count-agreement on the main tree, 14/14. tools/ is identical in both trees: the patch touches no tools file, and main's tools/ is clean.
+  - The main repo's git status md5 was the same before and after (ffa59223). No tools test was taught. The main-tree gate decides.
+- **Left as found** (the merge verifier): HEAD `479127b`, 42 files staged, 0 unstaged, 0 untracked; the staged diff sha still 1a2eafc2…; rules/engine.ts still 10ff85ac; its probe file moved to its scratchpad; no process of its own running.
+- **A cosmetic note** (the merge verifier, not blocking): in wire.ts a JSDoc block that belongs to serializeCoachedMistakes was already misplaced in base, and the new serializeUnbilledHardBrakes now sits under it. Moving it is an optional later tidy-up.
+- **Not re-run on `479127b`** by the integrator or the merge verifier: the round-7 verifier's fuzz zzV8Fuzz, its census, its split and chassis instruments, and its mutants beyond M2, M5, M6, M8 and M9. Those numbers are the round-7 verifier's, measured on its own lane (`230c7b8` + the r7 patch).
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` at the landing commit:
+  - PUMP245 (sc-follow-tailgater, L3 and L4) on PC and on the phone lens;
+  - a floored drive on PC and on the phone lens;
+  - N2: keyboard-tap chains on the PC keyboard lens. There the round-2 builder measured, over 43 keyboard pumps on the product chassis, a gap-excluded mean of 7.00–7.24 m/s² on the first pumped frame and a gap-inclusive mean of 4.5–7.5 over the whole tap sequence.
+  The judges read the toast, the «Похвали ✓» row, the debrief's named block and the headline. Whether the frames close 63c0c28c is for that wave's judge, under founder question 4.
+- **The founder is told:**
+  - rulings P1–P12 and Q1–Q10i;
+  - that question 10 is built as decided under his delegation: name it, no bill, and a reservation in place of the superlative;
+  - Q10h (the inherited class) and the stated limits Q10e, Q6 and P2;
+  - that ★★★ over a named brake is his question.
+- **Recorded, not filed:** the docs agent's candidates (below), the HARSH_BRAKING_NO_CAUSE lawRef first.
+- **The tools/ tests on the main tree.** The main-tree gate decides.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-04). Several restate items above; they are listed here with the docs agent's evidence, as it stated them.
+- **First, the HARSH_BRAKING_NO_CAUSE lawRef.** The rules catalogue's VIOLATIONS.HARSH_BRAKING_NO_CAUSE cites «ЗДвП чл. 20, ал. 1», but the article that states the duty directly is чл. 24, ал. 1 (content/law). The landed named block prints «→ Правило: ЗДвП чл. 20, ал. 1» on every named drive. Evidence: `flooredinvite-r1.json` (build.owed[0]); `flooredinvite-r7.json` (build.owed[5]).
+- **The inherited Q10h class.** On base, CLEAN_DRIVING timing on a drive billed HARSH_BRAKING_NO_CAUSE depends on whether an unrelated cause entered reach late, because base's billedAndUncorrected accrual reads the cause. A later payout moves 0.02–0.48 s, with no record and equal bills, on 521 of the verifier's 10,878 fuzz runs (the builder: 879 of 10,000). Ruled Q10h: inherited and recorded; a lane only if the founder wants one. Evidence: `scratch/flooredinvite-verify/probes/r7/v8fuzz-a.json`, `v8fuzz-b.json`, `v8fuzz-dbg-dump.json` (seeds 106880, 105370).
+- **The Q10e limit**, which is base's behaviour. A causeless floored brake check that the лепка answered with a hard brake goes unbilled and unnamed when an unrelated cause enters reach after the 0.4 s sustain from the last credit and before the report, with no re-press. The no-cause control is billed by the floor-lift. The verifier has 4 cells, with praise different from the control's in 1 (42.633 against 42.700); the builder has 43, with praise different in 6. Ruled a stated limit. Evidence: `scratch/flooredinvite-verify/probes/r7/v8fuzz-b.json` (limits); `scratch/flooredinvite-impl/probes/r7/fuzz-final1.json`.
+- **The Q6 limit.** Inside a chain that is pumped later and whose credits are more than the sustain apart, CLEAN_DRIVING can be minted before the pumped frame, and the live «Чисто и спокойно каране» toast fires; only the card and the debrief are scoped. The round-2 builder found praise minted inside the chain at 34 of 73 reducer offsets, and keyboard taps with releases of 0.25 s or more leaving up to 27 unheld frames. Not re-measured in round 7. This is the row's own symptom class, so it is for the re-drive judge. Evidence: `flooredinvite-r2.json` (build.owed[0]); `scratch/flooredinvite-impl/probes/r2-bound-exposure.json`, `kb-taps-B.txt`.
+- **The floored bullet can name a later, slower application** instead of where the brake check began. On a chain that began over the 35 km/h floor and floored later, it names only the floored application's clamped onset: on the round-7 split cell Y230 it prints «при 28 км/ч натисна спирачката рязко» and the floor clause «Под 35 км/ч симулаторът таксува…», although the brake check began at 54.4 km/h (record shownKmh 54.4, onsetKmh 28.06). This is the round-1 clamp working as designed; whether the sentence is the whole truth for a pump that started over the floor is a wording question. Evidence: `scratch/flooredinvite-impl/probes/r7/debrief-split.json`; `flooredinvite-r7.json` (build.shownText).
+- **The verdict card** (the ИЗДЪРЖАН pill, ★★★, +XP) carries no reservation on a drive whose debrief names an unbilled brake check, and ★★★ is shown over a named brake. Stars do not move (P10); this is the founder's question. Evidence: `flooredinvite-r1.json` (build.owed[4], [5]); `flooredinvite-r7.json` (build.owed[5]).
+- **No live in-drive card** names a pumped or floored brake check; the student learns of it only in the debrief. Evidence: `flooredinvite-r1.json` (build.owed[6]); `flooredinvite-r3.json` (build.owed[6]).
+- **A modulated causeless brake check that never releases** is not named under P2, and its praise stands: one application that re-anchors and never holds one window for the sustain. Bursts separated by a release of the sustain or longer also keep the praise. Evidence: `flooredinvite-r1.json` (build.owed[2], [9]); `flooredinvite-r7.json` (build.owed[5]).
+- **An F2 asymmetry inherited from brakeledger.** A floored frame resets the praise streak even when the cause arm later voids that floored record (a cause within the sustain), so the praise is withheld with nothing named. Q7's restore covers only pumped resets. There are 0 such drives in the census. Evidence: `flooredinvite-r1.json` (build.owed[3]); `flooredinvite-r3.json` (build.owed[3]).
+- **The pumped bullet's «…заедно те отнеха скоростта толкова рязко, колкото едно рязко спиране»** rests on the gap-excluded mean. On keyboard pumps the round-2 builder found that mean at 7.00–7.24 m/s² on the first pumped frame, but the gap-inclusive mean over the tap sequence at 4.5–7.5. Owed: the N2 rig drive on the PC keyboard lens. Evidence: `flooredinvite-r2.json` (build.owed[2]).
+- **A PC / phone split in the student's own ledger.** In the drafter's transcription, the rig-w3e PROBE cell on sc-follow-tailgater floors for 3 grid points on PC and 53 on the phone lens. Both lenses are billed by the floor-lift at `230c7b8`; it is not a lane target. Evidence: `draft-lane-flooredinvite-journal.jsonl`; `flooredinvite-r1.json` (build.owed[10]).
+- **The LLM / tutor grounding** (ADR-002) of the new «Рязко спиране, което не влезе в точките» block is out of scope and unverified: nobody measured whether the tutor knows of an unbilled record. Evidence: `flooredinvite-r1.json` (build.owed[14]); `flooredinvite-r7.json` (build.owed[8]).
+- **brakeledger condition 3's A3 progressive brakes** (40 km/h; 4 m/s² for 10 frames, then 8.45–8.50 m/s²; 40 brake frames) are neither billed nor floored, so by the code their praise is kept. They are still unmeasured after this lane: one application, so not pumped under P1. Evidence: `flooredinvite-r1.json` (build.owed[8]); doc 88, the brakeledger landing, condition 3.
+
+## Landed: the with-flow cyclist of sc-vu-bikelane-turn now waits 73.5 m back and rides at 5.0 m/s, so on the careful drive he is BEHIND the car when it stops and passes it while it waits. A guard authored for him alone measures the student's body against his line, in place of the 3.0 m corridor around the car's centre that held him 6 m short of a waiting car. The cut-path demo now turns across him as he comes up from behind on its right and is billed the hook. The hook bill shows its own card («Непропускане на велосипедист», ЗДвП чл. 35, ал. 2; чл. 5, ал. 2, т. 1) instead of the pooled roundabout card. Measured in process only. `sc-vu-bikelane-turn:9141072b` (major) (2026-11-04)
+
+Lane `vbltiming`, one round, built on `69418cf`. It answers clause (a) as rig-w3n judged it (integrator note «rig-w3n», 2026-11-02): on the careful drive the with-flow (WF) rider was always AHEAD of the car. So instruction 3, the objective and the moment «Огледало и рамо назад — движещият се направо велосипедист» sent the student to look for a rider who was never behind, and the hook bill printed the pooled ring card («На кръгово гледаш НАЛЯВО», «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1»).
+- Round 1 was SIGNED OFF WITH CONDITIONS by the adversarial verifier (verify-only run `wf_fc295ee6-158`; its PROGRESS.md, 2026-11-03T23:10Z = 2026-11-04 01:10 local). The conditions are below.
+- **The patch.** `vbltiming-result-r1.patch`: sha256 26a867e5…98d9, 35 files, 1,398,661 bytes, 0 CR bytes, every touched file LF in base (the builder). Most of its size is the two re-recorded single-line traces, each carried twice (content/ and public/).
+  - The verifier applied it to its own lane at `69418cf` (35 files, 0 CR). After every mutant it restored the lane and checked it against its 35-file sha256 manifest (`patched.sha256`). At the end it found the patch reverse-applies cleanly and the manifest matches 35/35.
+  - It is cumulative against the lane's base `69418cf`, not against HEAD. Between them, `479127b` carries the ra2 and e2 landings (`LessonScene.tsx`, `engine/reverseAssist` and input, the `lessons/engine.ts` endings, `advisor.ts`, `LessonPlayShell.tsx`, the debrief and end-card surfaces, the reviewed-text manifest). The landing's HEAD `f1c0545` is a TEMP commit on no branch: `479127b` plus the flooredinvite («fi») landing's gate patch (`gate-fi.patch` 1a2eafc2…c179f, 42 files: `rules/engine.ts`, the debrief and reservation, the new pin `rules/__tests__/unbilled-brake-inherited-praise.test.ts`, the reviewed-text manifest). fi and this landing go through ONE main-tree gate as ONE commit, as `479127b` did for ra2 + e2. The patch was applied 3-way: `rules/catalog.ts` and `rules/index.ts` applied cleanly on top of the fi changes, so both sets of changes are kept, and the one conflict was the reviewed-text manifest's derived «source» summary. See PROVEN ON f1c0545.
+  - The lane verifier was stopped once by the 2026-11-03 app restart, during its regression (18:40Z). Its lane then matched `patched.sha256` exactly, with no mutant applied. A fresh verifier session resumed at 21:11Z and finished.
+
+**Integrator rulings.** These were made under the founder's 2026-10-08 and 2026-10-19 delegations; they are not his. The founder is told at this landing.
+- In the brief (2026-11-02):
+  - T1, the guard. With the runner's hard-coded guard (a 3.0 m CENTRE corridor, wider than the rider's 2.6 m line), no re-staging by content alone can let him pass a waiting car.
+    - (a), an authored opt-OUT of the guard for him, was REJECTED: he would ride into a student standing on his line.
+    - (b), an authored per-actor FOOTPRINT line guard, was chosen. The student's box is checked against the rider's line within 0.4 m, with a 3.0 m centre fallback while the student's heading is unknown. It is set on `VBL_RIDER_WF` only; absent the field, the code is today's byte for byte.
+  - T2, the staging numbers: WF hold −73.5, cruise 5.0 m/s. His release, danger and conflict numbers and his side stay.
+  - T3: the counter-flow (CF) rider stays byte-identical. Mistake 0's CF premise is already unmet; that is its own candidate, not fixed here.
+  - T4, the scripts. The shadow shifts its approach left only over the pass of the standing rider. The cut-path overtakes him STANDING, slows, is caught up on its right and turns across him: the right hook on a rider coming from behind. This shape is the integrator's choice.
+  - T5(a), the card: a «cyclist-right-hook» situation row from retrieved law only. No trigger is added, and ADR-009's опасна filter (Ruling A) is untouched.
+  - T6: the builder runs the verifier's instruments before hand-off. Rulings V1 and V2 of the vo landing stand, except where T4 restates V1's strike list.
+- On the verifier's conditions (2026-11-04):
+  - C1 and C2 must be pinned at integration, before the gate.
+  - C5: the cut-path's 7.5 km/h dip is ACCEPTED as a lawful demo shape. The runtime defect it avoids is recorded as the triage candidate «rhrafterhook», and the founder is told.
+  - C4 is recorded, not changed.
+  - The stale `staged.ts` comment is corrected at integration (comment only).
+
+**The row is NOT closed by this landing.** `sc-vu-bikelane-turn:9141072b` stays OPEN.
+- Every number below was measured in process: the recorder (`recordScVuBikelaneTurnDrive`, seed 7) and the live rung chain (`liveChainReplay`, L1–L5).
+- Neither the builder, the verifier nor the integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Its closing condition is a KeyF shoulder-view frame of the WF rider during the hold, and rig-w3n found that this view does not swing to the rear (Owed). Whether its frames close clause (a) is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong** (the builder's causes at base; the verifier reproduced the F3 probe and the base event lists, below).
+- **The timing.** `templates-vru2.ts:978-979` (hold −30, cruise 3.0) put the WF rider ahead of the car on every rung.
+  - At the shadow's first rest (17.60, car x −20.04) he was ahead of the car's centre by +13.84 (L1) … +16.04 (L2), and by +14.99 in the recorder.
+  - He was never behind it on any drive (the builder). The vo landing's condition 2 and rig-w3n measured the same.
+- **Why content alone could not fix it.** The staged-actor guard, `traffic/staged.ts:1441-1442`, holds a rider whenever the car's centre is within the 3.0 m CENTRE corridor (`GUARD_LATERAL_M`), and the WF line is only 2.6 m from the car's lane centre. So any re-staging that brings him up behind the car holds him 6 m short of a car that waits.
+  - The verifier reproduced this with its own probe (`probe1.log`): with the new numbers and no new field, on the committed shadow at L1–L3, he rests at x −26.04. That is 6.00 m short of the car at −20.04. He is below 0.1 m/s from 23.18 (L1), 22.45 (L2) and 22.97 (L3) until the car moves off at 28.63, and he never passes it. His releases are at 9.12, 8.38 and 8.90.
+- **The card.** `rules/catalog.ts:3032-3039`: FAILED_TO_YIELD_SITUATION_COPY held only the ring row, and its type had no correctiveBg. So the hook bill printed the pooled card «На кръгово гледаш НАЛЯВО», «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1» (the builder).
+
+**What landed.** This is the builder's description; the verifier's measurements are under their own heading.
+1. **The footprint line guard** (T1(b)), in `traffic/staged.ts`:
+   - A new exported constant, `FOOTPRINT_LINE_HALF_WIDTH_M` 0.4. A test pins it equal to `VULNERABLE_PASS_BODY_ALLOWANCE_M` 1.25 − `PLAYER_HALF_WIDTH_M` 0.85.
+   - A new pure function, `footprintGuardAlongM()`. It places the student's chassis box (half-extents `PLAYER_HALF_LENGTH_M` 2.02 × `PLAYER_HALF_WIDTH_M` 0.85, imported from `../collision`) on his centre, with the per-agent derived heading `playerDirX/Y`, and clips it to the strip |cross| ≤ 0.4 around the rider's line. It returns the along distance to the nearest box point ahead of the rider: 0 if the box covers him, Infinity if no box point is on his line ahead.
+   - Step 2 of `updateStagedVehicle` uses that along distance, with the window, stop-short 6, gain 0.8 and `HOLD_DECEL_MPS2` 8 unchanged. It does so only for a spec with `playerGuardFootprint === true` and a known `playerDir`. Every other case is the old centre corridor, byte for byte.
+   - The field `playerGuardFootprint?: true` is declared on `StagedActorPathSpec` (`contracts.ts`) and on `StagedVehicleSpec` (`traffic/types.ts`). `CyclistRightHookRunner.stage` (`orchestrator/runners.ts`) forwards it exactly as it forwards `gradedOnlyByOwnRunner`.
+   - Its census: one writer (the runner), one reader (step 2) and one author in the whole catalogue (`VBL_RIDER_WF`). `vbl-hook-situation-copy.test.ts` pins this over the templates, LESSONS / EXAM_LESSON / POLIGON_LESSONS and every EXAM_SHELLS slot option.
+2. **The re-staging** (T2): `VBL_RIDER_WF` hold −73.5, cruise 5.0, `playerGuardFootprint: true`. His side (+2.6, y −6.66), release, danger and conflict numbers are unchanged, and so is the CF spec.
+3. **The scripts** (T4), in `traces/scVuBikelaneTurn.ts`:
+   - The shadow's approach is [[−130,Y],[−86,Y],[−81,−3.86],[−67,−3.86],[−62,Y]] (PASS_Y −3.86), so it passes the standing rider with more room. The pause stays 11.0.
+   - The cut-path keeps its 42 km/h run to x −62, then drives 15 km/h to x −40, dips to 7.5 km/h as far as −37, runs at 12.5 km/h to −18, then at 13 km/h on its own turn polyline (turn-in at −11). It never stops.
+   - Why the dip: with the brief's 11.5 km/h crawl, the recorder, L1, L2, L3 and L5 billed a second FAILED_TO_YIELD «right-hand-rule» on the WF rider at 24.65–24.97, after the hook. A tick at ≤ 8 km/h inside the 40 m observation zone and outside the 18 m core earns the runtime's existing lawful-commitment immunity (`worldRuntime.ts` `rhrApproachYielded` / `rhrEnteredClear`). See condition 5.
+   - The only-behind script is untouched, and its trace is byte-identical.
+   - The shadow and cut-path traces are re-recorded (`RECORD_TRACES=1`), content and public copies.
+4. **The card** (T5(a)), in `rules/catalog.ts`:
+   - New: `FAILED_TO_YIELD_SITUATION_CYCLIST_RIGHT_HOOK`, exported from `rules/index.ts`.
+   - The situation-row type is widened with an optional correctiveBg.
+   - A new «cyclist-right-hook» row, lawRef «ЗДвП чл. 35, ал. 2; чл. 5, ал. 2, т. 1», worded from the retrieved text as the approved bank item q-predimstvo-062 phrases it. It cites no чл. 25, ал. 2.
+   - ADR-009 / Ruling A is untouched. The graded sheet still cannot carry the mistake card «Отрязване на колелото по алеята»: the lesson-mistake-targets fixture is unchanged, null for L1–L5. That is why rig-w3n never saw it on a cut-path drive; it is by construction.
+   - In the THEO-3 sandbox at L1~m1 there is one mistakeMoment, at 22.60, «Непропускане на велосипедист».
+5. **Clip m1** was regenerated (`GEN_CLIP_PLAN=1 clipPlan.test.ts`, which is what `tools/clips/gen_clip_plan.mjs` spawns): `faultTimeSec` 15.55 → 22.58, the recorder's hook time. `requiredActors` is still [].
+6. **Comments** that had become false were rewritten: the WF header and the CF «~2.4 s AFTER» comment in `templates-vru2.ts`, and the file header and the cut-path header in `scVuBikelaneTurn.ts`.
+   - Of the vo landing's condition-2 comments, the header sentence at `:947` («…as the driver overtakes then turns across it») is rewritten, and the block comment now carries the new staging.
+   - `:933` («…so the driver overtakes it before the mouth…») is not in the patch. On the new staging it is true: the car passes him at x −73.4 (G4).
+   - The verifier did not report re-reading these comments.
+- **What did not change** (the builder; the verifier checked the diff against the protected list):
+  - every bill rule and threshold, and the runner's hook / yield / contact logic and `conflictFromRightFor`;
+  - `dangerRadiusM` 9, `conflictWindowM` 25, `releaseDistM` 60, `CYCLIST_CLEAR_ARC_M` 8, `GUARD_AHEAD_M` 16, `GUARD_LATERAL_M` 3.0, `GUARD_STOP_SHORT_M` 6, `GUARD_APPROACH_GAIN` 0.8, `HOLD_DECEL_MPS2` 8, `LEAD_CORRIDOR_M` 4.0, the VULNERABLE_PASS_* and RHR_* numbers, `DEFAULT_NEAR_MISS_CONFIG`, the ADR-009 filter and the points;
+  - the WF side and the CF spec.
+  No protected threshold moved.
+- **Tests.**
+  - New (the builder's counts):
+    - `lessons/scenario/__tests__/vbl-footprint-guard.test.ts` (10): the half-width pin, the pure geometry, M2 / M2b / M2c, and M3 on the sc-vu-cyclist-hook rider and the exam V1 rider (the field reaches no other rider: they still rest 6.00 / 5.96 m short);
+    - `vbl-wf-timing.test.ts` (54): G1–G8 on every rung, recorded in-test from the scripts, plus the THEO-3 sandbox pin and the clip m1 pin;
+    - `vbl-hook-situation-copy.test.ts` (5): the site census, the card's title / peek / lawRef / corrective, every-site truth, ADR-002;
+    - the helper `vblTimingDrive.ts`.
+  - Restated, each with the before → after and its measured reason in the file:
+    - `vu-bikelane-wf-rider-line.test.ts`: wf[0].x −30 → −73.5. The vo landing's C1 cell «L2 @18.20, rider AHEAD inside the stem lane (fwd 3.61, left 1.24)» now reads «L2 @22.60, rider BEHIND-RIGHT on his line, short of the stem lane, within 9 m (fwd −1.18, left −4.59, x −10.66)».
+    - The trace gate `sc-vu-bikelane-turn-traces.test.ts`, cut-path: codes [COLLISION, FAILED_TO_YIELD] → [FAILED_TO_YIELD]; strikes [wf, cf] → []; outcomes [wf:collision, cf:violation] → [wf:violation, cf:yielded]. This restates ruling V1's two-strike list, under T4.
+    - `npc-shell-cast-kind.test.ts`: the re-timed cut-path touches no rider, so the bikelane rapier cell is now a synthetic line at y −5.9, 20 km/h, into the standing WF rider. struck [wf, cf] → [wf]; ear [1000, 1001] → [1000] (condition 2).
+    - `solid-cross-uturn-act.test.ts`: the corrective census adds FAILED_TO_YIELD|cyclist-right-hook.
+    - `demo-curvature-census.json`: the cut-path goes 1.333 @ 17.95 → 1.278 @ 22.30. It is the same polyline, turned slower; it was already an offender.
+    - The keep-right claim census: 2 sentences classified «other» (total 570 → 572).
+    - `clipPlan.generated.ts`: m1 15.55 → 22.58.
+  - The reviewed-text manifest was re-recorded: catalog strings 598 → 608; two caption units; the catalog.ts and scVuBikelaneTurn.ts source units.
+
+**Shown text** (the builder's final strings).
+- ADDED, the FAILED_TO_YIELD «cyclist-right-hook» card. It is shown on every hook bill: sc-vu-cyclist-hook, sc-vu-pass-clearance, sc-vu-cyclist-group, both VBL riders, l3-cyclist-right-hook, ex-cyclist-right-hook and the exam V1 slots.
+  - titleBg «Непропускане на велосипедист»; peekBg «Пусни велосипедиста пръв.»; lawRef «ЗДвП чл. 35, ал. 2; чл. 5, ал. 2, т. 1».
+  - The explanation names a straight-going cyclist on the student's right whose path the turn crosses, the duty of чл. 35, ал. 2, and the care owed to two-wheelers under чл. 5, ал. 2, т. 1.
+  - The corrective is the right mirror and the right shoulder for a rider coming from behind and, only «ако велоалеята е двупосочна», ahead-right for one coming the other way.
+  - These replace the pooled title, explanation, peek, corrective and lawRef on that detail only.
+- CHANGED, two demo annotations at x −62 (observations, no law). The shadow's now says the car has passed the rider and he is behind-right («Подминахме велосипедиста на алеята — сега той е отзад вдясно…»). The cut-path's now says he stayed behind-right («Велосипедистът по алеята остана отзад вдясно…»).
+- NEWLY SHOWN on this lesson (existing copy): the commendation «Правилно разминаване с велосипедист» at 8.18 on the shadow. Its pooled explanation is not rendered (condition 4).
+- The verifier checked the card's law against `content/law/acts/zdvp.json` and q-predimstvo-062, and found the card true at every site that bills this detail. That site census checks the authored offset and path, and the copy is checked by regex; neither is a per-site geometric replay.
+- No string a tools/ test reads was added or changed (the builder).
+
+**What the verifier reproduced.** It used its own lane (`69418cf` + the patch), its own probe (`probe1.log`) and its own mutants. Log: `D:/knijka-lanes/scratch/vbltiming-verify/PROGRESS.md`; the other logs and the mutants are in that folder.
+- **The F3 probe** (above): the centre corridor holds him 6.00 m short, so STEP 1 was needed.
+- **The release steps** equal the builder's table on every rung. WF/CF: L1 546/524, L2 502/498, L3 533/511, L4 508/506, L5 520/544.
+- **Base → patched events**, L1–L5:
+  - Shadow: [36.57 YIELDED, 40.97 YIELDED] → [8.18 YIELDED_TO_PRIORITY:vulnerable-pass, 36.57, 40.97] on every rung. The phase completes.
+  - Cut-path, base: 15.55 FAILED_TO_YIELD:right-hand-rule on every rung, then:
+    - L1: COLLISION 17.52, FAILED_TO_YIELD:cyclist-right-hook 18.2, COLLISION 18.27;
+    - L2: COLLISION 18.18, hook 18.2;
+    - L3: COLLISION 17.80 and 18.18, no hook bill;
+    - L5: COLLISION 18.17, hook 18.2;
+    - L4 ends at 15.55.
+  - Cut-path, patched: [22.60 FAILED_TO_YIELD:cyclist-right-hook, 32.10 YIELDED_TO_PRIORITY] on L1, L2, L3 and L5. L4 now ends at the hook, 22.60, where it used to end at 15.55 on the right-hand-rule fault.
+  - Only-behind: [17.15 FAILED_TO_YIELD:right-hand-rule, 33.42 YIELDED] (L4 ends at 17.15), unchanged.
+- **The guard, by code review.**
+  - It is keyed on the authored `playerGuardFootprint` alone. It measures the chassis box (half-extents 2.02 × 0.85) against the rider's line within 0.4 m.
+  - It falls back to the old 3.0 m centre corridor while the heading is unknown, and without the field it is byte-identical to base.
+  - The runner forwards the field as it forwards `gradedOnlyByOwnRunner`, and only `VBL_RIDER_WF` authors it.
+- **Protected numbers:** none appears in the diff.
+- **The builder's geometry**, which the verifier did not re-measure beyond its event lists, is pinned by `vbl-wf-timing.test.ts`, green in the verifier's catalogue-wide run (regB):
+  - G1: at the shadow's rest the WF rider is behind the car's centre by 12.06 (L2) … 15.72 m (L1).
+  - G2: he passes the standing car at 20.02–20.75.
+  - G3: the turn latches at 33.33 (33.35 in the recorder), at least 6.9 s after he is 8 m past (≥ 8 m past at 25.63–26.37).
+  - G4: the shadow passes him standing at 7.48, x −73.4, 41.8 km/h, with a minimum centre lateral of 2.80 m.
+  - G6: at the cut-path latch (22.60) he is behind-right, fwd −1.18 … −2.44 m and left −4.59 … −7.82 m, 4.74–8.19 m from the car, with no contact.
+  - G6c: near-miss rows at L2 (0.53 m at 22.57) and L4 (0.71 m at 22.43), while the guard brakes him at 8 m/s².
+  - G7: on only-behind he passes the waiting car at 21.42–22.15.
+- **Mutants, its own eight** (V1–V5, V7–V9; there is no V6), one at a time. Each was restored and checked against `patched.sha256` before the next. None was killed by a timeout.
+  - V1, no edge crossings: «rider struck a standing car» (geometry 9.15).
+  - V2, stop-short measured from the centre: «expected 5.15 > 5.5».
+  - V3, the runner forwards the field to every rider: both M3 cases.
+  - V4, PASS_Y −3.92: «pass under 2.75 m: 2.74».
+  - V5, the dip at 8.5 km/h: «right-hand-rule bill on the cut-path» at 24.48–24.85 on 5 rungs, and the clip pin 22.58 ≠ 22.5 (condition 5).
+  - V7, the row's correctiveBg removed: the corrective regex and the solid-cross census.
+  - V8, the stop at the farthest box point: «expected 10.85 close to 9.15» and «4.30 > 5.5».
+  - V9, the guard's half-width halved: SURVIVED (condition 1).
+- **Regression on its lane**, one worker, one run at a time:
+  - targeted, 20 files: 540 passed, 1 skipped;
+  - lessons/__tests__, lessons/scenario/__tests__, components/sim/lesson-ui/__tests__, rules, traces and clips: 673 files, 12,854 passed, 166 skipped. 1 test failed (touchHintLifetime, ENOENT on `tools/mobile/lesson-audit.mjs`) and 1 file failed to load (whyPanel.test.ts, ENOENT on `docs/simulation/scenario-engine/scenario-map.json`). Both are environment only, because the lane has no tools/ or docs/;
+  - traffic + orchestrator: 94 files, 1,203 passed;
+  - collision: 70/70. Importing from `../collision` into `staged.ts` breaks no barrel-importer census;
+  - tsc: 22 errors, the environment baseline (prisma stores, api/health, lib/db), none in a touched file.
+
+**The conditions, and how each stands.**
+
+**1. C1: the guard's 0.4 m line half-width had no behavioural pin (mutant V9 survived). REQUIRED AT INTEGRATION, before the gate; PINNED AT INTEGRATION.**
+- With `FOOTPRINT_LINE_HALF_WIDTH_M / 2` inside `footprintGuardAlongM`, `vbl-footprint-guard` and `vbl-wf-timing` stayed green, 64/64 (`mut/V9-halfwidth-0.2.log`). Only the constant's equality to 1.25 − 0.85 was pinned.
+- The cyclist body's half-width is 0.23 (`VEHICLE_PROFILE_WIDTH_M` cyclist 0.46 / 2). So a 0.2 band would let him touch a standing car whose corner sits 0.2–0.23 m off his line.
+- The pin asked for: a geometry test that places the standing car's nearest corner 0.25–0.35 m off the WF rider's line and asserts that he comes to rest short of it with NO contact. V9 must die on assertion text (recorded below), and the original must pass.
+PINNED AT INTEGRATION: a new describe in `vbl-footprint-guard.test.ts`, «C1 — the 0.4 m band holds the rider short of a car whose nearest corner is 0.30 m off his line» (the integrator).
+  - Two cases: a car parallel to his line, and a car yawed 45° (heading 135°). In both the car's nearest corner is 0.30 m off the WF rider's line, which the test also asserts as a precondition (0.25–0.35, on the car's side).
+  - Separation is measured with the rider's real body, `VEHICLE_PROFILE_LENGTH_M.cyclist` 1.8 × `VEHICLE_PROFILE_WIDTH_M.cyclist` 0.46. The test asserts that he stops more than 5.5 m short of the nearest corner, that his speed is below 0.1 m/s, and that the minimum separation is above 0.
+  - It drives the real CyclistRightHookRunner, createTrafficSystem and traffic.update, with no stub and no regex (the merge verifier).
+  - The original is green: he rests 6.0 / 6.1 m short at v 0, with separation 5.1 / 3.73 m. The merge verifier counted the file 12/12.
+  - V9 (`const w = FOOTPRINT_LINE_HALF_WIDTH_M / 2;` inside `footprintGuardAlongM`) is killed on «the rider was not held short of the car whose corner is 0.30 m off his line: expected -47.25388888888669 to be greater than 5.5», and −44.41 in the yawed case. Under V9 he rides past the corner at 5 m/s with 0.07 m of air (0.30 − 0.23). The integrator's run: 2 failed, 64 passed across vbl-footprint-guard and vbl-wf-timing. The merge verifier killed it again itself: 2 failed | 10 passed, on the same text. staged.ts was restored by sha256 after each run.
+  - The merge verifier's note (its F2): V9 dies on the hold-short assertion. The no-contact assertion would not fail on its own, because under V9 the rider's real 0.46 m body passes with 0.07 m of air. The condition is met, since the cell asserts both and V9 dies on assertion text. Nothing here pins contact itself, which is correct for a car whose corner is 0.30 m off his line.
+
+**2. C2: the npc-shell-cast-kind restatement dropped the rapier and ear pin of a strike on the counter-flow rider. REQUIRED AT INTEGRATION, before the gate; PINNED AT INTEGRATION.**
+- The restated cell drives one synthetic line, at y −5.9, into the standing WF rider only, so struck goes [wf, cf] → [wf] and the ear [1000, 1001] → [1000]. The file gives the before → after and the reason.
+- What it lost: the rapier and ear pin of a strike on the `gradedOnlyByOwnRunner` counter-flow rider (npc 1001, «cyclist», graded). After the restatement, only the census and a synthetic mount in `npc-colliders-mount.test.ts` cover that strike.
+- The pin asked for: a second synthetic line into the CF rider, so the cell again pins both strikes and both ears. A mutant that drops the CF collider, or its kind, must die on assertion text.
+PINNED AT INTEGRATION: `npc-shell-cast-kind.test.ts` gains `bikelaneCf()`, a second synthetic line into the CF rider: y −4.06 to x −40, across to y −8.0 by x −20, then east, at 20 km/h (the integrator).
+  - Why a second line: on rapier a struck standing WF rider blocks the car (rest x −76.3, the session ends at grid point 1233), so one drive cannot reach both riders.
+  - The cell runs both lines and again pins struck [wf, cf] and the ear [cyclist:1000:true, cyclist:1001:true]. On the CF line it also pins no «vehicle» or anonymous report, one cyclist row, and an ear that is only cyclist:1001:true. The cadence cell compares the CF line on all 5 cadences.
+  - Measured: reports 1405–1407 and 1416, all sc-vbl-rider-cf; the ear at 1406 (20.0 km/h) and 1416 (1.05 km/h rebound), both npc 1001 graded; 1 row at t 23.42. It is identical on 60/30 Hz, 13 fps, 0.37 s and w69. The original's chassis cells are green 4/4; the merge verifier counted the whole file 11/11.
+  - C2a, drop the CF collider (`if (v.id === 1001) continue;` after `const v = traffic.vehicles[idx];` in NpcShellPool.step, `scene/npcShells.ts`): killed on «the rig's ear did not hear the counter-flow rider's shell as a graded cyclist (npc 1001): expected [] to deeply equal [ 'cyclist:1001:true' ]».
+  - C2b, the CF shell's kind set to «vehicle»: killed on «a report about the counter-flow rider's body called it a vehicle: expected [ [ 1406, 'vehicle', null ], …(1) ] to deeply equal []».
+  - npcShells.ts was restored to sha256 0b82cac4… after each. The merge verifier ran C2a and C2b again itself, and both died on the same texts.
+  - The merge verifier's note (its F1): the integrator found C2a surviving the patch-only cell (4/4 green), but that holds only for the chassis cells it selected with -t. Run as a whole file, the existing catalogue cell («every template × rung: cast kind == shell tag kind…») also fails under C2a and C2b (C2a: 2 failed | 9 passed), so the mutants were never unkilled file-wide. The new cell is the first chassis-level (rapier + ear) kill of C2a.
+
+**3. A stale comment.** `traffic/staged.ts` around line 1391 still says that `reentryClearAt` is the only consumer of `playerDirX/Y`. The footprint guard (~:1547) is now a second consumer. Comment only. AT INTEGRATION: corrected, comment only (the integrator). The comment now names both consumers: `reentryClearAt`, and the footprint line guard (`footprintGuardAlongM`) for playerGuardFootprint actors only. The merge verifier found it the only difference in staged.ts from what the lane patch alone produces. No mutant applies to a comment.
+
+**4. C4: the pooled explanation of the new vulnerable-pass praise. RECORDED, not changed.**
+- The «vulnerable-pass» praise row (`catalog.ts:2572`) has no explanationBg, so its explanation is the pooled «Пропусна превозното средство с предимство… кръстовище» (`catalog.ts:2308`). For a pass of a standing rider 73 m short of the junction, where no priority was involved, that sentence is false (the builder).
+- The verifier found that it is not rendered. `yield-praise-situation-copy.test.ts:105-113` states, and pins, that nothing in the product renders a commendation's explanation. What the student sees is the title «Правилно разминаване с велосипедист», which is true for the 2.80 m pass.
+- So it is not a false sentence on the glass. The pooled row stays an open copy row.
+- Not pinned at integration (the integrator's notPinned): it is not a behaviour to pin, and yield-praise-situation-copy.test.ts:105-113 already pins that no commendation explanation is rendered.
+
+**5. C5: the cut-path has no right-hand-rule bill only because of its scripted 7.5 km/h dip. The dip is ACCEPTED as a lawful demo shape; the defect it avoids is RECORDED as the candidate «rhrafterhook».**
+- Without the dip (V5, 8.5 km/h), a SECOND FAILED_TO_YIELD «right-hand-rule» on the WF rider falls at 24.48–24.85, after the hook, on 5 rungs (the verifier). The builder measured 24.65–24.97 with the brief's 11.5 km/h crawl.
+- The cause: the guard releases him after the hook, and `conflictFromRightFor` reads him with the car's post-turn (southbound) heading, so he counts as «from the right».
+- This is a runtime defect. A live student who hooks the rider without a lawful-commitment approach will meet it: two bills for one rider. It is not changed here, since `conflictFromRightFor` was on the must-not-change list. The founder is told.
+- Not pinned at integration (the integrator's notPinned): pinning it would need a product change, and this landing allows tests only. The dip itself is guarded: V5 is already killed by the lane's tests.
+
+**6. Owed, not a lane item: the device.** Everything above was measured in process. Clause (a) closes only on the rig re-drive (Owed).
+
+**7. A recorded device risk** (the builder's sweep; the verifier: «holds by construction»).
+- Either a box point is within 0.4 m of his line, and the guard stops him 6 m short; or none is, and his 0.23 m half-body clears it.
+- A careful student who waits with his car 1.0 m right of his lane centre (y −5.06) leaves 0.04 m of air to the 0.4 m proxy as the rider passes: about 0.21 m to the rig's real 0.46 m body. At that rest the 40.97 commendation does not appear.
+- At y −4.66 the air is 0.56 m. A student who approaches at 50 km/h, or late, may meet him moving. That is unmeasured until the re-drive.
+
+**Not cured by this landing.**
+- The mistake card «Отрязване на колелото по алеята» still never reaches the graded sheet, by construction (ADR-009 / Ruling A; T5). The hook bill now carries its own card instead.
+- The card's codeRefs still name FAILED_TO_YIELD alone: the vo landing's COPY DEBT (ruling V1).
+- Mistake 0 («Завой само с поглед назад») still never reaches its CF hook (T3; candidate below).
+- The other cyclistRightHook riders still have the centre corridor (candidate below).
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's working copy of doc 88 on 2026-11-04.
+- :15502, the vo title's «The cut-path demo's turn now runs into him in the recorder and at L1, L3 and L5». On the new staging the cut-path strikes no rider, and the hook is billed at 22.60 on every rung.
+- :15537, the trace gate's two-strike pin [wf, cf] (ruling V1), restated under T4 to [FAILED_TO_YIELD] with strikes []. :15538, the npc-shell-cast-kind rapier cell (rows at t 17.52 and 18.95), restated to a synthetic line (condition 2).
+- :15594, the C1 cell «…billed with the rider AHEAD of the car, inside the stem lane». It is restated to the rider BEHIND-RIGHT at 22.60 (fwd −1.18, left −4.59, x −10.66; the builder).
+- :15603 and :15619, condition 2 «the rider … is never behind the car». This is answered in process: on the shadow and on only-behind he is behind the car at its rest and passes it while it waits (G1, G2, G7; the builder, pinned by vbl-wf-timing). The device judgment is still owed.
+- :15648, «the WF rider is now struck at about 18.1 s … Its faultTimeSec 15.55 is unchanged». m1's faultTimeSec is now 22.58, and no rider is struck.
+- :15672, «Lane «vbltiming» is being briefed». It is landed in process. The «card never shows» half is answered by construction (ADR-009 / Ruling A; T5).
+
+**PROVEN ON f1c0545** (the integrator's run in the worktree `D:/knijka-lanes/integ-vt`, log `D:/knijka-lanes/scratch/vt-land/PROGRESS.md`, mutant logs in `scratch/vt-land/mut/`; its probe and patch-only test copies were moved to `scratch/vt-land/probe/`. The merge verifier ran lessons/scenario/__tests__, clips + traffic + orchestrator + collision, rules, traces, tsc and the tools tests itself, while another lane, rbreverse, had its own vitest running at the same time):
+- **The apply.** The worktree was clean at `f1c0545`, and the lane patch's sha256 matched (26a867e5…). `git apply --3way --index --binary` applied 34 of the 35 files cleanly; the 4 new files went in by direct application, and there was no other 3-way merge. `rules/catalog.ts` and `rules/index.ts` applied cleanly on top of the fi changes, so both sets of changes are kept.
+  - The one conflict was `reviewed-text-manifest/manifest.json`, in the derived «source» summary only: HEAD's fingerprint 9e2d93bb with 13,364 strings against the lane's df9fde31 with 13,305. It was resolved to ours and then re-recorded (below).
+- **The gate patch.** `D:/knijka-lanes/gate-vt.patch`, sha256 10867c7aa85bae69c3137deff8332467424b4a56f2cb7f2bd2677ecef6ac90ea, 35 files, +1556/−121 (`git diff --cached --shortstat` in the worktree), 0 CR bytes.
+  - The merge verifier found `git diff --cached --binary f1c0545` byte-identical to it, with nothing unstaged or untracked, and the lane (26a867e5…) and fi (1a2eafc2…) patch hashes matching.
+  - It applied the lane patch with `--3way --cached` to a temporary index built from `f1c0545` and compared blob ids file by file. 31 of the 35 files are blob-identical, covering every product file except staged.ts: types.ts, contracts.ts, runners.ts, templates-vru2.ts, catalog.ts, index.ts, scVuBikelaneTurn.ts, clipPlan.generated.ts and the four traces.
+  - The 4 that differ: `staged.ts` (the C3 comment only), `manifest.json` (the lane's version plus the re-recorded «source» summary; the catalog and caption summaries are the lane's own), `vbl-footprint-guard.test.ts` (the C1 pin) and `npc-shell-cast-kind.test.ts` (the C2 pin). No tools/ file is touched, and there is no other product change.
+- **The pins:** conditions 1, 2 and 3 above. Not pinned, with the integrator's reasons: C5 and C4 (under those conditions), and C3, a comment, to which no mutant applies.
+- **The lane's own tests and a lane mutant** (the merge verifier). vbl-wf-timing, vbl-footprint-guard, vbl-hook-situation-copy, vu-bikelane-wf-rider-line, sc-vu-bikelane-turn-traces and solid-cross-uturn-act ran green inside its scenario, rules and traces runs. It re-ran the lane verifier's V1 (`if (false && i > 0)`, no edge crossings): killed, 2 failed | 64 passed, on «rider struck a standing car: expected -1.233888888888643 to be greater than 0» and «expected Infinity to be close to 9.15». staged.ts was restored to e39d419d….
+- **The integrator's directories**, one at a time with --maxWorkers=1, all green:
+  - src/modules/clips/: 19 files, 302 passed, run before and after the other suites. The clipPlan freshness gate passed: the lane's regenerated clip m1 (15.55 → 22.58) matches the engine, so no regeneration was needed;
+  - lessons/__tests__: 127 files, 2,456 passed, 165 skipped (938 s);
+  - lessons/scenario/__tests__: 211 files, 5,178 passed, 1 skipped (4,660 s);
+  - components/sim: 107 files, 1,779 passed (1,157 s);
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 108 files, 1,908 (1,148 s); traffic 53, 675; runtime/__tests__ 48, 875;
+  - scene 47, 787; vehicle 22, 299; world 135, 2,409; hud/__tests__ 71, 1,401; collision 4, 70; traces 170, 2,372.
+- **The merge verifier's own runs**, to completion, --maxWorkers=1, one run at a time:
+  - lessons/scenario/__tests__: 211 files, 5,178 passed, 1 skipped (4,204 s), the reviewed-text manifest gate green inside;
+  - clips + traffic + orchestrator + collision: 117 files, 1,575 (302 + 675 + 528 + 70), the clip-plan freshness gate green inside;
+  - rules: 108 files, 1,908; traces: 170 files, 2,372.
+- **Reviewed-text manifest.** After the conflict the gate went red on the «source» summary alone: 0 strings differed from the reviewed copy, recorded 13,364 against the tree's 13,369. It was re-recorded with RECORD_REVIEWED_TEXT_MANIFEST=1: surfaces.source fingerprint 9e2d93bb… → fa505a24…, strings 13,364 → 13,369, 487 units; the gate is 49/49 green.
+  - Every string and unit move against `f1c0545` is the lane's own and came in its patch. Caption surface: the mistake-cut-path line («Велосипедистът по алеята остана отзад вдясно…») and the shadow-correct line («Подминахме велосипедиста на алеята…»). Catalog surface: FAILED_TO_YIELD_SITUATION_COPY gains the «cyclist-right-hook» row, and one PER_ACT_COPY string moved. Source surface: catalog.ts and scVuBikelaneTurn.ts.
+- **tsc** (`npx tsc --noEmit --incremental false`): at its baseline, 21 errors, all environment (api/health, lib/db, the admin / auth / learning / outcomes / payments / privacy stores, lesson/progress, sim/lessons/store, traces/attemptStore). None is in a touched file. The merge verifier counted the same.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, which is what wave-cycle.sh gate 4 runs, reading «ℹ fail N»): 2,029 tests, 2,006 pass, 8 fail, 11 skipped. The merge verifier's own run gave the same.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are environment-only, and none is caused by the landing. build-redrive.test.mjs §9(a), (b), (d) and (e), count-agreement.test.mjs and finding-reader.test.mjs fail with «could not find .audit-frames/findings»: .audit-frames is untracked and exists only in `E:\AI driver`. lane-evidence.test.mjs fails because playwright cannot be resolved: tools/clips/headless/node_modules is absent in the worktree.
+  - Re-run of those 4 files read only, with cwd `E:/AI driver` and `KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/`: build-redrive, finding-reader and lane-evidence (10/10) pass. count-agreement keeps one red, «counters disagree about the open list», where apply-reroute.mjs printed no WORKED line. That too is the environment: apply-reroute resolves REPO from its own file path (the worktree), cannot find .audit-frames/reroute.jsonl there, and exits 2 at line 54.
+  - Main's git status and the findings dir were unchanged afterwards. The lane touches no tools/ file, and no tools test was taught. The main-tree gate decides, and it is the authoritative measurement of count-agreement.
+- **Left as found** (the merge verifier): HEAD `f1c0545`, the staged diff sha unchanged (10867c7a…), no untracked or ignored files outside node_modules, and no node process on integ-vt. It disclosed one read-only recursive grep under `E:\AI driver`, which may have walked into .audit-frames; it stopped it within the 120 s cap, and nothing was written.
+- **Not re-run on `f1c0545`:** the lane verifier's probe (`probe1.log`) and its event lists, and its mutants beyond V1 and V9.
+
+**Owed.**
+- **The rig re-drive, right after the gate**, step-keyed through `/dev/drive-rig` on PC and on the phone lens, L1–L3, of SHADOW, CUT and BEHIND on the new staging. rig-w3n's programmes encode the old timings and need new tunes. Frames needed:
+  - the WF rider in the right mirror at the car's rest;
+  - the rear badge;
+  - the cut-path latch with the hook billed and the new card;
+  - the CLOSING CONDITION: the KeyF shoulder-view frame of the WF rider during the hold. rig-w3n found that the KeyF view did not swing to the rear (candidate below). If it still does not, this condition cannot be met on the device as it stands, and that is for the judge and the integrator.
+  Whether those frames close clause (a) is for that wave's judge and verifier.
+- **R0 media for clip `sc-vu-bikelane-turn__m1`** (faultTimeSec 15.55 → 22.58). On the render, check whether the WF rider must be a required actor (`requiredActors` is still []).
+- **The founder is told:**
+  - rulings T1–T6;
+  - the 2026-11-04 rulings on C1, C2, C4 and C5;
+  - the cut-path's 7.5 km/h dip and why it is there;
+  - the candidate «rhrafterhook».
+- **Recorded, not filed:** the docs agent's candidates (below), «rhrafterhook» first.
+- **The tools/ tests and the clip-plan freshness gate on the main tree.** The lane could not run touchHintLifetime or whyPanel. The freshness gate (src/modules/clips/) already passed on `f1c0545` in the integrator's runs and the merge verifier's (PROVEN ON f1c0545). The main-tree gate decides.
+- **Not measured:**
+  - any of this on a device;
+  - the 0.04 m sweep risk (condition 7);
+  - a per-site geometric replay of the new card's sentences;
+  - the lane verifier's probe and event lists on `f1c0545`, beyond what PROVEN ON f1c0545 states.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-04). «rhrafterhook» is first, then the KeyF shoulder view. Several restate items above; they are listed here with the docs agent's evidence, as it stated them.
+- «rhrafterhook» (condition 5). After a right hook, the runtime right-hand rule reads the released with-flow rider with the car's post-turn heading and bills a second FAILED_TO_YIELD «right-hand-rule» on the same rider: 24.48–24.85 on 5 rungs at 8.5 km/h, 24.65–24.97 at 11.5 km/h. Evidence: `vbltiming-r1-verify.json` (C5, F7); `scratch/vbltiming-verify/mut/V5-dip-8.5.log`; `vbltiming-r1.json` (owed).
+- The cockpit's KeyF shoulder view does not swing to the rear on the device. In rig-w3n's V3-BEHIND rep2 pair, both KeyF frames taken DURING the hold (PC step 1696, phone 1705) still show both riders through the windscreen, so the «рамо» half of instruction 3 may be unperformable. This bears directly on this row's closing condition. Evidence: `scratch/rig-w3n/sc-vu-bikelane-turn/9141072b/PROGRESS.md:52`; `vbltiming-r1.json` (owed).
+- The «Правилото» / «НА ПЪТЯ» block (`rules/offences.ts`, keyed by code) still quotes чл. 50, ал. 1 on the cyclist-right-hook card, beside the new row's чл. 35, ал. 2. Evidence: `vbltiming-r1.json` (named contradiction 1); the brief's T5.
+- The latent F3, catalogue-wide. Every other cyclistRightHook rider inside `GUARD_LATERAL_M` 3.0 (sc-vu-cyclist-hook, sc-vu-pass-clearance, sc-vu-cyclist-group, l3/ex-cyclist-right-hook, the exam V1 slots) is still held about 6 m short of a student who overtakes him and waits: 6.00 / 5.96 m in the M3 cases. Per the builder, that student is then billed the hook on turning. Evidence: `vbl-footprint-guard.test.ts` (M3); `vbltiming-r1.json` (owed).
+- FOLLOWING_TOO_CLOSE is read off a cyclist 2.6 m to the right (`LEAD_CORRIDOR_M` 4.0). On the device, cut L1 showed «Несъобразена дистанция» at 20.08 km/h. It was not reproduced in process on the new staging. Evidence: `vbltiming-r1.json` (owed); brief T4.
+- Mistake 0 («Завой само с поглед назад») never reaches its CF hook. In process both runners resolve «yielded» at 33.42, and its COLLISION is the authored beat (recorder 29.97). On the device the CF rider is 30.57 m away at the latch. Evidence: `vbltiming-r1.json` (owed); `scratch/rig-w3n/sc-vu-bikelane-turn/9141072b/PROGRESS.md:26, :48`.
+- The runtime right-hand rule reads the ONCOMING counter-flow cyclist on the two-way track as «from the right». It bills only-behind's FAILED_TO_YIELD@17.15, unchanged and reproduced by the verifier. Evidence: `vbltiming-r1.json` (owed, F8); `vbltiming-r1-verify.json` (F2).
+- Retrieval: mistake 1's whatWentWrongBg (`templates-vru2.ts`), teach.whyBg and the closing annotations of only-behind and cut-path (`scVuBikelaneTurn.ts`) cite «чл. 37», which is not among the template's retrieved articles. Evidence: `vbltiming-r1.json` (owed, «COPY LANE»; named contradiction 3).
+- The end card's count disagrees with the rule channel. On the rig-w3n L2 cut drive the end card read «20 наказателни точки «2 опасни грешки»» while the rule channel carried three 10-point events. Evidence: `scratch/rig-w3n/sc-vu-bikelane-turn/9141072b/PROGRESS.md:39`.
+- The vulnerable-pass praise's pooled «…кръстовище» explanation: an open copy row, not rendered today (condition 4). Evidence: `vbltiming-r1.json` (named contradiction 2); `vbltiming-r1-verify.json` (C4).
+- A recorded risk, not a defect (condition 7): a careful student who waits 1.0 m right of his lane centre (y −5.06) leaves 0.04 m of air to the 0.4 m proxy as the with-flow rider passes, about 0.21 m to the rig's real 0.46 m body, and at that rest the 40.97 commendation does not appear. It is unmeasured until the re-drive. Evidence: vbltiming-r1.json (owed, RECORDED RISK; sweep.log in D:/knijka-lanes/scratch/vbltiming-impl/); vbltiming-r1-verify.json (C7).

@@ -918,6 +918,26 @@ export interface StagedActorPathSpec {
    * npc-shell-cast-kind.test.ts. Absent = graded as its kind says.
    */
   gradedOnlyByOwnRunner?: true;
+  /**
+   * THE FOOTPRINT LINE GUARD (sc-vu-bikelane-turn:9141072b, lane vbltiming;
+   * integrator ruling T1(b), confirmed 2026-11-02). The player guard every
+   * staged rider carries brakes for a student whose CENTRE is within 3.0 m of
+   * the rider's heading line — wider than the 2.6 m curb line — so a student
+   * who stands in his own lane to let a curb rider pass holds that rider
+   * ≈ 6 m behind him for as long as he stands. With this field the corridor is
+   * the rider's own LINE against the student's BODY (chassis box on his centre
+   * and his derived heading, within the 0.4 m proxy half-width): a car standing
+   * in its lane is passed, a car across the track is stopped short of
+   * (traffic/staged.ts `footprintGuardAlongM`). Window, standoff, gain and
+   * brake are unchanged; while the student's heading is unknown the centre
+   * corridor stands. Authored `true` on exactly the with-flow rider of
+   * sc-vu-bikelane-turn — the one rider a careful student must let pass while
+   * he waits (pinned by lessons/scenario/__tests__/vbl-footprint-guard.test.ts;
+   * the census in npc-shell-cast-kind.test.ts). Read only by the
+   * CyclistRightHook runner, which stages the actor with it. Absent = today,
+   * byte for byte.
+   */
+  playerGuardFootprint?: true;
   /** Closed loop path (roundabout circulation). */
   loop?: boolean;
   /** Presentation palette index. */
