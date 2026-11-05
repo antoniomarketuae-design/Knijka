@@ -775,6 +775,15 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
   // waypoint: falling through to the objective would have answered a student
   // standing still at `sc-sctl-exit` with «Излез от кръстовището на север».
   const OFFICER_CARD = controllerWaitAdvisorPrompt().textBg;
+  // RE-TAUGHT 2026-11-04 (sc-sig-controller-postures:89d24103, lane waitcard):
+  // the officer's card has TWO variants since that lane. At the junction whose
+  // lamps the lesson authors as out (lessonOfficerLampsDark — postures only)
+  // the card names his three postures and no lamp, because the head there is
+  // drawn dark and «дори на червено» named a red never shown. Both cards are
+  // held to every property below; which lessons get an officer card at all is
+  // still decided by the lesson (lessonStagesController) and is still three.
+  const OFFICER_CARD_DARK = controllerWaitAdvisorPrompt(true).textBg;
+  const OFFICER_CARDS = [OFFICER_CARD, OFFICER_CARD_DARK] as const;
 
   it("sc-sig-controller-live: the wait card is the officer's, not «Тръгваш на зелено»", () => {
     const s = waitingSession("sc-sig-controller-live", "sc-sctl-cross", "redLight");
@@ -833,10 +842,14 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
   });
 
   it("…and on sc-sig-controller-postures' CROSSING objective, which never named him either", () => {
+    // RE-TAUGHT (lane waitcard): this is the dark-lamp drill, so the officer
+    // card it paints is the DARK one — still the officer's, still never the
+    // lamp's «Тръгваш на зелено».
     const s = waitingSession("sc-sig-controller-postures", "sc-sctp-cross", "redLight");
     const p = advisorPromptForSession(s);
     expect(p?.textBg).not.toContain("Тръгваш на зелено");
-    expect(p?.textBg).toBe(OFFICER_CARD);
+    expect(p?.textBg).toBe(OFFICER_CARD_DARK);
+    expect(p?.textBg).not.toBe(OFFICER_CARD);
   });
 
   it("…and after the last objective, where the route runs out past the same junction", () => {
@@ -852,29 +865,36 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
     // approve the wait nor tell the student to go; it says where to look and
     // what each posture means, which is true on every frame of every officer's
     // junction.
-    expect(OFFICER_CARD).not.toContain("Чакаш правилно");
-    expect(OFFICER_CARD).not.toMatch(/Тръгвай|Потегли|Мини сега/);
-    expect(OFFICER_CARD).toContain("регулировчик");
-    // The teaching content: where to look, and both postures, so the student
-    // can act on it rather than be told a verdict (THEO-4 requirement zero).
-    expect(OFFICER_CARD).toContain("позата");
-    expect(OFFICER_CARD).toContain("страничен профил");
-    expect(OFFICER_CARD).toContain("гърди");
-    // The raised arm is the third posture ППЗДвП чл. 65 names and the only one
-    // that overrides a side-on release. A card that listed the other two alone
-    // would send a student who is side-on straight through a phase change.
-    expect(OFFICER_CARD).toContain("ръка горе");
+    // RE-TAUGHT (lane waitcard): every property holds for BOTH officer cards.
+    for (const card of OFFICER_CARDS) {
+      expect(card).not.toContain("Чакаш правилно");
+      expect(card).not.toMatch(/Тръгвай|Потегли|Мини сега/);
+      expect(card).toContain("регулировчик");
+      // The teaching content: where to look, and both postures, so the student
+      // can act on it rather than be told a verdict (THEO-4 requirement zero).
+      expect(card).toContain("позата");
+      expect(card).toContain("страничен профил");
+      expect(card).toContain("гърди");
+      // The raised arm is the third posture ППЗДвП чл. 65 names and the only one
+      // that overrides a side-on release. A card that listed the other two alone
+      // would send a student who is side-on straight through a phase change.
+      expect(card).toContain("ръка горе");
+    }
     // …and no key chip, because the next action depends on a posture this
     // module cannot read (the advisor's own honesty rule).
     expect(controllerWaitAdvisorPrompt().keys).toEqual([]);
+    expect(controllerWaitAdvisorPrompt(true).keys).toEqual([]);
   });
 
   it("…and it fits the same 240 px column every other wait card is held to", () => {
     // `yield-voice.test.ts` holds all five reason cards to 40–150 characters.
     // This one is painted in the same slot, so it is held to the same band —
     // the first draft was 249 and would have clipped the clause that says GO.
-    expect(OFFICER_CARD.length).toBeGreaterThan(40);
-    expect(OFFICER_CARD.length).toBeLessThan(150);
+    // RE-TAUGHT (lane waitcard): both officer cards.
+    for (const card of OFFICER_CARDS) {
+      expect(card.length).toBeGreaterThan(40);
+      expect(card.length).toBeLessThan(150);
+    }
   });
 
   // --- the opposite direction --------------------------------------------
@@ -920,11 +940,15 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
         currentObjectiveIndex: idx,
         yieldWait: heldWait("redLight", 1),
       };
-      if (advisorPromptForSession(s)?.textBg === OFFICER_CARD) displaced.push(spec.id);
+      // RE-TAUGHT (lane waitcard): an officer card is either of the two; the
+      // set stays exactly three, and the dark one is painted on postures alone.
+      const card = advisorPromptForSession(s)?.textBg;
+      if (card === OFFICER_CARD) displaced.push(spec.id);
+      if (card === OFFICER_CARD_DARK) displaced.push(`${spec.id}:dark`);
     }
     expect(displaced.sort()).toEqual([
       "sc-sig-controller-live",
-      "sc-sig-controller-postures",
+      "sc-sig-controller-postures:dark",
       "sc-signal-controller",
     ]);
   });

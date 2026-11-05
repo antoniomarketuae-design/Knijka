@@ -115,7 +115,7 @@ import {
   type DifficultyMode,
   type VehicleSimOptions,
 } from "../../../vehicle";
-import { applyStagedOutcome, applyTick, buildLessonResult, createLessonSession } from "../../engine";
+import { applyStagedOutcome, applyTick, buildLessonResult, createLessonSession, type LessonStepResult } from "../../engine";
 import type { LessonResult, LessonSessionState } from "../../types";
 
 export type WindDriver = "analog" | "keyboard" | "keyboardRationed" | "gamepad" | "handsOff" | "late";
@@ -220,6 +220,14 @@ export interface LiveWindDriveOptions {
    * are whatever it answers on each frame.
    */
   planner?: (c: LiveWindPlannerInput) => LiveWindPlannerOutput;
+  /**
+   * EVERY STEP'S OWN RESULT (lane uismall, sc-ac-wind-truck-pass:698e58da):
+   * called with each `applyTick` result, before its `.state` is taken, so a
+   * test can read what the shell is handed on that frame — the toasts
+   * (`hudEvents`) and the cards it pauses for (`teachMoments`). Additive and
+   * read-only: a drive without it is unchanged.
+   */
+  onStep?: (t: number, step: LessonStepResult) => void;
 }
 
 export interface LiveWindSample {
@@ -918,7 +926,9 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
           });
         }
       }
-      session = applyTick(session, tick).state;
+      const stepped = applyTick(session, tick);
+      opts.onStep?.(t, stepped);
+      session = stepped.state;
       // The shell's order: the tick, then that frame's staged reports
       // (`LessonPlayShell handleStagedOutcome` → `applyStagedOutcome`).
       for (const o of res.outcomes) {
@@ -926,7 +936,9 @@ export function liveWindDrive(opts: LiveWindDriveOptions): LiveWindDriveOutcome 
         session = applyStagedOutcome(session, o);
       }
     } else {
-      session = applyTick(session, tick).state;
+      const stepped = applyTick(session, tick);
+      opts.onStep?.(t, stepped);
+      session = stepped.state;
     }
   }
 

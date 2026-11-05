@@ -2172,7 +2172,7 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     expect(corrective!("CROSSED_SOLID_LINE", "no-such-act")).toBe(pooled);
   });
 
-  it("CENSUS: three acts in the catalogue have their own corrective — the right hook on a cyclist (since lane vbltiming), the U-turn, and (since 2026-10-08) the return in front of an overtaken vehicle — and no other card moved", () => {
+  it("CENSUS: four acts in the catalogue have their own corrective — the right hook on a cyclist (since lane vbltiming), the U-turn, (since 2026-10-08) the return in front of an overtaken vehicle, and (since lane waitcard) the officer's halt at a junction whose lamps are out — and no other card moved", () => {
     const withOwn: string[] = [];
     for (const [code, acts] of Object.entries(rules.PER_ACT_COPY)) {
       for (const [detail, copy] of Object.entries(acts ?? {})) {
@@ -2192,7 +2192,17 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     // right-turner to look for the junction's priority traffic, not for the
     // rider going straight on his right (`vbl-hook-situation-copy.test.ts`
     // pins the row). Was [U-turn, overtakeReturn].
-    expect(withOwn).toEqual(["FAILED_TO_YIELD|cyclist-right-hook", `CROSSED_SOLID_LINE|${UTURN}`, "LANE_ENTRY_FORCED_BRAKING|overtakeReturn"]);
+    // The fourth row is sc-sig-controller-postures:89d24103 (lane waitcard): the
+    // pooled CONTROLLER_SIGNAL_VIOLATED advice («…гледай неговите ръце, не
+    // светофара…») names a lamp at the one officer's junction whose lamps are
+    // out; the dark-lamp officer's corrective teaches his posture instead.
+    // PER_ACT_COPY registers it last, so it is last here (insertion order).
+    expect(withOwn).toEqual([
+      "FAILED_TO_YIELD|cyclist-right-hook",
+      `CROSSED_SOLID_LINE|${UTURN}`,
+      "LANE_ENTRY_FORCED_BRAKING|overtakeReturn",
+      "CONTROLLER_SIGNAL_VIOLATED|lampsDark",
+    ]);
   });
 });
 

@@ -44,6 +44,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TouchInputSource } from "@/modules/sim/engine";
+import { sessionClockAdvance } from "./sessionClock";
 
 /** Keyboard-drive detection: W/S/arrows means this student is not using the
  *  mouse for the pedals, so the pads step out of the way. */
@@ -117,6 +118,37 @@ const WAKE_POINTER_PX = 24;
  * RAMPS — these are the seconds from resting to fully depressed. The brake is
  * quicker than the throttle because an emergency stop has to stay possible.
  * Release is instant: a foot comes off a pedal far faster than it goes down.
+ *
+ * THESE ARE SECONDS OF THE WORLD, NOT OF THE WALL (catalogue-mouse-pedals:
+ * def2df09, 2026-11-05). The ramp advances on each animation frame by the
+ * session clock's own advance — `sessionClockAdvance` (`./sessionClock`),
+ * which is rapier's frame clamp by construction: floor 0, ceiling
+ * PHYSICS_MAX_FRAME_DT, NaN → 0. So a held pad reaches the same pedal after
+ * the same WORLD time at every frame rate, exactly as the keyboard's ramp does
+ * (`engine/input.ts` MAX_RAMP_DT_S). Until this lane it was clamped at 0.1 s
+ * per callback of its own while the world took up to 0.5 s per frame: below
+ * 10 fps the pad delivered less pedal per second of world, a fifth at 2 fps (measured
+ * on this component at 2ee2469: the brake after the first frame reaching 0.5 s
+ * of world read 0.383 at 2 fps where 0.917 is due; one 300 ms hitch right after
+ * the press left 0.383 where 0.650 is due), and a first callback stamped before
+ * the press's `performance.now()` pulled the pedal below its start. Held in
+ * `components/sim/__tests__/mousePedalRamp.test.tsx` on the real component.
+ *
+ * WHAT STAYS FRAME-TIMED (ADR-014's stated class, recorded, not built): each
+ * frame's world still steps with ONE pedal value, the PREVIOUS frame's. R3F's
+ * loop requests its next frame as the first statement of its own callback,
+ * before this ramp re-requests at the end of its step, so R3F's callback — and
+ * the physics substeps `<Physics updateLoop="follow">` runs inside it, whose
+ * `useBeforePhysicsStep` reads the input (VehicleRig) — runs first in every
+ * frame and sees the value the ramp wrote the frame before. On a 2 fps machine
+ * the brake·s delivered over the first second of a hold is 0.583 against 0.783
+ * at 60 fps (a model, not a measurement; it was 0.317 before this lane).
+ *
+ * AND ONE RESIDUAL (not built): when the first callback is stamped before the
+ * press's `performance.now()` (a frame that began before the pointerdown was
+ * handled), its step floors at 0 and `last` restarts at that earlier
+ * timestamp, so the next step also counts the δ between that frame's start and
+ * the press: pre-press time, under one 60 Hz step in any real browser.
  */
 const BRAKE_RISE_SEC = 0.75;
 const THROTTLE_RISE_SEC = 1.1;
@@ -348,7 +380,7 @@ function Pedal({
     onValue(valueRef.current, e.timeStamp);
     paint(valueRef.current);
     const step = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000);
+      const dt = sessionClockAdvance((now - last) / 1000);
       last = now;
       valueRef.current = Math.min(1, valueRef.current + dt / Math.max(0.05, riseSec));
       onValue(valueRef.current);

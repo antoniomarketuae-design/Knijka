@@ -686,16 +686,30 @@ describe("LessonScene binds both exits, and they are not the same exit", () => {
     expect(ack).toContain("TOUCH_HINT_STORAGE_KEY");
   });
 
-  it("«РАЗБРАХ» has a pointer path AND keeps onClick", () => {
+  it("«РАЗБРАХ» has a pointer path AND keeps onClick — the hook's own", () => {
     // Both halves are load-bearing and they fail in opposite directions:
     // without the spread the button is dead under a second finger (§C2);
     // without `onClick` it is dead to the keyboard, to assistive activation and
     // to `element.click()`, none of which produce a pointer event.
+    // RE-TAUGHT at the tapswallow landing (2026-11-05, integrator ruling F4):
+    // the click path is now the SPREAD's `onClick` (the hook acts on every
+    // detail-0 click), with `dismissTouchHint` as the hook's activate callback.
+    // A separate `onClick={dismissTouchHint}` after the spread OVERRODE the
+    // hook's and bypassed the page tap ledger, so it is now refused —
+    // modules/sim/hud/__tests__/lessonscene-tap-override.test.ts pins the behaviour.
     const btn = SCENE.slice(
       SCENE.indexOf("{showTouchHint ? ("),
       SCENE.indexOf("</button>", SCENE.indexOf("{showTouchHint ? (")),
     );
     expect(btn).toContain("{...tapDismissTouchHint}");
-    expect(btn).toContain("onClick={dismissTouchHint}");
+    expect(SCENE).toContain("const tapDismissTouchHint = useTapActivation(dismissTouchHint);");
+    // Read as lessonscene-tap-override reads it: comment-stripped, after the
+    // spread, any `onClick` at all (an object-spread or computed one too).
+    const afterSpread = btn
+      .slice(btn.indexOf("{...tapDismissTouchHint}") + "{...tapDismissTouchHint}".length)
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^[ \t]*\/\/.*$/gm, "");
+    expect(afterSpread).not.toMatch(/\bonClick\b/);
   });
 });

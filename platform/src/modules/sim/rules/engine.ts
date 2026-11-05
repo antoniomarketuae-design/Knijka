@@ -70,6 +70,7 @@
  */
 
 import {
+  CONTROLLER_ACT_LAMPS_DARK,
   HANDBRAKE_ACT_MOVE_OFF_ATTEMPT,
   HEADLIGHTS_CONDITION_SNOW,
   JUNCTION_SCAN_CONTROL_GIVE_WAY,
@@ -9687,7 +9688,19 @@ function handleTickEvent(
         // escalates from its second encounter"). If a runaway red is ever
         // photographed, the latch is one call away and the key is "signal-line".
         if (e.controller !== undefined) {
-          if (e.controller === "halt") out.push(makeViolation("CONTROLLER_SIGNAL_VIOLATED", t));
+          // The same conviction, named for what it was where the lesson authors
+          // the lamps out (`lampsDark`, posted by the runtime with no
+          // `lightState`): its copy teaches the posture and names no lit lamp
+          // (catalog.ts CONTROLLER_SIGNAL_ACT_COPY, sc-sig-controller-postures:
+          // 89d24103). Code, points, severity, lawRef and verdict are the
+          // catalogue's either way; only the detail selects the words.
+          if (e.controller === "halt") {
+            out.push(
+              e.lampsDark === true
+                ? makeViolation("CONTROLLER_SIGNAL_VIOLATED", t, { detail: CONTROLLER_ACT_LAMPS_DARK })
+                : makeViolation("CONTROLLER_SIGNAL_VIOLATED", t),
+            );
+          }
           // …and the compliant half is CREDITED, which until now it was not:
           // this arm could only convict, so the ONE act the регулировчик
           // lessons exist to teach — going on his permission while your own

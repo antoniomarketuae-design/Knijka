@@ -4327,13 +4327,17 @@ export function ReadyScene({
           <button
             type="button"
             autoFocus
-            // §C2 — the pointer path FIRST, `onClick` kept beside it (the
-            // «Продължи» order, and for the same reason: both are live and the
-            // shared idiom de-duplicates). Without this the card's ONLY exit is
+            // §C2 — the pointer path. Without this the card's ONLY exit is
             // unreachable while a thumb rests on a pedal pad, which is the exact
-            // posture a driver reads it in — see the wiring block above.
+            // posture a driver reads it in — see the wiring block above. The
+            // spread's OWN `onClick` is the click path (keyboard, assistive
+            // activation and `element.click()` arrive as detail-0 clicks and
+            // always act); NO `onClick` may follow it. An overriding one
+            // (lane tapswallow F4, sc-roundabout-entry:b63a8fea) never
+            // consumed the page ledger's entry its own pointerup made, and
+            // acted on a touch's compatibility click re-targeted onto it.
+            // Pinned: modules/sim/hud/__tests__/lessonscene-tap-override.test.ts.
             {...tapDismissTouchHint}
-            onClick={dismissTouchHint}
             // ── IT PAINTED 0 % OF ITS OWN BOX, AND NOBODY HAD LOOKED AT IT.
             //
             // The line that stood here said „44 px of thumb, and the only thing
@@ -4433,11 +4437,12 @@ export function ReadyScene({
               type="button"
               autoFocus
               className="btn-accent"
-              // §R · W1 — the pointer path FIRST, `onClick` kept beside it.
-              // Order matters only for readability; both are live, and the
-              // shared idiom de-duplicates so a mouse click cannot fire twice.
+              // §R · W1 — the pointer path, and the spread's OWN `onClick` is
+              // the click path (mouse, keyboard and assistive activation).
+              // NO `onClick` may follow it: an overriding one bypassed the
+              // page's tap ledger (lane tapswallow F4). Pinned:
+              // modules/sim/hud/__tests__/lessonscene-tap-override.test.ts.
               {...tapResume}
-              onClick={() => setMenuPaused(false)}
             >
               Продължи
             </button>

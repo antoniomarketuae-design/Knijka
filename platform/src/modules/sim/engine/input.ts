@@ -129,8 +129,12 @@ export const BRAKE_RELEASE_S = 0.2;
  * throttle kept pushing for the same span. That is the sweep's own log line —
  * „the brake is held and the car went 7 -> 10 км/ч — the sim never got the
  * key" — fired 218× across sweep161, 73 of 195 mobile legs against 1 of 189 PC
- * legs. The touch pads are not ramped at all (TouchControls writes position
- * straight through), so the defect could only reach the keyboard channel.
+ * legs. The phone's drive pad is not ramped at all (TouchControls writes
+ * position straight through). The desktop mouse pads (lesson-ui/MousePedals.tsx)
+ * write into the same TouchInputSource with a ramp of their own, which had its
+ * own 0.1 s clamp per animation frame until 2026-11-05 (catalogue-mouse-pedals:
+ * def2df09) and now advances by the session clock (`sessionClockAdvance`, the
+ * same physics ceiling as this one).
  *
  * Equal clamps make pedal time and world time advance 1:1 at every frame rate:
  * a key held through a stalled frame now delivers exactly the pedal the world

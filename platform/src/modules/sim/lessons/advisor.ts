@@ -644,8 +644,50 @@ const CONTROLLER_WAIT_CARD_BG =
   "Тук решава регулировчикът, не лампата. Гледай позата му: гърди/гръб към теб — стоиш; " +
   "страничен профил — минаваш, дори на червено; ръка горе — чакаш.";
 
-/** The live-wait card at a junction an officer is directing. */
-export function controllerWaitAdvisorPrompt(): CoachedAdvisorPrompt {
+/**
+ * THE SAME CARD AT A JUNCTION WHOSE LAMPS THE LESSON AUTHORS AS OUT
+ * (sc-sig-controller-postures:89d24103, lane waitcard).
+ *
+ * The card above says «не лампата» and «дори на червено». Both are true of the
+ * rule, and both name a lamp that is never lit on sc-sig-controller-postures:
+ * the head there is drawn dark and captioned «Светофарът е ЗАГАСНАЛ», and the
+ * voice beside this card says «няма лампа за четене, четеш човека». Measured at
+ * 479127b (liveChainReplay, every grid point): this was the ONE line on a
+ * careful drive that named a red — 886–927 ticks on each of the five rig-w3a
+ * tapes, 870 on shadow-correct, 187 on mistake-start-on-raised-arm (L1–L3).
+ *
+ * So here the card names the officer and his three postures and does not
+ * mention the lamp at all (ruling W1): the head, its caption and the voice
+ * already say it is out, and a card that teaches the posture needs no lamp.
+ * Every clause is the lesson's own (templates-signals2.ts instructions 1, 2, 4
+ * and 5; ADR-002): «Тук важи само … поза» (1), chest or back — stop, side-on
+ * with you facing his shoulder — go (2, 5), arm up — wait (2, 4). Like the
+ * card above it claims no posture held at this instant and no verdict on the
+ * wait (this module is handed no posture), and it carries no chip.
+ */
+const CONTROLLER_WAIT_CARD_DARK_BG =
+  "Тук важи само позата на регулировчика: гърди/гръб към теб — стоиш; " +
+  "страничен профил, ти срещу рамото му — минаваш; ръка горе — чакаш.";
+
+/**
+ * Its phone line (ruling K2′, integrator 2026-11-04). On the phone the advisor
+ * row is titled «Съветник» (LessonPlayShell `ADVISOR_ROW_LINE_BG`), so the line
+ * names whose posture it is; the voice notice under its own officer title keeps
+ * «Тук важи само неговата поза.» (`OFFICER_LAMPS_DARK_HALT_COPY.namedPeekBg`).
+ * Hoisted so the card and the officer table read ONE string.
+ */
+const OFFICER_DARK_PEEK_BG = "Тук важи само позата на регулировчика.";
+
+/**
+ * The live-wait card at a junction an officer is directing.
+ *
+ * `lampsDark` chooses WHICH officer card, never whether there is one: the
+ * caller still asks `lessonStagesController` first, and passes
+ * `lessonOfficerLampsDark(lesson)` here. Absent or false returns the live-lamp
+ * card byte-identically — sc-sig-controller-live and sc-signal-controller keep
+ * every word they had.
+ */
+export function controllerWaitAdvisorPrompt(lampsDark = false): CoachedAdvisorPrompt {
   // No key chips, exactly as `yieldWaitAdvisorPrompt`: the next action depends
   // on a posture this module cannot read, and the honesty rule of this file is
   // that a chip may only name a control that PERFORMS the step.
@@ -654,6 +696,7 @@ export function controllerWaitAdvisorPrompt(): CoachedAdvisorPrompt {
   // for. The three postures do not fit two lines and are not cut to fit — a
   // posture list missing one posture is the officer's rule with a hole in it —
   // so they stay whole behind «Прочети».
+  if (lampsDark) return { textBg: CONTROLLER_WAIT_CARD_DARK_BG, keys: [], peekBg: OFFICER_DARK_PEEK_BG };
   return { textBg: CONTROLLER_WAIT_CARD_BG, keys: [], peekBg: "Гледай регулировчика, не лампата." };
 }
 
@@ -1573,7 +1616,9 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
     // junction with the objectives spent.
     if (trailing.reason === "redLight") {
       if (lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
-        return controllerWaitAdvisorPrompt();
+        // Which officer card: the dark-lamp one where the lesson authors his
+        // lamps out (sc-sig-controller-postures:89d24103).
+        return controllerWaitAdvisorPrompt(lessonOfficerLampsDark(s.lesson));
       }
       // …and the rails outrank the lamp's second clause on the run-out too:
       // sc-rx-tram-left's route ends 50 m south of the junction the tram
@@ -1614,7 +1659,9 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
   const waiting = s.yieldWait;
   if (waiting !== undefined && waiting.holding && waiting.reason !== null) {
     if (waiting.reason === "redLight" && lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
-      return controllerWaitAdvisorPrompt();
+      // The same choice as the run-out above: the dark-lamp card where the
+      // lesson authors his lamps out, the live-lamp card everywhere else.
+      return controllerWaitAdvisorPrompt(lessonOfficerLampsDark(s.lesson));
     }
     // RX-05 (sc-rx-tram-left:07c63b97): the lamp keeps its authority here — the
     // red is real — but not its unconditional «Тръгваш на зелено», because the
@@ -2762,14 +2809,16 @@ export function lessonOfficerLampsDark(lesson: LessonSpec): boolean {
  * channel knows whether that departure obeyed him — a conviction mutes it).
  *
  * The card fields are the card this junction already shows
- * (`controllerWaitAdvisorPrompt` displaces `redLight` on every officer lesson);
- * `yieldWaitAdvisorPrompt` never reads them from here.
+ * (`controllerWaitAdvisorPrompt(true)` displaces `redLight` on this lesson —
+ * the dark-lamp card, since lane waitcard); `yieldWaitAdvisorPrompt` never
+ * reads them from here. The card has no convicted twin: it approves nothing,
+ * so a conviction has nothing to take away from it.
  */
 const OFFICER_LAMPS_DARK_HALT_COPY: YieldVoiceCopy = {
-  cardBg: CONTROLLER_WAIT_CARD_BG,
-  convictedCardBg: CONTROLLER_WAIT_CARD_BG,
-  cardPeekBg: "Гледай регулировчика, не лампата.",
-  convictedCardPeekBg: "Гледай регулировчика, не лампата.",
+  cardBg: CONTROLLER_WAIT_CARD_DARK_BG,
+  convictedCardBg: CONTROLLER_WAIT_CARD_DARK_BG,
+  cardPeekBg: OFFICER_DARK_PEEK_BG,
+  convictedCardPeekBg: OFFICER_DARK_PEEK_BG,
   namedTitleBg: "Защо чакаш: регулировчикът",
   namedBg:
     "Светофарът на кръстовището е ЗАГАСНАЛ и движението нарежда РЕГУЛИРОВЧИК — няма лампа за четене, четеш човека. Тук важи само неговата поза. ГЪРДИ ИЛИ ГРЪБ към теб: минава напречното, ти спираш ПРЕДИ стоп-линията и чакаш там. РЪКА НАГОРЕ: не минава никой — той сменя фазите и предимството в този миг не е на никого. Тръгваш едва при СТРАНИЧЕН ПРОФИЛ, когато застанеш срещу рамото му: тогава посоката ти е отворена и предимството е твое — премини решително и спокойно.",

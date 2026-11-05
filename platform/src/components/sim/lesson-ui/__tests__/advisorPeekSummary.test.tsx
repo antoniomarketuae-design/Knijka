@@ -135,6 +135,9 @@ function authoredPrompts(): Array<{ where: string; prompt: AdvisorPrompt }> {
   // Lane rbreverse: the reverse warning, one card per body kind (founder ruling Q2, warn only).
   for (const k of ["vehicle", "cyclist"] as const) out.push({ where: `reverseWarning:${k}`, prompt: reverseWarningAdvisorPrompt(k) });
   out.push({ where: "controller", prompt: controllerWaitAdvisorPrompt() });
+  // The dark-lamp officer's card (sc-sig-controller-postures:89d24103, lane
+  // waitcard): its own phone line «Тук важи само позата на регулировчика.».
+  out.push({ where: "controller:dark", prompt: controllerWaitAdvisorPrompt(true) });
   out.push({ where: "railRed", prompt: railPriorityWaitAdvisorPrompt() });
   out.push({ where: "railRed:convicted", prompt: railPriorityWaitAdvisorPrompt(true) });
   for (const r of REASONS) {
@@ -159,7 +162,8 @@ describe("census — every prompt carries a summary that fits, or can never be a
   it("the authored prompts: all of them, all rules", () => {
     const rows = authoredPrompts();
     // + 2 since lane rbreverse: the reverse warning's two cards (vehicle, cyclist)
-    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 9 + REASONS.length * 3);
+    // + 1 since lane waitcard: the dark-lamp officer card, controller:dark (was + 9).
+    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 10 + REASONS.length * 3);
     const broken: string[] = [];
     for (const { where, prompt } of rows) {
       if (typeof prompt.peekBg !== "string") {

@@ -3930,6 +3930,59 @@ export const LANE_ENTRY_ACT_COPY: Record<
   },
 };
 
+/**
+ * CONTROLLER_SIGNAL_VIOLATED AT A JUNCTION WHOSE LAMPS ARE OUT —
+ * `sc-sig-controller-postures:89d24103` (lane waitcard).
+ *
+ * The pooled row says «…над светофара и знаците. Зеленият светофар не
+ * разрешава нищо, когато регулировчикът те спира…», peek «Той е над
+ * светофара.», corrective «…гледай неговите ръце, не светофара…». All true of
+ * the rule, and all of it names a lamp — a lit green among them — on the one
+ * drill whose lamp is out: there the head is drawn dark and captioned
+ * «Светофарът е ЗАГАСНАЛ», and the coach says «няма лампа за четене». Measured
+ * at 479127b on both mistake demos at L1–L4 (toast, teach card, debrief
+ * «Правилното действие», attempt reel, history row rebuilt from the wire).
+ *
+ * The reducer stamps this detail from the crossing's own `lampsDark` flag
+ * (praiselamp: the runtime posts it with no `lightState` on that approach), so
+ * the two live-lamp drills keep the pooled row word for word (ruling K1).
+ *
+ * WHAT IT SAYS, AND FROM WHERE (ADR-002). The first sentence is the pooled
+ * row's own, and the conviction's own fact (`controller === "halt"`). The
+ * second is the mistake demo's annotation («Загасналият светофар не разрешава
+ * нищо: движението се нарежда от регулировчика…», traces/scSigControllerPostures.ts)
+ * and instructions 1–5 of the lesson (chest or back and the raised arm stop
+ * this direction; side-on, facing his shoulder, opens it). The exam clause is
+ * the pooled row's, verbatim. It names no posture as held beyond «спираше»,
+ * which is what a halt is, whichever of the three halting signs it was.
+ *
+ * THE TITLE IS THE POOLED TITLE, by reference (ruling K1): one act, one name,
+ * on every surface that groups faults. No `lawRef` of its own: the pooled
+ * «ЗДвП чл. 6, т. 2; чл. 7, ал. 1» is inherited unchanged (W6 records that чл. 7,
+ * ал. 1 is the officer-versus-lamp tie-break, for the copy lane and the founder).
+ *
+ * ONE DISPLAY TIMER MOVES, DECLARED (ruling W9): the paragraph is 293
+ * characters against the pooled 276, so «Защо» opened on this card holds it
+ * toastReadMs(293) − toastReadMs(276) = 19,534 − 18,400 = +1,134 ms longer, and
+ * the debrief overlay that waits on a card being read waits as long. No graded
+ * clock and no base TTL moves.
+ */
+export const CONTROLLER_ACT_LAMPS_DARK = "lampsDark";
+
+export const CONTROLLER_SIGNAL_ACT_COPY: Record<
+  typeof CONTROLLER_ACT_LAMPS_DARK,
+  { titleBg: string; explanationBg: string; peekBg: string; correctiveBg: string }
+> = {
+  [CONTROLLER_ACT_LAMPS_DARK]: {
+    titleBg: VIOLATIONS.CONTROLLER_SIGNAL_VIOLATED.titleBg,
+    explanationBg:
+      "Премина стоп-линията, докато регулировчикът спираше твоето направление. Загасналият светофар не разрешава нищо — движението нарежда само той: гърди или гръб към теб и вдигната ръка спират посоката ти, а минаваш едва при страничен профил. На изпита това е опасна грешка и изпитът се прекратява.",
+    peekBg: "Позата му те спираше.",
+    correctiveBg:
+      "Когато светофарът е загаснал и движението нарежда регулировчик, гледай позата му: гърди, гръб или вдигната ръка — спираш преди линията и чакаш; потегляш едва при страничен профил, когато си срещу рамото му.",
+  },
+};
+
 export const PER_ACT_COPY: Partial<
   Record<
     ViolationCode,
@@ -3967,6 +4020,10 @@ export const PER_ACT_COPY: Partial<
   // sc-ac-wind-truck-pass:ff1d4290 round 2 — the return in front of the
   // overtaken vehicle that made it brake hard, named as itself.
   LANE_ENTRY_FORCED_BRAKING: LANE_ENTRY_ACT_COPY,
+  // sc-sig-controller-postures:89d24103 (lane waitcard) — the officer's halt at
+  // a junction whose lamps are out, taught without a lamp. Registered LAST so
+  // the insertion-order censuses append it.
+  CONTROLLER_SIGNAL_VIOLATED: CONTROLLER_SIGNAL_ACT_COPY,
 };
 
 /**

@@ -53,7 +53,7 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { createRuleEngine, DEFAULT_RULE_CONFIG, LANE_ENTRY_ACT_COPY, reduceTick } from "../../../rules";
+import { createRuleEngine, DEFAULT_RULE_CONFIG, LANE_ENTRY_ACT_COPY, reduceTick, VIOLATIONS } from "../../../rules";
 import { guidanceGoalFor } from "../../../scene/guidanceRoute";
 import { advisorPromptForObjective, shownObjectiveCapKmh } from "../../advisor";
 import { ROUTE_RUNOUT_ARRIVE_M, routeEndMark } from "../../finish";
@@ -62,7 +62,11 @@ import { createLessonWindShelter, lessonWindShelterActors } from "../../../scene
 import { parseScenarioTrace } from "../../../traces/parse";
 import { recordScriptedDrive } from "../../../traces/recorder";
 import type { ScenarioTrace } from "../../../traces/types";
-import type { StagedEventSpec } from "../../../contracts";
+import type { HudEvent, StagedEventSpec } from "../../../contracts";
+import type { LessonStepResult } from "../../engine";
+import { lessonMistakeTargetCodes, teachChipBg } from "../../lessonMistake";
+import type { TeachMoment } from "../../types";
+import { teachMomentOneLinerBg } from "../../../../../components/sim/lesson-ui/LessonPlayShell";
 import {
   CHASSIS_HALF_EXTENTS,
   CHASSIS_MASS,
@@ -134,7 +138,7 @@ beforeAll(async () => {
 // The live car, driven past the truck by a driver who watches the TRUCK
 // ---------------------------------------------------------------------------
 
-type DriveExtra = Partial<Pick<LiveWindDriveOptions, "noShelter" | "lapse" | "handScript" | "driver">> & {
+type DriveExtra = Partial<Pick<LiveWindDriveOptions, "noShelter" | "lapse" | "handScript" | "driver" | "onStep">> & {
   neverPass?: boolean;
   passWhenGapM?: number;
   /** Stay out until the truck's nose is this far behind the car's tail (default 12 m). */
@@ -1250,6 +1254,85 @@ function truckBrakedHard(o: LiveWindDriveOutcome): boolean {
   }
   return false;
 }
+
+/**
+ * THE RETURN'S OWN LINE ON EVERY SURFACE OF THE BILL — sc-ac-wind-truck-pass:
+ * 698e58da (filed 2026-10-11 at 59be0de; lane uismall, 2026-11-05).
+ *
+ * rig-w3b photographed this act on the phone: the paused L1 teach card printed
+ * the POOLED lane-drop one-liner (`VIOLATIONS.LANE_ENTRY_FORCED_BRAKING.peekBg`,
+ * whose feminine «я» points at the pooled card's car) under the ACT's title
+ * «…пред изпреварения», while the toast printed the act's own line. The shell
+ * built the card's one-liner from the moment's CODE. Cured in code by 9390622
+ * (the moment carries the act's line, `TeachMoment.peekBg`, and the shell
+ * reads it first, `teachMomentOneLinerBg`); nothing pinned it on THIS act,
+ * driven. Here the 3.0 m return (the truck always brakes hard, above) is
+ * driven on the live car and every step's own result is read (`onStep`): the
+ * bill's tick carries, at L1, a charged non-target teach moment whose line is
+ * the act's — on the moment, through the shell's own one-liner function, and
+ * on the same step's toast — and at L3 the toast's. Compared to the
+ * catalogue's fields, never to a typed literal (ADR-002). The row closes on
+ * the phone photographs, not here.
+ */
+describe("698e58da — the 3.0 m return's bill carries the ACT's one-liner on the L1 teach card and on the toast, never the pooled row's", () => {
+  for (const level of [1, 3] as const) {
+    it(
+      `L${level} @ ${TAUGHT_KMH} км/ч, back in 3.0 m ahead of the truck's bumper`,
+      () => {
+        const steps: Array<{ t: number; step: LessonStepResult }> = [];
+        const lesson = compileScenario(SC_AC_WIND_TRUCK_PASS, level);
+        const o = passDrive(level, TAUGHT_KMH, {
+          returnWhenClearM: RETURN_BEGIN[TAUGHT_KMH]![3]!,
+          returnChangeOverM: RETURN_OVER_M,
+          onStep: (t, step) => steps.push({ t, step }),
+        });
+        const act = LANE_ENTRY_ACT_COPY.overtakeReturn;
+        const pooled = VIOLATIONS.LANE_ENTRY_FORCED_BRAKING.peekBg;
+        expect(act.peekBg, "the catalogue authors two different lines for this code").not.toBe(pooled);
+        expect(o.violationCodes).toEqual(["LANE_ENTRY_FORCED_BRAKING"]);
+        const bill = o.session.events.find((e) => e.kind === "violation")!;
+        expect(bill.kind === "violation" && bill.detail).toBe("overtakeReturn");
+        expect(bill.titleBg).toBe(act.titleBg);
+        const billStep = steps.find((s) => Math.abs(s.t - bill.t) < 1e-9);
+        expect(billStep, "the bill's own step was handed to onStep").toBeDefined();
+        const toasts = billStep!.step.hudEvents.filter(
+          (h): h is Extract<HudEvent, { kind: "violation" }> => h.kind === "violation",
+        );
+        expect(toasts.map((h) => h.titleBg)).toEqual([act.titleBg]);
+        expect(toasts[0]!.peekBg, "the toast's one-liner").toBe(act.peekBg);
+        expect(toasts[0]!.peekBg).not.toBe(pooled);
+        const moments: TeachMoment[] = steps.flatMap((s) => s.step.teachMoments ?? []);
+        const ours = moments.filter((m) => m.code === "LANE_ENTRY_FORCED_BRAKING");
+        if (level === 1) {
+          // L1 «Пълна помощ» pauses on every graded fault (pauseOnError).
+          expect(lesson.aids?.pauseOnError).toBe(true);
+          expect(ours, "the L1 teach card raised for the bill").toHaveLength(1);
+          const m = ours[0]!;
+          expect(billStep!.step.teachMoments ?? []).toContain(m);
+          expect(m.t).toBe(bill.t);
+          // Not a target of this lesson, and charged: the chip the photograph
+          // expects is the ordinary one, not «Грешката на урока».
+          expect(lessonMistakeTargetCodes(lesson)?.has("LANE_ENTRY_FORCED_BRAKING") === true).toBe(false);
+          expect(m.lessonMistake !== true, "lessonMistake").toBe(true);
+          expect(m.charged, "charged").toBe(true);
+          expect(teachChipBg(m)).toBe(teachChipBg({ charged: true }));
+          expect(teachChipBg(m)).not.toBe(teachChipBg({ lessonMistake: true, charged: true }));
+          expect(m.titleBg, "the card's title is the act's").toBe(act.titleBg);
+          expect(m.peekBg, "the moment's own one-liner").toBe(act.peekBg);
+          expect(teachMomentOneLinerBg(m), "the line the shell prints on the paused card").toBe(act.peekBg);
+          expect(teachMomentOneLinerBg(m)).toBe(toasts[0]!.peekBg);
+          expect(teachMomentOneLinerBg(m)).not.toBe(pooled);
+        } else {
+          expect(lesson.aids?.pauseOnError === true).toBe(false);
+        }
+        note(
+          `698e58da L${level}: bill@${bill.t.toFixed(2)} toast peek «${toasts[0]!.peekBg}»; moments [${ours.map((m) => `${m.code}@${m.t.toFixed(2)} peek «${m.peekBg}» charged=${String(m.charged)} lessonMistake=${String(m.lessonMistake)} chip «${teachChipBg(m)}» oneLiner «${teachMomentOneLinerBg(m)}»`).join("; ")}]`,
+        );
+      },
+      TEST_TIMEOUT,
+    );
+  }
+});
 
 describe("ROUNDS 2–3 (F-01, F2-02) — an early return by a car faster than the truck: where the truck REALLY brakes hard, BILLED, NOT PRAISED, task 2 NOT credited by the gap the braking opens; where it only lifts, not billed, not praised, credited when the return is finished", () => {
   for (const level of LEVELS) {

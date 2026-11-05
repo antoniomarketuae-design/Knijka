@@ -17866,3 +17866,712 @@ ADR-014 carries this landing's amendment in this commit, «Amendment 2026-11-05 
 - **sc-park-45** (S7). An authored curb-strip beat in a car park (`scPark45.ts:154`) prints the off-road paragraph, including «Излизането от платното е самото произшествие», where the car is lawfully in a car park. It is the same class as the C2 lessons, but the open row b7297cb7 does not name this lesson. Unchanged by this landing. Evidence: the brief (S7); `staticcardcopy-r2.json` (build owed).
 - **The debrief's mistake-line cap** (the verifier's F7, ruled ACCEPTED and RECORDED on 2026-11-04; listed so it is not lost). A kerb strike plus a block strike are now two COLLISION rows, which selectShownGroups exempts as exam-ending, so MAX_MISTAKE_LINES (4) leaves one fewer slot for other mistakes. In the verifier's probe at hz L1 and L3, «Неустойчиво движение в лентата» and its corrective are hidden behind «…и още 1 вида нарушения», where base showed them. Evidence: `D:/knijka-lanes/scratch/staticcardcopy-verify/cap-base.txt` and `cap-tree.txt` (probe source `probes/vtmp-cap.test.ts`); `staticcardcopy-r2.json` (verify F7).
 - **Two road facts disagree on hz-debris-v1 and hz-roadworks-v1.** The edge network (DistrictIndex halfWidthM) puts the kerb at 8.125 m; the built asphalt (surfaceAt) runs from x −12.10 to 12.15. So a car centred between about 8.125 and 8.6 m is «off» by the edge-network fact while it is on the asphalt, and it can reach a taper cone. The open row names `SimTick.edgeAlignment.offCarriageway` as a road-relation signal. Whether that signal, or any other graded or shown consumer, reads the edge-network half-width rather than the built surface on these districts is unmeasured. Evidence: `D:/knijka-lanes/scratch/staticcardcopy-impl/probes/kerb-scan.txt`; `staticcardcopy-r1-journal.jsonl` (the T3(1) section, owed[2] and owed[3]).
+
+## Wave C verdicts — 2026-11-05
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`a981f78b88f7`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 11 |
+
+**Open list: 20 → 19**, out of 1559 filed across the whole programme (1539 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-05
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`a981f78b88f7`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 7 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 11 |
+
+**Open list: 19 → 18**, out of 1559 filed across the whole programme (1540 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-05
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`a981f78b88f7`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 6 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 11 |
+
+**Open list: 18 → 17**, out of 1559 filed across the whole programme (1541 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-05
+
+This run retired 1 row(s). Their evidence frames were driven at `a981f78b88f7` — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`a981f78b88f7`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 5 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 11 |
+
+**Open list: 17 → 16**, out of 1559 filed across the whole programme (1542 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Landed: on the dark-lamp drill sc-sig-controller-postures, the advisor card and peek during the officer's halt, and the fault card of a crossing against that halt, no longer name a red or green lamp or tell the student to look past one. During the halt (L1–L3 with the advisor on, and on the run-out) the card now reads «Тук важи само позата на регулировчика: гърди/гръб към теб — стоиш; страничен профил, ти срещу рамото му — минаваш; ръка горе — чакаш.» and the peek reads «Тук важи само позата на регулировчика.». The fault keeps its title, citation, points and termination. Its explanation and corrective name no lamp but the dark one, and its peek names none, wherever they print (W6's surfaces aside, below). The two live-lamp officer drills keep every word and every timer. Nothing billed or graded moves. The reading time after «Защо» on that fault card is 1,134 ms longer (W9). Measured in process only. `sc-sig-controller-postures:89d24103` (minor) (2026-11-05)
+
+Lane `waitcard`, one round, built on `479127b` (run `wf_0eb46164-822`). The adversarial verifier SIGNED it OFF WITH CONDITIONS on 2026-11-05 (its PROGRESS.md, «VERDICT»). The conditions are below.
+- **The patch.** `waitcard-result-r1.patch`: sha256 cf0efd48…1cc8d. It has 15 files, +634/−39 and 105,152 bytes, with 0 CR bytes (the builder).
+  - The verifier applied it cleanly to its own lane, built from `base-479127b.tar`. When it finished, the lane's diff against base equalled the patch apart from index lines.
+  - 3 product files: lessons/advisor.ts, rules/catalog.ts and rules/engine.ts. rules/index.ts is not touched, and the tests import the new names from rules/catalog.
+  - 4 test files. One is new: lessons/scenario/__tests__/controller-dark-lamp-waitcard.test.ts. Three are re-taught: advisor-sweep161, lesson-ui's advisorPeekSummary and rules' solid-cross-uturn-act.
+  - 8 files of the reviewed-text manifest.
+  - It is cumulative against `479127b`, NOT against HEAD `a981f78`. By the drafter's count (`git diff --name-only 479127b a981f78`), 13 of its 15 files have moved since its base: the three product files, advisorPeekSummary, solid-cross-uturn-act and the eight manifest files.
+    - rb (lane rbreverse) changed advisor.ts (the crash pin's look-first copy and the reversing warning) and advisorPeekSummary.
+    - sc (lane staticcardcopy) changed rules/engine.ts and rules/catalog.ts (the «staticObjectOnRoad» detail, its COLLISION_CONTACT_COPY row and foldActDetail).
+    - flooredinvite and vbltiming (`2ee2469`) changed rules/engine.ts, rules/catalog.ts, rules/index.ts and the solid-cross census.
+    - The merge, by intent and keeping both sides, is under PROVEN ON a981f78.
+- **The order (W7).** W7 asked for this patch to go in after flooredinvite and vbltiming. Both landed in `2ee2469`, so the order is met. The builder named two same-line test conflicts to recompute, not take from either side:
+  - solid-cross-uturn-act's census becomes the four-entry list titled «four acts»: ["FAILED_TO_YIELD|cyclist-right-hook", `CROSSED_SOLID_LINE|${UTURN}`, "LANE_ENTRY_FORCED_BRAKING|overtakeReturn", "CONTROLLER_SIGNAL_VIOLATED|lampsDark"];
+  - advisorPeekSummary's count becomes this lane's + 8 plus rbreverse's added prompts.
+
+**Integrator rulings.** These were made under the founder's 2026-10-08 and 2026-10-19 delegations, so they are not his. They were confirmed on 2026-11-04. The founder is to be told at this landing, and each is his to veto (owed, below).
+- **K1** (2026-10-18, carried): a per-act PER_ACT_COPY row keyed by the detail «lampsDark», stamped by the reducer from the flag the event already carries.
+  - The live-lamp drills keep «Зеленият светофар не разрешава нищо».
+  - The act row's title is the pooled title, taken by reference.
+- **K2′ (W8), which re-rules K2 for the advisor peek only.** K2 was ruled without the phone frame. On the phone the advisor row is titled «Съветник», so «Тук важи само неговата поза.» had no antecedent there.
+  - The dark advisor peek is now «Тук важи само позата на регулировчика.» (38 characters, wrapping 23 / 14, within the peek's two lines of 24; the brief and the builder wrote 22 / 14).
+  - The voice notice's namedPeekBg keeps «Тук важи само неговата поза.» under its own officer title.
+  - K2's other half stands: the act row gets a lamp-neutral corrective.
+- **K3** (2026-10-18, carried): the OFFICER table's card fields (OFFICER_LAMPS_DARK_HALT_COPY cardBg and convictedCardBg) point at the new dark card, and its card peek fields point at the dark peek. The integrator teaches the tools/ reader at the landing (condition C1).
+- **K4**: the lane key is «waitcard».
+- **W1**: the dark card names the officer and the three postures in the lesson's own words, and does not mention the lamp. The head, its caption and the voice already say «ЗАГАСНАЛ».
+- **W2**: the act explanation may say «Загасналият светофар не разрешава нищо» and never «над светофара». It keeps the exam clause «На изпита това е опасна грешка и изпитът се прекратява.» verbatim.
+- **W7**: the order above.
+- **W9, option A**: the act explanation is not held to the pooled 276 characters. The one display timer that moves is declared instead: the reading time after «Защо» on CONTROLLER_SIGNAL_VIOLATED / lampsDark, and the debrief overlay that waits on it, move by toastReadMs(293) − toastReadMs(276) = +1,134 ms.
+- **W5, a STOP that did not fire.** CONTROLLER_SIGNAL_OBEYED's explanation «…макар лампата да забраняваше…» is false on this drill. Had any renderer printed it there, the lane would have stopped. The census found none, so nothing was changed.
+- **W3, W4 and W6, recorded as written.**
+  - W3: the detail is a named exported constant, stamped by a branch with a literal detail.
+  - W4: the officer card has no convicted twin.
+  - W6: the verbatim-law and code-keyed surfaces are unchanged and were not judged (Not cured, below).
+
+**The row is NOT closed by this landing.** `sc-sig-controller-postures:89d24103` stays OPEN.
+- Every number below was measured in process, on replays of the committed traces and rig tapes through the real advisor, reducer, debrief and wire. No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong** (the builder, re-verified at `479127b`; line numbers are `479127b`'s).
+- **The card and peek.**
+  - `controllerWaitAdvisorPrompt()` (advisor.ts:648–658) took no argument, and both of its paint sites (run-out :1456–1457, live :1497–1498) were keyed on `lessonStagesController` alone.
+  - `lessonOfficerLampsDark` (:2616) was read only by the voice. So during the officer's halt on the dark-lamp drill the card said «Тук решава регулировчикът, не лампата. Гледай позата му: гърди/гръб към теб — стоиш; страничен профил — минаваш, дори на червено; ръка горе — чакаш.» and the phone peek said «Гледай регулировчика, не лампата.».
+  - OFFICER_LAMPS_DARK_HALT_COPY's card fields (:2650–2653) aliased the live card, and nothing paints them.
+- **The fault.** rules/engine.ts:8889 stamped no detail on the halt conviction, although the event already carries `lampsDark`. So the pooled row printed:
+  - the explanation «…Сигналите на регулировчика са на върха на йерархията — над светофара и знаците. Зеленият светофар не разрешава нищо, когато регулировчикът те спира…»;
+  - the peek «Той е над светофара.»;
+  - the corrective «…гледай неговите ръце, не светофара…».
+- **Reproduced on base** by the verifier's own probe, `tmp-wcv-officer.test.ts`, which dumps every shown surface, run on its lane with the three product files reverted to `479127b`. It ran on 44 drives: 5 rig-w3a tapes; postures 3 traces × L1–L4; sc-sig-controller-live 3 × L1–L4; and sc-signal-controller 3 × L1–L5.
+  - The lamp-naming card and peek appear on 11 halt windows.
+  - The pooled explanation, the peek «Той е над светофара.» and «не светофара» appear on all 8 mistake drives, on the toast, the teach card, the debrief, the wire, the history and the reel.
+
+**What landed.** This is the builder's description, checked against the patch by the verifier.
+- **advisor.ts.**
+  - A new constant CONTROLLER_WAIT_CARD_DARK_BG, a concatenation of two literals, and a hoisted constant OFFICER_DARK_PEEK_BG.
+  - `controllerWaitAdvisorPrompt(lampsDark = false)`: when it is true, it returns the dark card, keys [] and the K2′ peek; otherwise it returns the live prompt byte-identical.
+  - Both call sites pass `lessonOfficerLampsDark(s.lesson)`. The selector is still `lessonStagesController`.
+  - K3: OFFICER_LAMPS_DARK_HALT_COPY's cardBg and convictedCardBg point at CONTROLLER_WAIT_CARD_DARK_BG, and cardPeekBg and convictedCardPeekBg at OFFICER_DARK_PEEK_BG. namedPeekBg keeps its literal.
+- **rules/engine.ts.** The halt branch stamps `detail: CONTROLLER_ACT_LAMPS_DARK` («lampsDark») when `e.lampsDark === true`, and otherwise calls makeViolation exactly as before. It is a literal-detail branch, never `detail: undefined`. The commendation branch is untouched.
+- **rules/catalog.ts.**
+  - A new export CONTROLLER_ACT_LAMPS_DARK.
+  - A new export CONTROLLER_SIGNAL_ACT_COPY.lampsDark. Its title is VIOLATIONS.CONTROLLER_SIGNAL_VIOLATED.titleBg by reference. It has an explanation, a peek and a corrective, and no lawRef.
+  - It is registered LAST in PER_ACT_COPY.
+
+**What the student sees** (sc-sig-controller-postures only; the builder's strings, which the verifier checked sentence by sentence, its N6).
+- **The advisor card** during the officer's halt, at L1–L3 with the advisor on, and on the run-out: the dark card (133 characters). At L4 the advisor returns null, as before.
+- **The phone advisor peek**: «Тук важи само позата на регулировчика.».
+- **The fault, CONTROLLER_SIGNAL_VIOLATED with the detail lampsDark.** The title «Неизпълнение на сигнала на регулировчика», the citation «ЗДвП чл. 6, т. 2; чл. 7, ал. 1», 10 points, опасна and the termination are unchanged.
+  - **The explanation** (293 characters) shows on the toast's «ЗАЩО», the «Научи» card, the wire rebuild, the attempt reel, and a NEW debrief line «→ Какво стана: …»: «Премина стоп-линията, докато регулировчикът спираше твоето направление. Загасналият светофар не разрешава нищо — движението нарежда само той: гърди или гръб към теб и вдигната ръка спират посоката ти, а минаваш едва при страничен профил. На изпита това е опасна грешка и изпитът се прекратява.»
+  - **The peek**: «Позата му те спираше.».
+  - **The corrective** shows on the debrief's «Правилното действие», the history row, the reel and the end card's reason: «Когато светофарът е загаснал и движението нарежда регулировчик, гледай позата му: гърди, гръб или вдигната ръка — спираш преди линията и чакаш; потегляш едва при страничен профил, когато си срещу рамото му.» (206 characters).
+- **The one timer that moves (W9).** The reading time after «Защо» goes from 18,400 to 19,534 ms (+1,134) on the 8 postures mistake drives, and 0 everywhere else. The verifier found no other text-length timer: toastParagraphChars reads only the violation's explanation.
+
+**What the verifier reproduced.** It used its own lane (`479127b` + the r1 patch). Log: `D:/knijka-lanes/scratch/waitcard-verify/PROGRESS.md`. Data: `officer.base.json` and `officer.tree.json`, compared by `cmp.cjs`.
+- **The officer probe, 44 drives, base against tree.**
+  - On postures, no surface outside W6 matches /червен|зелен|жълт|не лампата|над светофара|не светофара/. The only lamp words left name the dark lamp: «Загасналият светофар», «Когато светофарът е загаснал», and the voice's «ЗАГАСНАЛ … няма лампа».
+  - The live drills (27 drives) show 0 field differences on every surface.
+  - On postures, only the card and peek change on the 11 halt windows, and only the fault copy and detail on the 8 mistake drives.
+  - These are identical: card-window timing, holds, commendations, the graded block, and the violation's code, t, title, lawRef, points, severity and termination.
+- **The dark-card ticks.** 886, 885, 927, 926 and 927 on the rig tapes; 870 × 3 on shadow-correct; 187 × 3 on raised-arm. That is 7,722, equal to the red-hold ticks.
+- **The violations.** CONTROLLER_SIGNAL_VIOLATED at t 14.2167 (barge-chest) and t 19.7 (raised-arm), L1–L4, now carrying the detail lampsDark.
+- **W9.** +1,134 ms on exactly the 8 postures mistake drives (above).
+- **W5 (its N3).** «макар лампата да забраняваше» is still in the session ledger and the rebuilt wire on 9 postures drives: the 5 rig tapes and shadow-correct L1–L4. The verifier's N3 says 18, which is the count over all three officer lessons in its data; on the live drills the sentence is true. No renderer prints it:
+  - the praise row is the chip «Браво» plus the title;
+  - the reel and the history are violations-only;
+  - no debrief line carries it (all 17 postures drives scanned, with W6's «Правилото на този урок» block excluded).
+- **The catalogue census.** It re-ran the builder's harness, which it read first (sha256 34da2327…a896b6, adapted from rbreverse's d4e2537d…5993).
+  - 2,434 cells on base and 2,434 on the tree. 0 errors and 0 graded differences.
+  - The only detail added is «lampsDark», on 8 cells: postures' two mistake traces × L1–L4. Card streams differ on 6 cells, and HUD and debrief on 8, all on postures.
+  - Its base and tree jsonl are byte-identical to the builder's, row for row.
+  - The clip-plan freshness gate (clipPlan.test.ts) is green with no regeneration.
+- **The tests.**
+  - The new test fails on base with the builder's assertion texts: 10 red, 3 green, 1 skipped. Its N1 corrects the builder's account: two of the three greens are preservation halves (T4 and T5's lit-lamp case). The third is T3's «names the officer and all three postures», green on base only because the live card also holds those tokens; its V9 kills that sub-test.
+  - The re-taught pins are red on base: sweep161 × 2 and the solid-cross census «three acts».
+  - On the tree: the 8 targeted files, 297/297. With a base tools/ copy present the T3 tools pin also ran, and was green.
+  - caption-truth, keep-right-claim-census, the dark-lamp head-and-voice and praise files and clipPlan: 130 green. yield-voice: 21 green.
+  - tsc: 21 errors, all in untouched prisma and store files (the environment).
+- **The manifest.** The multiset difference matches the builder's prediction exactly. Beyond it, only the 3 declared unit shape ids moved.
+- **Mutants.** Ten of its own, V1–V10, each run alone and restored with its sha256 checked (advisor.ts ffb41910…dca6, catalog.ts e22da8c6…921e, engine.ts e3c13e43…95a8). All ten were killed on assertion text, none by a timeout, TypeError or ReferenceError. For example:
+  - V1, the exam clause dropped: «expected 237 to be 293»;
+  - V4, the live site's flag inverted: «…expected 'Тук важи само позата на регулировчика…' to be 'Тук решава регулировчикът, не лампата…'»;
+  - V8, a copy override on the detail call: «copy riding the override channel, that no ALLOWED_CALLS entry claims».
+- **The tools reader.** On the tree, the §L block of driveline.test.mjs fails at one place only, :2799–2803, as the builder handed over. Handover (c) holds (the rest scan is green), and so does (d): the OFFICER block has 7 literals, one over its `>= 6` floor. For (a), (b) and (d) as written, see condition C1.
+- **Not run by the verifier:** the whole lessons/__tests__, lessons/scenario/__tests__, rules/, lesson-ui/ and src/modules/clips/ directories.
+
+**The builder's numbers, not re-measured by a verifier.**
+- 8 mutants, M1–M8, all killed on assertion text and each restored by sha256.
+- lessons/__tests__ + lesson-ui/__tests__ + rules/__tests__: 281/282 files; 5,157 passed, 165 skipped, 1 failed. The red is touchHintLifetime, ENOENT on tools/ (the environment).
+- lessons/scenario/__tests__: 205/205 files; 5,038 passed, 2 skipped. That includes the reviewed-text manifest after its one re-record.
+- src/modules/clips/: 20/21 files, 369 tests. whyPanel fails on ENOENT for docs/, the same on base.
+- tsc: 22 errors, the environment baseline.
+
+**The conditions, and how each stands.**
+
+**C1. The tools handover lost its backslashes. BUILD AT INTEGRATION (tools only).**
+- The builder's edits (a), (b) and (d) for `tools/mobile/__tests__/driveline.test.mjs` are in the right places and do the right thing. But in its PROGRESS.md the code text lost its backslashes:
+  - `[\s{,]` and `\s*` became `[s{,]` and `s*`;
+  - in (b), `[^"\\]|\\.` became `[^"\]|\.`, which leaves a character class unterminated.
+- The verifier spliced them in verbatim (`D:/knijka-lanes/scratch/waitcard-verify/apply-handover.cjs`), and the whole file died: «SyntaxError: Invalid regular expression: missing /». That is the failure mode of the 2026-10-11 gate death.
+- With the escapes restored, every test in the run passes (19 ✔). The corrected file is `driveline.fixed-handover.mjs` (sha256 b31e9162…ac77e), and its diff against base is `driveline.handover-corrected.diff`. driveline.test.mjs has not changed between `479127b` and `a981f78` (the drafter's diff). That diff also rewords (a)'s failure message («…is no longer the dark-lamp officer's card CONTROLLER_WAIT_CARD_DARK_BG…»), and (b) and (d) are new assertions with their own messages. So it is more than the original lines with the constant name changed.
+- The integrator applies the escaped text through a node script or the Write tool, never a shell heredoc. Then it runs the officer, «advisor.ts can put» and §L tests and the whole tools suite, and shows that the file parses.
+PINNED AT INTEGRATION: applied and proven (the integrator, 2026-11-05).
+  - `tools/mobile/__tests__/driveline.test.mjs` now equals the verifier's escaped `driveline.fixed-handover.mjs` (sha256 b31e9162…ac77e). It was installed with node `fs.copyFileSync`, never a heredoc. At `a981f78` the file was unchanged from `479127b` (sha256 a4f2fa60…), and its diff against `a981f78` is byte-identical to `driveline.handover-corrected.diff`. It has 0 CR bytes, and `node --check` parses it.
+  - The officer / «advisor.ts can put» / §L run is 17/17, and in the whole tools suite driveline.test.mjs has no red (PROVEN ON a981f78).
+  - Three tools mutants on advisor.ts, run one at a time, each killed on assertion text, with advisor.ts restored EQUAL 48ce2172… after each:
+    - TM1, OFFICER_LAMPS_DARK_HALT_COPY.cardPeekBg reverted to the «Гледай регулировчика, не лампата.» literal (handover d): «OFFICER_LAMPS_DARK_HALT_COPY.cardPeekBg is no longer the dark card's peek OFFICER_DARK_PEEK_BG — teach this reader the new shape»;
+    - TM2, the dark card gains «Чакаш правилно» (handover b): «The input was expected to not match the regular expression /Чакаш правилно|…/», and the rest-scan «…is not a wait card and reads as one»;
+    - TM3, the OFFICER cardBg reverted to CONTROLLER_WAIT_CARD_BG (handover a): «OFFICER_LAMPS_DARK_HALT_COPY.cardBg is no longer the dark-lamp officer's card CONTROLLER_WAIT_CARD_DARK_BG — teach this reader the new shape». The merge verifier ran TM3 again itself and killed it on the same text.
+  - No other tools file changed. The optional lesson-audit.mjs :7973 comment (handover e) was not applied.
+
+**C2. AT THE LANDING: the reviewed-text manifest, re-recorded once on the combined tree. DONE AT INTEGRATION (PROVEN ON a981f78).**
+- The lane's own re-record added 6 strings: the two card halves, the K2′ peek, and the act's explanation, peek and corrective. e99807ba61be stays in strings.e.txt.
+- units.source: advisor.ts 193 → 194 occurrences; catalog.ts 512 → 515. The title is referenced, so it gains no occurrence.
+- units.catalog: a new CONTROLLER_SIGNAL_ACT_COPY unit, and PER_ACT_COPY 84 → 88.
+- 3 unit shape ids moved by construction.
+- On `a981f78` it met rb's 6 and sc's 3 strings. The one re-record on the combined tree moved only this lane's 6 strings, its new unit and three shape ids (PROVEN ON a981f78).
+
+**N1. The builder's account of the base-green tests. RECORDED** (the verifier's note, not a refutation; above).
+
+**Not cured by this landing** (W6, recorded and not judged under the stop rule; listed for the copy lane and the founder).
+- **The pooled citation chip «ЗДвП чл. 6, т. 2; чл. 7, ал. 1»** still prints at the dark junction. чл. 7, ал. 1 is the tie-break between the officer and the lamp, and at a dark junction there is nothing for it to break. The old stop forbade a lawRef change in this lane.
+- **These still print unchanged:**
+  - FaultCard's road-consequence block (consequences.ts:2623–2650 at `479127b`: ЗДвП чл. 6, т. 2 and чл. 7, ал. 1 verbatim, and the headline «Тук няма число…»);
+  - the debrief's «Правилото на този урок» (instructions 1–5);
+  - the tutor's RULE_CANDIDATES (retrieval.ts:562–579);
+  - interrupt.ts :199, :203 and :233, pooled by code;
+  - the demo annotations, which already name the dark lamp truthfully.
+- **W5.** The commendation's «…макар лампата да забраняваше…» is still in the ledger and the wire on this drill, but no renderer prints it.
+
+**What this landing supersedes in doc 88.** The drafter found nothing. A grep of the main tree's working copy of doc 88 on 2026-11-05 for «не лампата», «Зеленият светофар не разрешава», «Той е над светофара» and `89d24103` finds no earlier sentence that this landing makes false. :1113 and O21 (:8055) concern the objective tick «…прочети регулировчика, не лампата», which this lane did not touch.
+
+No ADR is owed. This is copy and display only, on the existing detail-keyed act-copy channel (ADR-009's «Act copy» item). Under W3, the detail crosses the wire as every act detail does. ADR-018's sentence «Where a controller is posted, his permission for its axis governs, never the lamp … This holds with live or dark lamps» concerns ambient vehicles and is consistent with this landing.
+
+**PROVEN ON a981f78** (the integrator's run on 2026-11-05 in the worktree `D:/knijka-lanes/integ-wt`, log `D:/knijka-lanes/scratch/wt-land/PROGRESS.md`; the V1 fix after it, `D:/knijka-lanes/scratch/wt-v1-fix.cjs`, with its mutant log `D:/knijka-lanes/scratch/wt-v1-mutants.log`. The merge verifier ran MV1, MV5, MV6, MV8, F4M1 and TM3, the lanes' key tests with waitcard's V3 and tapswallow's M1, six directory runs and the tools tests itself.) waitcard and tapswallow were integrated together, in one worktree and one gate patch. This block holds the runs for both; the tapswallow section adds what is its own. With uismall they go through ONE main-tree gate as ONE commit on `a981f78`, as `479127b`, `2ee2469` and `a981f78` did. The three lanes together are proven on the TEMP commit `de8f8f0` = `a981f78` + gate-wt, with uismall on top (PROVEN ON de8f8f0, in the uismall section).
+- **The apply.** The worktree was clean at `a981f78b88f7`, and both patches' sha256 matched (cf0efd48…1cc8d and 2b22ec5a…2178). They were applied in that order with `git -c core.autocrlf=false apply --3way --index --binary`.
+  - waitcard: advisor.ts, rules/catalog.ts, rules/engine.ts, advisor-sweep161.test.ts and strings.0/1/2/6/b.txt merged cleanly by 3-way, and the new controller-dark-lamp-waitcard.test.ts went in by direct application. rb's hunks in advisor.ts (the crash pin's look-first copy and the reversing warning) and sc's in catalog.ts and engine.ts (staticObjectOnRoad, foldActDetail) are kept beside waitcard's. The controller branch moved to engine.ts:9688, and CONTROLLER_SIGNAL_ACT_COPY is registered last in PER_ACT_COPY.
+  - Five files conflicted, each resolved by intent:
+    - lesson-ui's advisorPeekSummary.test.tsx: rb said + 9 and waitcard + 8, both from a base of 7. It is recomputed from authoredPrompts() as + 10: routeHold 1, crashPinned 3, reverseWarning 2 (rb), controller 1, controller:dark 1 (waitcard), railRed 2. Both reasons are kept in the comment.
+    - solid-cross-uturn-act.test.ts: the census is titled «four acts», withOwn = [FAILED_TO_YIELD|cyclist-right-hook, CROSSED_SOLID_LINE|UTURN, LANE_ENTRY_FORCED_BRAKING|overtakeReturn, CONTROLLER_SIGNAL_VIOLATED|lampsDark], in PER_ACT_COPY insertion order. Both comment blocks are kept (the vbltiming restatement and waitcard's «fourth row»).
+    - manifest.json, units.catalog.txt and units.source.txt: the HEAD side, then one re-record on the combined tree (below).
+  - tapswallow: tapActivation.ts merged cleanly, and the new tap-page-ledger.test.ts went in by direct application. The two lanes share no file.
+- **What the stage holds beyond the lane patches** (the merge verifier loaded `a981f78` into a temporary index outside the worktree and applied each lane patch 3-way on its product paths; all applied cleanly, and the blobs equal the stage: advisor.ts e961424d, catalog.ts 5a93c864, engine.ts b5b81d2e, tapActivation.ts 9e2ee721).
+  - LessonScene.tsx, the F4 build (the tapswallow section), is the one product change beyond the lanes. Its diff is the two removed attributes plus comments.
+  - Every other file in the patch is a test, the manifest, or the C1 tools test (the merge verifier). Beyond the lanes' own, those are the F3 and F4 pins, the re-taught touchHintLifetime pin, the two test conflict resolutions and the manifest re-record.
+- **The gate patch.** `D:/knijka-lanes/gate-wt.patch`, sha256 a310cfae9931a1029462b50e25d737c8927e47a8ae03164dd9c00dc70d1c18e2, 21 files, 0 CR bytes, re-cut from the staged index after the V1 fix. No touched file is CRLF in the repo.
+  - The first cut, before V1, was c8f4277c…f050e, 21 files, +1629/−62; the merge verifier found the staged diff hashing to it, with nothing unstaged or untracked. The V1 fix wrote only its two test files.
+  - At composition (2026-11-05) `git diff --cached --binary a981f78` in integ-wt hashes to the re-cut sha, 21 files, +1636/−62, and `de8f8f0`'s tree equals integ-wt's staged tree.
+- **The pins:** C1 above, and F3 and F4 with the V1 fix (the tapswallow section).
+- **Lane mutants the merge verifier killed again.**
+  - waitcard's V3, the dark branch's peek reverted to «Гледай регулировчика, не лампата.»: 4 red, for example «rig:pc-L1-C t=20.55: expected 'Гледай регулировчика, не лампата.' to be 'Тук важи само позата на регулировчика.'». Restored EQUAL. The lane's key tests (controller-dark-lamp-waitcard, advisor-sweep161, solid-cross-uturn-act and advisorPeekSummary): 180/180.
+  - tapswallow's builder M1, clause 4 bypassed: 16 red, including T1 «nothing but the ack acted…». Restored EQUAL. tap-page-ledger and tap-activation: 74/74.
+- **The reviewed-text manifest.** Re-recorded ONCE on the combined tree (RECORD_REVIEWED_TEXT_MANIFEST=1, 49/49). Everything that moved is waitcard's, as the lane predicted:
+  - strings +6, −0: 61aa57dd2dba and 04b4b2663a7f (the two dark-card halves), 1814ac8878e2 (the K2′ peek «Тук важи само позата на регулировчика.»), b6e0a4c65356 (the act explanation), 2a664eadfa85 (the act peek «Позата му те спираше.») and b5ba24b84050 (the act corrective);
+  - units.catalog: a NEW unit CONTROLLER_SIGNAL_ACT_COPY (914a78a8a7d5 1aa2d78b7f3b b6e0a4c65356 2a664eadfa85 b5ba24b84050); the PER_ACT_COPY shape id moved ee20c4a3d201 → 8fbc8a815e8f (+4 ids appended);
+  - units.source: the advisor.ts shape id ee35b3d57c2e → 2f33690dfb8d, and catalog.ts 53fc4ec32506 → 88207694aa98;
+  - manifest.json: catalog 15 → 16 units and 614 → 622 strings; source 13,378 → 13,382 strings.
+  - tapswallow and F4 moved nothing (F4 changed only comments and attributes).
+- **The integrator's directories,** all green:
+  - hud/__tests__: 74 files, 1,454 passed (136 s), tap-page-ledger 22 and lessonscene-tap-override 8 included;
+  - rules/__tests__: 110 files, 1,929 passed (983 s);
+  - orchestrator/__tests__, traffic/, runtime/__tests__, scene/, vehicle/, world/ and traces/ in one run: 519 files, 7,988 passed (1,010 s);
+  - src/modules/clips/: 19 files, 302 passed. The clip-plan freshness gate is green, with no regeneration;
+  - src/components/sim/ (all, lesson-ui/__tests__ included): 110 files, 1,800 passed (1,563 s), touchHintLifetime (re-taught) and advisorPeekSummary included;
+  - lessons/__tests__: 128 files, 2,465 passed, 165 skipped (1,637 s);
+  - lessons/scenario/__tests__: 214 files, 5,226 passed, 1 skipped (4,983 s), the reviewed-text manifest, caption-truth, the keep-right census and controller-dark-lamp-waitcard (14/14, its T3 tools pin run) included.
+  - These ran before the V1 fix, which changed two test files only. After it, those two files ran 51/51. `de8f8f0` carries them, and its hud/ (74 files, 1,454) and components/sim (111 files, 1,846) ran green (PROVEN ON de8f8f0).
+- **The merge verifier's own runs,** one worker, one at a time, all to completion: lessons/scenario/__tests__ 214 files, 5,226 passed, 1 skipped (4,561 s); rules/ 110 files, 1,929 (1,008 s); lessons/__tests__ 128 files, 2,465 passed, 165 skipped; hud/ 74 files, 1,454; components/sim/ 110 files, 1,800; src/modules/clips/ 302, with no regeneration.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment (health/route.ts, lib/db.ts, the prisma *store.ts files, lesson/progress.ts, traces/attemptStore.ts). None is in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4/4 runs it): 2,030 tests, 2,007 pass, 8 fail, 11 skipped, 4 todo (2,284 s). driveline.test.mjs has no red. The merge verifier's own run gave the same.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are the worktree's environment, and none of them reads a file this landing touches. count-agreement and finding-reader (file-level) and build-redrive §9(a), (b), (d) and (e) fail with «could not find .audit-frames/findings by walking up from this file or the cwd»: .audit-frames is gitignored and exists only in `E:\AI driver`, and it was not linked. lane-evidence fails with «[mobile-harness] could not resolve the playwright package»; re-run with KNIJKA_PLAYWRIGHT_ROOT="E:/AI driver/tools/clips/headless/" (a read-only resolve) it is 10/10, and the worktree stayed clean.
+  - No tools test was taught beyond C1. The main-tree gate decides, with the tapswallow tap scripts (lesson-audit.mjs, parity-cards.mjs, parity-e.mjs and w9-symptoms.mjs).
+- **Left as found.** The worktree is staged, with no temporary file in it and none of the integrator's processes running; the vitest runner seen at the end was another lane's (w3u, started 12:30). The merge verifier left the staged diff unchanged, with nothing unstaged or untracked and every mutated file back at its original sha256.
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` (ADR-017), on the PC keyboard and the phone lens.
+  - (1) A careful drive of sc-sig-controller-postures at PC L1 and phone L1 (advisor on by default), plus phone L1 or L3 opted in. Frames of the advisor card and the phone peek at the first and last second of the officer's halt: the dark card, no lamp word, beside the dark head, its caption and the «Защо чакаш: регулировчикът» notice. On each frame record which judged card is open, bannerYields, and whether the advisor card waits.
+  - (2) Under K2′, once for the record: a phone L1 frame of the advisor row ALONE during the halt («Съветник» over «Тук важи само позата на регулировчика.»). Note whether the head caption or the notice shares that frame.
+  - (3) mistake-barge-chest at PC L1: open «Защо» on the fault toast, and time the toast's life and the debrief overlay's opening against W9's +1,134 ms.
+  - (4) mistake-barge-chest, or a rig drive that crosses on the officer's chest, at PC L1 and phone L1. Frames: the fault toast (title, the peek «Позата му те спираше.» on one line, the «ЗАЩО» body and the corrective); the «Научи» card; the debrief's «Какво стана» and «Правилното действие»; and the end card's reason. At L4, the termination end card. Then the history page row for that drive (the server rebuild). None may name a red, a green or «над светофара».
+  - (5) A control: sc-sig-controller-live at PC L1 during a red hold. The live card «Тук решава регулировчикът, не лампата. … дори на червено …» and its fault card «…Зеленият светофар не разрешава нищо…» must be unchanged.
+  - Whether those frames close `89d24103` is for that wave's judge and verifier.
+- **The tools/ readers on the main-tree gate**: driveline.test.mjs :2777–2825 as taught under C1, and the T3 mirror pin (`it.runIf` tools exists). The lesson-audit.mjs :7973 comment may add «(and its dark-lamp twin)»; no regex changes.
+- **The founder is told,** one plain sentence each, each his to veto:
+  - K1, K3, K4, K2′ (W8), W1, W2, W7 and W9 option A;
+  - W5: no renderer prints «макар лампата», so nothing was changed;
+  - W6: the pooled citation still cites чл. 7, ал. 1 at a dark junction;
+  - the strings above.
+- **Recorded, not filed:** the docs agent's candidates (below), which restate the items under «Not cured by this landing».
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds). They restate items above; each is listed with its evidence.
+- **W6, the pooled citation at a dark junction** (minor). On sc-sig-controller-postures the pooled lawRef chip still cites «ЗДвП чл. 6, т. 2; чл. 7, ал. 1». Чл. 7, ал. 1 is the tie-break between the officer and the lamp, and with the lamp dark there is nothing for it to break. FaultCard's road-consequence block (consequences.ts:2623–2650 at `479127b`) is also unchanged and was not judged. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/waitcard-r1.json` (build report STEP 3(iv)); `D:/knijka-lanes/scratch/waitcard-brief/brief-r1.json` (ruling W6).
+- **W6, unjudged.** The tutor's RULE_CANDIDATES (tutor/retrieval.ts:562–579) and interrupt.ts :199, :203 and :233, both pooled by code, print the same on the dark-lamp drill. Whether they name a lit lamp there was never judged. Evidence: `waitcard-r1.json` (build report STEP 3(iv)); `brief-r1.json` (W6).
+- **W5, latent.** CONTROLLER_SIGNAL_OBEYED's explanation «…макар лампата да забраняваше…» is false on sc-sig-controller-postures. It reaches the session ledger and the rebuilt wire on 9 postures drives, the 5 rig tapes and shadow-correct L1–L4 (the docs verifier's count; the verifier's N3 says 18, which is the count over all three officer lessons). Nothing renders it today, but any future renderer of commendation explanations would print it. Evidence: `waitcard-r1.json` (verify finding N3); `D:/knijka-lanes/scratch/waitcard-verify/officer.tree.json` (scan.cjs).
+
+## Landed: in process, a touch tap that acknowledges a card no longer lets its browser compatibility click act on the control that takes that card's place. On the phone this is PROBABLE until the device drive. Every control built on useTapActivation now shares one page-wide record of the clicks owed to touch taps (with F4, the touch hint's «Разбрах» and «Продължи» in LessonScene too). A browser compatibility click that reaches a different control without that control's own press is suppressed while a tap's click is owed. After the island strike on sc-roundabout-entry at L1, a composed replay of the real exports (the replay decides where the compatibility click lands) shows the tap on «РАЗБРАХ» now leaving the scored violation card standing at +1 instead of dismissing it for good. A mouse click on a control that saw its own press still acts, except in two cases: the hybrid case F2 (a mouse button held through a touch tap on another control, accepted) and P1 (a mouse click within 700 ms of a touch on the same control, the same on base). A keyboard or assistive activation (detail 0) always acts. No shown text, grade or threshold moves. Measured in process only. The browser re-targeting the fix assumes is PROBABLE until the device drive. `sc-roundabout-entry:b63a8fea` (major) (2026-11-05)
+
+Lane `tapswallow`, one round, built on `2ee2469` (run `wf_273d2b2d-633`). The adversarial verifier SIGNED it OFF WITH CONDITIONS on 2026-11-05 (its PROGRESS.md, «VERDICT»). The conditions are below.
+- **The patch.** `tapswallow-result-r1.patch`: sha256 2b22ec5ac14d54fe6a975b67d2d015365152cc67495902c9e318360fcd312178, LF only, 0 CR bytes. It has 2 files: `hud/tapActivation.ts` and the new `hud/__tests__/tap-page-ledger.test.ts`.
+  - The verifier built its lane from `base-2ee2469.tar` and applied the patch; the sha matched. When it finished, `git diff --binary` of its lane was byte-identical to the patch, and tapActivation.ts was sha256 e9cacb0d….
+  - It is cumulative against `2ee2469`, NOT against HEAD `a981f78`. Neither of its files moved between `2ee2469` and `a981f78` (the drafter's diff). At `7547a0c` the verifier found tapActivation.ts byte-identical to base, and the T8 census regex found the same 20 call sites. (`7547a0c` is the TEMP commit 2ee2469 + gate-rb + gate-wp, with no ref. `a981f78` adds the sc landing, which also changed LessonScene.tsx, so the census on a981f78 is the landing's; see PROVEN ON a981f78.) This lane shares no file with waitcard.
+  - There is no call-site edit, and nothing under rules/, lessons/, runtime/, traffic/, scenarios/, scene/, traces/ or content/. Condition F4 (below) adds the two LessonScene.tsx edits at integration.
+
+**Integrator rulings.** These were made under the founder's 2026-10-08 and 2026-10-19 delegations, so they are not his. They were confirmed on 2026-11-05. The founder is to be told at this landing, and each is his to veto (owed, below).
+- **T1**: no browser and no dev server in the lane. STEP 0 is an elimination census plus a composed replay through the real exports. The browser half is recorded as PROBABLE, and only the device drive settles it.
+- **T2**: one page-wide owed-click ledger in hud/tapActivation.ts, with a check per control for a press seen. A window capture-phase listener was rejected, because it could eat an assistive or programmatic click.
+- **T3**: no layout, copy or number fix. The overlap of «РАЗБРАХ» and the ✕ is not repaired by moving or resizing chips; the chip sizes come from the founder's 2026-09-20 «Shrink the buttons». Protected: TAP_CLICK_SUPPRESS_MS 700, DISMISS_GLYPH_TAP_PX, OVERLAY_PEEK_HEIGHT_PX, the tap tolerance, PRIORITY, AMBIENT, selectOverlay's order, every class and style in the control row, and every shown string.
+- **T4**: no way back for faults in this lane. dismissedOverlayIds stays permanent per id.
+- **T5**: built on `2ee2469`; it lands after the `7547a0c` gate, and the device drive runs on the tree with rb, wp and sc landed.
+- **T6**: an onClick-only control in hud/ or lesson-ui/ that the census shows a tap-driven re-render can put under a finger takes the useTapActivation idiom in this lane. Anything outside those two folders is listed for the integrator. Condition F4 converts two at integration.
+- **F2 (2026-11-05): ACCEPTED**, and recorded inside the named residual family (condition F2, below).
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:b63a8fea` stays OPEN.
+- Every number below was measured in process, by replays that compose the real exported tap handlers and overlay selection, on a fake clock. The replay decides where the compatibility click lands. That the browser re-targets it onto the element committed in pointerup is PROBABLE, not CONFIRMED.
+- No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong** (the builder, re-verified at `2ee2469`; line numbers are `2ee2469`'s).
+- **Each hook kept its own state.**
+  - In `hud/tapActivation.ts` (:163–173, :376–382), each `useTapActivation` hook kept its own state. A touch release that acts left a mark in that hook's queue only (:251), and only a click on the same hook consumed it (:272–282).
+  - So a detail-1 click on a different hook with an empty queue activated (:279).
+- **Two hooks under one point.**
+  - In `hud/SimOverlay.tsx`, the teach card's acknowledge (tapAck :2324) and the next card's ✕ chip (tapDismissChip :1874) are separate hooks, in a right-aligned row (:3309).
+  - The teach card's row is [ЗАЩО][РАЗБРАХ], and the violation's is [ЗАЩО][✕]. On the row's frames the ✕ centre (699–700, 168 CSS, frame 14) is 17 px from «РАЗБРАХ»'s (682–683, 170, frame 13), inside the 44 px chip.
+- **Why the violation went for good.** dismiss (:1808–1816) acts on shownRef, which a passive effect refreshes. react-dom 19.2.4 flushes that effect at the end of a Sync commit, so the dismiss hit the post-ack card, the violation. Its id then went into dismissedOverlayIds (LessonPlayShell :5316–5323) for good.
+- **STEP 0(a), elimination.** Over the window rAF 548 to 579, with sim time frozen at 51.4, the builder ruled out every other path that can take the violation off the compact overlay:
+  - the other writers of dismissedOverlayIds;
+  - SimOverlay's local dismissal;
+  - the toast TTL and cap;
+  - HudToasts' dismiss (roomy only);
+  - `ended`, pauseModalUp and screenOwners;
+  - keys.
+  The instrument shows one locator.tap on «РАЗБРАХ». Only SimOverlay.dismiss fits the drop from +2 to +0.
+- **The verifier's spot check** of the instrument (phone-L1-ION.json): one pausingCardsAcknowledged press, at pressedPerfNow 66104, and the key acts end at t 47.8.
+
+**What landed.** This is the builder's description, checked by the verifier against the code it read in full.
+- **One page-wide ledger.** `TapClickLedger { owed: TapOwedClick[] (oldest first, each with its owner hook), press: TapAuthorizingPress | null }` is a module singleton, `PAGE_TAP_LEDGER`, not exported. It is bound only inside useTapActivation: `useState(() => createTapActivationState(PAGE_TAP_LEDGER))`.
+  - Called with no argument, createTapActivationState gives a state a private ledger. No existing call changes: createTapActivationState gains one optional argument, createTapHandlers keeps its 3 arguments, and the patch adds the export createTapClickLedger and the types TapClickLedger, TapOwedClick and TapAuthorizingPress.
+- **`tapClickActivates` applies the ordered rule:**
+  1. detail 0 activates and consumes nothing;
+  2. this hook's own mark is consumed, with its ledger entry, and the click suppressed;
+  3. this hook's authorizing press is cleared and the click activates;
+  4. any owed entry: the oldest is consumed, with its owner's mark, and the click suppressed;
+  5. otherwise the click activates.
+- **Press bookkeeping.**
+  - Every pointerdown is recorded, a mouse press included, overwriting the last.
+  - A release starts that press's 700 ms clock.
+  - A touch or pen press that fires clears the press and pushes a mark and a ledger entry.
+  - A press released outside the rect stays authorizing.
+  - pointercancel clears the hook's own press.
+- **What did not change**: TAP_CLICK_SUPPRESS_MS stays 700, and no shown string, slot, chip size, class, PRIORITY, selectOverlay or bill moved. The patch adds 0 lines of Cyrillic outside comments (5 comment lines).
+
+**What the student sees.** No shown text changed.
+- The builder re-recorded the reviewed-text manifest once: «reviewed-text manifest: nothing changed against the previous recording.» The verifier's re-record printed the same.
+- In the replay of the row, base dismisses the violation after the ack and shows the older hint toast:5 at +0. The tree keeps the violation active, chip «−10 изпитни т.», at +1.
+- In the builder's other compositions, each acts on base and is suppressed on the tree:
+  - teach → praise card body;
+  - teach → a card whose right-most control is ЗАЩО (a sheet opened);
+  - ✕ on A → plain card B (one tap removed two cards);
+  - the sheet's «Разбрах» → the peek's ✕.
+
+**What the verifier reproduced.** It used its own lane. Log: `D:/knijka-lanes/scratch/tapswallow-verify/PROGRESS.md`. Probes and kill tests: `attempts/zz-verify-probe.test.ts`.
+- **The row (its F1).** tap-page-ledger.test.ts passes 18/18 on the tree. Against base's tapActivation (with an ignored createTapClickLedger shim, so the file imports), 13 are red and 5 green. T1 fails on «nothing but the ack acted: expected [ 'ack teach:COLLISION:51.3', …(1) ] …», so the base model does dismiss the violation after the ack.
+- **The builder's mutants M1 and M9**, re-run: both killed on assertion text.
+- **Its own probes, tree against base.**
+  - P4, teach → teach on the same hook: right.
+  - P8, an interleave: right; base double-fired B.
+  - P9, a two-finger phantom: the same as base.
+  - P10, a pen: treated as touch, an improvement.
+  - P11, the 700 ms boundary: acts.
+  - P1, P2 and P3: conditions F2 and F4, below.
+- **Suites,** one worker, one run at a time:
+  - hud/: 73 files, 1,428/1,428, with its 9 probe tests.
+  - lesson-ui/__tests__: 55 files, 882/882, with main's `2ee2469` tools/mobile/lesson-audit.mjs copied in so that touchHintLifetime runs (43/43).
+  - lessons/__tests__: 127 files, 2,456 passed, 165 skipped.
+  - The 2 lessons/scenario files that import tap-dependent modules (endings-chassis and hz-static-contact-cadence), within its 168/168 over 5 files.
+  - The reviewed-text manifest, caption-truth, keep-right-claim-census and keep-right-lessons-reviewed-text: 144/144.
+  - src/modules/clips/: 19 files, 302/302, with no regeneration (scenario-map.json copied in).
+  - tsc: 22 errors, the environment baseline, none in the patched files. eslint: clean.
+  - It did not re-run the full lessons/scenario/__tests__ directory.
+- **Its own mutants.** MV2 was killed by the existing tap-activation.test.ts. MV1, MV5, MV6 and MV8 SURVIVED the builder's suite (tap-page-ledger, tap-activation and sim-overlay-dismiss: 96/96 green under each, `MV1.txt`, `MV5.txt`, `MV6.txt` and `MV8.txt`). Each is killed by one of its kill probes: condition F3. Every mutant was restored to e9cacb0d….
+
+**The builder's numbers, not re-measured by a verifier.**
+- Its 11 mutants, M1–M10 with M5a and M5b, each killed on assertion text and restored by sha256. M3 survived its first run and died once T3 was strengthened. M2 is a harness-binding mutant on the test's `bind` line, because production binds only inside useTapActivation, which T8 pins.
+- lessons/scenario/__tests__: 211 files, 5,178 passed, 1 skipped.
+- The census: 20 useTapActivation call sites, all bound to the page ledger (SimOverlay 7, LessonPlayShell 2, LessonScene 3, TraceTimeline 5, TouchControls 3), and 70 onClick-only hits in hud/ and lesson-ui/. The end screen after «Резултат» is shown safe by frames 20/21. PreDriveChecklist × 8 and CalibrationGate are PROBABLE and unmeasured (Not cured, below).
+
+**The conditions, and how each stands.**
+
+**F2. A hybrid mouse-and-touch case. INTEGRATOR RULING (2026-11-05): ACCEPTED,** and recorded inside the named residual family.
+- The verifier's P2: a mouse button held on X; a touch tap on Y; the mouse released and clicked on X; then Y's compatibility click on Y. The tree gives ['Y','Y'] and base ['Y','X']. The mouse click is lost and Y fires twice.
+- The cause is the brief's rule 3: any later pointerdown clears the authorizing press, so the mouse click falls to clause 4 and consumes Y's mark.
+- A PC with no touch is unaffected, because nothing is ever owed there.
+- P1 is the same on base and tree: a touch owed on X, then a mouse click on the same X within 700 ms, is eaten by X's own mark (['x']).
+
+**F3. Four surviving mutants. PIN AT INTEGRATION.** The verifier's kill probes K1, K5, K6 and K8 (`D:/knijka-lanes/scratch/tapswallow-verify/attempts/zz-verify-probe.test.ts`, COPIED, not moved) become tests in tap-page-ledger.test.ts or a sibling. Each must kill its mutant on assertion text:
+- MV1, clause 4 keeps the owner's mark: «K1 never an only: expected ['A'] to deeply equal ['A','A']». This is a real never-an-only gap: under MV1, a touch on A released outside loses its own click.
+- MV5, a press released outside never expires: «K outside: the stale press must not authorize: expected ['A','X']…».
+- MV6, pointercancel keeps the press: «K cancel: …expected ['A','X']…».
+- MV8, clause 4 consumes the newest entry: «K8 oldest first: expected ['A','B','D']…».
+The production code is right on all four: each kill probe passes on the tree.
+PINNED AT INTEGRATION: pinned (the integrator, 2026-11-05). A describe «F3 — the ordered rule's remaining clauses (verifier kill-probes K1, K5, K6, K8)», 4 tests, is appended to `hud/__tests__/tap-page-ledger.test.ts`. The tests run the real createTapHandlers on a ledger and clock of their own; nothing is stubbed (the merge verifier). The file is 22/22 on the landing tree.
+  - Each mutant was applied to tapActivation.ts alone and run against tap-page-ledger, tap-activation and sim-overlay-dismiss (100 tests). Each fails ONLY its own K test, on assertion text:
+    - MV1: «K1 never an only: expected [ 'A' ] to deeply equal [ 'A', 'A' ]»;
+    - MV5: «K outside: the stale press must not authorize: expected [ 'A', 'X' ] to deeply equal [ 'A' ]»;
+    - MV6: «K cancel: the stale press must not authorize: expected [ 'A', 'X' ] to deeply equal [ 'A' ]»;
+    - MV8: «K8 oldest first: expected [ 'A', 'B', 'D' ] to deeply equal [ 'A', 'B' ]».
+  - tapActivation.ts was restored EQUAL e9cacb0d… after each. The merge verifier ran all four again itself: each failed 1 of 74 tests (tap-page-ledger and tap-activation) on the same text, and each restore was EQUAL.
+
+**F4. Two LessonScene buttons override the hook's onClick. BUILD AT INTEGRATION.**
+- The builder's census row «LessonScene tapDismissTouchHint … covered» is inaccurate, and it does not mention tapResume.
+- Two buttons override the hook's onClick (the verifier's line numbers at `2ee2469` are :4331–4332 and :4435–4436; at `a981f78` they are :4335–4336 and :4439–4440, found by text by the drafter):
+  - the touch hint's «Разбрах» spreads `{...tapDismissTouchHint}` and then sets `onClick={dismissTouchHint}`;
+  - the menu's «Продължи» spreads `{...tapResume}` and then sets `onClick={() => setMenuPaused(false)}`.
+- So on the click path both are onClick-only:
+  - a compatibility click that a re-render puts onto them acts unguarded;
+  - their own compatibility click never consumes the ledger entry their pointerup made. That entry stays up to 700 ms and widens the named residual (P3: the tree suppresses a detail-1 click without a press on another hook at +50 ms).
+- Base has the same override. LessonScene is outside hud/ and lesson-ui/, so T6 listed them for the integrator.
+- **The build:** each hook's activate callback already performs the button's action (at `a981f78`, LessonScene :2063 `useTapActivation(() => setMenuPaused(false))` and :2336 `useTapActivation(dismissTouchHint)`). The build therefore drops the overriding onClick, as the other useTapActivation sites do. touchHintLifetime's pin ««РАЗБРАХ» has a pointer path AND keeps onClick», which asserts the override, is re-taught in the same change.
+- **The pins:**
+  - each button's own compatibility click is consumed;
+  - a compatibility click re-targeted onto it is suppressed;
+  - a mouse click and a keyboard detail-0 click still act;
+  - a mutant that restores the override dies on assertion text.
+PINNED AT INTEGRATION: built and pinned (the integrator, 2026-11-05); the pin was widened after the landing under the merge verifier's V1.
+  - **The build.** In LessonScene.tsx, found by text, «Разбрах» no longer has `onClick={dismissTouchHint}` after `{...tapDismissTouchHint}`, and «Продължи» no longer has `onClick={() => setMenuPaused(false)}` after `{...tapResume}`. Besides the two removed attributes only comments changed; no shown text moved. It is the one product change beyond the lane patches, made because ruling F4 orders it. The merge verifier accepted it: the hooks already carried the actions, and no other file reads the removed attributes.
+  - **The re-taught pin.** touchHintLifetime ««РАЗБРАХ» has a pointer path AND keeps onClick — the hook's own» now requires the spread and the hook binding, and refuses any `onClick` on the button.
+  - **The new pin.** `hud/__tests__/lessonscene-tap-override.test.ts`, 8 tests. For each button: a source pin; its own compatibility click is consumed and nothing is left owed; a compatibility click re-targeted onto it is suppressed; a mouse click and a detail-0 click still act. The button's effective props are derived from LessonScene's own source.
+  - **Its mutants,** each restored EQUAL 716314e8… after its run. F4M1, the «Разбрах» override restored: 4 red, including ««Разбрах» (touch hint): one tap acted 2 times: expected [ 'button', 'button' ] to deeply equal [ 'button' ]» and «…a stray compatibility click acted on it: expected [ 'other', 'button' ] to deeply equal [ 'other' ]». F4M2, the «Продължи» override restored: 3 red, on the same texts for «Продължи». The merge verifier killed F4M1 again.
+  - **V1, fixed after the landing** (the merge verifier's finding; the integrator, 2026-11-05). The behaviour tests do not run LessonScene: around the real createTapHandlers, they decide from LessonScene's comment-stripped source whether an override exists, then model it with a stub. With the detector `/\bonClick\s*=/`, the verifier's evasion mutant F4M3, `{...{ onClick: () => setMenuPaused(false) }}` after `{...tapResume}`, survived 51/51. The detector is now `/\bonClick\b/` on the comment-stripped slice after the spread, at both sites in lessonscene-tap-override.test.ts (the source assertion and the `overrides` switch in page()) and in touchHintLifetime.test.ts, which now strips comments the same way (the integrator; the regex swap at the three sites is `D:/knijka-lanes/scratch/wt-v1-fix.cjs`). Tests only; no product file changed. The two files are 51/51 green, and each mutant dies on assertion text (`D:/knijka-lanes/scratch/wt-v1-mutants.log`): F4M1 4 failed of 51, F4M2 3 and F4M3 3, the last two on «an onClick on this button overrides the hook's and bypasses the page tap ledger: expected '<button…' not to match /\bonClick\b/». LessonScene.tsx was restored EQUAL 716314e8… after each, and the gate patch was re-cut (PROVEN ON a981f78, in the waitcard section).
+
+**F7. The device drive and the PROBABLE exposures. OWED** (below). The verifier agrees that the mechanism is not claimed repaired on a device.
+
+**THE LANDING RE-RUNS** (T5). DONE. T1–T10 of tap-page-ledger.test.ts ran on the landing tree, inside its 22/22. The proof ran hud/, components/sim/ (lesson-ui/__tests__ included), src/modules/clips/, lessons/__tests__, lessons/scenario/__tests__ and rules/, all green. This lane moved no manifest entry; the manifest was re-recorded once on the combined tree for waitcard. See PROVEN ON a981f78.
+
+**Not cured by this landing.**
+- **The named residual.** An assistive or scripted detail-1 click with no pointerdown is suppressed by clause 4 if it arrives within 700 ms of a touch tap whose click is still owed. The owed compatibility click then finds the ledger empty and activates on whatever it lands on.
+  - That includes an `el.dispatchEvent` click with detail 1. Playwright's tap and click send their own pointerdown and are unaffected.
+  - tools/mobile/wave3-graded-clutch.mjs:210–215 sends `up.click()` (detail 0), which is unaffected (the verifier).
+  - F2's hybrid case is recorded in this family.
+- **A deliberate double tap on «РАЗБРАХ»** still dismisses the fault card that replaces it, because the second tap is a real press. Only a layout or delay change, which T3 forbids, could prevent it.
+- **A fault removed by a deliberate ✕** still has no way back (T4).
+- **Two onClick-only exposures, PROBABLE and unmeasured,** the same on base:
+  - PreDriveChecklist × 8 inside the predrive read sheet that tapWhy opens (tap-activation.test.ts's ratchet pins it as UNCOVERED 8);
+  - CalibrationGate under a held result.
+
+**What this landing supersedes in doc 88.** Nothing, as far as the drafter found; no earlier sentence in doc 88 describes the compatibility click. Two earlier landings asked this lane's census for items:
+- The rbreverse landing (:17304) asked for the reversing warning. The builder lists it as an overlap for rb's device drive (rig-w3b phone-L1-ION frames 13 → 17). The overlay's hooks are all on the page ledger.
+- The wcafterpaint landing (:17524, :17605) asked for the changed phone-peek frames: a fault holds the peek for 8 s against a burst, and «+N» reads one higher. This lane was built on `2ee2469`, without wp, and neither report lists them. They are carried to the device drive (below).
+
+No ADR is owed. This is input fidelity and display only; no rule, grade, points or graded clock moves. `docs/architecture/07` has no sentence on tap activation, compatibility clicks or the overlay's dismiss (the drafter's grep), so no ADR sentence is contradicted.
+
+**PROVEN ON a981f78** (the same integration as the waitcard section's: one worktree, `D:/knijka-lanes/integ-wt`, one run on 2026-11-05, log `D:/knijka-lanes/scratch/wt-land/PROGRESS.md`, and one gate patch, `gate-wt.patch`, re-cut after V1. The directory runs, tsc, the tools tests and the gate patch are listed there once.) What is this lane's own:
+- **The apply.** tapActivation.ts merged cleanly, and the new tap-page-ledger.test.ts went in by direct application; the patch's sha256 matched (2b22ec5a…2178). It shares no file with waitcard. The merge verifier applied the lane patch to a temporary index on `a981f78`: tapActivation.ts's blob, 9e2ee721, equals the staged one.
+- **The census on `a981f78`.** sc changed LessonScene.tsx, and F4 changes it again. tap-page-ledger.test.ts, T1–T10 and the T8 census regex among them, is 22/22 on the landing tree, and lessonscene-tap-override.test.ts is 8/8, both inside hud/ (74 files, 1,454).
+- **The pins:** F3, and F4 with the V1 fix (above).
+- **A lane mutant** (the merge verifier). The builder's M1, clause 4 bypassed: 16 red, including T1 «nothing but the ack acted…», restored EQUAL. tap-page-ledger and tap-activation: 74/74.
+- **The manifest.** tapswallow and F4 moved no entry.
+- **Not pinned.** F2, ruled ACCEPTED: pinning it would freeze accepted behaviour, not guard a defect. And the browser re-target of the compatibility click, which no in-process test can see: it stays PROBABLE until the device drive (Owed, below).
+- **The tools tests.** The tap scripts (lesson-audit.mjs, parity-cards.mjs, parity-e.mjs and w9-symptoms.mjs) must be confirmed on the main-tree gate, with the 7 worktree-environment reds (the integrator).
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` (ADR-017), on the phone lens (iphone16-landscape, Playwright WebKit) and the PC lens, on the tree with rb, wp, sc, waitcard and tapswallow landed.
+  - (1) sc-roundabout-entry L1: replay rig-w3b phone-L1-ION up to the island strike. Frames: the teach card at +2; ONE locator.tap on «РАЗБРАХ»; then, on the next rAF, the violation card (−10, опасна, «Удар в неподвижно препятствие») at +1, standing until its own life ends or a deliberate ✕. Then a deliberate ✕, after which the next card is selectOverlay's pick with +N equal to the logged non-ambient waiting count. Record the HUD change log per rAF, with the reader state and the candidate list. Only then is the re-targeting CONFIRMED.
+  - (2) A frame of the violation card itself, by drive or /dev/popup-rig at 852×393 CSS, measuring its ✕ and ЗАЩО rects against «РАЗБРАХ»'s centre (about 682, 170 CSS).
+  - (3) The same at L3 (advisor on), and on a burst (two faults before the ack). Under wp, the fault now holds the peek for 8 s against a praise burst and «+N» can read one higher; record both.
+  - (4) The device controls:
+    - a real fast double tap: each physical tap acts on at most one control, no single tap removes two cards, and a second physical tap on the next card's ✕ dismisses it;
+    - a PC mouse click on ✕ and Space on «РАЗБРАХ», unchanged.
+  - (5) The other transitions on the phone lens:
+    - teach → plain praise card;
+    - ✕ → plain card;
+    - the briefing sheet's «Разбрах»;
+    - a play-menu row over the glyph arc. Graded mirror glances and indicators must not toggle, and any rule event that differs from base is named.
+  - (6) The two LessonScene buttons converted under F4 (the touch hint's «Разбрах» and «Продължи»).
+  - (7) The PROBABLE exposures: PreDriveChecklist under the ЗАЩО / «Списък» point once the predrive read sheet opens, and CalibrationGate under «Резултат» on a held result. If either overlaps, it takes the useTapActivation idiom, and the PreDriveChecklist conversion re-teaches the UNCOVERED ratchet row.
+  - (8) If a Chromium touch lens is available (tools/mobile/.out/wave1-verify/touch-verify.mjs, the CDP hand), the row frame on Chrome.
+  - (9) With rbreverse: one phone frame where a tap precedes the reversing warning (advisor:<text>), to check that no stray click dismisses it.
+  - Whether those frames close `b63a8fea` is for that wave's judge and verifier.
+- **The tools/ tap scripts on the main-tree gate**: tools/mobile/lesson-audit.mjs :63, :2248 and :11338 (:11341 with rb landed), parity-cards.mjs :105 and :129, parity-e.mjs :267, and w9-symptoms.mjs :634. glance-events.mjs:8 cites `tapPointWithin` at hud/tapActivation.ts:159; it is at :198 on base and :301 after this patch. That comment is stale.
+- **The founder is told,** one plain sentence each, each his to veto:
+  - T1–T6, and F2 accepted;
+  - the fix is input-only;
+  - Playwright cannot drive VoiceOver or TalkBack, so assistive safety rests on the detail-0 rule and the never-an-only argument, with its one named residual;
+  - a fault removed by a deliberate ✕ has no way back (T4);
+  - a double tap on «РАЗБРАХ» can still dismiss the fault card that replaces it.
+- **Recorded, not filed:** the docs agent's candidates (below), which restate items under «Not cured by this landing».
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds). They restate items above; each is listed with its evidence.
+- **F2, an accepted residual on hybrid devices.** With a mouse button held on X, a touch tap on Y, then the mouse click on X and Y's compatibility click on Y, the tree gives ['Y','Y'] where base gave ['Y','X']: the mouse click is lost and Y fires twice. Evidence: `D:/knijka-lanes/scratch/tapswallow-verify/attempts/zz-verify-probe.test.ts` (P2); `D:/knijka-lanes/scratch/tapswallow-verify/PROGRESS.md`.
+- **P1, the same on base and tree.** A touch tap owed on X, then a real mouse click on the same X within 700 ms, is eaten by X's own mark (['x']). Evidence: `zz-verify-probe.test.ts` (P1); the verifier's PROGRESS.md.
+- **The named residual.** A detail-1 click with no pointerdown (assistive, or a scripted el.dispatchEvent) within 700 ms of an owed touch tap is suppressed by clause 4, and the owed compatibility click then activates on whatever it lands on. LessonScene's two onClick overrides widened this to the full 700 ms (P3). F4, built at integration, drops both overrides, and lessonscene-tap-override.test.ts pins that each button's own compatibility click is consumed and nothing is left owed. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/tapswallow-r1.json` (build report «Assistive-technology argument»; verify finding F4); `zz-verify-probe.test.ts` (P3).
+- **Two onClick-only controls, PROBABLE and unmeasured,** may sit under a tap's re-targeted compatibility click; base has the same exposure. They are PreDriveChecklist × 8 in the predrive read sheet that tapWhy opens (the ratchet's UNCOVERED 8 in tap-activation.test.ts) and CalibrationGate under a held result. Evidence: `tapswallow-r1.json` (build census; verify finding F7).
+- **For the founder (T3, T4).** A deliberate double tap on «РАЗБРАХ» still dismisses the fault card that replaces it. A fault removed by a deliberate ✕ has no way back, because dismissedOverlayIds is permanent per id. Evidence: `tapswallow-r1.json` (build report, last paragraph; build owed «Tell the founder»).
+- **A stale tools comment.** tools/mobile/glance-events.mjs:8 cites `tapPointWithin` at hud/tapActivation.ts:159. It is at :198 on `2ee2469` and :301 after this patch. Evidence: `tapswallow-r1.json` (build report TOOLS); `E:/AI driver/tools/mobile/glance-events.mjs:8`.
+
+## Landed: a held desktop MOUSE pedal now ramps on world time at every frame rate. Its ramp advances by the session clock's own step (floor 0, ceiling PHYSICS_MAX_FRAME_DT), not by its own 0.1 s clamp per animation frame. Below 10 fps the pad therefore reaches the same pedal after the same seconds of world as at 60 fps. At 10 fps and above, when the first frame is stamped after the press, what it writes is unchanged (N2 covers the other case). A frame stamped before the press no longer pulls the pedal below its 0.25 start. The cause behind the phone's paused L1 teach card for the overtake-return bill was already replaced in code. This landing pins it: the act's own line «Накара го да спира рязко.» is the line the shell is handed for the paused card (the moment's peekBg and `teachMomentOneLinerBg`) and for the toast's peek, and the pooled «Принуди я да спира рязко.» appears in neither. No shown sentence moves. Nothing billed or graded moves. Measured in process only; the card on the phone is not yet photographed. `catalogue-mouse-pedals:def2df09` (major), `sc-ac-wind-truck-pass:698e58da` (minor) (2026-11-05)
+
+Lane `uismall` ran one round, on base `2ee2469`.
+- **The verdict.** The adversarial verifier SIGNED IT OFF WITH CONDITIONS on 2026-11-05. Its log is `D:/knijka-lanes/scratch/uismall-verify/PROGRESS.md`, entries 10:38–10:53. None of the stop-rule refutations applied. The conditions are below.
+- **The patch.** `uismall-result-r1.patch`: sha256 bd89c831…dd5edb, 7 files, +582/−12, 0 CR bytes.
+  - The verifier built its own lane from `base-2ee2469.tar` and applied the patch there. When it finished, the patch reverse-checked, so its tree equalled base plus the patch. Its probe was moved out to `attempts/`. engine.ts and LessonPlayShell.tsx equalled base.
+  - The patch is cumulative against `2ee2469`, not against HEAD. The landing's HEAD `de8f8f0` is a TEMP commit, never pushed: `a981f78` plus gate-wt (lanes waitcard + tapswallow, as integrated in `D:/knijka-lanes/integ-wt`). wt and us go through ONE main-tree gate as ONE commit on `a981f78`.
+  - The 7 patch files are byte-identical at `2ee2469` and `a981f78` (the verifier: `git diff --stat` was empty). The six existing patch files also have equal blob ids at `2ee2469` and `de8f8f0`, and the new `mousePedalRamp.test.tsx` is absent at both (checked when this section was drafted).
+  - **This patch shares no file with wt.** wt touches LessonScene.tsx, advisor.ts, rules/catalog.ts, rules/engine.ts, hud/tapActivation.ts, the reviewed-text manifest, tools/mobile/__tests__/driveline.test.mjs and tests. uismall touches MousePedals.tsx, engine/input.ts (comments only), app/dev/popup-rig/adr009-fixtures.ts, the tests-only liveWindDrive.ts and three test files. The apply is under PROVEN ON de8f8f0.
+
+**The rows are NOT closed by this landing.** `catalogue-mouse-pedals:def2df09` and `sc-ac-wind-truck-pass:698e58da` both stay OPEN.
+- Every number below was measured in process. On def2df09 that means the real MousePedals component, mounted with a captured requestAnimationFrame, a controlled `performance.now` and an exact frame grid; the values read are the ones the pad writes, not its painted face. On 698e58da it means the live wind drive's engine chain and the shell's one-liner function, not a rendered card. No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (Owed, below). Whether its frames close either row is for that wave's judge and verifier.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **def2df09, the mouse ramp** (the builder; the verifier reproduced every number).
+  - On base, `MousePedals.tsx:351` read `const dt = Math.min(0.1, (now - last) / 1000);`. So the pad's own rAF callback was clamped at 0.1 s while the world advances up to 0.5 s per frame (PHYSICS_MAX_FRAME_DT).
+  - The brake after the first frame that reaches 0.5 s of world, by frame rate:
+    - 0.9167 at 60, 30 and 10 fps (W 0.5);
+    - 0.7833 at 8 fps (W 0.5);
+    - 0.65 at 5 fps (W 0.6);
+    - 0.5167 at 4 fps (W 0.5);
+    - 0.3833 at 2 fps (W 0.5).
+  - One 300 ms hitch right after the press left 0.3833 where 0.65 is due.
+  - A first callback stamped before the press subtracted from the 0.25 start: 0.243333.
+  - The builder's throttle at 0.5 s of world: 0.7045 at 60, 30 and 10 fps; 0.6136 at 8; 0.5227 at 5 (W 0.6); 0.4318 at 4; 0.3409 at 2.
+- **A false comment.** `engine/input.ts` :132–133 said the keyboard-ramp defect «could only reach the keyboard channel». The mouse pads write into the same TouchInputSource through a ramp of their own, so that was false.
+- **698e58da, the paused card's line.**
+  - The row's cause was `teachMomentPeekBg(code)`, which keys the line on the code. It was already replaced in the shell before this lane by `teachMomentOneLinerBg`, which prefers the moment's own peekBg; it entered with `9390622` (git show: absent from its parent). The builder measured the cure on base with only the tests-only hook applied.
+  - The dev popup rig (`adr009-fixtures.ts`) still copied the old expression, `peekBg: teachMomentPeekBg(m.code)`. Its four fixture outputs were the same either way (adr009-rig §6).
+
+**What landed.** This is the builder's description; the verifier's measurements are under their own heading.
+- **MousePedals.tsx: one code line and an import.** The ramp's step is now `const dt = sessionClockAdvance((now - last) / 1000);`. That is the session clock's own advance: floor 0, ceiling PHYSICS_MAX_FRAME_DT, NaN gives 0.
+  - So a held pad reads min(1, 0.25 + W/rise) after W seconds of world.
+  - A comment block beside BRAKE_RISE_SEC states the rule as built, the frame-timed residual and the pre-press residual (Not cured, below).
+  - The builder made one comment-only correction before cutting the patch: «a fifth of the pedal per second of world» became «less pedal per second of world, a fifth at 2 fps».
+- **engine/input.ts: comment only.** The false sentence is replaced: the phone's drive pad is not ramped, and the desktop mouse pads ramp on their own, now on the session clock. The comment-stripped token streams of base and tree are identical: 2,117 tokens (the builder). The verifier's TypeScript-printer diff is empty.
+- **app/dev/popup-rig/adr009-fixtures.ts (dev rig):** `peekBg: teachMomentOneLinerBg(m)`, the shell's own expression.
+- **liveWindDrive.ts (tests-only helper):** an optional `onStep(t, LessonStepResult)`, called at both applyTick sites before `.state` is taken.
+  - Neither consumer, wind-truck-pass-restage or crosswind-live-lane-hold, compares the outcome object whole.
+  - The verifier ran both files in full green without RECORD_WIND_CENSUS.
+- **New and extended tests.**
+  - `components/sim/__tests__/mousePedalRamp.test.tsx`, 46 tests, T1–T7. It covers world time at 60/30/10/8/5/4/2 fps for brake and throttle, the 300 and 700 ms hitches, never running backwards, no change at ≥10 fps, release, the channel stamps, and a comment-stripped source pin.
+  - wind-truck-pass-restage.test.ts gains the describe «698e58da …»: L1 and L3, 62 km/h, the 3.0 m return.
+  - adr009-rig.test.ts gains §6, 2 tests.
+- **What did not move** (the builder; the verifier found the same):
+  - the rise times 0.75 / 1.1 s, the 0.25 start and the instant release;
+  - `atMs` written only on press and release, and wake / yield;
+  - every Cyrillic literal: MousePedals 10/10, input.ts and adr009-fixtures with no change (the verifier's literal-node count);
+  - TouchControls.tsx, touch.ts, the code of input.ts and reverseAssist.
+- **Reach.**
+  - Builder and verifier: MousePedals is imported only by LessonScene.tsx. Outside the product only `tools/clips/headless/predrive-mouse-drive.mjs` refers to it, through the selector `[data-pedal="СПИРАЧКА"]`. The verifier found every other hit to be a comment.
+  - The builder: nothing under modules/sim drives it, not traces, the recorder, liveChainReplay, liveWindDrive, rules or lessons. So every graded output is unchanged by construction. The 2,434-cell census was not run.
+  - Under a slow headless frame rate the clip tool's 900 ms brake hold now gets more pedal per second of world. Its selectors and strings are unchanged (the builder).
+
+**What the student sees.** No sentence was added, removed or changed. On a desktop machine below 10 fps, holding a mouse pad, the written pedal now rises as fast in world time as it does at 60 fps. Base gave, for example, 0.3833 against 0.9167 at 2 fps. The pad's fill is painted from the same value in the same step (code), but only the owed device cell reads the painted face. At 10 fps and above nothing visible changes. The 698e58da pin moves nothing the student sees, because the act's line was already the one the shell was handed.
+
+**What the verifier reproduced.** It used its own lane and its own probe on the real component. The probe carries an independent oracle: rapier's clamp is written out in the probe, not imported. Output: `D:/knijka-lanes/scratch/uismall-verify/probe.txt`.
+- **Base reproduces the row's evidence exactly:** 0.9167 / 0.7833 / 0.65 / 0.5167 / 0.3833 at 60–10 / 8 / 5 / 4 / 2 fps, 0.3833 after the 300 ms hitch, and 0.243333 on a negative first step.
+- **On the tree, every frame matches min(1, 0.25 + W_k/rise),** to at most 1.4e-15, for brake and throttle at all seven rates.
+  - Over 80,000 random frames (5–2,500 ms long, with the first rAF from 16 ms before to 600 ms after the press), the value never decreased.
+  - The 300 ms hitch gives 0.65 and the 700 ms hitch 0.9167. A negative first step stays at exactly 0.25.
+- **At 10 fps and above** (400 jittered runs of 1–100 ms frames), the tree's writes equal the base formula with a difference of 0.
+- **Release** writes 0 at the event's timeStamp, cancels the queued callback and writes nothing afterwards.
+- **The source diff, comments stripped with the TypeScript printer.**
+  - input.ts: no difference.
+  - MousePedals.tsx: only the import and the dt line.
+  - adr009-fixtures.ts: only the import and the peekBg expression.
+- **698e58da's cause is cured in code, as the builder said** (in process; the row stays open).
+  - The verifier's own scan drove the 3.0 m return at L1–L5 and read every step's toasts and teach moments (`scratch/uismall-verify/bscan.txt`).
+  - The bill is LANE_ENTRY_FORCED_BRAKING, detail overtakeReturn, with the act's title «Прибиране твърде близо пред изпреварения», at t = 20.983 on every rung. Every toast's peek is «Накара го да спира рязко.».
+  - The L1 moment carries the same line as its peekBg and through `teachMomentOneLinerBg`, with chip «Учебен момент», charged = true and lessonMistake undefined.
+  - The pooled line appears 0 times. The B pin passes 2/2.
+- **Red on base.** The builder's mousePedalRamp test fails 15 of 46 on base, all on assertion text.
+- **Mutants: nine, each anchored by text, run alone and restored by sha256 (MATCH every time).** All nine were killed on assertion text, never on a timeout or TypeError:
+  - M1, the 0.1 clamp restored: 14 failed, «brake 4 fps frame 1 … reads 0.3833, world time asks 0.5833»;
+  - M2, a literal Math.min(0.5) with no floor: 4 failed, «a frame stamped before the press moved the pedal: expected 0.2433 to be 0.25»;
+  - M3, Math.max(0, Math.min(0.5)): 3 failed, «a second clamp number in the ramp's step: 0.5»;
+  - M4, no stopRamp: 14 failed, «the ramp's callback is still queued after the release: expected 1 to be +0»;
+  - M7, `last = now` dropped: 21 failed;
+  - M8, release without atMs: 16 failed, pedalStampsOverlay included;
+  - M9, a 0.3 start: 39 failed;
+  - M5, engine.ts's peekBg spread dropped: «the moment's own one-liner: expected undefined to be 'Накара го да спира рязко.'»;
+  - M6, the one-liner returns the code-keyed line: «expected 'Принуди я да спира рязко.' to be 'Накара го да спира рязко.'».
+  - Restores: MousePedals ab8f81b4…, engine.ts b9776766…, LessonPlayShell d0753e76….
+- **Its test runs.**
+  - 9 targeted files, 261/261: mousePedalRamp 46, pedalStampsOverlay 17, sessionClock 11, teachPeekSummary 10, adr009-rig 29, predrive-mouse-first 12, teach-moment-one-liner 8, input 25 and reverseAssist-cadence 103.
+  - wind-truck-pass-restage in full plus crosswind-live-lane-hold: 169/169.
+  - reviewed-text-manifest, caption-truth, keep-right-claim-census and src/modules/clips/: 418/418 tests, with no re-recording. The one red file is whyPanel.test.ts, ENOENT on docs/, because the lane has no docs/.
+- **The tools test.** The one tools test that reads input.ts, `tools/mobile/__tests__/path-follow.test.mjs:851`, matches only code patterns. The verifier reports that all of them still match. Its report does not say it ran the test (lanes cannot run tools tests), so the main-tree gate runs it.
+- **Not run by the verifier:** the catalogue-wide directory run, which had not finished when it reported; the full lessons/scenario/__tests__ directory; and tsc. That is condition C1.
+- **The builder's numbers, not re-measured by a verifier.**
+  - components/sim: 1,824/1,825. The one red is touchHintLifetime, ENOENT on tools/.
+  - engine + procedures + popup-rig + lessonWind + clips + lessons/__tests__: 3,186 passed, 165 skipped, 0 failed, with two file-level ENOENTs from the absent docs/ and tools/.
+  - lessons/scenario/__tests__: 211 files, 5,180 passed, 1 skipped.
+  - tsc: 22 errors, the lane's environment baseline, none in a patch file.
+  - On `a981f78` plus the patch: mousePedalRamp + adr009-rig 75/75, the B pin 2/2, and its M1–M6 killed there.
+  - The F9 model (below).
+
+**The conditions, and how each stands.**
+
+**C1. The catalogue-wide proof on the combined tree. PROVEN ON de8f8f0 (below).** The verifier did not finish its directory run, and the integrator killed its orphaned vitest. This landing's proof ran these on `de8f8f0` plus the patch, one at a time, every run to completion, all green or at their baseline:
+- components/sim/ (all), modules/sim/engine, procedures and the app/dev/popup-rig tests;
+- lessons/__tests__ and lessons/scenario/__tests__, wind-truck-pass-restage and crosswind-live-lane-hold included;
+- hud/, src/modules/clips/ and rules/, and also orchestrator, traffic, runtime, scene, vehicle, world and traces;
+- tsc, at its 21-error environment baseline, none in a touched file;
+- the tools tests that read input.ts or MousePedals: tools/mobile/__tests__/path-follow.test.mjs, which reads input.ts's ramps from source, green in the full tools run (the integrator also lists tools/mobile/ready.test.mjs, green). No tools test names MousePedals or data-pedal. The one tools file that does, `tools/clips/headless/predrive-mouse-drive.mjs`, is a clip tool, not a test, and its selector is unchanged.
+
+**The reviewed-text manifest. PROVEN ON de8f8f0 (below).** uismall moves no shown string. The proof re-recorded the manifest on the combined tree, and nothing moved beyond what gate-wt already holds: `git diff` was empty after the re-record.
+
+**C2. The device cells. OWED.** No in-process proof closes either row (Owed, below).
+
+**N1, a comment. RECORDED.** «Seconds of the world» is true only up to timestamp jitter.
+- The ramp's dt comes from rAF timestamps. R3F/rapier's frame delta comes from the clock read inside R3F's own callback.
+- Both are clamped the same way, so per frame they agree up to that jitter, not bit for bit.
+- It is a comment, not shown text, and changes nothing.
+
+**N2, intended.** When the first rAF is stamped before the press (Chromium can do this), even at 60 fps the tree differs from base by up to one 60 Hz step. Base subtracted δ/rise; the tree floors the step at 0. The brief's T4 scopes «nothing moves» to a first rAF after the press.
+
+**Not cured by this landing.**
+- **The frame-timed residual (the builder's F9; ADR-014's stated class; recorded, not built).** Each frame's world still steps with ONE mouse-pedal value, the one the ramp wrote the frame before.
+  - The reason is the order inside a frame. R3F requests its next frame as the first statement of its own loop. The ramp re-requests at the end of its step. The physics substeps run inside R3F's callback under `updateLoop="follow"`. So the world's read (VehicleRig :672 / :703) runs first in every frame. The verifier checked these citations: R3F 9.6.1 esm 16071–16072 and cjs 7899–7900, LessonScene 2934 and 3003–3008, and VehicleRig 672 and 703.
+  - The builder's model of brake·s over the first second of a hold (a model, not a measurement): 0.783 at 60 fps, base and tree alike; at 2 fps, 0.317 on base and 0.583 on the tree.
+- **The pre-press residual (the builder; not built, not measured).** When the first callback is stamped before the press, its step floors at 0, but `last` restarts at that earlier timestamp. So the next step also counts the δ between that frame's start and the press. The source comment puts this under one 60 Hz step in any real browser.
+- **What the patch does not touch.** The phone's drive pad, the keyboard ramp and the gamepad are untouched by this patch.
+
+**What this landing supersedes in doc 88.** Nothing. The reverseatrest landing's line «their requestAnimationFrame ramp writes no transition … `catalogue-mouse-pedals:def2df09` is a separate open row this lane did not touch» (main tree's working copy, :15837) is still true: the ramp still writes no transition, and only its step changed.
+
+**ADR.** No ADR text is owed: this is input fidelity and a display pin only.
+- ADR-014 already lists «the cabin's discrete channels and the pedals» as frame-timed (doc 07 :366, :464–:471, :489).
+- No sentence of doc 07 that names the mouse pedals is made false by this patch (checked: :949, :1081, :1129 D-4, :1246 R4). The pads' transitions are still stamped with the pointer event's timeStamp, and per-step human pedal integration is still not built.
+- The builder proposed one line under ADR-014's «Stated as frame-timed». This landing does not carry it.
+
+**PROVEN ON de8f8f0** (the integrator's run on 2026-11-05, from 15:41 to 19:06, in the worktree `D:/knijka-lanes/integ-us`, log `D:/knijka-lanes/scratch/us-land/PROGRESS.md`, run outputs `scratch/us-land/run-*.txt`. The merge verifier ran the mutants, lessons/scenario/__tests__, one combined run of four directories and the tools tests itself.) `de8f8f0` is a TEMP commit, never pushed: `a981f78` + gate-wt, the waitcard and tapswallow landings as integrated in `D:/knijka-lanes/integ-wt`, the V1 test fix included. So these runs measure all three lanes together. wt and us go through ONE main-tree gate as ONE commit on `a981f78`.
+- **The apply.** The worktree was clean at `de8f8f0fd2fb`, and the patch's sha256 matched (bd89c831…). `git apply --3way --index --binary` reported each of the 6 modified files as applied cleanly, so no 3-way merge was needed, and the new mousePedalRamp.test.tsx went in by direct application. 0 conflicts; 7 files, +582/−12.
+- **No file is shared with wt.** The six existing patch files are byte-identical at `2ee2469` and `de8f8f0`, the new mousePedalRamp.test.tsx is absent at both, and none of the 7 is in the 97-file diff `2ee2469..de8f8f0` (the integrator and the merge verifier).
+- **The gate patch.** `D:/knijka-lanes/gate-us.patch`, sha256 bd89c831fe82560664b85fda8351b21957f0b7c41d42d1c6db74252470dd5edb, 7 files, +582/−12, 0 CR bytes, byte-identical to the lane patch `uismall-result-r1.patch`. No file in it is CRLF.
+  - The merge verifier found `git diff --cached --binary de8f8f0` hashing to the same sha, with the working tree equal to the index and nothing untracked.
+  - It applied the lane patch with `--cached --3way` to a temporary index read from `de8f8f0`. The tree, 89ffe57a…, is the staged index's, so the stage is the lane patch and nothing else. The product change is MousePedals.tsx line 383, `sessionClockAdvance((now - last) / 1000)`, plus the import and a comment; engine/input.ts changes in a comment only.
+- **The pins.** The verifier named no surviving mutant. Because wt changed the tree underneath, the integrator re-ran four mutants on the combined tree, one at a time, each killed on assertion text and restored with a sha256 MATCH:
+  - M1, MousePedals.tsx:383 back to `Math.min(0.1, (now - last) / 1000)`, the base defect: mousePedalRamp, 14 failed, «brake 8 fps frame 1 (W = 0.1250 s of world): the pad reads 0.3833, world time asks 0.4167: expected 0.0333 to be less than or equal to 0.0222». Restored ab8f81b4…;
+  - M6, LessonPlayShell.tsx:1425 teachMomentOneLinerBg returning the pooled line: the 698e58da pin, «the line the shell prints on the paused card: expected 'Принуди я да спира рязко.' to be 'Накара го да спира рязко.'». Restored 8e53e17b…;
+  - M5, lessons/engine.ts:3042, the charged notePause arm dropping its peekBg: the 698e58da pin, «the moment's own one-liner: expected undefined to be 'Накара го да спира рязко.'». Restored 1e3c8172…;
+  - MR, adr009-fixtures.ts:408 back to `teachMomentPeekBg(m.code)`: adr009-rig §6, «expected '/** ...' to contain 'peekBg: teachMomentOneLinerBg(m),'». Restored a3f9bb68….
+  - The combined tree's key runs: mousePedalRamp and adr009-rig 75/75, and the B pin 2/2.
+- **The merge verifier** ran M1, M6, M5 and MR again itself, each killed on the same text and restored byte for byte, and the lane verifier's M7 (`last = now` dropped): 21 failures, for example «brake 60 fps frame 3 … the pad reads 0.3833, world time asks 0.3167». mousePedalRamp, adr009-rig and wind-truck-pass-restage: 167/167. Its two notes, neither blocking:
+  - V-N1: MR is killed only by a source-text assertion. The rig's moments carry no act, so both helpers return the same string and the mutant is behaviourally equivalent there. It is a dev-rig fixture, not product code; if the rig ever gains an act-split moment, an executed assertion is owed on it.
+  - V-N2: the B pin calls the exported pure function teachMomentOneLinerBg, not the shell's rendered card. The shell's call site (LessonPlayShell.tsx:6845) is held by an earlier source pin; the verifier's probe mutant there was killed in the lesson-ui teach-card tests and restored. The phone photograph stays owed (C2).
+- **The reviewed-text manifest.** reviewed-text-manifest.test.ts passed 49/49 without recording. Re-recorded with RECORD_REVIEWED_TEXT_MANIFEST=1 (49/49), and `git diff` was empty afterwards: nothing moved. The merge verifier's re-record gave the same.
+- **The integrator's directories,** one at a time, each rc=0:
+  - lessons/__tests__: 128 files, 2,465 passed, 165 skipped (803 s);
+  - lessons/scenario/__tests__: 214 files, 5,228 passed, 1 skipped (5,262 s), wind-truck-pass-restage (the 698e58da pin), crosswind-live-lane-hold with no RECORD_WIND_CENSUS, and the reviewed-text manifest included;
+  - src/components/sim/ (all): 111 files, 1,846 passed (1,165 s), mousePedalRamp 46 and touchHintLifetime included;
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 110, 1,929 (881 s); traffic 53, 675; runtime/__tests__ 49, 902; scene 48, 799; vehicle 22, 299; world 135, 2,409; hud/__tests__ 74, 1,454; traces 171, 2,376;
+  - src/modules/clips/: 19 files, 302 passed. The clip-plan freshness gate passed, with no regeneration;
+  - modules/sim/engine/, modules/sim/procedures/ and app/dev/popup-rig/: 20 files, 467 passed, adr009-rig §6 and input.test included.
+  - On this tree the V1-fixed pins ran green: touchHintLifetime inside components/sim, and lessonscene-tap-override inside hud/.
+- **The merge verifier's own runs,** to completion: lessons/scenario/__tests__ 214 files, 5,228 passed, 1 skipped (4,211 s); components/sim, engine, procedures and app/dev/popup-rig in one run, 131 files, 2,313 passed (1,190 s).
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment (api/health/route.ts 4, lib/db.ts 1, the admin store 3, auth 2, learning 3, lesson/progress 1, outcomes 1, payments 2, privacy 1, sim/lessons/store 2, sim/traces/attemptStore 1). None is in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4/4 runs it): 2,030 tests, 2,007 pass, 8 fail, 0 cancelled, 11 skipped, 4 todo (2,006 s). The 8 classify exactly as on the wt landing:
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»);
+  - 6 are «could not find .audit-frames/findings» (count-agreement and finding-reader, file-level, and build-redrive §9(a), (b), (d) and (e)): .audit-frames is gitignored and exists only in `E:\AI driver`, which was not touched;
+  - 1 is lane-evidence, «could not resolve the playwright package»; re-run with KNIJKA_PLAYWRIGHT_ROOT="E:/AI driver/tools/clips/headless/" (a read-only resolve) it is 10/10.
+  - path-follow.test.mjs, which reads input.ts's ramps from source, and ready.test.mjs have no red. No tools test was taught or changed.
+  - The merge verifier's own run: the same 8 failures (2,079 s).
+  - The main-tree gate decides.
+- **Left as found.** The worktree is staged with only the 7 patch files, nothing untracked and no integ-us process running; the mutant backups were moved to `scratch/us-land/attempts/`. The merge verifier left the staged diff hash unchanged.
+
+**Owed.**
+- **def2df09: the PC device cell, through the drive rig, right after the gate.**
+  - Set-up: Chromium with the CDP CPU throttle at ≤ 5 fps and at ≤ 2.5 fps, against an unthrottled 60 fps control.
+  - The hold: `[data-pedal="СПИРАЧКА"]` with page.mouse.down for 1.5 s of world.
+  - The reading: the PAINTED pad face through a MutationObserver (v = px/5), stamped with `__roadProbe` t.
+  - Pass: v_k = min(1, 0.25 + W_k/0.75) within 0.0222 + 0.002.
+  - The same for ГАЗ from rest: rise 1.1, tolerance 0.0152.
+  - Stopping distance and brake·s are recorded as data only.
+- **def2df09: the same cell on base `2ee2469` as a negative control.** It must show the shortfall, e.g. 0.383 against 0.917 at 2 fps. At 60 fps, base and tree must agree.
+- **698e58da: the phone L1 photograph of the paused teach card,** through the drive rig (rig-w3b H62-04, the 3 m return). Expected: chip «УЧЕБЕН МОМЕНТ», title «Прибиране твърде близо пред изпреварения», one-liner «Накара го да спира рязко.». Then the phone L3 H62-04 bill frame, whose peek must show the same line. The row closes only on these frames.
+- **The tools/ tests on the main tree:** path-follow.test.mjs, which reads input.ts, and the 7 worktree-environment reds (PROVEN ON de8f8f0). The main-tree gate decides.
+- **The founder is told** (the builder's status line): the mouse pedals now ramp on world time at every frame rate. On a very slow machine each frame still applies one pedal value, the previous frame's; that is recorded, not changed.
+- **Optional, not filed:** integrate the mouse ramp at read time inside TouchInputSource, if equal delivered impulse per frame is wanted (the builder's alternative R2(b); not built). It would answer the first item of «Recorded, not filed».
+
+**Recorded, not filed** (candidates from the lane reports, not open rows, under the founder's order of 2026-10-19 of no new triage rounds).
+- **The mouse pedal is applied one frame late.** Each frame's world steps with the ramp value written the frame before. The builder's model of brake·s over the first second of a hold is 0.583 at 2 fps against 0.783 at 60 fps (not measured). Within ADR-014's stated frame-timed class. Evidence: `uismall-r1.json` build report STEP 0 (c); the MousePedals.tsx comment «WHAT STAYS FRAME-TIMED».
+- **Pre-press time is credited.** A first rAF stamped before the press credits that frame's pre-press δ on the next step, under one 60 Hz step in any real browser by the source comment (not measured). Evidence: the MousePedals.tsx comment «AND ONE RESIDUAL»; `uismall-r1.json` build report (the F6 residual, not built).
+- **The ramp's clock and the world's clock.** They come from different timestamps (rAF timestamps against R3F's in-callback clock), so pedal time and world time agree per frame only up to jitter. The magnitude is unmeasured. Evidence: `uismall-r1.json` verify N1.
+
+## Integrator note: P-A9 (`sc-ac-crosswind:a9db1738`) (2026-11-05)
+
+This commit also carries the integrator ruling P-A9, made on 2026-11-05 under the founder's 2026-10-08 and 2026-10-19 delegations; it is the founder's to veto. It is text only. It rides this gate, but it is none of the three landings above.
+- **ADR-012 gains «Amendment 2026-11-05».** The wind's visible manifestation in the car's attitude is the pull: the yaw and drift whenever the correction is short or released, and the size of the correction the student must hold. The cockpit head-lean carries the wind's own, unexaggerated F/m (about 0.1 g) and is a supporting cue, not promised visible on the keyboard, where the driver's own taps mask it. The release trigger the lesson guarantees is the chip's flip «Поривът отслабва — връщай волана плавно и без втори замах.» at L1, and the world (the canopies and the dust) and the drift at L3 and above. ADR-012's supporting decision «so a lane-holder still feels the wind» now reads «so a lane-holder's head still carries the wind's own F/m (a supporting cue, not promised visible on keys — «Amendment 2026-11-05» below)».
+- **The header of `vehicle/cockpitLean.ts` is corrected with it: comment only, no code.** It called the lean's easing «the observable trigger step 6 asks the student to release the correction on». It now calls that easing a supporting cue for the release, not promised visible on the keyboard, and names the trigger the lesson guarantees: the chip's flip at L1, and the world and the drift at L3 and above.
+- **Rig wave w3z** (2026-11-05, at `a981f78`) measured the pull and the correction size on the device under this reading.
+- **The row stays open** on its other clauses. The founder's manual drive via the rig on the keyboard path, PC and phone (his 2026-10-08 item 4), stays owed.
+- Evidence: `D:/knijka-lanes/scratch/wtus-land/adr-fixes.json` and `comment-fixes.json`, written by `make-pa9-fixes.cjs`, which checks that each replaced text occurs once in the main tree; the ruling's text in `C:/Users/Ljh/.claude/projects/E--AI-driver/finish-2026-09-26/make-rig-wave.cjs` (LATER_RULINGS, «P-A9»).

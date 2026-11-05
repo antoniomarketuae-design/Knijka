@@ -58,7 +58,10 @@ import {
   ROADWORKS_SHIFT_L5,
   TRUCK_SPRAY_L3,
   notTakenResult,
+  teachMoments,
+  teachNotificationItems,
 } from "../adr009-fixtures";
+import { teachMomentPeekBg } from "@/components/sim/lesson-ui/LessonPlayShell";
 
 const DIR = path.join(process.cwd(), "src", "app", "dev", "popup-rig");
 const read = (file: string): string => {
@@ -457,5 +460,21 @@ describe("§5 · F-P3 — each result fixture lands on the verdict it is caption
     const spec = scenarioById("sc-rb-lane-choice");
     expect(spec).toBeDefined();
     expect(LANE_CHOICE_L3.titleBg.startsWith(`${spec!.titleBg} · Ниво 3`)).toBe(true);
+  });
+});
+
+describe("§6 · R4 (lane uismall, 2026-11-05) — the teach item's one-liner is the shell's own expression again", () => {
+  it("adr009-fixtures.ts builds `peekBg` with `teachMomentOneLinerBg(m)`, as LessonPlayShell does, and no longer names the code-keyed helper", () => {
+    const src = read("adr009-fixtures.ts");
+    expect(src).toContain("peekBg: teachMomentOneLinerBg(m),");
+    expect(src).not.toContain("teachMomentPeekBg");
+  });
+
+  it("…and its four outputs are unchanged: each equals the code-keyed line it printed before (the moments carry no act)", () => {
+    const moments = teachMoments();
+    const items = teachNotificationItems();
+    for (const k of ["freeFirst", "lessonFirst", "lessonCharged", "charged"] as const) {
+      expect(items[k].peekBg, k).toBe(teachMomentPeekBg(moments[k].code));
+    }
   });
 });

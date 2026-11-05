@@ -308,11 +308,13 @@ displacement rises strictly with speed from 8 to 110 км/ч and the hands-off p
 is included (the founder declined «analog only»).
 
 **Supporting decisions.** One shared wind mapping for LessonScene, VehicleRig and the test harness; the cockpit lean read through
-`cockpitLeanFromSim` on the road wheels, so a lane-holder still feels the wind; the recorder writes the held correction into the correct demos'
+`cockpitLeanFromSim` on the road wheels, so a lane-holder's head still carries the wind's own F/m (a supporting cue, not promised visible on keys — «Amendment 2026-11-05» below); the recorder writes the held correction into the correct demos'
 wheel channel (`heldWheel`); the second-swing cue reads the student's hand.
 
 **Consequences.** Hands-off is now OFF_CARRIAGEWAY on every rung of both wind lessons; the audit harness's right legs must hold a correction.
 Owed: the founder's own drive on keyboard and phone; the truck-pass lesson's staging (row `sc-ac-wind-truck-pass:ff1d4290`).
+
+**Amendment 2026-11-05 (integrator ruling P-A9, made under the founder's 2026-10-08 and 2026-10-19 delegations; the founder's to veto; row `sc-ac-crosswind:a9db1738`).** The wind's visible manifestation in the car's attitude is THE PULL: the yaw and drift whenever the correction is short or released, and the size of the correction the student must hold. The cockpit head-lean carries the wind's own, unexaggerated F/m (about 0.1 g) and is a SUPPORTING cue; it is not promised visible on the keyboard, where the driver's own taps mask it. The release trigger the lesson guarantees is the chip's flip «Поривът отслабва — връщай волана плавно и без втори замах.» at L1, and the world (the canopies and the dust) and the drift at L3 and above. No code changes with this amendment; the `cockpitLean.ts` header that called the lean's easing «the observable trigger» is corrected with it. Rig wave w3z (2026-11-05, at `a981f78`) measured the pull and the correction size on the device under this reading; the row stays open on its other clauses.
 
 ## ADR-013: The U-turn act is decided from the car's heading and the road
 

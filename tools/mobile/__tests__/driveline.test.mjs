@@ -2783,6 +2783,15 @@ describe("§L the lawful wait is read in every form advisor.ts can say it", () =
     assert.doesNotMatch(card, GLASS);
   });
 
+  it("the dark-lamp officer's card claims no wait either", () => {
+    const m = ADVISOR.match(/const CONTROLLER_WAIT_CARD_DARK_BG =\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+);/);
+    assert.ok(m, "CONTROLLER_WAIT_CARD_DARK_BG is not a concatenation of literals any more — this reader cannot see it");
+    const card = [...m[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => JSON.parse(`"${x[1]}"`)).join("");
+    assert.match(card, /регулировчик/u, "the parse returned something that is not the officer's card");
+    assert.doesNotMatch(card, CARD);
+    assert.doesNotMatch(card, GLASS);
+  });
+
   it("the dark-lamp officer's halt is a lawful wait on the glass, and its card is the officer's — never a wait card", () => {
     const where = "OFFICER_LAMPS_DARK_HALT_COPY";
     // The notices: while the officer holds the student, the glass says so in the
@@ -2798,8 +2807,14 @@ describe("§L the lawful wait is read in every form advisor.ts can say it", () =
     // drift into reading as a wait (a leg holding on a card cannot see him turn).
     for (const field of ["cardBg", "convictedCardBg"]) {
       assert.ok(
-        new RegExp(`(?:^|[\\s{,])${field}:\\s*CONTROLLER_WAIT_CARD_BG\\s*,`).test(OFFICER.block),
-        `${where}.${field} is no longer the officer's card CONTROLLER_WAIT_CARD_BG — teach this reader the new shape`,
+        new RegExp(`(?:^|[\\s{,])${field}:\\s*CONTROLLER_WAIT_CARD_DARK_BG\\s*,`).test(OFFICER.block),
+        `${where}.${field} is no longer the dark-lamp officer's card CONTROLLER_WAIT_CARD_DARK_BG — teach this reader the new shape`,
+      );
+    }
+    for (const field of ["cardPeekBg", "convictedCardPeekBg"]) {
+      assert.ok(
+        new RegExp(`(?:^|[\\s{,])${field}:\\s*OFFICER_DARK_PEEK_BG\\s*,`).test(OFFICER.block),
+        `${where}.${field} is no longer the dark card's peek OFFICER_DARK_PEEK_BG — teach this reader the new shape`,
       );
     }
     // Nothing else in the table reads as a wait, on either surface.

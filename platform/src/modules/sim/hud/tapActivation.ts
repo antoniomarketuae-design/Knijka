@@ -83,6 +83,67 @@
  *      every future touch for the rest of the session. That failure mode is not
  *      getting a second home in this file.
  *
+ * 5. A CLICK THAT LANDS ON A DIFFERENT CONTROL — 2026-11-05, lane «tapswallow»,
+ *    sc-roundabout-entry:b63a8fea (rig-w3b phone-L1-ION, iPhone 16 landscape).
+ *    The student strikes the island; the phone pauses on the teach card with
+ *    «+2», and ONE `locator.tap` on «РАЗБРАХ» clears it — and in the same rAF
+ *    the peek shows the OLDER hint at «+0». The graded −10 «Удар в неподвижно
+ *    препятствие» never reached the phone glass. The ack runs in our
+ *    `pointerup`, React commits that discrete update before the browser
+ *    dispatches the touch's compatibility `click`, and the next card's ✕ sits
+ *    where «РАЗБРАХ» was (frame 14: 17 CSS px apart, inside its 44 px). Rule
+ *    1's mark belonged to «РАЗБРАХ»'s hook; the ✕ is a DIFFERENT hook with no
+ *    mark, so the click activated it and removed a scored fault for good. (The
+ *    re-target itself is PROBABLE until the owed device drive; the elimination
+ *    and the composed replay are in the lane's PROGRESS.md.)
+ *    → so the marks fold into ONE PAGE-WIDE LEDGER (`TapClickLedger`) that
+ *      every `useTapActivation` hook obeys. Every mark is also one ledger
+ *      entry, so no compatibility click is counted twice, and the ledger
+ *      COUNTS (two taps before either click are two entries, never a flag).
+ *      A pointer-borne click is decided by this ORDERED rule, first match wins
+ *      (`tapClickActivates`):
+ *        (1) `detail === 0` → ACT, and consume nothing. THIS is the clause that
+ *            keeps keyboard, switch access and screen-reader activation from
+ *            ever being eaten: it is answered before the ledger is read.
+ *        (2) this hook holds its own unexpired mark → consume it and its
+ *            matching ledger entry; SUPPRESS (rule 1, unchanged).
+ *        (3) this hook holds the AUTHORIZING press → clear it; ACT. That is the
+ *            page's most recent pointerdown, on this hook, that did NOT act on
+ *            pointerup: any mouse press, or a touch/pen press released outside
+ *            the rect. A touch/pen press that acted never authorizes — it left
+ *            a mark instead. Cleared by its click, by pointercancel, by the
+ *            next pointerdown on any hook, and TAP_CLICK_SUPPRESS_MS after its
+ *            pointerup (a press still held does not expire, so a long mouse
+ *            press keeps its click).
+ *        (4) the ledger holds an unexpired entry → consume ONE, the oldest
+ *            (with its owner's mark); SUPPRESS. The new clause: the
+ *            compatibility click of a tap that already acted, wherever a
+ *            re-render put it.
+ *        (5) otherwise → ACT.
+ *      «Suppression may only ever cost a duplicate, never an only» still holds:
+ *      a click is refused only while a touch activation that ALREADY ACTED is
+ *      owed its click (≤ TAP_CLICK_SUPPRESS_MS), and a click with a press of
+ *      its own on this hook, or with nothing owed, always acts.
+ *      THE ONE RESIDUAL, named: a detail-1 assistive click with no pointerdown
+ *      that arrives while a touch tap is still owed its click (≤ 700 ms) is
+ *      suppressed by (4) — and the owed click, when it then arrives, finds the
+ *      ledger empty and acts on whatever it lands on. Keyboard / switch /
+ *      programmatic activation (detail 0) is never in that residual.
+ *      "The next pointerdown on any hook" stands in for "any pointerdown on the
+ *      page" without loss: an owed entry is only ever made by a hook's own
+ *      pointerdown + pointerup, and that pointerdown has already replaced any
+ *      older authorizing press, so a press no hook saw can never stand between
+ *      an owed entry and the click that (4) refuses.
+ *    → the ledger is bound in ONE place, `useTapActivation` (the page
+ *      singleton below). `createTapActivationState()` with no argument gets a
+ *      FRESH PRIVATE ledger — the per-hook behaviour every older test was
+ *      written against. `tap-page-ledger.test.ts` pins the call sites and the
+ *      binding.
+ *    → NOT REPAIRED HERE, recorded for the founder: a deliberate SECOND tap on
+ *      the next card's ✕ is a real press and acts (layout and timing are out of
+ *      this rule's reach), and a fault removed by a deliberate ✕ still has no
+ *      way back.
+ *
  * ─────────────────────────────────────────────────────────────────────────────
  * ─────────────────────────────────────────────────────────────────────────────
  * ─────────────────────────────────────────────────────────────────────────────
@@ -160,16 +221,58 @@ export type TapPoint = { x: number; y: number };
 /** The four numbers of a `DOMRect` that decide containment. */
 export type TapRect = { left: number; top: number; right: number; bottom: number };
 
+/** One compatibility click the page is still owed (rule 5 in the header). */
+export type TapOwedClick = {
+  /** Same clock as the marks; the entry is gone at this instant. */
+  expiresAt: number;
+  /** The hook whose activation is owed it — its mark is the same click. */
+  owner: TapActivationState;
+};
+
+/** The page's most recent pointerdown, while it can still authorize a click. */
+export type TapAuthorizingPress = {
+  owner: TapActivationState;
+  pointerId: number;
+  /** null while the press is still held; set at its pointerup. */
+  expiresAt: number | null;
+};
+
+/**
+ * THE PAGE-WIDE LEDGER (rule 5). A COUNT of owed clicks, oldest first, and the
+ * one press that may authorize a click on its own hook.
+ */
+export type TapClickLedger = {
+  owed: TapOwedClick[];
+  press: TapAuthorizingPress | null;
+};
+
+export function createTapClickLedger(): TapClickLedger {
+  return { owed: [], press: null };
+}
+
 export type TapActivationState = {
   /** `pointerId` of the press this element owns, or null when idle. */
   pointerId: number | null;
   /** Expiry timestamps (ms, same clock as `now`) of activations still owed a
-   *  compatibility click. Ascending, because `now` never goes backwards. */
+   *  compatibility click. Ascending, because `now` never goes backwards. Each
+   *  one is also an entry in `ledger.owed`. */
   pendingClicks: number[];
+  /** The ledger this hook obeys: the page's (`useTapActivation`) or, when none
+   *  is passed, a private one of its own. */
+  ledger: TapClickLedger;
 };
 
-export function createTapActivationState(): TapActivationState {
-  return { pointerId: null, pendingClicks: [] };
+/**
+ * WHY THE LEDGER RIDES ON THE STATE (rather than a new argument on every
+ * export): the low-level exports and `createTapHandlers` keep their exact
+ * signatures, so no call site and no existing test changes, and the binding is
+ * decided ONCE, where the state is made. Omitted → a fresh private ledger, i.e.
+ * the per-hook behaviour that predates rule 5.
+ */
+export function createTapActivationState(
+  ledger: TapClickLedger = createTapClickLedger(),
+): TapActivationState {
+  return { pointerId: null, pendingClicks: [], ledger };
 }
 
 /**
@@ -209,6 +312,20 @@ function dropExpiredMarks(pendingClicks: number[], now: number): void {
   while (pendingClicks.length > 0 && pendingClicks[0] <= now) pendingClicks.shift();
 }
 
+/** The ledger's own expiry: owed entries on the marks' clock, and a RELEASED
+ *  press TAP_CLICK_SUPPRESS_MS after its pointerup (a held press never). */
+function dropExpiredLedger(ledger: TapClickLedger, now: number): void {
+  while (ledger.owed.length > 0 && ledger.owed[0].expiresAt <= now) ledger.owed.shift();
+  const press = ledger.press;
+  if (press !== null && press.expiresAt !== null && press.expiresAt <= now) ledger.press = null;
+}
+
+/** Remove ONE occurrence of `value` — the same click, held in its other book. */
+function removeOne<T>(list: T[], match: (item: T) => boolean): void {
+  const i = list.findIndex(match);
+  if (i >= 0) list.splice(i, 1);
+}
+
 /**
  * Arm the element for this press. Returns whether we took it.
  *
@@ -221,6 +338,11 @@ export function tapPointerDown(
   pointerId: number,
   pointerType: string,
 ): boolean {
+  // Rule 5: EVERY press — mouse included — is now the page's most recent
+  // pointerdown, so it replaces whatever press could authorize a click before
+  // it. Overwrite, never refuse (rule 4). The per-hook arm below is untouched
+  // by a mouse, exactly as before.
+  state.ledger.press = { owner: state, pointerId, expiresAt: null };
   if (!tapOwnsPointerType(pointerType)) return false;
   // Overwrite, never refuse — see rule 4 in the header.
   state.pointerId = pointerId;
@@ -241,14 +363,31 @@ export function tapPointerUp(
   rect: TapRect,
   now: number,
 ): boolean {
-  if (state.pointerId === null || state.pointerId !== pointerId) return false;
+  // Rule 5: the release of the page's latest press starts that press's
+  // clock, whichever hook hears it (a mouse lifts wherever the cursor is).
+  const press = state.ledger.press;
+  const releasesPress = press !== null && press.pointerId === pointerId && press.expiresAt === null;
+  if (state.pointerId === null || state.pointerId !== pointerId) {
+    if (releasesPress) press.expiresAt = now + TAP_CLICK_SUPPRESS_MS;
+    return false;
+  }
   state.pointerId = null;
-  if (!tapPointWithin(point, rect)) return false;
+  if (!tapPointWithin(point, rect)) {
+    // A touch released outside acted on nothing: its click, if one comes,
+    // is still its own and may act (rule 5, clause 3).
+    if (releasesPress) press.expiresAt = now + TAP_CLICK_SUPPRESS_MS;
+    return false;
+  }
+  // It acted, so it can never authorize a click: it is owed one instead.
+  if (releasesPress) state.ledger.press = null;
   // Prune here as well as in `tapClickActivates`: in the multi-touch case the
   // click never arrives, so this is the only path that runs on a screen where
   // the student presses a button a hundred times in a session.
   dropExpiredMarks(state.pendingClicks, now);
-  state.pendingClicks.push(now + TAP_CLICK_SUPPRESS_MS);
+  dropExpiredLedger(state.ledger, now);
+  const expiresAt = now + TAP_CLICK_SUPPRESS_MS;
+  state.pendingClicks.push(expiresAt);
+  state.ledger.owed.push({ expiresAt, owner: state });
   return true;
 }
 
@@ -257,6 +396,11 @@ export function tapPointerUp(
  * disarm, fire nothing. Called with no id to reset unconditionally.
  */
 export function tapPointerCancel(state: TapActivationState, pointerId?: number): void {
+  // A cancelled press authorizes nothing (rule 5, clause 3) — on any device.
+  const press = state.ledger.press;
+  if (press !== null && press.owner === state && (pointerId === undefined || press.pointerId === pointerId)) {
+    state.ledger.press = null;
+  }
   if (pointerId !== undefined && state.pointerId !== pointerId) return;
   state.pointerId = null;
 }
@@ -274,11 +418,34 @@ export function tapClickActivates(
   detail: number,
   now: number,
 ): boolean {
+  // (1) keyboard / assistive / programmatic: act, and consume NOTHING.
   if (detail === 0) return true;
+  const ledger = state.ledger;
   dropExpiredMarks(state.pendingClicks, now);
-  if (state.pendingClicks.length === 0) return true;
-  state.pendingClicks.shift();
-  return false;
+  dropExpiredLedger(ledger, now);
+  // (2) this hook's own mark: the click its own tap is owed.
+  const own = state.pendingClicks.shift();
+  if (own !== undefined) {
+    removeOne(ledger.owed, (e) => e.owner === state && e.expiresAt === own);
+    return false;
+  }
+  // (3) the press that authorizes this click: a press on THIS hook that did
+  //     not act on its pointerup (a mouse, or a touch released outside).
+  const press = ledger.press;
+  if (press !== null && press.owner === state) {
+    ledger.press = null;
+    return true;
+  }
+  // (4) a click some OTHER hook's tap is owed, landing here after a re-render
+  //     put this control under the finger. One entry, the oldest — and its
+  //     owner's mark with it, so the same click is never counted twice.
+  const owed = ledger.owed.shift();
+  if (owed !== undefined) {
+    removeOne(owed.owner.pendingClicks, (m) => m === owed.expiresAt);
+    return false;
+  }
+  // (5) nothing owed, nothing pressed: act.
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +531,15 @@ export function createTapHandlers(
 }
 
 /**
+ * THE PAGE'S LEDGER (rule 5). One per page, because a compatibility click is
+ * one per touch whichever control a re-render put under it. Bound ONLY inside
+ * `useTapActivation`; nothing else in production makes a ledger or a state
+ * (`tap-page-ledger.test.ts`, the census pin). On the server no event ever
+ * fires, so it stays empty there.
+ */
+const PAGE_TAP_LEDGER: TapClickLedger = createTapClickLedger();
+
+/**
  * Spread onto any button that must work while a thumb is already on the glass:
  *
  *     const tap = useTapActivation(onClick);
@@ -377,6 +553,7 @@ export function useTapActivation(onActivate: (() => void) | undefined): TapActiv
   // `useState` with a lazy initialiser, not a ref: one object per mounted
   // control, created once, read during render without tripping
   // `react-hooks/refs`. The setter is never called, so this costs no render.
-  const [state] = useState(createTapActivationState);
+  // Every hook obeys THE PAGE'S ledger (rule 5) — this line is the binding.
+  const [state] = useState(() => createTapActivationState(PAGE_TAP_LEDGER));
   return useMemo(() => createTapHandlers(state, onActivate, nowMs), [state, onActivate]);
 }

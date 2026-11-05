@@ -59,9 +59,14 @@
  * driver taught to read an inflated cue has been taught to misread the real
  * road (the north-star test). What makes it legible is not size but RHYTHM —
  * the shipped gust envelope breathes the term between 0.057 g and 0.142 g on a
- * 5 s sine, so the lean swells and eases with the gust. That easing is the
- * observable trigger step 6 asks the student to release the correction on, and
- * step 7's „втора корекция" is the mistake he makes when he cannot see it.
+ * 5 s sine, so the lean swells and eases with the gust. That easing is a
+ * SUPPORTING cue for the release step 6 asks for — it is not promised visible on
+ * the keyboard, where the driver's own taps mask a lean this small (integrator
+ * ruling P-A9, 2026-11-05; ADR-012 «Amendment 2026-11-05»). The release trigger
+ * the lesson guarantees is the chip's flip «Поривът отслабва — връщай волана
+ * плавно и без втори замах.» at L1, and the world (the canopies and the dust) and
+ * the drift at L3 and above; step 7's „втора корекция" is the mistake he makes
+ * when he misses it.
  *
  * BIT-IDENTICAL WHEN CALM. `windLatAccelMs2` returns the literal 0 on every
  * lesson that authors no `physics.crosswind` (two templates in the whole

@@ -96,7 +96,7 @@ import {
   makeViolation,
   type ViolationCode,
 } from "@/modules/sim/rules";
-import { teachMomentPeekBg } from "@/components/sim/lesson-ui/LessonPlayShell";
+import { teachMomentOneLinerBg } from "@/components/sim/lesson-ui/LessonPlayShell";
 import type { SimOverlayItem } from "@/modules/sim/hud";
 /**
  * DEEP IMPORT, for the reason `CalibrationGate.tsx:31-34` gives in its own
@@ -389,7 +389,7 @@ export function teachMoments(): Record<
  *
  * EVERY FIELD IS THE SHELL'S OWN EXPRESSION, copied as an expression and not as
  * a result: `teachChipBg`, `teachStakeBg(..., { citeMark: true })`,
- * `teachMomentPeekBg` and `EXAM_POINTS_SHORT_NOTE_BG`, in the shell's order and
+ * `teachMomentOneLinerBg` and `EXAM_POINTS_SHORT_NOTE_BG`, in the shell's order and
  * with the shell's two `\n\n` joins. A rig that re-composed this string would
  * be measuring its own sentence.
  */
@@ -405,7 +405,7 @@ export function teachNotificationItems(): Record<
     chipBg: teachChipBg(m),
     lineBg: m.titleBg,
     detailBg: `${m.explanationBg}\n\n${teachStakeBg(m, { citeMark: true })}\n\n${EXAM_POINTS_SHORT_NOTE_BG}`,
-    peekBg: teachMomentPeekBg(m.code),
+    peekBg: teachMomentOneLinerBg(m),
     lawRef: m.lawRef ?? null,
     blocking: true,
     onAck: () => undefined,
