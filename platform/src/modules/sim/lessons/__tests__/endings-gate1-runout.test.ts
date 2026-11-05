@@ -468,26 +468,38 @@ describe("E3 — the crash pin's ending and its route hold claim only what was m
     }
   });
 
-  it("the hold card is CONDITIONAL — ease away first only if the car touches what it hit, otherwise look and move off — and carries no key chip", () => {
+  it("the hold card is CONDITIONAL — look round first; once clear, ease away only if the car touches what it hit, otherwise move off — and carries no key chip", () => {
     // Rounds 2–3 (E5 / E9): the FRONT half touched a stationary body — it eases BACK.
+    // RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e, ruling R6): through
+    // 479127b this pinned «Ако колата опира в удареното, първо съвсем леко назад…» —
+    // the move as the FIRST act with no look (the look lived only in the free
+    // branch). The card now looks first, and the conditional, the direction, the
+    // because-clause and the free branch's meaning stay pinned below.
     const p = routeHoldAdvisorPrompt("crashPinned", "back");
-    expect(p.textBg).toMatch(/^Ако колата опира в удареното, първо съвсем леко назад/u);
-    expect(p.textBg).toContain("газта напред само я притиска");
-    expect(p.textBg).toContain("Ако не опира, огледай се и тогава потегли");
-    expect(p.peekBg).toBe("Ако опира — първо назад: напред я притиска.");
+    expect(p.textBg).toMatch(/^Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад/u);
+    expect(p.textBg).toContain("напред я притиска");
+    expect(p.textBg).toContain("ако не опира, потегли");
+    expect(p.textBg).toContain("Спри, ако някой идва.");
+    expect(p.textBg.search(/огледа/iu)).toBeLessThan(p.textBg.search(/назад|напред|отдръпни|потегл/u));
+    expect(p.peekBg).toBe("Огледай се; ако опира — леко назад.");
     expect(p.keys).toEqual([]);
     expect(p.textBg).not.toMatch(/притисната|притисн[ае]т/u);
   });
 
-  it("the banner lead is conditional too, and no longer than the lead it replaced (66 characters) — every way out", () => {
+  it("the banner lead is conditional too, looks first, and is no longer than the lead it replaced (66 characters) — every way out", () => {
+    // RE-TAUGHT (lane rbreverse, ruling R6): the stem was «След удара — ако колата
+    // опира в удареното, първо леко» — the move first, no look. It is now
+    // «След удара — първо се огледай; ако колата опира, леко»: the conditional and
+    // the length budget stand; the look comes before the move.
     for (const w of ["back", "forward", "away"] as const) {
       const line = objectiveTitleUnderHold("ЗАДАЧА", "crashPinned", w)!;
       const lead = line.slice(0, line.length - ": ЗАДАЧА".length);
-      expect(lead.startsWith("След удара — ако колата опира в удареното, първо леко")).toBe(true);
+      expect(lead.startsWith("След удара — първо се огледай; ако колата опира, леко")).toBe(true);
+      expect(lead.search(/огледа/iu)).toBeLessThan(lead.search(/назад|напред|отдръпни|потегл/u));
       expect(lead.length).toBeLessThanOrEqual("Колата е притисната след удара — измъкни се назад, за да продължиш".length);
       expect(line).not.toMatch(/притисната|измъкни се назад/u);
     }
-    expect(objectiveTitleUnderHold("ЗАДАЧА", "crashPinned", "back")).toBe("След удара — ако колата опира в удареното, първо леко назад: ЗАДАЧА");
+    expect(objectiveTitleUnderHold("ЗАДАЧА", "crashPinned", "back")).toBe("След удара — първо се огледай; ако колата опира, леко назад: ЗАДАЧА");
   });
 
   /**
@@ -692,17 +704,24 @@ const STALL_BAY: LessonSpec = {
 // ending's corrective is the one true of the crash it closes
 // ───────────────────────────────────────────────────────────────────────────
 
-const STEM = "След удара — ако колата опира в удареното, първо леко";
+// RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e; integrator rulings R6 /
+// R6a, 2026-11-04). These tables held the move-first strings word for word
+// («Ако колата опира в удареното, първо съвсем леко назад…», «Ако опира — първо
+// назад…», «След удара — ако колата опира в удареното, първо леко…»): the move as
+// the first act, the look only in the free branch. They now hold the look-first
+// copy; every property §6 pins (one stem, the conditional, the way-out word per
+// variant, the because-clause on the card, the free branch, ≤ 66 / < 150) stands.
+const STEM = "След удара — първо се огледай; ако колата опира, леко";
 const CARD = {
-  back: "Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.",
+  back: "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад — напред я притиска; ако не опира, потегли. Спри, ако някой идва.",
   forward:
-    "Ако колата опира в удареното, първо съвсем леко напред с прави колела — задният ход само я притиска. Ако не опира, огледай се и тогава потегли.",
-  away: "Ако колата опира в удареното, първо съвсем леко я отдръпни от него — натискът към него само я притиска. Ако не опира, огледай се и тогава потегли.",
+    "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко напред — назад я притиска; ако не опира, потегли. Спри, ако някой идва.",
+  away: "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, леко я отдръпни — към него я притиска; ако не опира, потегли. Спри, ако някой идва.",
 } as const;
 const PEEK = {
-  back: "Ако опира — първо назад: напред я притиска.",
-  forward: "Ако опира — напред: назад я притиска.",
-  away: "Ако опира — отдръпни я: към него я притиска.",
+  back: "Огледай се; ако опира — леко назад.",
+  forward: "Огледай се; ако опира — леко напред.",
+  away: "Огледай се; ако опира — леко я отдръпни.",
 } as const;
 const LEAD = {
   back: `${STEM} назад`,
@@ -877,8 +896,18 @@ describe("E9 / E10 — the pin records the impact; the hold names the way away f
       expect(p.textBg).toBe(CARD[w]);
       expect(p.peekBg).toBe(PEEK[w]);
       expect(p.keys).toEqual([]);
-      expect(p.textBg).toMatch(/^Ако колата опира в удареното, /u);
-      expect(p.textBg.endsWith("Ако не опира, огледай се и тогава потегли.")).toBe(true);
+      // Re-taught (rbreverse, R6): was «^Ако колата опира в удареното, » and
+      // «…Ако не опира, огледай се и тогава потегли.» — the move first. Now the
+      // look opens it, the conditional follows once clear, the free branch keeps
+      // its meaning and the card ends with the stop for anyone approaching.
+      expect(p.textBg).toMatch(/^Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, /u);
+      expect(p.textBg).toContain("; ако не опира, потегли.");
+      expect(p.textBg.endsWith("Спри, ако някой идва.")).toBe(true);
+      expect(p.textBg.length).toBeLessThan(150);
+      for (const surface of [p.textBg, p.peekBg ?? "", LEAD[w]]) {
+        expect(surface.search(/огледа/iu), surface).toBeGreaterThanOrEqual(0);
+        expect(surface.search(/огледа/iu), surface).toBeLessThan(surface.search(/назад|напред|отдръпни|потегл/u));
+      }
       const line = objectiveTitleUnderHold("ЗАДАЧА", "crashPinned", w)!;
       expect(line).toBe(`${LEAD[w]}: ЗАДАЧА`);
       expect(LEAD[w].startsWith(STEM)).toBe(true);

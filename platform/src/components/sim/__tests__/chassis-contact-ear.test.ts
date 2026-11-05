@@ -32,6 +32,7 @@ import { describe, expect, it } from "vitest";
 import type { VehicleSample } from "@/modules/sim/contracts";
 import type { StepContact } from "@/modules/sim/traffic";
 import { DISTRICT_SURFACE_USER_DATA } from "@/modules/sim/world";
+import { STATIC_ON_CARRIAGEWAY_USER_DATA } from "@/components/sim/ScenarioObstacles";
 import {
   COLLISION_MIN_KMH,
   hearChassisContact,
@@ -86,6 +87,41 @@ describe("hearChassisContact — the old onCollisionEnter's judgement, every num
   });
 });
 
+describe("the struck body's carriageway fact (lane staticcardcopy, C1) — read off the collider, never off an NPC shell", () => {
+  function judgeAll(otherUserData: unknown, impactKmh: number, collisionMinKmh: number) {
+    const graded: unknown[][] = [];
+    let nudges = 0;
+    const thumps: number[] = [];
+    const ret = hearChassisContact({ otherUserData, impactKmh }, collisionMinKmh, {
+      thump: (v) => thumps.push(v),
+      graded: (...args: unknown[]) => void graded.push(args),
+      nudge: () => void nudges++,
+    });
+    return { ret, graded, nudges, thumps };
+  }
+
+  it("a stamped wall or prop is graded as a static object WITH the fact, as a third argument", () => {
+    expect(judgeAll(STATIC_ON_CARRIAGEWAY_USER_DATA, 31.29, 0).graded).toEqual([[31.29, "staticObject", true]]);
+  });
+
+  it("an unstamped body is graded with TWO arguments, exactly as base", () => {
+    expect(judgeAll(undefined, 31.29, 0).graded).toEqual([[31.29, "staticObject"]]);
+    expect(judgeAll(DISTRICT_SURFACE_USER_DATA, 31.29, 0).graded).toEqual([[31.29, "staticObject"]]);
+  });
+
+  it("an NPC shell never carries it, even if its userData were to say so", () => {
+    expect(judgeAll({ ...NPC_VEHICLE, staticOnCarriageway: true }, 31.29, 0).graded).toEqual([[31.29, "vehicle"]]);
+  });
+
+  it("the fact moves no threshold, thump or nudge: a stamped body is judged at the lesson's number", () => {
+    const flagged = judgeAll(STATIC_ON_CARRIAGEWAY_USER_DATA, 6.01, COLLISION_MIN_KMH);
+    const plain = judgeAll(undefined, 6.01, COLLISION_MIN_KMH);
+    expect(flagged).toEqual(plain);
+    expect(flagged).toMatchObject({ ret: false, graded: [], nudges: 1 });
+    expect(judgeAll(STATIC_ON_CARRIAGEWAY_USER_DATA, 80, 0).thumps).toEqual(judgeAll(undefined, 80, 0).thumps);
+  });
+});
+
 describe("the wiring — a contact reaches the grade ONLY through the step record", () => {
   const rig = read("VehicleRig.tsx");
   const scene = read("LessonScene.tsx");
@@ -121,7 +157,12 @@ describe("the wiring — a contact reaches the grade ONLY through the step recor
     expect(effects.length).toBe(1);
     const body = effects[0].arguments[0].getText(rigSf).replace(/\s+/g, " ");
     expect(body).toContain("contactListenerRef.current = (contact, student) => { hearChassisContact(contact, collisionMinKmh, {");
-    expect(body).toContain("onCollision?.(impactKmh, withWhat, student);");
+    // RE-TAUGHT (lane staticcardcopy, C1): the graded branch also hands on the
+    // struck BODY's carriageway fact, as `hearChassisContact` heard it — the
+    // fourth argument. A closure that dropped it would print the off-road copy
+    // over a fallen load in the lane; the executed ear below pins it too.
+    expect(body).toContain("graded: (impactKmh, withWhat, onCarriageway) => {");
+    expect(body).toContain("onCollision?.(impactKmh, withWhat, student, onCarriageway);");
     expect(body).toContain("thump: (volume01) => audioRef.current?.thump(volume01)");
     expect(body).toContain("hapticsRef.current?.collision(impactKmh);");
     expect(body).toContain("nudge: () => hapticsRef.current?.curb()");
@@ -139,7 +180,12 @@ describe("the wiring — a contact reaches the grade ONLY through the step recor
     );
     expect(handle).toBeDefined();
     const text = handle!.getText(sceneSf).replace(/\s+/g, " ");
-    expect(text).toContain("(impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) =>");
+    // RE-TAUGHT (lane staticcardcopy, C1): the scene's callback takes the
+    // struck body's carriageway fact as its fourth parameter and forwards it to
+    // the runtime (executed through the harness cut: static-on-road-chain).
+    expect(text).toContain(
+      "(impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>, onCarriageway?: true) =>",
+    );
     expect(text).toContain("playerObb(student.position.x, student.position.y, student.headingDeg)");
     expect(text).not.toMatch(/sampleRef|\bsample\./);
   });
@@ -176,7 +222,11 @@ describe("the wiring — a contact reaches the grade ONLY through the step recor
 interface EarScope {
   contactListenerRef: { current: ChassisContactListener | null } | undefined;
   collisionMinKmh: number;
-  onCollision: ((impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) => void) | undefined;
+  // RE-TAUGHT (lane staticcardcopy, C1): the rig's prop carries the struck
+  // body's carriageway fact as a fourth argument.
+  onCollision:
+    | ((impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>, onCarriageway?: true) => void)
+    | undefined;
   audioRef: { current: { thump(volume01: number): void } | null };
   hapticsRef: { current: { collision(impactKmh: number): void; curb(): void } | null };
 }
@@ -310,6 +360,26 @@ describe("the ear follows the render — the rig's own layout effect, executed",
     m.render(0, onCollision);
     m.ear.current!(contactAt(40, 3), studentAt(4));
     expect(graded).toEqual(["6.01 staticObject", "12 staticObject", "3 staticObject"]);
+    expect(m.root.errors).toEqual([]);
+  });
+
+  it("a contact with a body STAMPED as standing on the carriageway reaches onCollision with the fact; every other contact without it (lane staticcardcopy, C1)", () => {
+    const m = mount();
+    const heard: unknown[][] = [];
+    m.render(0, (...args) => heard.push([args[0], args[1], (args[2] as { position: { x: number } }).position.x, ...args.slice(3)]));
+    m.ear.current!(contactAt(10, 31.29, STATIC_ON_CARRIAGEWAY_USER_DATA), studentAt(1));
+    m.ear.current!(contactAt(20, 31.29, undefined), studentAt(2));
+    m.ear.current!(contactAt(30, 31.29, NPC_VEHICLE), studentAt(3));
+    expect(
+      heard,
+      "the ear's graded closure must forward the struck body's carriageway fact as onCollision's 4th argument",
+    ).toEqual([
+      [31.29, "staticObject", 1, true],
+      [31.29, "staticObject", 2, undefined],
+      [31.29, "vehicle", 3, undefined],
+    ]);
+    // The fact moves no other channel: one thump and one haptic per contact.
+    expect(m.heard).toEqual({ thumps: 3, collisionHaptics: [31.29, 31.29, 31.29], curbs: 0 });
     expect(m.root.errors).toEqual([]);
   });
 

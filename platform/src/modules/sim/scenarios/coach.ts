@@ -63,7 +63,7 @@
  * argued; replace it deliberately or work around it, never delete it to pass.
  */
 
-import { actCopy } from "../rules";
+import { actCopy, foldActDetail } from "../rules";
 import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
 import { repeatFamilyForCode, scenarioForCode, teachTopicForCode } from "./mapping";
@@ -218,7 +218,10 @@ function encounterKey(v: CoachInput): string {
   // The cast is safe by construction: a code outside the per-act tables misses
   // the lookup and returns null, which is the pooled (no-act) answer anyway.
   const isAct = actCopy(v.code as ViolationCode, v.detail) !== null;
-  return isAct ? `${base}#${v.detail}` : base;
+  // FOLDED (lane staticcardcopy, ruling S3(a)): «staticObjectOnRoad» counts on
+  // the «#staticObject» counter — a different paragraph, not a different
+  // mistake — so a kerb taught and a block struck later still escalate.
+  return isAct ? `${base}#${foldActDetail(v.detail)}` : base;
 }
 
 /** Decide one violation and return the updated encounter counts. */

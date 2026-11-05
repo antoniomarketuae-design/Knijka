@@ -222,7 +222,9 @@ describe("the hz block at the street tolerance — the reading is the impact", (
       expect(approach).toBeGreaterThan(approachMin);
       expect(first.graded).toBe(true);
       expect(o.collisions.length).toBe(1);
-      expect(o.collisions[0]).toMatchObject({ points: 10, withWhat: "staticObject" });
+      // RE-TAUGHT (lane staticcardcopy, C1): the block stands in the lane — the
+      // bill's detail is the on-road static act; the points are unmoved.
+      expect(o.collisions[0]).toMatchObject({ points: 10, withWhat: "staticObjectOnRoad" });
     });
   }
 });

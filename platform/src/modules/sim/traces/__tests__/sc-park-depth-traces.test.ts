@@ -186,7 +186,11 @@ describe("parking-depth mistake demos — exactly the authored codes", () => {
     const wall = drive("sc-park-wall", "mistake-into-wall").ruleEvents.find(
       (e) => e.kind === "violation" && e.code === "COLLISION",
     )!;
-    expect(wall.kind === "violation" ? wall.detail : undefined).toBe("staticObject");
+    // RE-TAUGHT (lane staticcardcopy, S2(a)): lot-wall-v1 builds its aisle as
+    // roadway and the wall's centre measures "carriageway", so its rect carries
+    // `onCarriageway` and the bill names the on-road static act — still the WALL
+    // (a static body), not the van.
+    expect(wall.kind === "violation" ? wall.detail : undefined).toBe("staticObjectOnRoad");
     const van = drive("sc-park-van", "mistake-early-turn").ruleEvents.find(
       (e) => e.kind === "violation" && e.code === "COLLISION",
     )!;

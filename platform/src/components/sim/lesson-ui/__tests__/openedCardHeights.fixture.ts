@@ -1,6 +1,6 @@
 /**
  * EVERY CATALOGUE FAULT CARD, OPENED AND BEING READ, AS TWO BROWSERS LAID IT OUT — the measured half of
- * `toastReadCensus.test.ts`. 86 rows: each code, and each act of the act-split codes, that has a summary to be
+ * `toastReadCensus.test.ts`. 87 rows: each code, and each act of the act-split codes, that has a summary to be
  * opened FROM (a card with no summary prints its paragraph and has no «Защо»).
  *
  * HOW IT WAS MEASURED (2026-10-13, lane whycut round 2; scratch `r2/census/census2.mjs`): the round-2 card markup
@@ -12,6 +12,11 @@
  * Columns: key · paragraph characters · then for Chromium and for WebKit: natural height, pinned rows (the card
  * less its body box), and the same two WITH the «+1» badge in the footer (on 32 cards it takes a line of its own).
  * A paragraph edited in the catalogue changes `chars` and turns the census red until this is re-measured.
+ *
+ * Row 87, COLLISION/staticObjectOnRoad (lane staticcardcopy, 2026-11-04), was measured by the same script cut to
+ * two cards (scratch `staticcardcopy-impl/cardcensus/census-scc.mjs`): the COLLISION/staticObject control
+ * reproduced its row above to the half pixel in both engines (295.5 / 97.5 Chromium, 293 / 111.5 WebKit), and the
+ * new 321-character paragraph measured 279 / 97.5 (Chromium) and 293 / 111.5 (WebKit), badge or not.
  */
 export const OPENED_CARD_HEIGHTS: ReadonlyArray<
   readonly [key: string, chars: number, crNatural: number, crPinned: number, crNaturalBadge: number, crPinnedBadge: number, wkNatural: number, wkPinned: number, wkNaturalBadge: number, wkPinnedBadge: number]
@@ -52,6 +57,7 @@ export const OPENED_CARD_HEIGHTS: ReadonlyArray<
   ["COLLISION/pedestrian",305,259.75,78.25,259.75,78.25,257.25,92.25,257.25,92.25],
   ["COLLISION/cyclist",271,226.75,78.25,226.75,78.25,240.75,92.25,240.75,92.25],
   ["COLLISION/staticObject",323,295.5,97.5,295.5,97.5,293,111.5,293,111.5],
+  ["COLLISION/staticObjectOnRoad",321,279,97.5,279,97.5,293,111.5,293,111.5],
   ["COLLISION/vehicleCutIn",346,276.25,78.25,276.25,78.25,273.75,92.25,273.75,92.25],
   ["ENGINE_STALLED",186,193.75,78.25,193.75,78.25,177.23,78.23,177.23,78.23],
   ["MOVE_OFF_WITHOUT_OBSERVATION",293,243.25,78.25,243.25,78.25,257.25,92.25,257.25,92.25],

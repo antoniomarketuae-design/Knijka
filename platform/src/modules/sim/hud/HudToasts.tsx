@@ -94,10 +94,12 @@ const TOAST_TTL_MS = 4000;
  * student time to read them (~15 chars/s reading speed at driving load). */
 const TEACHING_TOAST_TTL_MS = 8000;
 /**
- * The queue holds a little more than the column shows: quiet mode filters
- * praise out at render time, and dropping a card from the store as well would
- * make „по-тихи известия" retroactively delete history the debrief still
- * counts. `visibleToasts` is the one place the cap is applied.
+ * The queue holds a little more than the column shows, and the STORE is capped
+ * at this on every push (`capToastQueue` in `push`, quiet-suppressed praise
+ * counted like any card). The cap may drop praise and info; it never drops a
+ * judged card — a graded fault or a «Научи» card — while that card's own life
+ * runs, nor the card being read (`capExempt`; W11, 2026-10-18).
+ * `visibleToasts` decides separately how many of the stored cards are painted.
  */
 const MAX_QUEUED = TOAST_MAX_VISIBLE + 2;
 
@@ -174,12 +176,15 @@ export function toastExpiryAfterWhy(expiresAtMs: number, nowMs: number, paragrap
 }
 
 /**
- * The queue's cap, with the cards in `keep` exempt from it. `MAX_QUEUED` drops
- * the OLDEST cards, and the one the student has open is by then usually the
- * oldest — so the cap alone would delete the paragraph under its reader the
- * moment enough newer cards arrived. Round 3 (W5): the judged cards waiting
- * behind it are in `keep` as well (`createToastLives.capExempt`). Order is
- * kept; nothing newer is dropped to make their place.
+ * The queue's cap, with the cards in `keep` exempt from it. POSITIONAL: the
+ * first `max` cards (newest first, of any kind, exempt ones included) stay, and
+ * so does every card in `keep`; any other card is dropped. So a card outside
+ * `keep` goes on the push that puts `max` newer cards of any kind above it.
+ * `keep` is `createToastLives.capExempt`: the card being read, which the cap
+ * alone would delete under its reader, and — since W11 (2026-10-18) — every
+ * judged card for its whole life (W5, round 3, had kept only those waiting
+ * behind an explanation). Order is kept; nothing newer is dropped to make their
+ * place.
  */
 export function capToastQueue<T extends { id: number }>(
   toasts: readonly T[],
@@ -234,9 +239,14 @@ interface ToastLife {
        has always been stacked, each one as the cards above it leave;
      · praise and info keep their OWN clocks: no WHY, nothing the student is
        judged by, and they may leave unread. They — and only they — are what
-       the cap may still evict while judged cards wait;
-     · with nothing open nothing here runs: no card is ever stopped, so the
-       queue, the cap and the clocks are the ones the product always had.
+       the cap may evict: since W11 (2026-10-18) the cap spares every judged
+       card for its whole life, running or waiting, opened or not: from the
+       pin on and in quiet mode, the cap never lets praise decide which judged
+       cards are kept (W11-C, 2026-11-04). Praise still moves the judged glass
+       where the cap is not the cause, as before W11 (W12; a W7 stand it
+       provokes; a W5 wait it prolongs) — triage candidates, not ruled;
+     · with nothing open no clock is stopped (W12): a judged card pushed below
+       the column's capacity keeps running its life off the glass.
    Nothing graded reads any of this; it decides only what is on the glass.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -285,10 +295,15 @@ function createToastLives(onExpire: (id: number) => void) {
   return {
     reading: reading as ReadonlySet<number>,
     /** What the queue's cap may not drop: the card being read, and every
-     *  judged card that waits with its clock stopped (W5). */
+     *  judged card for as long as its own life runs, its clock running or
+     *  stopped (W11, 2026-10-18; before it, only a judged card waiting with a
+     *  stopped clock — W5). The ledger keeps the read exemption for a card of
+     *  any kind (`whyChanged` does not ask the kind); in the product only a
+     *  graded fault is ever opened — `ToastCard` hands `onWhyChange` to
+     *  `ViolationToast` alone — so `reading` holds judged ids there (R3). */
     capExempt(): ReadonlySet<number> {
       const keep = new Set<number>(reading);
-      for (const [id, life] of lives) if (life.waits && life.pausedLeftMs !== null) keep.add(id);
+      for (const [id, life] of lives) if (life.waits) keep.add(id);
       return keep;
     },
     /** A card was raised: start its clock — unless the column is held for
@@ -477,8 +492,9 @@ export function useHudToastQueue(): {
   /**
    * The column is held for the card with this id: every other card that
    * carries a WHY — older, newer, and any raised while the hold stands — stops
-   * its clock and is kept from the cap until the column paints it again, and
-   * then runs out what it had left. A card made to wait is not on the glass
+   * its clock until the column paints it again, and then runs out what it had
+   * left; the cap spares it all the while, as it spares every judged card for
+   * its whole life (W11). A card made to wait is not on the glass
    * (`visibleToasts`), and a card that is not on the glass may not spend its
    * reading time there. Praise keeps its own clock (W5).
    */

@@ -284,6 +284,14 @@ AFTER the car has cleared the mouth is billed by nothing here. The barge demos w
 offence is real; clip `sc-roundabout-entry__m0` must be re-captured. Owed to the founder as reads: the 0.3 m/s size, and the
 voice line said shortly before a later cost.
 
+**Amendment (2026-11-04, lane `rbreverse`, sc-roundabout-entry:9e85f27e; founder ruling Q2 2026-10-19 «warn only»).** The
+car's own `playerShedMps` account gains a THIRD reader, and it is display-only: `TrafficSystem.playerShedAccounts()` (pure;
+every ambient and staged vehicle's account, kind, centre and speed) → `runtime/reverseBrakedFor.ts` (integrator rulings R5''
+and R5''': in R and reversing, the nearest vehicle in the rear half-plane whose account grew ≥ 0.3 m/s since the R interval
+began, or that stood at rest — ≤ 0.5 m/s, `HOLD_LIT_SPEED_MPS` — on some point of this R interval with an account ≥ 0.3) →
+`SimTick.reverseBrakedFor`, read only by the advisor's reverse warning (`lessons/advisor.ts reverseWarningForSession`).
+No rule reads it: `rules/__tests__/reverse-braked-for-not-graded.test.ts` pins every file under rules/ blind to the field.
+
 ## ADR-012: A crosswind steers the front wheels — the «yaw pull» (Founder ruling, 2026-10-05 «Ship the pull»)
 
 **Status.** Accepted. Founder rulings 2026-10-04 «Stronger wind» and 2026-10-05 «Ship the pull»; lane `crosswind`, rounds 1–3, each
@@ -621,6 +629,32 @@ the trace's samples, looks and indicator edges. LessonScene owns the grid's life
   - Unpinned, and unreachable in the product: the body-less branch and the reset zeroing (verifier V4, V10).
 - **D6 stands.** Nothing here was driven in a browser. The device re-drive on PC and the phone lens of a 50 km/h façade crash on l0-free-drive and lex-exam-1 is owed (doc 88).
 
+**Amendment 2026-11-05 — a static contact carries one optional, display-only fact about the struck body: `onCarriageway`.** Lane `staticcardcopy`, rounds 1–2, row `sc-hz-brake-dont-swerve:b7297cb7`. Round 2 was SIGNED OFF WITH CONDITIONS on 2026-11-04 and landed with the landing commit, which carries this paragraph (doc 88). It rests on integrator rulings C1–C3 (2026-10-18) and S1–S10 as built. S2 option (a), the centre rule, the replacement of T3(1) and the history-row fold (F8, which amends S3/S10's history clause) were ruled on 2026-11-04 under the founder's 2026-10-08 and 2026-10-19 delegations. It is not a founder ruling, and there is no new ADR. It closes no row: the evidence is in process only, and the device re-drive is owed (doc 88).
+- **The fact.** A held wall or prop, district cones included, is on the carriageway when its footprint CENTRE measures `surfaceAt(resolveDistrictDrivableSurface(district), centre).under === "carriageway"`.
+  - `scene/scenarioSceneryProps.ts` `stampHeldOnCarriageway` stamps it at scene build. It is applied in `lessonWorldRecipe.ts` `buildLessonWorldCore` on the same cached road build the runtime grades with (`worldRuntime.ts` `districtDrivableSurfaceOf`).
+  - It never throws. A fuel station, vehicle, animal or worker is never stamped.
+  - On the committed catalogue it flags 14 bodies (pinned): the sc-hz-brake-dont-swerve block, the 10 sc-merge-roadworks-shift cones, the sc-park-wall lot wall and the 2 sc-ed-poligon-chain cones.
+  - A body whose centre is off the carriageway is not flagged, even with some corners on it: for example, the sc-pk-driveway wall at (9, 47.3), which is both a held body and a recorder rect. The recorder rects of the U-turn and reverse-line kerbs are not held bodies; their by-value flag is pinned false against the same centre fact.
+- **The contract.**
+  - `scene/obstacleSpec.ts` `STATIC_ON_CARRIAGEWAY_USER_DATA` rides on the stamped RigidBody's `userData`, which the 2026-10-11 amendment's `StepContact` already carries.
+  - VehicleRig's `hearChassisContact` hands it on only on a graded contact, and only from a body with no NPC tag. Its threshold, thump, haptic and nudge are unchanged.
+  - LessonScene's `handleCollision` passes it to `WorldRuntime.pushCollision(withWhat, bodyId?, onCarriageway?: true)`. That emits it as `SimTickEvent { kind: "collision", withWhat: "staticObject", onCarriageway: true }`, with `actorId` too when the reporter names the body.
+  - On every other contact the key is omitted, not set to undefined, as with the actor id.
+  - The recorder's static rects carry the same flag by value, pinned equal to the measured fact. Authored beats never carry it.
+- **What reads it.** Only the COLLISION case of `rules/engine.ts`. It picks the copy detail `staticObjectOnRoad`, a sixth `COLLISION_CONTACT_COPY` row with the same title, no lawRef and no corrective of its own. `withWhat` stays "staticObject".
+  - No bill, point, severity, termination, threshold or episode reads it, and nothing reads the car's pose to choose the copy.
+  - The crash pin does not move: `lessons/finish.ts` `asCrashPinBody` maps the detail back to "staticObject".
+  - The folded act (`foldActDetail`, exported from rules/) is read in three places, so both copies share one counter, one printed corrective and one history row:
+    - the coach's repeat ladder;
+    - the debrief's two dedupe sets: the corrective already printed, and the acts the sheet already charged (scored, coached and withheld);
+    - since this landing's integration, the history rows (`historyMistakeGroups`; doc 88, condition F8).
+  - The debrief's «Какво стана» rows stay split by copy key. A drive with a kerb strike and a block strike shows two rows under one title, and they use two of the debrief's four mistake lines (doc 88, condition F7, accepted).
+- **Measured in process only,** on `2ee2469` + the lane patch (the lane verifier):
+  - 0 of 2,434 replay cells changed (invariance only: the replay hears no held static contact);
+  - 20 of 342 recorder cells and 123 of 249 rapier sweep cells changed, only in the copy, the card's reading time derived from it (21,534 → 21,400 ms), the bill's detail and the event key;
+  - the key appears only on flagged static contacts (55 recorder events and 131 sweep events), and is always true.
+  The proof of the combined tree on which the landing commit is built (this lane with rbreverse and wcafterpaint) is recorded in doc 88's landing section; the main-tree gate measures the commit itself.
+
 ## ADR-015: A pass is judged by what the overtaken vehicle really had to do
 
 **Status.** Accepted by the integrator under the founder's delegation of 2026-10-08 (doc 88, «Founder delegation», item 2: restage the truck-pass
@@ -672,7 +706,7 @@ from its own traffic-model account (`StagedActorView.playerShedMps`).
   only where a lesson authors `physics.crosswind` and stages an actor with `windShelter: true`. Today that is this lesson alone.
 - **New vocabulary.** All of it is opt-in:
   - the SimTickEvent `laneEntryAnswer` (watching / clear / lift / braked, with heldSec and qualifiedSec);
-  - `StagedActorView.playerShedMps` and `stateId`;
+  - `StagedActorView.playerShedMps` and `stateId` (its third, display-only reader — the reverse warning — is recorded in the ADR-011 amendment of 2026-11-04);
   - `CutInLeadCarSpec.overtake`, `ReachZoneParams.stagedPass` and the outcome details drewLevel / overtaken.
 - **On ADR-014's grid.** The watch and the harsh-brake step read the truck and the car at the fixed 1/60 s grid point, never a frame-end pose. The one
   exception is not graded. The lee, stepped before each physics step, reads the truck's newest grid state, so inside a long frame it can be up to one

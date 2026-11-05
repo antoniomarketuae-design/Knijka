@@ -128,6 +128,11 @@ export function roadworksConeRects(): ObstacleRect2D[] {
     halfWidthM: 0.3,
     halfLengthM: 0.3,
     withWhat: "staticObject" as const,
+    // THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, L7): every cone
+    // of the closure measures `surfaceAt(...).under === "carriageway"` at its
+    // centre on hz-roadworks-v1, as its live twin's stamp does; pinned against
+    // that fact (scene/__tests__/static-on-carriageway-fact.test.ts).
+    onCarriageway: true as const,
   });
   return [
     // The taper — lane 0 narrows to nothing over 24 m.

@@ -495,7 +495,9 @@ describe("sc-hz-brake-dont-swerve — a car that has TOUCHED the block has not s
         });
 
         it("the bill is the base's: one 10-point опасна with a static object at the contact's own step — the sheet's points, verdict, stars and task 1 unmoved", () => {
-          expect(o.collisions.map((b) => [b.points, b.withWhat])).toEqual([[10, "staticObject"]]);
+          // RE-TAUGHT (lane staticcardcopy, C1): the block stands in the lane, so the
+          // bill's detail is the on-road static act; points and step unmoved.
+          expect(o.collisions.map((b) => [b.points, b.withWhat])).toEqual([[10, "staticObjectOnRoad"]]);
           expect(Math.round(o.collisions[0].t * 60), "the grid point the bill is stamped at").toBe(c.contactStep);
           expect(o.result.score).toBe(10);
           expect(sessionVerdict(o.result)).toBe("failed");

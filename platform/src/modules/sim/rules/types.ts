@@ -172,11 +172,23 @@ export type SimTickEvent =
    * one bill). Reporters that KNOW which body they hit supply it and are then
    * graded per body; reporters that do not omit it and are graded per
    * category, exactly as before. See `engine.ts`'s `collision` case.
+   *
+   * `onCarriageway` is A FACT ABOUT THE STRUCK BODY, never the car (lane
+   * staticcardcopy, integrator rulings C1/S6; ADR-014 amendment 2026-11-04):
+   * `true` only on a "staticObject" contact whose body's footprint centre
+   * stands on the built carriageway (`surfaceAt(...).under === "carriageway"`,
+   * measured once at scene build — scene/scenarioSceneryProps.ts
+   * `stampHeldOnCarriageway`, and by value on the recorder twins). It selects
+   * the shown copy only (`COLLISION_CONTACT_COPY.staticObjectOnRoad`); no bill,
+   * point, episode or crash-pin fact reads it. The key is OMITTED on every
+   * other contact — never set to undefined — the same rule `actorId` keeps,
+   * so every `toEqual` on an old contact sees byte-identical input.
    */
   | {
       kind: "collision";
       withWhat: "vehicle" | "pedestrian" | "cyclist" | "staticObject";
       actorId?: string;
+      onCarriageway?: true;
     }
   /** Player looked at a mirror — or over his shoulder into the blind spot
    *  (`mirror: "shoulder"`, which is NOT glass; see `GlanceKind`). Gaze /
@@ -1386,8 +1398,40 @@ export interface SimTick {
   /** Distance to the nearest intersection node, m (within ~80 m); absent =
    * none near. Context gate for the causeless-harsh-brake detector. */
   nextJunctionM?: number;
+  /**
+   * A VEHICLE OR RIDER BEHIND HAS HAD TO SLOW FOR THIS REVERSING CAR — it is
+   * braking for him in this R interval, or it stopped for him and stood at rest
+   * in this R interval (lane rbreverse, sc-roundabout-entry:9e85f27e; founder
+   * ruling Q2 2026-10-19 «WARN ONLY»; integrator rulings R1, R5'', R5'''). MEASUREMENT ONLY — no rule reads it
+   * (`rules/__tests__/reverse-braked-for-not-graded.test.ts` pins every file
+   * under rules/ blind to it); the lesson session folds it and the coach's
+   * advisor card names the danger from it (`lessons/advisor.ts
+   * reverseWarningForSession`). Computed in ONE place, once per graded grid
+   * point (ADR-014): `runtime/reverseBrakedFor.ts`.
+   *
+   *   undefined  no account query is wired (a hand-wired harness, a replay
+   *              with no traffic system) — «this reporter cannot answer»,
+   *              never «nobody»;
+   *   null       wired, and no vehicle behind is braking for a reversing car;
+   *   object     the nearest such vehicle: its published state id, its kind
+   *              (`TrafficSystem.vehicleCollisionKind`), and its centre in the
+   *              car frame (fwdM < 0: the rear half-plane; leftM > 0: left).
+   */
+  reverseBrakedFor?: ReverseBrakedFor | null;
   /** Discrete events since the previous tick. */
   events: SimTickEvent[];
+}
+
+/** See `SimTick.reverseBrakedFor`. */
+export interface ReverseBrakedFor {
+  /** The vehicle's published state id (`TrafficVehicleState.id`). */
+  vehicleId: number;
+  /** What it is, as the contact bill would name it. */
+  kind: "vehicle" | "cyclist";
+  /** Its centre along the car's heading, m (< 0: behind). */
+  fwdM: number;
+  /** Its centre across the car's heading, m (> 0: to the car's left). */
+  leftM: number;
 }
 
 /**

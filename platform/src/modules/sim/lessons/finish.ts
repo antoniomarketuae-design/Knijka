@@ -2548,8 +2548,18 @@ export const CRASH_PIN_END_TOUCH_M = 0.05;
 
 const CRASH_PIN_BODY_RANK: readonly CrashPinBody[] = ["pedestrian", "cyclist", "vehicle", "staticObject"];
 
-function asCrashPinBody(v: unknown): CrashPinBody | null {
+/**
+ * A bill's detail (or a contact's withWhat) as the body the pin names.
+ * «vehicleCutIn» is a vehicle; «staticObjectOnRoad» (lane staticcardcopy, S4)
+ * is a static object — the same body as «staticObject», only its paragraph
+ * differs — so the END is still measured and E9–E11 print as before. MANDATORY,
+ * not cosmetic: without it an on-road bill reads as no body, and the fallback
+ * ranks a same-tick UNBILLED vehicle contact first (`crashPinImpact`). Exported
+ * for the direct-call pin (a drive cannot tell the mapping's absence apart).
+ */
+export function asCrashPinBody(v: unknown): CrashPinBody | null {
   if (v === "vehicleCutIn") return "vehicle";
+  if (v === "staticObjectOnRoad") return "staticObject";
   return CRASH_PIN_BODY_RANK.includes(v as CrashPinBody) ? (v as CrashPinBody) : null;
 }
 

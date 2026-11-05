@@ -268,6 +268,16 @@ const passAndCut = (xt: number) => (st: DriveState): Out => {
 };
 const UNCONDITIONAL_REVERSE = /^(Съвсем леко назад|Първо назад|Колата е притисната)/u;
 
+// RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e; integrator rulings R6 /
+// R6a, 2026-11-04): every card, peek and lead string this file pins verbatim held
+// the move-first order through 479127b («Ако колата опира в удареното, първо съвсем
+// леко …», «Ако опира — …», «След удара — ако колата опира в удареното, първо леко
+// …») — the move as the first act, the look only in the free branch. They now hold
+// the look-first copy (look round; once clear, ease away only if the car touches —
+// slowly, and why — or move off; stop for anyone approaching). What these chassis
+// cells measure — which way out the pin chose, the conditional, and that no
+// surface orders an unconditional reverse — is unchanged.
+
 describe("E3 on the chassis — a car standing FREE of what it hit is never told it is pressed, nor ordered back into it", () => {
   const CUTS: Array<{ name: string; xt: number; end: number; sep: number }> = [
     { name: "CUT-R", xt: 6.2, end: 1565, sep: 2.2416 },
@@ -297,11 +307,12 @@ describe("E3 on the chassis — a car standing FREE of what it hit is never told
         expect(r.holds[0].k).toBe(1201);
         for (const h of r.holds) {
           expect(h.lead).not.toMatch(/притисната|измъкни се назад/u);
-          expect(h.lead).toMatch(/^След удара — ако колата опира в удареното, първо леко назад: ЗАДАЧА$/u);
+          expect(h.lead).toMatch(/^След удара — първо се огледай; ако колата опира, леко назад: ЗАДАЧА$/u);
           expect(h.card).not.toBeNull();
           expect(h.card!.textBg).not.toMatch(UNCONDITIONAL_REVERSE);
-          expect(h.card!.textBg).toMatch(/^Ако колата опира в удареното/u);
-          expect(h.card!.textBg).toContain("Ако не опира, огледай се и тогава потегли");
+          expect(h.card!.textBg).toMatch(/^Огледай се — огледала и рамо\. Щом е чисто: ако опира в удареното/u);
+          expect(h.card!.textBg).toContain("ако не опира, потегли");
+          expect(h.card!.textBg.search(/огледа/iu)).toBeLessThan(h.card!.textBg.search(/назад|напред|отдръпни|потегл/u));
           expect(h.card!.peekBg ?? "").not.toMatch(UNCONDITIONAL_REVERSE);
           expect(h.card!.keys).toEqual([]);
         }
@@ -360,8 +371,8 @@ describe("E3 on the chassis — a car PRESSED against the driveway wall gets a t
       expect(h.sepM).toBeLessThanOrEqual(SWEEP_RESOLUTION_M);
       expect(h.way).toBe("away");
       expect(h.towardAny).toBe(false);
-      expect(h.card!.textBg).toMatch(/^Ако колата опира в удареното, първо съвсем леко я отдръпни от него — натискът към него само я притиска\./u);
-      expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко я отдръпни: ЗАДАЧА");
+      expect(h.card!.textBg).toMatch(/^Огледай се — огледала и рамо\. Щом е чисто: ако опира в удареното, леко я отдръпни — към него я притиска;/u);
+      expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко я отдръпни: ЗАДАЧА");
     }
   });
 });
@@ -429,11 +440,11 @@ describe("E5 / E6, re-keyed by E9 / E10, on the chassis — sc-pk-driveway's wal
           expect(r.holds.length).toBeGreaterThan(0);
           for (const h of r.holds) {
             expect(h.sepM).toBeLessThanOrEqual(SWEEP_RESOLUTION_M);
-            expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко напред: ЗАДАЧА");
+            expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко напред: ЗАДАЧА");
             expect(h.card!.textBg).toBe(
-              "Ако колата опира в удареното, първо съвсем леко напред с прави колела — задният ход само я притиска. Ако не опира, огледай се и тогава потегли.",
+              "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко напред — назад я притиска; ако не опира, потегли. Спри, ако някой идва.",
             );
-            expect(h.card!.peekBg).toBe("Ако опира — напред: назад я притиска.");
+            expect(h.card!.peekBg).toBe("Огледай се; ако опира — леко напред.");
             expect(h.card!.textBg).not.toMatch(/леко назад|газта напред само/u);
           }
           const e = endings(r);
@@ -456,14 +467,14 @@ describe("E5 / E6, re-keyed by E9 / E10, on the chassis — sc-pk-driveway's wal
         expect(r.holds.length).toBeGreaterThan(0);
         for (const h of r.holds) {
           if (known) {
-            expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко назад: ЗАДАЧА");
+            expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко назад: ЗАДАЧА");
             expect(h.card!.textBg).toBe(
-              "Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.",
+              "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад — напред я притиска; ако не опира, потегли. Спри, ако някой идва.",
             );
-            expect(h.card!.peekBg).toBe("Ако опира — първо назад: напред я притиска.");
+            expect(h.card!.peekBg).toBe("Огледай се; ако опира — леко назад.");
           } else {
-            expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко я отдръпни: ЗАДАЧА");
-            expect(h.card!.peekBg).toBe("Ако опира — отдръпни я: към него я притиска.");
+            expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко я отдръпни: ЗАДАЧА");
+            expect(h.card!.peekBg).toBe("Огледай се; ако опира — леко я отдръпни.");
           }
         }
         const e = endings(r);
@@ -624,9 +635,9 @@ function pinDriveChassis(cfg: PinCfg, act: "card" | "none" | "R" | "D") {
 }
 
 const CARD_AWAY =
-  "Ако колата опира в удареното, първо съвсем леко я отдръпни от него — натискът към него само я притиска. Ако не опира, огледай се и тогава потегли.";
+  "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, леко я отдръпни — към него я притиска; ако не опира, потегли. Спри, ако някой идва.";
 const CARD_BACK =
-  "Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.";
+  "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад — напред я притиска; ако не опира, потегли. Спри, ако някой идва.";
 
 describe("E11 / E13 on the chassis — THE WEDGE: the round-2 decisive drive, its rear on a SECOND wall after the bill, gets no direction", () => {
   it("sc-pk-driveway L1 (pk26): one bill (front-swing into wall #0), an unbilled rear contact with wall #1 before the hold; PRESSED at both walls; card, peek and lead direction-free on every hold frame; the front-swing corrective", () => {
@@ -644,8 +655,8 @@ describe("E11 / E13 on the chassis — THE WEDGE: the round-2 decisive drive, it
     for (const h of d.holds) {
       expect(h.way).toBe("away");
       expect(h.card!.textBg).toBe(CARD_AWAY);
-      expect(h.card!.peekBg).toBe("Ако опира — отдръпни я: към него я притиска.");
-      expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко я отдръпни: ЗАДАЧА");
+      expect(h.card!.peekBg).toBe("Огледай се; ако опира — леко я отдръпни.");
+      expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко я отдръпни: ЗАДАЧА");
       expect(h.sepsAll.every((v) => v <= SWEEP_RESOLUTION_M)).toBe(true);
     }
     // E10: the corrective keeps the BILL's end — the billed crash was the front swing.
@@ -685,9 +696,9 @@ describe("E9 / E10 / E11 on the chassis — a front-swing reverse strike whose R
     for (const h of d.holds) {
       expect(h.way).toBe("back");
       expect(h.towardAny).toBe(false);
-      expect(h.lead).toBe("След удара — ако колата опира в удареното, първо леко назад: ЗАДАЧА");
+      expect(h.lead).toBe("След удара — първо се огледай; ако колата опира, леко назад: ЗАДАЧА");
       expect(h.card!.textBg).toBe(CARD_BACK);
-      expect(h.card!.peekBg).toBe("Ако опира — първо назад: напред я притиска.");
+      expect(h.card!.peekBg).toBe("Огледай се; ако опира — леко назад.");
     }
     expect(d.ends).toHaveLength(1);
     expect(d.ends[0].text.endsWith(FRONT_SWING_CORRECTIVE)).toBe(true);
@@ -745,5 +756,50 @@ describe("E9 — the session is handed the held scenery's collider boxes, by the
       expect(src.split(CALL).length - 1, h).toBe(1);
       expect(src, h).not.toMatch(/createLessonSession\(lesson\)/);
     }
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// T1 (lane rbreverse, sc-roundabout-entry:9e85f27e; integrator rulings R6 / R6a)
+// — THE LOOK COMES BEFORE THE MOVE on every hold frame the chassis raises, on
+// both lessons the brief names beside the ring: sc-hz-brake-dont-swerve CUT-R
+// (a free car, the block behind) and sc-pk-driveway's wall struck in R and in D
+// (the «напред», «назад» and direction-free variants). Through 479127b every
+// card, peek and lead ordered the move first («първо … назад / напред / я
+// отдръпни») and named no look; the ring's own frames are pinned in
+// rbreverse-ring-reverse.test.ts.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("T1 · look before move on the chassis's hold frames — sc-hz-brake-dont-swerve CUT-R and sc-pk-driveway (R / D)", () => {
+  const LOOK = /огледа/iu;
+  const MOVE = /назад|напред|отдръпни|потегл/u;
+  const lookFirst = (s: string) => {
+    const l = s.search(LOOK);
+    const m = s.search(MOVE);
+    return l >= 0 && m > l;
+  };
+  it("every card, peek and lead on every hold frame names the look before the first move, and all three ways out are driven", () => {
+    const runs: Ran[] = [
+      run(SC_HZ_BRAKE_DONT_SWERVE.id, 1, { x: 4.06, y: 15, headingDeg: 0 }, passAndCut(6.2), () => ({ brake: 1, steer: 0 }), [BLOCK], 60 * 45),
+      wallDrive(1, 0, "R", "hold").r,
+      wallDrive(1, 0, "D", "release").r,
+      wallDrive(1, 1, "D", "release").r,
+    ];
+    const ways = new Set<string>();
+    let frames = 0;
+    const bad: string[] = [];
+    for (const r of runs) {
+      expect(r.holds.length).toBeGreaterThan(0);
+      for (const h of r.holds) {
+        frames++;
+        ways.add(h.way);
+        for (const [surface, text] of [["card", h.card?.textBg ?? ""], ["peek", h.card?.peekBg ?? ""], ["lead", h.lead ?? ""]] as const) {
+          if (!lookFirst(text)) bad.push(`${h.k} ${h.way} ${surface}: «${text}»`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    expect(frames).toBeGreaterThan(10);
+    expect([...ways].sort()).toEqual(["away", "back", "forward"]);
   });
 });

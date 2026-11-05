@@ -272,7 +272,9 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
   it("THE RIG'S BANNER, one line: the same sentence, whole in the DOM, set on one line with an ellipsis — and it starts with the hold's own order", () => {
     // Lane endings (2026-10-18, integrator ruling E3): the lead is conditional now — the hold cannot tell a car
     // pressed against what it hit from one standing free of it — and no longer than the lead it replaced (66; round 2: 59).
-    expect(PINNED).toBe(`След удара — ако колата опира в удареното, първо леко я отдръпни: ${TASK}`);
+    // RE-TAUGHT (lane rbreverse, ruling R6): the lead looks first now (it was «След удара — ако колата
+    // опира в удареното, първо леко я отдръпни»); the one-line banner form this test pins is unchanged.
+    expect(PINNED).toBe(`След удара — първо се огледай; ако колата опира, леко я отдръпни: ${TASK}`);
     const p = sentenceOf(true, PINNED);
     expect(p.props.children, "the one-line form changed the sentence").toBe(PINNED);
     const cls = String(p.props.className).split(/\s+/);
@@ -282,7 +284,7 @@ describe("§4 bannerOneLineWhileReading — the banner's last step, and what it 
     // not asserted here; laid out in Chromium at the rig's 304 px (lane scratch r2/spike/banner.mjs) the banner
     // goes 76.25 → 48.75 px and the line ended after «…измъкни се назад,» with the old lead; the new lead is the
     // 59–64 characters (rounds 2–3), and where its line ends on the device is owed to the rig (lane endings' report).
-    expect(PINNED.startsWith("След удара — ако колата опира в удареното")).toBe(true);
+    expect(PINNED.startsWith("След удара — първо се огледай; ако колата опира")).toBe(true);
   });
 
   it("NOT ASKED FOR: the banner is the banner it was — the sentence wraps and nothing is cut", () => {

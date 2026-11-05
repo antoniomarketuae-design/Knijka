@@ -117,6 +117,11 @@ export function hzBrakeDontSwerveObstacles(): ObstacleRect2D[] {
       halfWidthM: 0.8,
       halfLengthM: 1.2,
       withWhat: "staticObject" as const,
+      // THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, L7): the block (hz-debris-v1)
+      // measures `surfaceAt(...).under === "carriageway"` at its centre on the
+      // committed district, as its live twin's stamp does; pinned against that
+      // fact (scene/__tests__/static-on-carriageway-fact.test.ts).
+      onCarriageway: true as const,
       trigger: { x: LANE_X, y: DEBRIS_Y, distM: 30 },
     },
   ];

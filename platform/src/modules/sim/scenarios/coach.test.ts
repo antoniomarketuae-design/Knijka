@@ -441,11 +441,20 @@ describe("what counts as a repeat — the act, not just the code", () => {
     expect(seq[3]).toMatchObject({ mode: "grade", penaltyMultiplier: 2 });
   });
 
-  it("every struck body in the catalogue gets its own counter", () => {
+  it("every struck body KIND in the catalogue gets its own counter, and the on-road static variant shares the static one", () => {
     // The sweep: if a fifth body kind lands in COLLISION_CONTACT_COPY, this is
     // what guarantees it is not billed as a repeat of the four before it.
-    const bodies = Object.keys(COLLISION_CONTACT_COPY);
+    //
+    // RE-TAUGHT (lane staticcardcopy, integrator ruling S3(a)): «staticObjectOnRoad»
+    // is NOT a body kind — it is the same untagged static contact, on a body
+    // that stands on the carriageway, given a paragraph that is true there. No
+    // founder ruling prices it as a different mistake, so it is folded onto
+    // the «#staticObject» counter (rules/catalog.ts foldActDetail) and is
+    // excluded from the own-counter sweep; the second half below pins the
+    // fold. Every OTHER key, «vehicleCutIn» included, keeps its own counter.
+    const bodies = Object.keys(COLLISION_CONTACT_COPY).filter((k) => k !== "staticObjectOnRoad");
     expect(bodies.length).toBeGreaterThanOrEqual(4);
+    expect(bodies).toContain("staticObject");
     const seq = coachSession(
       bodies.map((detail) => ({
         code: "COLLISION",
@@ -457,6 +466,25 @@ describe("what counts as a repeat — the act, not just the code", () => {
     for (const [i, d] of seq.entries()) {
       expect(d.penaltyMultiplier, `${bodies[i]} is its own mistake`).toBe(1);
     }
+    // THE FOLD (S3(a)): a static strike and an on-road static strike, in
+    // either order and three deep, decide EXACTLY as three static strikes do —
+    // the same multipliers, the same modes, the same escalations.
+    const crash = (detail: string): CoachInput => ({
+      code: "COLLISION",
+      severityClass: "opasna",
+      terminateSession: true,
+      detail,
+    });
+    const allStatic = coachSession([crash("staticObject"), crash("staticObject"), crash("staticObject")]);
+    expect(allStatic.map((d) => d.penaltyMultiplier), "base's ladder for three static strikes").toEqual([1, 1.5, 2]);
+    expect(
+      coachSession([crash("staticObject"), crash("staticObjectOnRoad"), crash("staticObject")]),
+      "a kerb, then a block, then a kerb: one static ladder",
+    ).toEqual(allStatic);
+    expect(
+      coachSession([crash("staticObjectOnRoad"), crash("staticObjectOnRoad"), crash("staticObject")]),
+      "a block, then a block, then a kerb: one static ladder",
+    ).toEqual(allStatic);
   });
 
   it("an absent detail behaves exactly as before (every caller that stamps none)", () => {

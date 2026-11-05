@@ -55,6 +55,7 @@ import {
   type StopLineSet,
 } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
+import { ReverseBrakedForTracker, type PlayerShedAccountsQuery } from "./reverseBrakedFor";
 import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
 import {
@@ -257,6 +258,41 @@ const OFF_CARRIAGEWAY_M = OFF_CARRIAGEWAY_BODY_ALLOWANCE_M;
  * builders cannot sweep must not be retried once per runtime either.
  */
 const surfaceByDistrict = new WeakMap<object, DrivableSurface | null>();
+
+/**
+ * THE RUNTIME'S OWN SURFACE RESOLVE, BY DOCUMENT — the body of
+ * `drivableSurface()` below, lifted out unchanged so a caller that holds the
+ * same district document reads the SAME cached index instead of paying a
+ * second road build (lane staticcardcopy: `scene/lessonWorldRecipe.ts` stamps
+ * the held walls and props that stand on the carriageway at scene build, and
+ * `createWorldRuntime(raw)` keys this cache on that very object, because
+ * `parseDistrict` returns the raw document unchanged). Never throws: a
+ * document the builders cannot sweep, or one whose sweep holds no asphalt,
+ * is `null` — «unknown», cached as such.
+ */
+export function districtDrivableSurfaceOf(district: object): DrivableSurface | null {
+  const cached = surfaceByDistrict.get(district);
+  if (cached !== undefined) return cached;
+  let drivable: DrivableSurface | null;
+  try {
+    // parseDistrict returns the raw document unchanged, so this IS the
+    // builder's own input; the runtime's District type merely omits the
+    // keys (buildings) that the road/junction sweep never reads.
+    const s = resolveDistrictDrivableSurface(district as unknown as WorldDistrict);
+    // An index with NO asphalt in it is not the statement "this district
+    // is one big field" — it is the statement "the sweep produced
+    // nothing", which every hand-built test fixture in this repo can
+    // trigger. Treated as unknown, because the alternative is a runtime
+    // that reports every point of every such map off-road.
+    drivable = s.counts.carriageway > 0 ? s : null;
+  } catch {
+    // A fixture the world builders cannot sweep must not take the drive
+    // down with it (the curveAdvisory tolerance discipline, A12).
+    drivable = null;
+  }
+  surfaceByDistrict.set(district, drivable);
+  return drivable;
+}
 /**
  * Amber adjudication (B1a, doc 72 JU-06): at the green→yellow flip the
  * runtime freezes the last green-frame snapshot (distance to line + speed);
@@ -916,6 +952,9 @@ type CollisionWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 interface QueuedContact {
   readonly withWhat: CollisionWith;
   readonly bodyId: string | undefined;
+  /** The struck body's own fact (lane staticcardcopy): its footprint centre
+   *  stands on the built carriageway. `undefined` on every other contact. */
+  readonly onCarriageway: true | undefined;
 }
 
 /** Is there a conflicting (crossing/oncoming) moving vehicle near (x,y)? */
@@ -1204,6 +1243,12 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    *  see LANE_ENTRY_REACTION_SEC). Default: none — every `laneEntered` event
    *  then carries `follower: null` and nothing can be billed from it. */
   setSameDirVehiclesQuery(fn: SameDirVehiclesQuery | null): void;
+  /** Install the traffic module's every-vehicle ACCOUNT lookup
+   *  (`traffic.playerShedAccounts`) for the reverse-warning measurement,
+   *  `SimTick.reverseBrakedFor` (lane rbreverse; display-only — no rule reads
+   *  it). Default: none — the field is then ABSENT from every tick («cannot
+   *  answer»), never null. */
+  setPlayerShedAccountsQuery(fn: PlayerShedAccountsQuery | null): void;
   /**
    * Physics layer reports a contact; drained into the next sample().
    *
@@ -1214,8 +1259,13 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    * a name they bill one (see `QueuedContact` for the measurement). Omit it
    * only when no identity exists (world geometry) or when naming would be a
    * guess; the per-category fallback is unchanged and errs innocent.
+   *
+   * `onCarriageway` (lane staticcardcopy, S6) is `true` only for a held wall
+   * or prop the scene stamped as standing on the carriageway; it travels to
+   * the event's `onCarriageway` and selects the shown copy only. Omitted
+   * otherwise, and then the event keeps the old shape byte for byte.
    */
-  pushCollision(withWhat: CollisionWith, bodyId?: string): void;
+  pushCollision(withWhat: CollisionWith, bodyId?: string, onCarriageway?: true): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
   signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase;
   /**
@@ -1292,25 +1342,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   function drivableSurface(): DrivableSurface | null {
     if (!drivableResolved) {
       drivableResolved = true;
-      const cached = surfaceByDistrict.get(district);
-      if (cached !== undefined) return (drivable = cached);
-      try {
-        // parseDistrict returns the raw document unchanged, so this IS the
-        // builder's own input; the runtime's District type merely omits the
-        // keys (buildings) that the road/junction sweep never reads.
-        const s = resolveDistrictDrivableSurface(district as unknown as WorldDistrict);
-        // An index with NO asphalt in it is not the statement "this district
-        // is one big field" — it is the statement "the sweep produced
-        // nothing", which every hand-built test fixture in this repo can
-        // trigger. Treated as unknown, because the alternative is a runtime
-        // that reports every point of every such map off-road.
-        drivable = s.counts.carriageway > 0 ? s : null;
-      } catch {
-        // A fixture the world builders cannot sweep must not take the drive
-        // down with it (the curveAdvisory tolerance discipline, A12).
-        drivable = null;
-      }
-      surfaceByDistrict.set(district, drivable);
+      drivable = districtDrivableSurfaceOf(district);
     }
     return drivable;
   }
@@ -1325,6 +1357,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let cyclistQuery: CyclistQuery = () => null;
   let overtakenQuery: CyclistQuery = () => null;
   let sameDirQuery: SameDirVehiclesQuery = () => [];
+  // Lane rbreverse: null = not wired (the tick then carries no reverseBrakedFor).
+  let shedAccountsQuery: PlayerShedAccountsQuery | null = null;
+  const reverseBrakedFor = new ReverseBrakedForTracker();
 
   // Junction node positions (district space) for priority conflict lookups.
   const nodePos = new Map<string, { x: number; y: number }>();
@@ -2145,11 +2180,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // per-category fallback, see byte-identical input.
       while (collisionQueue.length > 0) {
         const c = collisionQueue.shift() as QueuedContact;
-        events.push(
+        const ev: Extract<SimTickEvent, { kind: "collision" }> =
           c.bodyId === undefined
             ? { kind: "collision", withWhat: c.withWhat }
-            : { kind: "collision", withWhat: c.withWhat, actorId: c.bodyId },
-        );
+            : { kind: "collision", withWhat: c.withWhat, actorId: c.bodyId };
+        // The struck body's carriageway fact, under the same omit rule.
+        if (c.onCarriageway === true) ev.onCarriageway = true;
+        events.push(ev);
       }
 
       // 2. Mirror glance passthrough (input layer sets it on the glance frame).
@@ -3272,6 +3309,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // writer at all until this line — see `orchestrator/contact.ts
       // vruAheadMeters` for the frames.
       if (Number.isFinite(vruAheadM)) tick.vruAheadM = vruAheadM;
+      // A VEHICLE OR RIDER BEHIND BRAKING FOR THIS REVERSING CAR (lane
+      // rbreverse, sc-roundabout-entry:9e85f27e; founder ruling Q2 «warn only»)
+      // — measured once per graded grid point (ADR-014), in one place
+      // (`runtime/reverseBrakedFor.ts`), off the contract gear and the signed
+      // speed this tick already carries. DISPLAY-ONLY: no rule reads it. Absent
+      // when no account query is wired; null when wired and nobody qualifies.
+      if (shedAccountsQuery !== null) {
+        tick.reverseBrakedFor = reverseBrakedFor.step(
+          { gear: v.gear, speedKmh: v.speedKmh, x: v.position.x, y: v.position.y, headingDeg: v.headingDeg },
+          shedAccountsQuery,
+        );
+      }
       if (v.fogLightsOn !== undefined) tick.fogLightsOn = v.fogLightsOn;
       // THE PEDAL (SimTick.throttlePedal) — the same additive seam: published
       // only by a rig that HAS an accelerator channel, so every recorded trace
@@ -4210,12 +4259,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       sameDirQuery = fn ?? (() => []);
     },
 
+    setPlayerShedAccountsQuery(fn: PlayerShedAccountsQuery | null): void {
+      shedAccountsQuery = fn;
+    },
+
     debugUncontrolledJunctions() {
       return uncontrolledJunctions;
     },
 
-    pushCollision(withWhat: CollisionWith, bodyId?: string): void {
-      collisionQueue.push({ withWhat, bodyId });
+    pushCollision(withWhat: CollisionWith, bodyId?: string, onCarriageway?: true): void {
+      collisionQueue.push({ withWhat, bodyId, onCarriageway: onCarriageway === true ? true : undefined });
     },
 
     debugStopLines(): readonly StopLine[] {

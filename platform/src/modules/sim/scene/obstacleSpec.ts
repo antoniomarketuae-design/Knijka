@@ -98,6 +98,16 @@ export type ScenarioPropKind = "cone" | "pole";
 export interface ScenarioPropObstacle extends ObstaclePose {
   kind: "prop";
   prop: ScenarioPropKind;
+  /**
+   * THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, integrator rulings
+   * C1/S1): its footprint centre measures `surfaceAt(...).under ===
+   * "carriageway"` on the built road. Never authored by hand — stamped at scene
+   * build by `scenarioSceneryProps.stampHeldOnCarriageway` and mounted as
+   * `STATIC_ON_CARRIAGEWAY_USER_DATA` on the body's collider, which is all a
+   * contact can read of it. Selects the shown COLLISION copy only. Absent
+   * otherwise.
+   */
+  onCarriageway?: true;
 }
 
 /** A wall/pillar segment running along its heading. */
@@ -109,6 +119,16 @@ export interface ScenarioWallObstacle extends ObstaclePose {
   heightM?: number;
   /** Default 0.3 m. */
   thicknessM?: number;
+  /**
+   * THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, integrator rulings
+   * C1/S1): its footprint centre measures `surfaceAt(...).under ===
+   * "carriageway"` on the built road. Never authored by hand — stamped at scene
+   * build by `scenarioSceneryProps.stampHeldOnCarriageway` and mounted as
+   * `STATIC_ON_CARRIAGEWAY_USER_DATA` on the body's collider, which is all a
+   * contact can read of it. Selects the shown COLLISION copy only. Absent
+   * otherwise.
+   */
+  onCarriageway?: true;
 }
 
 /**
@@ -219,6 +239,31 @@ export type ScenarioObstacleSpec =
 // wall which way is away from it. The component imports both back and
 // re-exports `PROP_COLLIDERS`, so every existing importer reads the same
 // object.
+
+/**
+ * THE TAG ON A HELD WALL'S OR PROP'S COLLIDER WHOSE BODY STANDS ON THE
+ * CARRIAGEWAY (lane staticcardcopy; ADR-014 amendment 2026-11-04). Mounted by
+ * `components/sim/ScenarioObstacles.tsx` (which re-exports this very object)
+ * on exactly the specs `onCarriageway` marks, and read by
+ * `components/sim/VehicleRig.tsx hearChassisContact` through
+ * `isStaticOnCarriagewayUserData`. It is NOT an NPC tag (no `npcCollider`,
+ * so the contact still classifies "staticObject") and NOT the drive-over
+ * surface (no `districtSurface`, so the body keeps the lesson's threshold):
+ * it changes which sentence a contact prints, nothing else. A frozen module
+ * constant so the `userData` identity is stable for the body's lifetime (the
+ * `DISTRICT_SURFACE_USER_DATA` convention).
+ */
+export const STATIC_ON_CARRIAGEWAY_USER_DATA = Object.freeze({ staticOnCarriageway: true as const });
+
+/** Narrowing reader for the contact ear (unknown → does the struck body
+ *  stand on the carriageway?). */
+export function isStaticOnCarriagewayUserData(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as { staticOnCarriageway?: unknown }).staticOnCarriageway === true
+  );
+}
 
 /** A wall's default thickness when the spec omits it, m (ObstacleWall). */
 export const WALL_DEFAULT_THICKNESS_M = 0.3;

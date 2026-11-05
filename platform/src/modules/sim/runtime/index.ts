@@ -52,7 +52,21 @@ export {
   type OncomingConflict,
   type OncomingQuery,
   type SignalPhaseInfo,
+  // lane staticcardcopy (S1/S6): the runtime's own per-document surface
+  // resolve, so the scene stamps held bodies against the SAME cached index.
+  districtDrivableSurfaceOf,
 } from "./worldRuntime";
+// …and the one query it is read with (what is under a district point).
+export { makeSurfaceFix, surfaceAt, type DrivableSurface, type SurfaceFix } from "./surface";
+// Lane rbreverse: the reverse-warning measurement (display-only; no rule reads it).
+export {
+  REVERSE_BRAKED_FOR_VEHICLE_STOPPED_MPS,
+  REVERSE_BRAKED_FOR_REVERSING_KMH,
+  REVERSE_BRAKED_FOR_SHED_MPS,
+  ReverseBrakedForTracker,
+  type PlayerShedAccountsQuery,
+  type ShedAccountRow,
+} from "./reverseBrakedFor";
 export {
   parseDistrict,
   BG_URBAN_DEFAULT_KMH,

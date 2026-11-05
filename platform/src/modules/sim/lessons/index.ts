@@ -170,6 +170,10 @@ export {
   // three different moments would read as three bugs.
   ROUTE_HOLD_S,
   routeHoldAdvisorPrompt,
+  // Lane rbreverse: the display-only reverse warning (founder ruling Q2, warn only).
+  reverseWarningAdvisorPrompt,
+  reverseWarningForSession,
+  REVERSE_DUTY_BEFORE,
   routeHoldForSession,
   // Lane endings round 2 (E5): which way is away from what the car struck —
   // the shell's crash-hold banner lead reads it beside `routeHoldForSession`.

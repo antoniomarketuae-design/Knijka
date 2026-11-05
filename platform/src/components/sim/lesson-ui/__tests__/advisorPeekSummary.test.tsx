@@ -34,6 +34,7 @@ import {
   compileScenario,
   createLessonSession,
   routeHoldAdvisorPrompt,
+  reverseWarningAdvisorPrompt,
   yieldWaitAdvisorPrompt,
   advisorPromptForPreDriveStep,
   advisorPromptForObjective,
@@ -131,6 +132,8 @@ function authoredPrompts(): Array<{ where: string; prompt: AdvisorPrompt }> {
   out.push({ where: "routeHold:offRoad", prompt: routeHoldAdvisorPrompt("offRoad") });
   // Lane endings round 2 (E5): one card per way out — back, forward, away.
   for (const w of ["back", "forward", "away"] as const) out.push({ where: `routeHold:crashPinned:${w}`, prompt: routeHoldAdvisorPrompt("crashPinned", w) });
+  // Lane rbreverse: the reverse warning, one card per body kind (founder ruling Q2, warn only).
+  for (const k of ["vehicle", "cyclist"] as const) out.push({ where: `reverseWarning:${k}`, prompt: reverseWarningAdvisorPrompt(k) });
   out.push({ where: "controller", prompt: controllerWaitAdvisorPrompt() });
   out.push({ where: "railRed", prompt: railPriorityWaitAdvisorPrompt() });
   out.push({ where: "railRed:convicted", prompt: railPriorityWaitAdvisorPrompt(true) });
@@ -155,7 +158,8 @@ function evalVariants(): Array<ObjectiveEvalState | undefined> {
 describe("census — every prompt carries a summary that fits, or can never be an advisor row", () => {
   it("the authored prompts: all of them, all rules", () => {
     const rows = authoredPrompts();
-    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 7 + REASONS.length * 3);
+    // + 2 since lane rbreverse: the reverse warning's two cards (vehicle, cyclist)
+    expect(rows.length).toBe(PRE_DRIVE_STEP_ORDER.length + 9 + REASONS.length * 3);
     const broken: string[] = [];
     for (const { where, prompt } of rows) {
       if (typeof prompt.peekBg !== "string") {
@@ -197,7 +201,7 @@ describe("census — every prompt carries a summary that fits, or can never be a
     expect(reassured).toBe(REASONS.length);
   });
 
-  it("the route-hold lines are an ACT and its REASON — the because-clause of their own card", () => {
+  it("the route-hold lines are an ACT and its REASON — the because-clause of their own card (the pinned line: the LOOK and the conditional act, R6a)", () => {
     // Round 2 wrote the act alone («Не дърпай волана — върни се под малък ъгъл.»),
     // the order-without-its-why shape 04-t090s was filed for, one tap away.
     const off = routeHoldAdvisorPrompt("offRoad");
@@ -206,19 +210,38 @@ describe("census — every prompt carries a summary that fits, or can never be a
     expect(off.textBg).toContain("сцеплението е друго");
     // Round 2 (E5): the act names the way away from the struck body — «назад» after a
     // forward strike, «напред» after a reversing one, «отдръпни я» where the side is unknown.
-    for (const [w, act] of [["back", /назад/u], ["forward", /напред/u], ["away", /отдръпни я/u]] as const) {
+    //
+    // RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e; integrator ruling R6a
+    // option A, 2026-11-04). Through 479127b this asserted the pinned line STARTS with
+    // the act («Ако опира — …») and carries its reason — i.e. it pinned the move-first
+    // order the row was filed for (rig-w3b SC2 reversed on the ring toward a circulator
+    // that had to stop ~1 m off his bumper). The look is the first act the north star
+    // requires after a crash, and look + act + reason do not fit two lines of 24, so FOR
+    // crashPinned ONLY the line is the look plus the conditional act and the
+    // because-clause («притиска») lives on the card behind «Прочети». Every other line
+    // in this file keeps the act-and-reason rule (the off-road line above).
+    const firstMove = /назад|напред|отдръпни|потегл/u;
+    for (const [w, act] of [["back", /назад/u], ["forward", /напред/u], ["away", /отдръпни/u]] as const) {
       const p = routeHoldAdvisorPrompt("crashPinned", w);
       expect(p.peekBg).toMatch(act);
-      expect(p.peekBg).toContain("притиска");
+      expect(p.textBg).toMatch(act);
+      // the card keeps the because-clause; the line keeps the look and the conditional
       expect(p.textBg).toContain("притиска");
-      expect(p.peekBg).toMatch(/^Ако опира/u);
-      expect(p.textBg).toMatch(/^Ако колата опира/u);
+      expect(p.peekBg).toMatch(/ако опира/u);
+      expect(p.textBg).toMatch(/ако опира в удареното/u);
+      // the LOOK first — in word order — on the line and on the card
+      const peek = p.peekBg ?? "";
+      expect(peek.search(/огледа/iu), w).toBeGreaterThanOrEqual(0);
+      expect(peek.search(/огледа/iu), w).toBeLessThan(peek.search(firstMove));
+      expect(p.textBg.search(/огледа/iu), w).toBeLessThan(p.textBg.search(firstMove));
+      expect(p.peekBg).toMatch(/^Огледай се/u);
+      expect(p.textBg).toMatch(/^Огледай се/u);
     }
     const pinned = routeHoldAdvisorPrompt("crashPinned", "back");
     // Conditional since lane endings (2026-10-18, integrator ruling E3): the act
     // is for a car that touches what it hit — the hold cannot tell which.
-    expect(pinned.peekBg).toMatch(/^Ако опира/u);
-    expect(pinned.textBg).toMatch(/^Ако колата опира/u);
+    expect(pinned.peekBg).toMatch(/ако опира/u);
+    expect(pinned.textBg).toMatch(/ако опира в удареното/u);
   });
 
   it("the mirror lines name the LOOK, not a mouse or a hold the phone does not have", () => {

@@ -161,9 +161,14 @@ describe("the four crashes keep four summaries", () => {
   it("no two struck bodies share one", () => {
     const bodies = Object.values(COLLISION_CONTACT_COPY).map((c) => c.peekBg);
     // five rows since the cut-in contact (COLLISION_CONTACT_COPY.vehicleCutIn,
-    // founder ruling 2026-09-30) — and still no two sharing a summary
+    // founder ruling 2026-09-30); SIX since the on-road static contact
+    // (COLLISION_CONTACT_COPY.staticObjectOnRoad, lane staticcardcopy: its own
+    // paragraph and its own cause-stating peek, because «Не се появи
+    // внезапно.» is false of a load fallen into the lane) — and still no two
+    // sharing a summary
     expect(new Set(bodies).size).toBe(Object.keys(COLLISION_CONTACT_COPY).length);
-    expect(Object.keys(COLLISION_CONTACT_COPY).length).toBe(5);
+    expect(Object.keys(COLLISION_CONTACT_COPY).length).toBe(6);
+    expect(Object.keys(COLLISION_CONTACT_COPY)).toContain("staticObjectOnRoad");
   });
 
   it("violationPeekBg reads the ACT first and the pooled row second", () => {

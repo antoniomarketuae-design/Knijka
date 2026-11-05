@@ -82,6 +82,7 @@ import {
   type CyclistApproach,
   type DistrictEdge,
   type OncomingApproach,
+  type PlayerShedAccount,
   type RearBodyBehind,
   type SameDirVehicle,
   type StagedActorSpec,
@@ -442,6 +443,9 @@ class TrafficSystemImpl implements TrafficSystem {
     conflict: false,
     vehicles: this.circulatingRows,
   };
+  /** playerShedAccounts' reused rows (lane rbreverse) — one pool, no
+   *  allocation after warm-up; the pool is the query's own, never world state. */
+  private readonly shedAccountRows: PlayerShedAccount[] = [];
   private readonly stagedEnv: StagedEnv;
   /** sc-roundabout-entry:7b747c15 — see `StagedSubstepListener`. */
   private stagedListener: StagedSubstepListener | null = null;
@@ -1380,6 +1384,35 @@ class TrafficSystemImpl implements TrafficSystem {
       };
     }
     return Number.isFinite(parked) ? { gapM: parked, kind: "vehicle" } : null;
+  }
+
+  /**
+   * EVERY VEHICLE AGENT'S ACCOUNT (lane rbreverse, sc-roundabout-entry:9e85f27e)
+   * — see `TrafficSystem.playerShedAccounts`. Ambient agents first, staged
+   * after, as `circulatingTraffic` walks them. PURE: the agents are read and
+   * never touched; only this query's own row pool is written.
+   */
+  playerShedAccounts(): readonly PlayerShedAccount[] {
+    const rows = this.shedAccountRows;
+    let n = 0;
+    for (const list of [this.vehicleAgents, this.stagedVehicles] as const) {
+      for (const a of list) {
+        let row = rows[n];
+        if (row === undefined) {
+          row = { id: 0, kind: "vehicle", x: 0, y: 0, playerShedMps: 0, speedMps: 0 };
+          rows[n] = row;
+        }
+        row.id = a.state.id;
+        row.kind = this.vehicleCollisionKind(a.state.id);
+        row.x = a.state.x;
+        row.y = a.state.y;
+        row.playerShedMps = a.playerShedMps;
+        row.speedMps = a.state.speedMps;
+        n++;
+      }
+    }
+    rows.length = n;
+    return rows;
   }
 
   /**

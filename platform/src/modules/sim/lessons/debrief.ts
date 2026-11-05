@@ -52,6 +52,7 @@ import {
   deriveSpeedingBand,
   examMarkFor,
   examPointsWordBg,
+  foldActDetail,
   formatEur,
   gravestViolation,
   instrumentLabelBg,
@@ -356,8 +357,13 @@ export function buildDebrief(
   // for it — the only «Правилното действие» on the page was the overtaking
   // advice of the drift (verifier Y3). One key, the block's own: `actKeyOf`.
   // A code that authors no acts keys exactly as before.
-  const scoredActs = new Set<string>(summary.mistakes.map((m) => actKeyOf(m.code, m.detail)));
-  const coached = (context.coachedMistakes ?? []).filter((c) => !scoredActs.has(actKeyOf(c.code, c.detail)));
+  //
+  // …AND THE FOLDED ACT (lane staticcardcopy, ruling S10): «staticObjectOnRoad»
+  // is the same mistake as «staticObject» with a truer paragraph, so a coached
+  // kerb strike stays hidden behind a scored block strike exactly as base hid
+  // it behind a scored kerb strike (`sameActKeyOf`).
+  const scoredActs = new Set<string>(summary.mistakes.map((m) => sameActKeyOf(m.code, m.detail)));
+  const coached = (context.coachedMistakes ?? []).filter((c) => !scoredActs.has(sameActKeyOf(c.code, c.detail)));
   /**
    * HOW MANY TEACH MOMENTS THE STUDENT WILL ACTUALLY SEE, hoisted out of the
    * „издържан" branch because a SECOND verdict branch now has to consult it.
@@ -1220,9 +1226,14 @@ export function buildDebrief(
       // the grounding draft for the post-Alpha LLM debrief: the LLM may
       // rephrase this line but must not invent corrective advice.
       const corrective = correctiveFor(g.code, g.actKey);
-      if (corrective !== null) {
+      // Once per FOLDED act (lane staticcardcopy, ruling S10): a kerb row and
+      // an on-road block row are two rows under one title — each says what
+      // happened in its own words — but one mistake, with one corrective. On
+      // every other pair the fold is the identity and the rows' keys are
+      // already distinct, so this guard never fires there.
+      if (corrective !== null && !actionGivenForCode.has(sameActKeyOf(g.code, g.actKey))) {
         mistakeBlock.push(`  → Правилното действие: ${corrective}`);
-        actionGivenForCode.add(actKeyOf(g.code, g.actKey));
+        actionGivenForCode.add(sameActKeyOf(g.code, g.actKey));
       }
       // The debrief is PLAIN TEXT — it has no FaultCard to carry the rider, and
       // it is what /review/my-drive replays weeks later. So the one fault that
@@ -1510,7 +1521,7 @@ export function buildDebrief(
    */
   const hitCodes = new Set(hits.map((h) => h.code));
   /** Hits the изпитен лист did NOT charge — the ones this block owns. */
-  const withheldHits = hits.filter((h) => !scoredActs.has(actKeyOf(h.code, h.detail)));
+  const withheldHits = hits.filter((h) => !scoredActs.has(sameActKeyOf(h.code, h.detail)));
   const coachedIncidental = coached.filter((c) => !hitCodes.has(c.code));
   if (withheldHits.length > 0) {
     lines.push("");
@@ -1530,7 +1541,7 @@ export function buildDebrief(
       lines.push(`• ${copy.titleBg}`);
       lines.push(`  → Защо: ${copy.explanationBg}`);
       lines.push(`  → Правилното действие: ${copy.correctiveBg}`);
-      actionGivenForCode.add(actKeyOf(hit.code, hit.detail));
+      actionGivenForCode.add(sameActKeyOf(hit.code, hit.detail));
       // The same chip the teach card printed at the moment of the mistake
       // (`TeachMomentOverlay.tsx` «правило: …»), so the card and the debrief
       // cite one article in one form. Retrieved, never written here.
@@ -1784,7 +1795,7 @@ export function buildDebrief(
      * when the action for this very act is already on the page, and the full
      * form when nothing else has given it.
      */
-    const actionAlreadyGiven = actionGivenForCode.has(actKeyOf(first.code, first.detail));
+    const actionAlreadyGiven = actionGivenForCode.has(sameActKeyOf(first.code, first.detail));
     lines.push("");
     if (focusTitle) {
       lines.push(
@@ -2832,6 +2843,19 @@ function excessOf(detail: string | undefined): number | null {
 function actKeyOf(code: string, detail: string | undefined): string {
   const act = codeIsKnown(code) ? actCopy(code as ViolationCode, detail) : null;
   return `${code}|${act === null ? "" : (detail ?? "")}`;
+}
+
+/**
+ * THE KEY OF ONE MISTAKE — `actKeyOf` over the FOLDED act (`rules/catalog.ts
+ * foldActDetail`; lane staticcardcopy, ruling S10). The two DEDUPE questions
+ * ask it — whose corrective is already on the page (`actionGivenForCode`) and
+ * which taught-and-free rows the charged block already covers (`scoredActs`)
+ * — because «staticObjectOnRoad» is the same mistake as «staticObject» with a
+ * truer paragraph. `groupMistakes` keeps `actKeyOf`: the two paragraphs are
+ * two rows. The identity on every other act.
+ */
+function sameActKeyOf(code: string, detail: string | undefined): string {
+  return actKeyOf(code, foldActDetail(detail));
 }
 
 function groupMistakes(

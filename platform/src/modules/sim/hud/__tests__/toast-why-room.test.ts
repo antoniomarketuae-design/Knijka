@@ -259,31 +259,76 @@ describe("§1 the queue, MOUNTED: a press on «Защо» re-arms that card's cl
     m.unmount();
   });
 
+  // RE-TAUGHT 2026-11-04 (lane wcafterpaint, sc-roundabout-entry:ad192bc4) — integrator
+  // decision W11 (R1, 2026-10-18): the cap spares every judged card (violation, lesson) for
+  // its whole life, so five newer TEACH cards are all kept now; this pin used to count the
+  // newest cap-many among them. R3 (confirmed 2026-11-04): the `reading` set stays in the
+  // cap's exemption. The opened card in this pin and in the PRAISE variant below is a graded
+  // fault, which W11 keeps for its life anyway, so neither observes `reading` (round-1
+  // verifier, mutant V11): the row that does is «an OPENED commendation…» below.
   it("the card being read is not capped out of the queue by newer cards", () => {
     const at = { now: 0 };
     const m = mountQueue(at);
     m.value.push([staticObjectToast()]);
     const id = m.rerender().toasts[0]!.id;
     m.value.whyChanged?.(id, true);
-    // Five newer cards: the cap (TOAST_MAX_VISIBLE + 2) drops the OLDEST.
+    // Five newer judged cards: W11 keeps every one of them for its own life.
     for (let i = 0; i < 5; i += 1) m.value.push([TEACH]);
     const held = m.rerender().toasts.map((t) => t.id);
     expect(held, "the paragraph he opened was deleted from the queue under him").toContain(id);
-    // …and nothing newer was dropped to keep it: the newest cap-many are all there.
-    const newest = held.filter((x) => x !== id);
-    expect(newest).toHaveLength(TOAST_MAX_VISIBLE + 2);
-    expect(Math.min(...newest)).toBeGreaterThan(id);
+    expect(held, "a «Научи» card was capped inside its own life (W11)").toEqual([6, 5, 4, 3, 2, id]);
     m.unmount();
   });
 
-  it("CLOSING «Защо» gives the cap back: a card nobody is reading is capped like any other (verifier mutant V03)", () => {
+  it("…the card being read is kept against five newer PRAISE, and the cap keeps the four newest praise, drops the fifth (R3)", () => {
     const at = { now: 0 };
     const m = mountQueue(at);
     m.value.push([staticObjectToast()]);
     const id = m.rerender().toasts[0]!.id;
+    m.value.whyChanged?.(id, true);
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: `Браво ${i}` }]);
+    const held = m.rerender().toasts.map((t) => t.id);
+    expect(held, "the paragraph he opened was deleted from the queue under him").toContain(id);
+    // …and nothing newer was dropped to keep it: the newest cap-many are all there.
+    const newest = held.filter((x) => x !== id);
+    expect(newest, "the cap stopped capping praise, or dropped a newer card to keep the opened one").toEqual([6, 5, 4, 3]);
+    expect(newest).toHaveLength(TOAST_MAX_VISIBLE + 2);
+    m.unmount();
+  });
+
+  // ROUND 2 (2026-11-04, lane wcafterpaint; integrator CONDITION V11 under R3). Under W11 the
+  // `reading` set decides the cap only for a card that is NOT judged. In the product nothing
+  // opens one (ToastCard hands onWhyChange to ViolationToast only, so `reading` holds graded
+  // faults); the ledger keeps the exemption for any kind, and this row is the one that
+  // observes it: mutant V11 (`new Set<number>()` in place of `new Set<number>(reading)`)
+  // fails the first assertion, and a close that kept the exemption (M7) fails the second.
+  it("an OPENED commendation is kept by the cap while it is read, and is capped like any praise once it is closed (R3, V11)", () => {
+    const at = { now: 0 };
+    const m = mountQueue(at);
+    m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // id 1
+    m.value.whyChanged!(1, true);
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: `Браво ${i}` }]); // ids 2..6
+    expect(m.rerender().toasts.map((t) => t.id), "an opened card that is not judged was capped while it was being read").toEqual([6, 5, 4, 3, 1]);
+    m.value.whyChanged!(1, false);
+    m.value.push([{ kind: "commendation", titleBg: "Браво 5" }]); // id 7
+    expect(m.rerender().toasts.map((t) => t.id), "a closed commendation kept the exemption only a card being read may have").toEqual([7, 6, 5, 4]);
+    m.unmount();
+  });
+
+  // RE-TAUGHT 2026-11-04 (wcafterpaint; W11, R1/R3). The verifier's V03 mutant — a closed
+  // explanation keeps its exemption — is now EQUIVALENT for a judged card (a judged card is
+  // exempt for its whole life anyway), so the pin is kept killed through a card the cap may
+  // take: a COMMENDATION opened and closed (`whyChanged(id, true)` puts any live card in
+  // `reading`, F5). The judged half is taught separately: opened and closed, it stays to its
+  // press-extended expiry and leaves exactly then.
+  it("CLOSING «Защо» gives the cap back: a card nobody is reading is capped like any other (verifier mutant V03)", () => {
+    const at = { now: 0 };
+    const m = mountQueue(at);
+    m.value.push([{ kind: "commendation", titleBg: "Браво" }]);
+    const id = m.rerender().toasts[0]!.id;
     m.value.whyChanged!(id, true);
     m.value.whyChanged!(id, false);
-    for (let i = 0; i < 5; i += 1) m.value.push([TEACH]);
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: `Браво ${i}` }]);
     expect(
       m.rerender().toasts.map((t) => t.id),
       "a closed explanation kept its exemption from the queue's cap",
@@ -291,14 +336,39 @@ describe("§1 the queue, MOUNTED: a press on «Защо» re-arms that card's cl
     m.unmount();
   });
 
-  it("…and with nothing open the cap is the cap it always was", () => {
+  it("…a JUDGED card opened and closed stays to its press-extended expiry and leaves exactly then (W11)", () => {
     const at = { now: 0 };
     const m = mountQueue(at);
-    for (let i = 0; i < 7; i += 1) m.value.push([TEACH]);
+    m.value.push([staticObjectToast()]); // id 1, raised at 0
+    at.now = 2_233;
+    m.value.whyChanged!(1, true); // the press: its life runs to 2 233 + 21 534 = 23 767
+    at.now = 3_000;
+    m.value.whyChanged!(1, false);
+    for (let i = 0; i < 5; i += 1) m.value.push([TEACH]);
+    expect(m.rerender().toasts.map((t) => t.id), "a judged card that was opened and closed was capped inside its life").toEqual([6, 5, 4, 3, 2, 1]);
+    // armed at the press (2 233) for the paragraph's 21 534 ms: due at 23 767
+    const mine = m.timers.find((t) => t.ms === 21_534);
+    expect(mine, "the opened-and-closed card's clock is not its press-extended expiry").toBeDefined();
+    at.now = 23_767;
+    mine!.fn();
+    expect(m.rerender().toasts.map((t) => t.id), "the card did not leave at exactly its press-extended expiry").not.toContain(1);
+    m.unmount();
+  });
+
+  // RE-TAUGHT 2026-11-04 (wcafterpaint; W11, R1). Seven TEACH cards are all alive, so all
+  // seven are kept; the cap's own rule is shown on seven PRAISE. The pure lines are unchanged.
+  it("…and with nothing open the cap is the cap it always was — for praise; judged cards are kept for their life (W11)", () => {
+    const at = { now: 0 };
+    const m = mountQueue(at);
+    for (let i = 0; i < 7; i += 1) m.value.push([{ kind: "commendation", titleBg: `Браво ${i}` }]);
     expect(m.rerender().toasts.map((t) => t.id)).toEqual([7, 6, 5, 4]);
+    m.unmount();
+    const m2 = mountQueue(at);
+    for (let i = 0; i < 7; i += 1) m2.value.push([TEACH]);
+    expect(m2.rerender().toasts.map((t) => t.id), "a «Научи» card was capped inside its own life (W11)").toEqual([7, 6, 5, 4, 3, 2, 1]);
+    m2.unmount();
     expect(NEW.capToastQueue?.([{ id: 3 }, { id: 2 }, { id: 1 }], 2, new Set([1]))).toEqual([{ id: 3 }, { id: 2 }, { id: 1 }]);
     expect(NEW.capToastQueue!([{ id: 3 }, { id: 2 }, { id: 1 }], 2, new Set())).toEqual([{ id: 3 }, { id: 2 }]);
-    m.unmount();
   });
 
   it("EVERY OTHER CARD STOPS ITS CLOCK while one is read — older AND newer — and runs out what it had left when the column paints it again (W5)", () => {
@@ -392,25 +462,55 @@ describe("§1 the queue, MOUNTED: a press on «Защо» re-arms that card's cl
     m.unmount();
   });
 
+  // RE-TAUGHT 2026-11-04 (lane wcafterpaint; W11, R1/R3). The mutant this pin was written
+  // against — a card made to wait keeps its READ exemption — is now EQUIVALENT for a judged
+  // card (W11 exempts a judged card for its whole life anyway), so it is kept killed through
+  // a COMMENDATION that was opened, made to wait (holdAllBut on another opened card) and
+  // released: praise in `reading` is the one place the read exemption still decides (R3).
+  // The judged half is taught separately below: kept through its life, gone at its expiry.
   it("a card made to wait is no longer being read: once it is back on the glass and running, the cap may take it like any other", () => {
     const at = { now: 0 };
     const m = mountQueue(at);
-    m.value.push([staticObjectToast()]); // id 1
+    m.value.push([{ kind: "commendation", titleBg: "Браво 0" }]); // id 1 — praise, opened
     m.value.push([staticObjectToast()]); // id 2
     m.value.whyChanged!(1, true);
     m.value.whyChanged!(2, true);
     m.value.holdAllBut!(2);
-    // While it waits it is kept (W5: a graded fault behind an explanation).
-    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // ids 3..7
-    expect(m.rerender().toasts.map((t) => t.id)).toContain(1);
     // Released and painted again: it runs, it is not being read — no exemption.
-    m.value.painted!([7, 6]);
+    m.value.painted!([2]);
     m.value.holdAllBut!(null);
     m.value.painted!([2, 1]);
-    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // ids 8..12
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // ids 3..7
     const ids = m.rerender().toasts.map((t) => t.id);
     expect(ids, "the card still being read lost its exemption").toContain(2);
     expect(ids, "a card that waited kept an exemption only a card being read may have").not.toContain(1);
+    m.unmount();
+  });
+
+  it("…a JUDGED card made to wait and released is kept through its life (W11) and leaves at its expiry; the card still read is kept", () => {
+    const at = { now: 0 };
+    const m = mountQueue(at);
+    m.value.push([staticObjectToast()]); // id 1, raised at 0
+    m.value.push([staticObjectToast()]); // id 2
+    m.value.whyChanged!(1, true); // id 1's life: max(8 000, 0 + 21 534) = 21 534
+    m.value.whyChanged!(2, true);
+    m.value.holdAllBut!(2); // id 1 waits with 21 534 left
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // ids 3..7
+    expect(m.rerender().toasts.map((t) => t.id)).toContain(1);
+    at.now = 1_000;
+    m.value.painted!([7, 6]);
+    m.value.holdAllBut!(null);
+    m.value.painted!([2, 1]); // id 1 runs again: due at 1 000 + 21 534
+    for (let i = 0; i < 5; i += 1) m.value.push([{ kind: "commendation", titleBg: "Браво" }]); // ids 8..12
+    const ids = m.rerender().toasts.map((t) => t.id);
+    expect(ids, "the card still being read lost its exemption").toContain(2);
+    expect(ids, "a judged card was capped inside its own life (W11)").toContain(1);
+    // id 2's press re-armed it for 21 534 at 0; id 1 restarted with the same 21 534 at 1 000 — the later timer
+    const mine = m.timers.filter((t) => t.ms === 21_534).at(-1);
+    expect(m.timers.filter((t) => t.ms === 21_534), "the released card's clock is not the life it had left").toHaveLength(2);
+    at.now = 22_534;
+    mine!.fn();
+    expect(m.rerender().toasts.map((t) => t.id), "the judged card did not leave at its expiry").not.toContain(1);
     m.unmount();
   });
 

@@ -31,7 +31,7 @@
  * Same stored event, same registry, same key — one act, one name, everywhere.
  */
 
-import { actCopy, VIOLATIONS, type ViolationCode } from "@/modules/sim/rules";
+import { actCopy, foldActDetail, VIOLATIONS, type ViolationCode } from "@/modules/sim/rules";
 import type { SessionHistoryMistake } from "./session-history";
 
 const SEVERITY_RANK: Record<SessionHistoryMistake["severityClass"], number> = {
@@ -61,7 +61,14 @@ export function historyMistakeGroups(
     // for the same reason. An event whose detail names no authored act keys on
     // the code alone, so a speeding row's measurement string cannot split one
     // continuing offence into five rows.
-    const key = act === null ? code : `${code}|${e.detail as string}`;
+    //
+    // The act is FOLDED first (lane staticcardcopy, integrator ruling F8,
+    // 2026-11-04): «staticObjectOnRoad» and «staticObject» differ only in the
+    // explanation paragraph, which this list never prints — title, lawRef,
+    // points and corrective are the same — so a kerb strike plus a block strike
+    // is ONE row with count 2, as it was before the split, not two rows that
+    // read identically with count 1 each.
+    const key = act === null ? code : `${code}|${foldActDetail(e.detail as string) as string}`;
     const g = groups.get(key);
     if (g) {
       g.count += 1;

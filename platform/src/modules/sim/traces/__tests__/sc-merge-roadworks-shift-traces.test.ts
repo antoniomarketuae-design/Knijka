@@ -232,7 +232,11 @@ describe("sc-merge-roadworks-shift — mistake demos grade their exact codes (do
     // does overlap authored cones, and the graded detail says what it hit.
     expect(drive.trace.samples.some((s) => touchesCone(s))).toBe(true);
     for (const e of drive.ruleEvents) {
-      if (e.kind === "violation" && e.code === "COLLISION") expect(e.detail).toBe("staticObject");
+      // RE-TAUGHT (lane staticcardcopy, C1): the cones stand ON the carriageway
+      // (their rects carry `onCarriageway` by value, pinned against the built
+      // road), so the bill names the on-road static act — the same static body,
+      // the paragraph that is true of a cone in a lane closure.
+      if (e.kind === "violation" && e.code === "COLLISION") expect(e.detail).toBe("staticObjectOnRoad");
     }
     // …and the straddle is real: it drags itself along the boundary line, far
     // enough off ANY lane center to be nowhere at all.

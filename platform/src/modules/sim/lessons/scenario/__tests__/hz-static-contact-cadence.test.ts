@@ -149,7 +149,11 @@ describe("sc-hz-brake-dont-swerve — the block is hit on every display, and bil
         expect(before, "the approach speed into the block").toBeGreaterThan(c.name.includes("late") ? 15 : 45);
         expect(ref.collisions.length, "COLLISION bills at 60 Hz").toBeGreaterThanOrEqual(1);
         expect(ref.collisions[0].points).toBe(10);
-        expect(ref.collisions[0].withWhat).toBe("staticObject");
+        // RE-TAUGHT (lane staticcardcopy, C1): the hz block stands IN the lane — its
+        // centre measures "carriageway" on hz-debris-v1 — so the recipe stamps it and
+        // the bill names the on-road static act; the same static body, the same 10
+        // points, the paragraph that is true of a load in the lane.
+        expect(ref.collisions[0].withWhat).toBe("staticObjectOnRoad");
         expect(ref.result.passed, "a crash into the block is not a pass").toBe(false);
         expect(graded(ref).length).toBeGreaterThanOrEqual(1);
       });
@@ -331,9 +335,12 @@ function sceneCollisionOn(level: 1 | 3) {
 }
 
 describe("LessonScene's own handleCollision, cut out of the scene and executed — what the rig's ear calls", () => {
-  it("is the callback VehicleRig's ear calls: (impactKmh, withWhat, student), and it reads no name this file does not hand it", () => {
+  it("is the callback VehicleRig's ear calls: (impactKmh, withWhat, student, onCarriageway), and it reads no name this file does not hand it", () => {
     const cut = sceneHandleCollision();
-    expect(cut.params, "the scene's callback no longer takes the student of the contact's grid point").toBe(3);
+    // RE-TAUGHT (lane staticcardcopy, C1): a fourth parameter, the struck body's
+    // carriageway fact, which the scene forwards to the runtime; the student of
+    // the contact's grid point is still the third.
+    expect(cut.params, "the scene's callback no longer takes the student of the contact's grid point and the body's fact").toBe(4);
     expect([...SCENE_COLLISION_NAMES].filter((n) => !new RegExp(`\\b${n}\\b`).test(cut.text))).toEqual([]);
   });
 

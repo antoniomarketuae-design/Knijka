@@ -336,9 +336,10 @@ const FOLLOW_HINT_POLL_S = 0.25;
  * as it shipped.
  *
  * A HOLD OF EITHER KIND. `crashPinned` stands the pill down too. A car held
- * after a crash is told «Ако колата опира в удареното, първо съвсем леко
- * назад…» — ease back first if it touches what it hit (conditional since lane
- * endings, 2026-10-18) — and „follow the line" would compete with that card.
+ * after a crash is told «Огледай се — огледала и рамо. Щом е чисто: ако опира
+ * в удареното, съвсем леко назад…» — look round, then ease back if it touches
+ * what it hit (conditional since lane endings, 2026-10-18; the look first since
+ * lane rbreverse) — and „follow the line" would compete with that card.
  *
  * MEASURED ON THE PARKING CORPUS, the direction that is worse than the defect:
  * all 78 committed sc-park-* / sc-pk-* tapes (26 shadow-correct, 52 mistake),
@@ -2876,7 +2877,7 @@ export function ReadyScene({
   );
 
   const handleCollision = useCallback(
-    (impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) => {
+    (impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>, onCarriageway?: true) => {
       // f0023997: the crash has to be VISIBLE. Presentation only — it reads no
       // grading state and writes none, so a refused cut can never change a
       // verdict (`ImpactCut`'s header carries the measurement).
@@ -2899,6 +2900,9 @@ export function ReadyScene({
             hittableObstacleBodies(built.scenarioObstacles, obstacleFootprintsRef.current),
           ),
         ),
+        // The struck body's carriageway fact (lane staticcardcopy), handed on
+        // as the rig heard it: `true` or absent, never derived here.
+        onCarriageway,
       );
     },
     [runtime, director, traffic, built.scenarioObstacles],

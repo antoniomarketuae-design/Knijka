@@ -25,7 +25,7 @@ import {
   PRE_DRIVE_STEP_ORDER,
   type PreDriveStepId,
 } from "../procedures";
-import { VIOLATIONS, type SimTick, type ViolationCode } from "../rules";
+import { VIOLATIONS, type ReverseBrakedFor, type SimTick, type ViolationCode } from "../rules";
 // The arc the ring objective demands before it will credit an exit — imported
 // rather than mirrored so the card and the grade cannot drift apart.
 import { ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG } from "./objectives";
@@ -1148,15 +1148,35 @@ function offCarriagewaySustainedNow(s: LessonSessionState): boolean {
  * on the pose the card is shown on (`crashPin.clear`): a car wedged by a
  * second, unbilled contact with its other end gets the direction-free card.
  * The FREE branch is the same in all three.
+ *
+ * THE LOOK COMES FIRST (lane rbreverse, sc-roundabout-entry:9e85f27e;
+ * integrator rulings R6 / R6a, 2026-11-04). Through 479127b every variant's
+ * PRESSED branch ordered the move as the first act («първо съвсем леко назад /
+ * напред / я отдръпни») and named no look: the look lived only in the FREE
+ * branch («Ако не опира, огледай се и тогава потегли»). So a pressed car was
+ * taught to move out first and look afterwards — and on the ring the «away»
+ * move from a nose strike IS a reverse. rig-w3b SC2 (59be0de, 3 of 3) drove
+ * exactly that: reversed on the ring toward the staged circulator, which braked
+ * from 2.9 m/s to a standstill about 1 m off his rear bumper. Now, in word
+ * order AND in logic: look round first (mirrors and over the shoulder); only
+ * once it is clear («Щом е чисто:» scopes BOTH branches) ease away if the car
+ * touches what it hit — slowly, «леко», and why — or move off if it does not;
+ * and stop if anyone approaches. Kept: E3's conditional («опира»), the E5 /
+ * E9 / E11 direction (`crashPinWayOut` and `crashPinCorrective` are not
+ * touched), the free branch's meaning (a car that does not touch may drive off
+ * — after the look) and the card's because-clause («притиска», THEO-4).
+ * Within the 240 px column (< 150 characters: 149 / 149 / 149): «с прави
+ * колела» went first (the drop order), «съвсем» stays on the two directional
+ * cards and «леко» on all three. No article is printed (an instruction about
+ * where the car is needs none, ADR-002).
  */
 const CRASH_HOLD_CARD_BG: Record<CrashPinWayOut, string> = {
-  back: "Ако колата опира в удареното, първо съвсем леко назад с прави колела — газта напред само я притиска. Ако не опира, огледай се и тогава потегли.",
+  back: "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад — напред я притиска; ако не опира, потегли. Спри, ако някой идва.",
   forward:
-    "Ако колата опира в удареното, първо съвсем леко напред с прави колела — задният ход само я притиска. Ако не опира, огледай се и тогава потегли.",
-  // No «с прави колела» here: the direction-free branch also serves a contact
-  // the pin cannot place (side-on, a road user), where it is not the way off —
-  // and the card fits the 240 px column (< 150 characters) without it.
-  away: "Ако колата опира в удареното, първо съвсем леко я отдръпни от него — натискът към него само я притиска. Ако не опира, огледай се и тогава потегли.",
+    "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко напред — назад я притиска; ако не опира, потегли. Спри, ако някой идва.",
+  // No «съвсем» here (149 characters with «леко» alone): the direction-free
+  // branch also serves a contact the pin cannot place (side-on, a road user).
+  away: "Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, леко я отдръпни — към него я притиска; ако не опира, потегли. Спри, ако някой идва.",
 };
 
 const ROUTE_HOLD_CARD_BG: Record<"offRoad", string> = {
@@ -1187,14 +1207,23 @@ const ROUTE_HOLD_CARD_BG: Record<"offRoad", string> = {
  *    impact since its round 2, `CRASH_HOLD_PEEK_BG`).
  * The rest — lift off, straighten the wheels, the small angle, look before
  * going forward — stays whole behind «Прочети».
+ *
+ * THE PINNED LINE IS NOW THE LOOK AND THE CONDITIONAL ACT (lane rbreverse,
+ * integrator ruling R6a option A, 2026-11-04). The look is the first act the
+ * north star requires after a crash, and look + act + reason do not fit two
+ * 24-character lines («Огледай. Ако опира — назад: напред я притиска.» wraps
+ * to three). So this one line carries TWO acts in their order — look round,
+ * then, if the car touches, ease away slowly — and its because-clause
+ * («притиска») lives on the card behind «Прочети». Every other line keeps the
+ * act-and-reason rule.
  */
 const CRASH_HOLD_PEEK_BG: Record<CrashPinWayOut, string> = {
-  // Conditional like its card (lane endings, E3), and AWAY from what it hit
-  // like its card (round 2, E5): the act is for a car that touches it, and the
-  // because-clause stays with it. Each wraps to two 24-character lines.
-  back: "Ако опира — първо назад: напред я притиска.",
-  forward: "Ако опира — напред: назад я притиска.",
-  away: "Ако опира — отдръпни я: към него я притиска.",
+  // Conditional like its card (lane endings, E3), AWAY from what it hit like
+  // its card (round 2, E5), and the look first (rbreverse, R6a). Each wraps to
+  // two 24-character lines: «Огледай се; ако опира —» / «леко …».
+  back: "Огледай се; ако опира — леко назад.",
+  forward: "Огледай се; ако опира — леко напред.",
+  away: "Огледай се; ако опира — леко я отдръпни.",
 };
 
 const ROUTE_HOLD_PEEK_BG: Record<"offRoad", string> = {
@@ -1409,6 +1438,89 @@ export function routeHoldAdvisorPrompt(
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE REVERSE WARNING (lane rbreverse, sc-roundabout-entry:9e85f27e).
+ *
+ * THE ROW. rig-w3b SC2 (59be0de): after the island strike the student reversed
+ * on the ring (≈ 4.3 km/h, 6.3 m) toward the staged circulator, which braked
+ * from 2.9 m/s to a standstill about 1 m off his rear bumper — while the coach
+ * ordered «Излез от кръговото с десен мигач» and nothing warned.
+ *
+ * FOUNDER RULING Q2 (2026-10-19): WARN ONLY — no bill, no rule event, no
+ * points, no verdict change, no debrief row. The drive's collision stays its
+ * only bill. Integrator rulings: R1 the warning is keyed on the REVERSE and the
+ * vehicle's own braking, not on a crash (ЗДвП чл. 40 binds every reverse); R2
+ * the channel is this advisor card + peek, ranked BELOW the person hold (whose
+ * frames stay byte-identical) and ABOVE every other card, nothing in exam
+ * mode; R4 the banner, task row, follow pill and route guidance keep what they
+ * show (from L3 the advisor is off by default — a recorded limit).
+ *
+ * THE SIGNAL is the session's `reverseBrakedFor` — the tick's
+ * `SimTick.reverseBrakedFor`, measured once per graded grid point in
+ * `runtime/reverseBrakedFor.ts`: in R (the contract gear), travelling backward
+ * (< −0.8 km/h), a vehicle whose centre is in the car's rear half-plane, whose
+ * own account of speed shed BECAUSE OF THE STUDENT has (A) grown ≥ 0.3 m/s
+ * since the R interval began, or (B) reached ≥ 0.3 m/s over the drive while
+ * the vehicle stands at rest NOW (R5'', which replaced R5') — or stood at rest
+ * on some point of this R interval (R5''', 2026-11-04: Risk 2's circulator
+ * moving off beside him in the last 0.2 s before the contact).
+ *
+ * EVERY CLAUSE IS TRUE ON EVERY FRAME IT SHOWS ON:
+ *  · «Спри заден ход» — the instruction; the car is in R and going back.
+ *  · «… намали заради теб» — the vehicle's own model shed ≥ 0.3 m/s because of
+ *    him: under (A) in this R interval, under (B) on this drive, and it stood
+ *    where it stopped inside this R interval. Either way it slowed (or stopped) for him. Past tense,
+ *    because on the row's later frames it stands still — «спира» would be
+ *    false there, «намали» is true from the first frame to the last.
+ *  · «… ти се движиш към него» — its centre is in the rear half-plane and the
+ *    car travels backward, so the car's own motion closes on it.
+ *  · NO SIDE (the circulator stands 50°–75° off the rear axis — beside him on
+ *    the ring, not «отзад»), NO OUTCOME he cannot cause («пропусни», «изчакай
+ *    да мине»: his stopping does not make it pass), NO MOVE ORDER (no
+ *    «потегли», «отдръпни», «назад», «напред», no objective) — only the stop
+ *    and the look.
+ *  · The look's clause cites ЗДвП чл. 40, ал. 1 by RETRIEVAL ONLY (ADR-002,
+ *    R3): `REVERSE_DUTY_BEFORE`; ал. 1 is the clause that names a reverse
+ *    that creates «опасност или затруднения» for other road users.
+ * One sentence per body kind (`ReverseBrakedFor.kind`); «превозно средство»,
+ * not «кола», because a truck, a bus and a tram are "vehicle" casts too. The
+ * peek names neither: «някой» is true of both, and two lines of 24 hold the
+ * act and its reason.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const REVERSE_DUTY_BEFORE = { lawRef: "ЗДвП чл. 40, ал. 1" } as const;
+
+const REVERSE_WARNING_NOUN_BG: Readonly<Record<ReverseBrakedFor["kind"], string>> = {
+  vehicle: "превозно средство",
+  cyclist: "велосипедист",
+};
+
+/** The warning card and peek for a vehicle or rider of `kind` (see above). */
+export function reverseWarningAdvisorPrompt(kind: ReverseBrakedFor["kind"]): CoachedAdvisorPrompt {
+  return {
+    textBg: `Спри заден ход — ${REVERSE_WARNING_NOUN_BG[kind]} намали заради теб, а ти се движиш към него. Огледай се: заден ход само по свободен път (${REVERSE_DUTY_BEFORE.lawRef}).`,
+    keys: [],
+    peekBg: "Спри заден ход: някой намали заради теб.",
+  };
+}
+
+/**
+ * The reverse warning for a live session, or null. Its own guards, each a
+ * ruling: never in exam mode (R2), only while driving, NEVER under the person
+ * hold (its frames stay byte-identical — e2 N5/N18: no new string may reach a
+ * shown surface after a pedestrian or cyclist strike), and only while the
+ * signal stands.
+ */
+export function reverseWarningForSession(s: LessonSessionState): CoachedAdvisorPrompt | null {
+  if (s.lesson.examMode === true) return null;
+  if (s.phase !== "driving") return null;
+  const signal = s.reverseBrakedFor;
+  if (signal === undefined || signal === null) return null;
+  if (s.personStruckAtSec !== undefined || routeHoldForSession(s) === "personStruck") return null;
+  return reverseWarningAdvisorPrompt(signal.kind);
+}
+
+/**
  * The advisor's single entry point: the NEXT expected action for a live
  * session, or null when there is nothing to advise (exam mode, ended
  * session, free drive / all objectives done).
@@ -1437,10 +1549,17 @@ export function advisorPromptForSession(s: LessonSessionState): CoachedAdvisorPr
   const hold = routeHoldForSession(s);
   if (hold === "personStruck") {
     // N5: the person hold's own card — no chip (no key performs „do not drive
-    // on"), and never the pinned card's «…огледай се и тогава потегли».
+    // on"), and never the pinned card's «…ако не опира, потегли» (through
+    // 479127b: «…огледай се и тогава потегли»).
     const person = personHoldCopy(s);
     if (person !== null) return { textBg: person.cardBg, keys: [], peekBg: person.peekBg };
   }
+  // THE REVERSE WARNING (lane rbreverse) — below the person hold, ABOVE every
+  // other card: the pinned recovery's move, the off-road card, the live yields
+  // and the objective («Излез от кръговото с десен мигач») are all off the
+  // advisor on every frame a vehicle behind is braking for this reversing car.
+  const reverseWarning = reverseWarningForSession(s);
+  if (reverseWarning !== null) return reverseWarning;
   if (hold !== null && hold !== "personStruck") return routeHoldAdvisorPrompt(hold, routeHoldWayOutForSession(s));
 
   if (s.currentObjectiveIndex >= s.objectives.length) {

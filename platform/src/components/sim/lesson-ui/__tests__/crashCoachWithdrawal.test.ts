@@ -193,7 +193,11 @@ describe("sc-roundabout-entry L3 — the island contact of drive b, through the 
     // where the END of the car that touched it is known — the island is world
     // geometry, not one of the scenery's listed boxes, so the lead is the
     // direction-free one.
-    expect(late.banner.on).toMatch(/^След удара — ако колата опира в удареното, първо леко я отдръпни: /);
+    // RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e, ruling R6): the lead
+    // was «След удара — ако колата опира в удареното, първо леко я отдръпни» — the
+    // move first, no look. It now looks first; still conditional, still the
+    // direction-free way out for the island (world geometry).
+    expect(late.banner.on).toMatch(/^След удара — първо се огледай; ако колата опира, леко я отдръпни: /);
     expect(late.banner.off).toBe(late.banner.on);
   });
 

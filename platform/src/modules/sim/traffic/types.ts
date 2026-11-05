@@ -1037,6 +1037,12 @@ export interface StagedActorView {
    * differences two readings; the number itself grades nothing. Optional for
    * the same fake-port reason as the fields above — absent reads as „no
    * account", and a runner that finds it absent reports nothing from it.
+   *
+   * A THIRD READER, DISPLAY-ONLY (lane rbreverse, sc-roundabout-entry:9e85f27e;
+   * founder ruling Q2 2026-10-19 «warn only»): `TrafficSystem.playerShedAccounts`
+   * hands every agent's account to the runtime's reverse-warning measurement
+   * (`runtime/reverseBrakedFor.ts` → `SimTick.reverseBrakedFor`), which only
+   * the coach's advisor card reads. It bills nothing.
    */
   readonly playerShedMps?: number;
   /**
@@ -1078,6 +1084,29 @@ export interface RearBodyBehind {
   /** Bumper-to-bumper metres, never negative — `rearGapMeters`' own number. */
   readonly gapM: number;
   readonly kind: "vehicle" | "cyclist";
+}
+
+/**
+ * ONE ROW OF `TrafficSystem.playerShedAccounts` (lane rbreverse,
+ * sc-roundabout-entry:9e85f27e): a vehicle agent — ambient or staged — where
+ * it is, what it is, and its own running account of the speed it has shed
+ * because of the student (`playerShedMps`). The rows are a reused pool, valid
+ * for the frame they were returned in.
+ */
+export interface PlayerShedAccount {
+  /** The published vehicle state's id. */
+  id: number;
+  /** `vehicleCollisionKind(id)` — the cast's kind for a staged actor. */
+  kind: "vehicle" | "cyclist";
+  /** Centre, district space. */
+  x: number;
+  y: number;
+  /** Cumulative and monotone for the agent's life, m/s. */
+  playerShedMps: number;
+  /** The published state's speed (`state.speedMps`), m/s — what the reverse warning's «at
+   *  rest» half (integrator rulings R5'' / R5''') reads against the traffic model's
+   *  stopped bar (`staged.ts HOLD_LIT_SPEED_MPS`). */
+  speedMps: number;
 }
 
 /**
@@ -1185,6 +1214,16 @@ export interface TrafficSystem {
    * nothing.
    */
   rearBodyBehind(px: number, py: number, headingDeg: number): RearBodyBehind | null;
+  /**
+   * EVERY VEHICLE AGENT'S `playerShedMps` ACCOUNT, with its pose and kind —
+   * ambient agents first, staged after (the order `vehicles` publishes them
+   * in). PURE: it reads the agents and moves nothing (no account, pose or RNG);
+   * the rows are a reused pool. Lane rbreverse (sc-roundabout-entry:9e85f27e):
+   * the runtime's reverse-warning measurement (`SimTick.reverseBrakedFor`)
+   * reads it — a DISPLAY-ONLY reader: no rule reads that field (founder ruling
+   * Q2 2026-10-19, «warn only»). Pedestrians have no account and are not here.
+   */
+  playerShedAccounts(): readonly PlayerShedAccount[];
   /**
    * O62: hand `rearGapMeters` the STATIC bodies the scene actually mounted, as
    * oriented boxes in district space — the held scenery and hittable obstacles

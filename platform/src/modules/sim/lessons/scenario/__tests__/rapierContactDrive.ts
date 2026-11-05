@@ -78,7 +78,7 @@ import * as Rig from "@/components/sim/VehicleRig";
 import * as Npc from "@/components/sim/NpcColliders";
 import { readNpcColliderUserData, type NpcColliderUserData } from "@/components/sim/NpcColliders";
 import { hittableObstacleBodies, liveContactBodies, nameLiveContact } from "@/components/sim/LessonScene";
-import { obstacleYawRad, PROP_COLLIDERS } from "@/components/sim/ScenarioObstacles";
+import { obstacleYawRad, PROP_COLLIDERS, STATIC_ON_CARRIAGEWAY_USER_DATA } from "@/components/sim/ScenarioObstacles";
 import { actorObb, PEDESTRIAN_BODY_RADIUS_M, playerObb } from "../../../collision";
 import type { LessonSpec, NearMissEvent, NearMissStats, VehicleSample } from "../../../contracts";
 import { directorContactCast } from "../../../orchestrator/director";
@@ -101,6 +101,7 @@ import {
   type TrafficSystem,
 } from "../../../traffic";
 import { createHeadlessChassis, IDLE_INPUT, VehicleSim, type VehicleInput } from "../../../vehicle";
+import type { CabinControls } from "../../../scene/cabin";
 import { READY_DRIVELINE } from "../../../vehicle/driveline";
 import * as T from "../../../vehicle/tuning";
 import { WorldColliders, type WorldColliderSet } from "../../../world";
@@ -182,7 +183,13 @@ function mountWorldColliders(world: RAPIER.World, colliders: WorldColliderSet): 
 
 const yawQ = (yawRad: number) => ({ x: 0, y: Math.sin(yawRad / 2), z: 0, w: Math.cos(yawRad / 2) });
 
-/** A fixed cuboid body the way ScenarioObstacles mounts a wall or a prop. */
+/**
+ * A fixed cuboid body the way ScenarioObstacles mounts a wall or a prop —
+ * including its `userData`: a spec the recipe stamped `onCarriageway` carries
+ * `STATIC_ON_CARRIAGEWAY_USER_DATA`, IMPORTED from the product module (never
+ * re-typed), written onto the rapier body exactly as r3r writes the prop
+ * (`rb.userData = value`); every other body mounts none (lane staticcardcopy).
+ */
 function mountCuboid(
   world: RAPIER.World,
   x: number,
@@ -192,10 +199,12 @@ function mountCuboid(
   centerY: number,
   friction: number,
   restitution: number,
+  userData?: unknown,
 ): void {
   const rb = world.createRigidBody(
     RAPIER.RigidBodyDesc.fixed().setTranslation(x, 0, -y).setRotation(yawQ(obstacleYawRad(headingDeg))),
   );
+  if (userData !== undefined) rb.userData = userData as typeof rb.userData;
   world.createCollider(
     RAPIER.ColliderDesc.cuboid(half.x, half.y, half.z)
       .setTranslation(0, centerY, 0)
@@ -225,11 +234,17 @@ function mountScenarioObstacles(world: RAPIER.World, lesson: LessonSpec, raw: un
     if (o.kind === "wall") {
       const height = o.heightM ?? 1.2;
       const thickness = o.thicknessM ?? 0.3;
-      mountCuboid(world, o.x, o.y, o.headingDeg, { x: thickness / 2, y: height / 2, z: o.lengthM / 2 }, height / 2, 0.6, 0.05);
+      mountCuboid(
+        world, o.x, o.y, o.headingDeg, { x: thickness / 2, y: height / 2, z: o.lengthM / 2 }, height / 2, 0.6, 0.05,
+        o.onCarriageway === true ? STATIC_ON_CARRIAGEWAY_USER_DATA : undefined,
+      );
       out.walls++;
     } else if (o.kind === "prop") {
       const dims = PROP_COLLIDERS[o.prop];
-      mountCuboid(world, o.x, o.y, o.headingDeg, dims.half, dims.centerY, 0.6, 0.1);
+      mountCuboid(
+        world, o.x, o.y, o.headingDeg, dims.half, dims.centerY, 0.6, 0.1,
+        o.onCarriageway === true ? STATIC_ON_CARRIAGEWAY_USER_DATA : undefined,
+      );
       out.props++;
     } else if (!("visual" in o && o.visual === true)) {
       out.skipped.push(o.kind);
@@ -317,7 +332,12 @@ export const SCENE_COLLISION_NAMES = [
 ] as const;
 export type SceneCollisionName = (typeof SCENE_COLLISION_NAMES)[number];
 /** The scene's callback, as VehicleRig's ear calls it. */
-export type SceneCollisionHandler = (impactKmh: number, withWhat: string, student: Readonly<VehicleSample>) => void;
+export type SceneCollisionHandler = (
+  impactKmh: number,
+  withWhat: string,
+  student: Readonly<VehicleSample>,
+  onCarriageway?: true,
+) => void;
 export interface SceneCollisionCut {
   /** The callback's source text, as the scene spells it. */
   text: string;
@@ -652,6 +672,32 @@ export interface ContactDriveOptions {
    * own `handleCollision` hands its impact cut (the flash, the shake and the
    * chase cut read it). Default: none (the chain's presentation is dropped).
    */
+  /**
+   * sc-roundabout-entry:9e85f27e (lane rbreverse) — A REAL CABIN, so the
+   * contract gear is the product's: `CabinControls` is handed to the scene's
+   * `cabinRef` (its before-step and frame refresh `updateCabinChannels`, which
+   * maps the selector to `SimTick.gear` — R = −1), its driveline is what
+   * `sim.update` is given every step, and after every frame's physics the
+   * cabin and its driveline are advanced as VehicleRig advances them
+   * (`cabin.update`, `driveline.update` with the sim's speed — the selector
+   * interlock reads it). Omitted: no cabin, a belted car in D, exactly as before.
+   */
+  cabin?: CabinControls;
+  /**
+   * Called at the START of every render frame, before its physics — where
+   * the scene's reverse-assist driver runs (`REVERSE_ASSIST_FRAME_PRIORITY`).
+   * A drive moves the selector here (the [ / ] keys) or steps the product's
+   * `reverseAssistFrameStart` (the ra2 gesture). `stepS` is the physics-step
+   * clock (steps taken × FIXED_DT).
+   */
+  frameStart?: (f: {
+    delta: number;
+    frame: number;
+    stepS: number;
+    drive: Readonly<DriveState>;
+    /** Read-only use (the drive may time itself off the staged world, as a rig script does). */
+    traffic: TrafficSystem;
+  }) => void;
   presentation?: {
     contact?(c: unknown): void;
     thump?(volume01: number): void;
@@ -895,12 +941,13 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
           opts.presentation?.contact?.(contact);
           hear(contact, collisionMinKmh, {
             thump: (v: number) => opts.presentation?.thump?.(v),
-            graded: (impactKmh: number, withWhat: string) => {
+            graded: (impactKmh: number, withWhat: string, onCarriageway?: true) => {
               graded = true;
               impact = impactKmh;
               what = withWhat;
-              // VehicleRig's ear: `onCollision?.(impactKmh, withWhat, student)`.
-              sceneCollision!(impactKmh, withWhat, student);
+              // VehicleRig's ear: `onCollision?.(impactKmh, withWhat, student,
+              // onCarriageway)` — the struck body's fact forwarded as heard.
+              sceneCollision!(impactKmh, withWhat, student, onCarriageway);
             },
             nudge: () => {},
           });
@@ -976,7 +1023,7 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
     onStagedOutcome: noop,
     onTick,
     onNearMiss: opts.onNearMiss ?? noop,
-    cabinRef: { current: null },
+    cabinRef: { current: opts.cabin ?? null },
     attemptFeedRef: { current: createAttemptFeedState() },
     feedAttemptPoint,
     simRef: { current: sim },
@@ -995,6 +1042,7 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
   const drive: DriveState = { step: 0, x: opts.start.x, y: opts.start.y, headingDeg: opts.start.headingDeg, speedKmh: 0 };
   const speedAfterStep: number[] = [0];
   let accumulator = 0;
+  let lastInput: VehicleInput = { ...IDLE_INPUT };
   let frames = 0;
   let maxStepsPerFrame = 0;
   let endedAt = -1;
@@ -1003,6 +1051,7 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
     const delta = opts.deltas[frames % opts.deltas.length];
     frames++;
     frameFirstStep = steps.stepCount + 1;
+    opts.frameStart?.({ delta, frame: frames, stepS: steps.stepCount * H, drive, traffic: traffic as unknown as TrafficSystem });
     accumulator += Math.min(Math.max(delta, 0), 0.5);
     let n = 0;
     while (accumulator >= H) {
@@ -1017,7 +1066,8 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
       }
       // …then the drive's decision from the car after the previous step.
       const input = { ...IDLE_INPUT, ...opts.control(drive) };
-      sim.update(input, H, READY_DRIVELINE);
+      lastInput = input;
+      sim.update(input, H, opts.cabin ? opts.cabin.driveline.physicsInput : READY_DRIVELINE);
       // The instrument's own read of what the solve receives (see
       // `auditStartedEvents`): the chassis velocity right before the step.
       const lv0 = body.linvel();
@@ -1088,6 +1138,13 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
         }
       });
     });
+    // VehicleRig's useFrame (after the physics): the cabin and its driveline
+    // advance, and the frame's sample takes the cabin's channels.
+    if (opts.cabin) {
+      opts.cabin.update(delta, sim.steerRad);
+      opts.cabin.driveline.update(delta, { speedKmh: sim.speedKmh, throttle: lastInput.throttle });
+      SampleBuilder.updateCabinChannels(sample, sim, opts.cabin, lastInput);
+    }
     // RuntimeDriver: its frame's whole grading region — the clock line, the
     // assist and the two watches, then the scene's call (sceneGradeCut.ts).
     scene.frame(delta);

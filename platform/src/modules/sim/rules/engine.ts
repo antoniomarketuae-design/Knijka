@@ -10188,7 +10188,16 @@ function handleTickEvent(
       // cut-in (see the `laneEntered` case) — same charge, the true sentence.
       const cutInTail =
         e.withWhat === "vehicle" && s.cutInContactUntil !== null && t <= s.cutInContactUntil;
-      out.push(makeViolation("COLLISION", t, { detail: cutInTail ? "vehicleCutIn" : e.withWhat }));
+      // …and a STATIC contact whose struck body stands on the carriageway reads
+      // as «staticObjectOnRoad» (lane staticcardcopy, C1): the same charge, a
+      // paragraph that is true of a fallen load or a cone on the road. The fact
+      // is the BODY's (SimTickEvent `onCarriageway`), never the car's pose.
+      const onRoadStatic = e.withWhat === "staticObject" && e.onCarriageway === true;
+      out.push(
+        makeViolation("COLLISION", t, {
+          detail: cutInTail ? "vehicleCutIn" : onRoadStatic ? "staticObjectOnRoad" : e.withWhat,
+        }),
+      );
       break;
     }
 

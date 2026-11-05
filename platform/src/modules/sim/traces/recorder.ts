@@ -26,6 +26,7 @@ import {
   type RuleEngineConfig,
   type RuleEvent,
   type SimTick,
+  type SimTickEvent,
 } from "../rules";
 import { createWorldRuntime, type SignalClusterMode } from "../runtime";
 import { createLessonWindShelter, type WindShelterLesson } from "../scene/lessonWindShelter";
@@ -314,6 +315,18 @@ export interface ObstacleRect2D {
    * behavior, byte-identical for every shipped obstacle set.
    */
   trigger?: { x: number; y: number; distM: number };
+  /**
+   * THE RECT'S BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy; the twin of
+   * the live collider tag `STATIC_ON_CARRIAGEWAY_USER_DATA`). Carried BY VALUE
+   * on a static rect whose centre measures `surfaceAt(...).under ===
+   * "carriageway"` on its lesson's committed district — and only there: a pin
+   * (scene/__tests__/static-on-carriageway-fact.test.ts) asserts every
+   * recorder static rect's flag equals that measured fact, so a hand-set value
+   * that disagrees with the built road goes red. A contact on a flagged rect
+   * reports `onCarriageway: true`, which selects the shown COLLISION copy
+   * only. ABSENT = the old event shape, byte-identical.
+   */
+  onCarriageway?: true;
 }
 
 /**
@@ -703,6 +716,9 @@ export function recordScriptedDrive(
   // same hookup scene/lessonWorldRecipe.ts wireTrafficQueries gives the live
   // lesson, so a recorded demo is graded on the same world the student is.
   runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
+  // …and the reverse-warning measurement's account query (lane rbreverse), as
+  // wireTrafficQueries gives the live lesson. Display-only: it grades nothing.
+  runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
   const staged = options.stagedEvents ?? [];
   const director =
     staged.length > 0
@@ -815,7 +831,7 @@ export function recordScriptedDrive(
    * queue did — while a scripted `collision` step runs BETWEEN frames and so
    * drains on the NEXT one, again as before.
    */
-  const pendingContacts: Array<{ withWhat: TraceCollisionWith; actorId?: string }> = [];
+  const pendingContacts: Array<{ withWhat: TraceCollisionWith; actorId?: string; onCarriageway?: true }> = [];
   const heroRect = {
     x: 0,
     y: 0,
@@ -854,7 +870,12 @@ export function recordScriptedDrive(
           // still overlapping is a second body — but the report handed the rule
           // engine only `withWhat`, which made the engine latch per KIND and
           // gave the second wrecked car away free.
-          pendingContacts.push({ withWhat: obstacles[i].withWhat, actorId: obstacleIds[i] });
+          // …and the struck rect's carriageway fact, under the omit rule.
+          pendingContacts.push(
+            obstacles[i].onCarriageway === true
+              ? { withWhat: obstacles[i].withWhat, actorId: obstacleIds[i], onCarriageway: true }
+              : { withWhat: obstacles[i].withWhat, actorId: obstacleIds[i] },
+          );
         }
         obstacleContact[i] = hit;
       }
@@ -892,11 +913,14 @@ export function recordScriptedDrive(
     // same stream it always did.
     while (pendingContacts.length > 0) {
       const c = pendingContacts.shift()!;
-      tick.events.push(
+      const ev: Extract<SimTickEvent, { kind: "collision" }> =
         c.actorId === undefined
           ? { kind: "collision", withWhat: c.withWhat }
-          : { kind: "collision", withWhat: c.withWhat, actorId: c.actorId },
-      );
+          : { kind: "collision", withWhat: c.withWhat, actorId: c.actorId };
+      // A flagged rect's fact rides on its event; the key is omitted otherwise
+      // (authored beats never carry it).
+      if (c.onCarriageway === true) ev.onCarriageway = true;
+      tick.events.push(ev);
     }
     if (director) {
       const res = director.step({

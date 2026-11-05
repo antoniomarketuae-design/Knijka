@@ -142,6 +142,9 @@ function buildCaptureStack(clipId: string): CaptureStack {
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
+  // Lane rbreverse: the reverse-warning account query, as wireTrafficQueries
+  // and traces/recorder.ts wire it (display-only; grades nothing).
+  runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
 
   // KNOWN DIVERGENCE, left deliberately (ledger T17 surfaced it; it is not this
   // lane's to close). The capture CLIENT re-enacts a clip against

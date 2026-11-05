@@ -252,7 +252,7 @@ interface ModelCard {
  * the toast scroller (its content's height, shrunk to what the cap leaves),
  * and the fold row while the shell's fold measure says so.
  */
-function column(start: { bannerPx: number; advisorPrompt: boolean; cards: ModelCard[]; capPx?: number; hold?: boolean }) {
+function column(start: { bannerPx: number; advisorPrompt: boolean; cards: ModelCard[]; capPx?: number; hold?: boolean; quiet?: boolean }) {
   const s = { capPx: RIG.cap as number, hold: false, ...start, rowUp: false, reader: null as Reader | null };
   /** The banner as the shell lays it out: under a route hold, the SHELL'S OWN rule decides
    *  whether the reader's `bannerYields` sets it on one line (`bannerOneLineWhileReading`). */
@@ -261,7 +261,8 @@ function column(start: { bannerPx: number; advisorPrompt: boolean; cards: ModelC
   const advisorMounted = () => s.advisorPrompt && s.reader?.held !== true;
   const toasts = () => s.cards.map((c) => ({ ...c, event: { kind: c.kind } }));
   const standing = () => s.reader?.standing ?? null;
-  const painted = () => vis(toasts(), false, s.reader?.reading ?? null, standing());
+  /** `quiet` is laid out only by §3e; every other row lays the column out with praise audible, as before. */
+  const painted = () => vis(toasts(), s.quiet === true, s.reader?.reading ?? null, standing());
   // the advisor's card is a column child (`data-hud-advisor`, W10) — taken out of flow, it takes no room
   const advisorEl = new El();
   advisorEl.attrs["data-hud-advisor"] = "";
@@ -419,7 +420,7 @@ function mountReader(model: ReturnType<typeof column>) {
         scroller: { current: model.scroller },
         whyChanged: () => undefined,
         holdAllBut: (id) => hold.push(id),
-        quiet: false,
+        quiet: model.s.quiet === true,
       });
       model.s.reader = reader;
       model.commit();
@@ -1166,6 +1167,416 @@ describe("§3c a «Браво» card cut on top of a cut graded card: the column
       r.m.unmount();
     });
   }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// §3d THE STAND FOLLOWS THE STOOD CARD'S LIFE — lane `wcafterpaint`
+//     (sc-roundabout-entry:ad192bc4), integrator decision W11 (2026-10-18) and
+//     its consequence R7 (confirmed 2026-11-04): the cap no longer removes a
+//     judged card inside its life, so a W7 stand, `held` and the advisor
+//     card's wait last until the stood card's OWN life ends. On base they ended
+//     at the cap's eviction. Not a change to W7: the stand is the one it was.
+//     Fed each commit from the REAL `useHudToastQueue` (T9).
+//     The third consequence (W11-C, 2026-11-04) — an OLDER judged card the burst
+//     no longer removes stays under the stood card — is §3f.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("§3d T9 a stand under the crash pin lasts the fault's own life, though four «Браво» arrive above it", () => {
+  it("CONTROL-NOPRESS-SIM shape + a burst: standing and held to 8 000, the advisor's card painted on the commit after the fault expires", () => {
+    const at = { now: 0 };
+    const realNow = Date.now;
+    Date.now = () => at.now;
+    const g = globalThis as unknown as { window: unknown };
+    const qm = mountHook(() => Hud.useHudToastQueue());
+    const qWin = g.window;
+    const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, cards: [] });
+    const r = mountReader(model);
+    const rWin = g.window;
+    /** The queue's own timers live on its own fake window. */
+    const inQ = <T,>(fn: () => T): T => {
+      g.window = qWin;
+      try {
+        return fn();
+      } finally {
+        g.window = rWin;
+      }
+    };
+    let q = inQ(() => qm.rerender());
+    const due = new Map<number, number>();
+    const recordDue = () => {
+      for (const t of qm.timers) if (!due.has(t.id)) due.set(t.id, at.now + t.ms);
+    };
+    let holdsSeen = 0;
+    const rows: Array<{ t: number; what: string; standing: number | null; held: boolean; bannerYields: boolean; trimAge: boolean; painted: number[]; advisorMounted: boolean; store: number[] }> = [];
+    /** One commit: the queue's store → the stand-in column → the reader → the column's paint report back to the queue. */
+    const sync = (what: string) => {
+      q = inQ(() => qm.rerender());
+      model.s.cards = q.toasts.map((t) => ({ id: t.id, px: t.event.kind === "commendation" ? 52 : RIG.summary, kind: t.event.kind as ModelCard["kind"] }));
+      const reader = r.settle();
+      const painted = model.painted().map((c) => c.id);
+      inQ(() => q.painted(painted));
+      for (; holdsSeen < r.hold.length; holdsSeen += 1) {
+        const id = r.hold[holdsSeen]!;
+        inQ(() => q.holdAllBut(id));
+      }
+      recordDue();
+      rows.push({
+        t: at.now,
+        what,
+        standing: reader.standing?.id ?? null,
+        held: reader.held,
+        bannerYields: reader.bannerYields,
+        trimAge: reader.standing?.trimAge === true,
+        painted,
+        advisorMounted: model.advisorMounted(),
+        store: q.toasts.map((t) => t.id),
+      });
+    };
+    const advanceTo = (t: number) => {
+      for (;;) {
+        recordDue();
+        let next: { id: number; at: number } | null = null;
+        for (const timer of qm.timers) {
+          const d = due.get(timer.id)!;
+          if (d <= t && (next === null || d < next.at)) next = { id: timer.id, at: d };
+        }
+        if (next === null) break;
+        at.now = next.at;
+        const i = qm.timers.findIndex((x) => x.id === next!.id);
+        const [timer] = qm.timers.splice(i, 1);
+        due.delete(timer!.id);
+        inQ(() => timer!.fn());
+        sync("timer");
+      }
+      at.now = t;
+    };
+    const push = (t: number, e: Parameters<typeof q.push>[0][number], what: string) => {
+      advanceTo(t);
+      inQ(() => q.push([e]));
+      sync(what);
+    };
+    const fault = {
+      kind: "violation" as const,
+      titleBg: "Удар в неподвижно препятствие",
+      explanationBg: "Х".repeat(323),
+      peekBg: "Кратко.",
+      points: 10,
+      severity: "opasna" as const,
+      lawRef: "ЗДвП чл. 20, ал. 2",
+    };
+    push(0, fault, "fault F");
+    const F = q.toasts[0]!.id;
+    // the crash pins the car: the banner grows, the advisor's prompt arrives (CONTROL-NOPRESS-SIM)
+    model.s.bannerPx = RIG.bannerPinned;
+    model.s.hold = true;
+    model.s.advisorPrompt = true;
+    sync("crash pin");
+    for (let i = 1; i <= 4; i += 1) push(i * 300, { kind: "commendation" as const, titleBg: `Браво ${i}` }, `Браво ${i}`);
+    advanceTo(60_000);
+    process.stdout.write(`T9 per commit: ${rows.map((x) => JSON.stringify(x)).join("\n")}\n`);
+
+    const whileAlive = rows.filter((x) => x.t < 8_000 && x.what !== "fault F");
+    expect(whileAlive.length).toBeGreaterThan(5);
+    expect(
+      whileAlive.filter((x) => x.standing !== F || !x.held || x.advisorMounted).map((x) => `${x.t} ${x.what}`),
+      "the stand for the fault ended before its own life did — the cap took the card it stood for",
+    ).toEqual([]);
+    expect(whileAlive.filter((x) => x.painted.join() !== String(F)).map((x) => `${x.t}: [${x.painted}]`), "praise was painted over the stood fault").toEqual([]);
+    const gone = rows.find((x) => !x.store.includes(F));
+    expect(gone?.t ?? null, "the fault left the store before its own 8 s, or never left it").toBe(8_000);
+    expect({ standing: gone!.standing, held: gone!.held, advisorMounted: gone!.advisorMounted }, "the advisor's card did not come back on the commit the fault expired").toEqual({
+      standing: null,
+      held: false,
+      advisorMounted: true,
+    });
+    r.m.unmount();
+    qm.unmount();
+    Date.now = realNow;
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// §3f PRAISE NEVER DECIDES WHICH JUDGED CARDS A STANDING COLUMN SHOWS — lane
+//     `wcafterpaint` round 2, integrator ruling W11-C (2026-11-04), the third
+//     consequence of W11 beside R7. The round-1 verifier (V-STAND-OLDER-JUDGED)
+//     drove an OLDER fault H, three «Браво», a NEWER fault G and the crash pin:
+//     on base the burst capped H out of the store, so the column stood for G
+//     alone and the banner kept both lines; under W11 H is kept, painted under
+//     G with 109.15 of 116.5 px cut (7.35 px of it in the window: cap 245.6 −
+//     the one-line banner 48.75 − 6 − pill 23.5 − 6 − the fold row 29.5 = 131.85
+//     under G's 116.5 + 8), and W8 sets the pinned banner on one line
+//     (`bannerYields`) from 500 for the rest of the stand (to G's expiry at
+//     8 400; H leaves at its own 8 000). That glass is exactly what the
+//     same two judged cards give WITHOUT the praise (base and tree alike) — so
+//     the rule pinned here is the lane's whole point: once the column stands
+//     (from the crash pin on) and everywhere in quiet mode, the drive WITH the
+//     burst paints the same cards, cuts, standing card, `held`, `bannerYields`,
+//     trim and banner as the same drive with the praise taken out, at every
+//     commit time of either. The column, W7–W9, the trim and the banner rules
+//     are not touched (W11-C (3)).
+//     BEFORE the pin, in the roomy column, the burst is on the glass in its own
+//     right (the column's capacity and order, W12; a W7 stand the praise itself
+//     provokes) — the same on base; asserted below as exactly those two shapes.
+//     The 7.5 px sliver itself is base's own layout of two judged cards: triage
+//     candidate «judgedsliver», recorded by the lane, not built here.
+// ═════════════════════════════════════════════════════════════════════════════
+
+type QCEvent = { kind: "violation" | "lesson" | "commendation"; titleBg: string; [k: string]: unknown };
+type QCStep = { t: number; ev?: QCEvent; crash?: boolean; what: string };
+type QCRow = {
+  t: number;
+  what: string;
+  standing: number | null;
+  held: boolean;
+  bannerYields: boolean;
+  trimAge: boolean;
+  painted: number[];
+  cut: Array<number | null>;
+  advisorMounted: boolean;
+  bannerPx: number;
+  store: number[];
+};
+
+/** The T9 drive, generalised: the REAL `useHudToastQueue` → the §3 stand-in column → `useToastReader`, one commit per
+ *  push, per timer and per crash pin; the column's paint report and the reader's holds go back to the queue. */
+function driveQueueColumn(steps: readonly QCStep[], quiet: boolean): QCRow[] {
+  const at = { now: 0 };
+  const realNow = Date.now;
+  Date.now = () => at.now;
+  const g = globalThis as unknown as { window: unknown };
+  const qm = mountHook(() => Hud.useHudToastQueue());
+  const qWin = g.window;
+  const model = column({ bannerPx: RIG.bannerTask, advisorPrompt: false, cards: [], quiet });
+  const r = mountReader(model);
+  const rWin = g.window;
+  const inQ = <T,>(fn: () => T): T => {
+    g.window = qWin;
+    try {
+      return fn();
+    } finally {
+      g.window = rWin;
+    }
+  };
+  let q = inQ(() => qm.rerender());
+  const due = new Map<number, number>();
+  const recordDue = () => {
+    for (const t of qm.timers) if (!due.has(t.id)) due.set(t.id, at.now + t.ms);
+  };
+  let holdsSeen = 0;
+  const rows: QCRow[] = [];
+  const sync = (what: string) => {
+    q = inQ(() => qm.rerender());
+    model.s.cards = q.toasts.map((t) => ({ id: t.id, px: t.event.kind === "commendation" ? 52 : RIG.summary, kind: t.event.kind as ModelCard["kind"] }));
+    const reader = r.settle();
+    const painted = model.painted().map((c) => c.id);
+    inQ(() => q.painted(painted));
+    for (; holdsSeen < r.hold.length; holdsSeen += 1) {
+      const id = r.hold[holdsSeen]!;
+      inQ(() => q.holdAllBut(id));
+    }
+    recordDue();
+    rows.push({
+      t: at.now,
+      what,
+      standing: reader.standing?.id ?? null,
+      held: reader.held,
+      bannerYields: reader.bannerYields,
+      trimAge: reader.standing?.trimAge === true,
+      painted,
+      cut: painted.map((id) => {
+        const c = model.cardAt(id);
+        return c === null ? null : Math.round(c.cutPx * 10) / 10;
+      }),
+      advisorMounted: model.advisorMounted(),
+      bannerPx: model.bannerNow(),
+      store: q.toasts.map((t) => t.id),
+    });
+  };
+  const advanceTo = (t: number) => {
+    for (;;) {
+      recordDue();
+      let next: { id: number; at: number } | null = null;
+      for (const timer of qm.timers) {
+        const d = due.get(timer.id)!;
+        if (d <= t && (next === null || d < next.at)) next = { id: timer.id, at: d };
+      }
+      if (next === null) break;
+      at.now = next.at;
+      const i = qm.timers.findIndex((x) => x.id === next!.id);
+      const [timer] = qm.timers.splice(i, 1);
+      due.delete(timer!.id);
+      inQ(() => timer!.fn());
+      sync("timer");
+    }
+    at.now = t;
+  };
+  try {
+    for (const s of steps) {
+      advanceTo(s.t);
+      if (s.crash === true) {
+        // the crash pins the car: the banner grows, the advisor's prompt arrives (CONTROL-NOPRESS-SIM)
+        model.s.bannerPx = RIG.bannerPinned;
+        model.s.hold = true;
+        model.s.advisorPrompt = true;
+        sync(s.what);
+      } else {
+        inQ(() => q.push([s.ev as never]));
+        sync(s.what);
+      }
+    }
+    advanceTo(60_000);
+  } finally {
+    r.m.unmount();
+    qm.unmount();
+    Date.now = realNow;
+  }
+  return rows;
+}
+
+const qcFault = (n: string): QCEvent => ({
+  kind: "violation",
+  titleBg: n,
+  explanationBg: "Х".repeat(323),
+  peekBg: "Кратко.",
+  points: 10,
+  severity: "opasna",
+  lawRef: "ЗДвП чл. 20, ал. 2",
+});
+const qcTeach = (n: string): QCEvent => ({ kind: "lesson", titleBg: n, explanationBg: "Обяснение." });
+const qcPraise = (n: string): QCEvent => ({ kind: "commendation", titleBg: n });
+
+/** What the glass shows, card ids replaced by the step that raised them (the two drives number their cards differently). */
+type Glass = {
+  t: number;
+  what: string;
+  painted: string[];
+  cut: Array<number | null>;
+  standing: string | null;
+  held: boolean;
+  bannerYields: boolean;
+  trimAge: boolean;
+  advisor: boolean;
+  banner: number;
+};
+function glassOf(rows: readonly QCRow[], steps: readonly QCStep[]): Glass[] {
+  const labels = steps.filter((x) => x.ev !== undefined).map((x) => x.what);
+  const L = (id: number) => labels[id - 1] ?? `#${id}`;
+  return rows.map((x) => ({
+    t: x.t,
+    what: x.what,
+    painted: x.painted.map(L),
+    cut: x.cut,
+    standing: x.standing === null ? null : L(x.standing),
+    held: x.held,
+    bannerYields: x.bannerYields,
+    trimAge: x.trimAge,
+    advisor: x.advisorMounted,
+    banner: x.bannerPx,
+  }));
+}
+/** The glass AT time t: what the last commit at or before t left there. */
+const glassAt = (g: readonly Glass[], t: number): Glass | null => {
+  let last: Glass | null = null;
+  for (const x of g) if (x.t <= t) last = x;
+  return last;
+};
+/** W11-C's compared fields: painted cards, their cuts, the standing card, held, bannerYields, the trim and the banner. */
+const seen = (x: Glass | null) =>
+  x === null
+    ? "nothing"
+    : JSON.stringify({ painted: x.painted, cut: x.cut, standing: x.standing, held: x.held, bannerYields: x.bannerYields, trimAge: x.trimAge, banner: x.banner });
+
+/** H (the older judged card) at 0; the crash pin at 50 ("before") or 100 ms after G ("after"); n «Браво» 100 ms apart; G (a newer fault). */
+function familySteps(older: "violation" | "lesson", n: number, crash: "before" | "after", withBurst: boolean): QCStep[] {
+  const s: QCStep[] = [{ t: 0, ev: older === "violation" ? qcFault("H") : qcTeach("H"), what: "H" }];
+  if (crash === "before") s.push({ t: 50, crash: true, what: "crash pin" });
+  if (withBurst) for (let i = 1; i <= n; i += 1) s.push({ t: 100 * i, ev: qcPraise(`p${i}`), what: `p${i}` });
+  s.push({ t: 100 * (n + 1), ev: qcFault("G"), what: "G" });
+  if (crash === "after") s.push({ t: 100 * (n + 2), crash: true, what: "crash pin" });
+  return s;
+}
+
+/** Every commit time of either drive at which the two glasses differ, split at the crash pin. */
+function compareToNoPraise(older: "violation" | "lesson", n: number, crash: "before" | "after", quiet: boolean) {
+  const sB = familySteps(older, n, crash, true);
+  const s0 = familySteps(older, n, crash, false);
+  const gB = glassOf(driveQueueColumn(sB, quiet), sB);
+  const g0 = glassOf(driveQueueColumn(s0, quiet), s0);
+  const pinAt = sB.find((x) => x.crash === true)!.t;
+  const times = [...new Set([...gB.map((x) => x.t), ...g0.map((x) => x.t)])].sort((a, b) => a - b);
+  const differ = times.filter((t) => seen(glassAt(gB, t)) !== seen(glassAt(g0, t)));
+  return { gB, g0, pinAt, times, after: differ.filter((t) => t >= pinAt), before: differ.filter((t) => t < pinAt) };
+}
+
+describe("§3f W11-C: from the crash pin on, the column shows the judged cards the same drive shows with the praise taken out", () => {
+  it("the verifier's V1 (H fault 0, «Браво» 100/200/300, G fault 400, crash pin 500): equal to the drive without praise from 500; H painted under G, 109.15 px cut, to its own expiry at 8 000; the banner on one line from 500 until the stand ends with G at 8 400", () => {
+    const c = compareToNoPraise("violation", 3, "after", false);
+    process.stdout.write(
+      `§3f V1 with the burst:\n${c.gB.map((x) => JSON.stringify(x)).join("\n")}\n§3f V1 without praise:\n${c.g0.map((x) => JSON.stringify(x)).join("\n")}\n`,
+    );
+    expect(c.after, "praise decided which judged cards the standing column shows: the drive with the burst differs from the same drive without it").toEqual([]);
+    // THE FRAME, listed (W11-C (1)): the same in both drives — base's own layout of two judged cards («judgedsliver»).
+    const pin = glassAt(c.gB, 500)!;
+    expect({ painted: pin.painted, cut: pin.cut, standing: pin.standing, bannerYields: pin.bannerYields, banner: pin.banner }).toEqual({
+      painted: ["G", "H"],
+      cut: [0, 109.2], // 109.15, rounded to 0.1 px
+      standing: "G",
+      bannerYields: true,
+      banner: RIG.bannerOneLine,
+    });
+    const leaves = c.gB.find((x) => x.t > 500 && !x.painted.includes("H"));
+    expect(leaves?.t ?? null, "H left the standing column before its own 8 s").toBe(8_000);
+    // the yield, once the stand has taken it (W8), lasts the stand: to G's own expiry (400 + 8 000), in both drives
+    const unyields = c.gB.find((x) => x.t > 500 && !x.bannerYields);
+    expect(
+      { t: unyields?.t ?? null, standing: unyields?.standing ?? null, banner: unyields?.banner ?? null },
+      "the banner's one line did not last exactly the stand",
+    ).toEqual({ t: 8_400, standing: null, banner: RIG.bannerPinned });
+  });
+
+  it("the verifier's V2 (H fault 0, crash pin 50, «Браво» 100/200/300, G fault 400): equal to the drive without praise at every commit", () => {
+    const c = compareToNoPraise("violation", 3, "before", false);
+    process.stdout.write(`§3f V2 with the burst:\n${c.gB.map((x) => JSON.stringify(x)).join("\n")}\n`);
+    expect(
+      [...c.before, ...c.after],
+      "praise decided which judged cards the standing column shows: the drive with the burst differs from the same drive without it",
+    ).toEqual([]);
+  });
+
+  it("THE FAMILY: H a fault or a «Научи» card × 1–5 «Браво» × the crash pin before or after the burst × quiet off / on — 40 drive pairs", () => {
+    const report: string[] = [];
+    const broken: string[] = [];
+    let commits = 0;
+    for (const older of ["violation", "lesson"] as const)
+      for (const n of [1, 2, 3, 4, 5])
+        for (const crash of ["before", "after"] as const)
+          for (const quiet of [false, true]) {
+            const c = compareToNoPraise(older, n, crash, quiet);
+            const name = `${older} n=${n} pin=${crash} quiet=${quiet}`;
+            commits += c.times.length;
+            report.push(`${name}: ${c.times.length} commit times; differ from the pin on [${c.after}], before it [${c.before}]`);
+            // (A) from the pin on — and in quiet mode, where praise is never painted, everywhere
+            for (const t of quiet ? [...c.before, ...c.after] : c.after) broken.push(`${name} t=${t}: ${seen(glassAt(c.gB, t))} ≠ ${seen(glassAt(c.g0, t))}`);
+            // (B) before the pin in the roomy column the burst is on the glass in its own right, in exactly two shapes:
+            //     praise painted (the column's capacity and order — W12), or the same cards painted while the column
+            //     stands for H against the praise above it (W7), with the advisor's card not up in either drive.
+            if (!quiet)
+              for (const t of c.before) {
+                const b = glassAt(c.gB, t)!;
+                const o = glassAt(c.g0, t)!;
+                const praisePainted = b.painted.some((x) => x.startsWith("p"));
+                const standsForH =
+                  b.standing === "H" &&
+                  o.standing === null &&
+                  !b.advisor &&
+                  JSON.stringify([b.painted, b.cut, b.bannerYields, b.trimAge, b.banner, b.advisor]) ===
+                    JSON.stringify([o.painted, o.cut, o.bannerYields, o.trimAge, o.banner, o.advisor]);
+                if (!praisePainted && !standsForH) broken.push(`${name} t=${t} (before the pin): ${seen(b)} ≠ ${seen(o)}`);
+              }
+          }
+    process.stdout.write(`§3f family: 40 drive pairs, ${commits} commit times compared\n${report.join("\n")}\n`);
+    expect(broken, "praise decided which judged cards the column shows (W11-C)").toEqual([]);
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

@@ -222,3 +222,44 @@ describe("the split may not become a looser card that fits every crash", () => {
     expect(rail.explanationBg).not.toBe(VIOLATIONS.RAIL_CROSSING_VIOLATION.explanationBg);
   });
 });
+
+describe("the fifth static case: a body that stands ON the carriageway (lane staticcardcopy, C1–C3)", () => {
+  // The four KINDS above are unchanged: «staticObjectOnRoad» is not a fifth body
+  // but the same untagged static contact on a body whose centre stands on the
+  // built carriageway (`onCarriageway` on the contact). It gets its own true
+  // paragraph, because the static row's «излязъл извън платното» is false there.
+  function hitOnRoad(): ViolationEvent[] {
+    return collisions(
+      drive([
+        tick(0, { speedKmh: 25, events: [{ kind: "collision", withWhat: "staticObject", onCarriageway: true }] }),
+        tick(1, { speedKmh: 5 }),
+      ]).events,
+    );
+  }
+
+  it("the on-road contact convicts once, with the on-road act and the static row's title", () => {
+    const v = hitOnRoad();
+    expect(v).toHaveLength(1);
+    expect(v[0].detail).toBe("staticObjectOnRoad");
+    expect(v[0].titleBg).toBe(COLLISION_CONTACT_COPY.staticObject.titleBg);
+    expect(v[0].explanationBg).toBe(COLLISION_CONTACT_COPY.staticObjectOnRoad.explanationBg);
+    expect(v[0].explanationBg).not.toBe(hit("staticObject")[0].explanationBg);
+  });
+
+  it("…and the charge, the ending and the citation are the static row's", () => {
+    const [on] = hitOnRoad();
+    const [off] = hit("staticObject");
+    expect([on.severityClass, on.points, on.terminateSession, on.conceptId, on.lawRef]).toEqual([
+      off.severityClass,
+      off.points,
+      off.terminateSession,
+      off.conceptId,
+      off.lawRef,
+    ]);
+  });
+
+  it("the pooled corrective still answers it: its off-road clause is conditional («А тръгне ли…»)", () => {
+    expect(ROW.correctiveBg).toMatch(/А тръгне ли колата извън платното/);
+    expect(COLLISION_CONTACT_COPY.staticObjectOnRoad).not.toHaveProperty("correctiveBg");
+  });
+});

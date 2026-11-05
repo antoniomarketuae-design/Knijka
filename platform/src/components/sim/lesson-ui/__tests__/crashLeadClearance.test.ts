@@ -33,8 +33,12 @@ import {
 import { makeTick } from "@/modules/sim/lessons/__tests__/fixtures";
 import { bannerObjectiveLineBg, objectiveTitleUnderHold, snapshotOf, type HudSnapshot } from "../LessonPlayShell";
 
-const LEAD_BACK = "След удара — ако колата опира в удареното, първо леко назад";
-const LEAD_AWAY = "След удара — ако колата опира в удареното, първо леко я отдръпни";
+// RE-TAUGHT (lane rbreverse, sc-roundabout-entry:9e85f27e, ruling R6): these were
+// «След удара — ако колата опира в удареното, първо леко назад / я отдръпни» — the
+// move first, no look. The leads now look first; which one a wedged car gets (the
+// clearance fact this file pins, condition 1 / mutant W5) is unchanged.
+const LEAD_BACK = "След удара — първо се огледай; ако колата опира, леко назад";
+const LEAD_AWAY = "След удара — първо се огледай; ако колата опира, леко я отдръпни";
 
 type Box = NonNullable<LessonSessionState["staticContactBodies"]>[number];
 

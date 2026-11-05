@@ -40,6 +40,7 @@
  */
 
 import { parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
+import { districtDrivableSurfaceOf, makeSurfaceFix, surfaceAt } from "@/modules/sim/runtime";
 import type { ScenarioObstacleSpec, ScenarioPropObstacle } from "./obstacleSpec";
 import { staticContactBodiesOf } from "./obstacleSpec";
 
@@ -1238,6 +1239,54 @@ export function heldSceneryFor(
   const parsed = parseScenarioLessonId(lessonId);
   const dressing = (parsed && HELD_SCENERY[parsed.templateId]) || [];
   return [...dressing, ...scenarioConesOf(districtRaw)];
+}
+
+/**
+ * WHERE A HELD BODY STANDS — THE FACT A STATIC CONTACT'S SENTENCE IS CHOSEN BY
+ * (lane staticcardcopy, sc-hz-brake-dont-swerve:b7297cb7; integrator rulings
+ * C1, S1, S2(a) and the centre rule, 2026-10-18 / 2026-11-04).
+ *
+ * A held WALL or PROP — the template's dressing and the district's own cones
+ * alike — is ON THE CARRIAGEWAY when `surfaceAt` over the district's built
+ * drivable surface (`resolveDistrictDrivableSurface`, the runtime's own
+ * resolve) says "carriageway" at its footprint CENTRE. Such a spec is returned
+ * as a copy carrying `onCarriageway: true`; every other spec is returned as
+ * the same object. The centre decides, never the corners: a kerb rect that
+ * straddles the asphalt edge keeps the off-road copy, which is true of it (a
+ * kerb is the carriageway's edge). A fuel station is NEVER stamped — a 26 × 28
+ * m composite has no one centre true of each column and pump — and neither is
+ * a vehicle, an animal or a worker (none mounts a static collider of its own
+ * that this fact could describe). The fact is the BODY's: the car's pose is
+ * never read, here or downstream.
+ *
+ * Applied by `lessonWorldRecipe.buildLessonWorldCore` (rule 4 of STEP 1),
+ * where the district document is already in hand and `createWorldRuntime`
+ * has keyed its surface cache on that very object — so the stamp and the
+ * runtime's per-tick surface read share ONE road build (rule 3). It computes
+ * the surface only when the list holds a wall or a prop (rule 1), and it
+ * never throws: a document that is not an object, or one the builders cannot
+ * sweep, stamps nothing (rule 2). `heldSceneryFor` itself is unchanged, so
+ * `heldStaticContactBodies` and every other reader of it are byte-identical.
+ *
+ * MEASURED on the committed districts (lane PROGRESS.md, STEP 0(a)): exactly
+ * the hz block, the ten roadworks cones, the sc-park-wall lot wall and the two
+ * sc-ed-poligon-chain cones are stamped; the sc-pk-driveway walls (footway at
+ * the centre; the (9, 47.3) wall straddles, 2/4 corners on asphalt) are not.
+ */
+export function stampHeldOnCarriageway(
+  obstacles: readonly ScenarioObstacleSpec[],
+  districtDoc: unknown,
+): ScenarioObstacleSpec[] {
+  if (!obstacles.some((o) => o.kind === "wall" || o.kind === "prop")) return [...obstacles];
+  if (typeof districtDoc !== "object" || districtDoc === null) return [...obstacles];
+  const surface = districtDrivableSurfaceOf(districtDoc);
+  if (surface === null) return [...obstacles];
+  const fix = makeSurfaceFix();
+  return obstacles.map((o) =>
+    (o.kind === "wall" || o.kind === "prop") && surfaceAt(surface, o.x, o.y, fix).under === "carriageway"
+      ? { ...o, onCarriageway: true as const }
+      : o,
+  );
 }
 
 /**

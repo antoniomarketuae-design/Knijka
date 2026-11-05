@@ -21,6 +21,7 @@ import type {
   SessionSummary,
   SeverityClass,
   SimTick,
+  ReverseBrakedFor,
   UnbilledHardBrake,
   Vec2,
 } from "../rules";
@@ -2543,6 +2544,17 @@ export interface LessonSessionState {
    * `LessonResult.ending` by `buildLessonResult`.
    */
   endingCopy?: LessonEndingCopy;
+  /**
+   * Lane rbreverse (sc-roundabout-entry:9e85f27e; founder ruling Q2 2026-10-19
+   * «WARN ONLY»; integrator rulings R5'' and R5'''): the last graded tick's
+   * `SimTick.reverseBrakedFor` — a vehicle or rider behind this reversing car
+   * that is braking for it in this R interval, or that was at rest on some
+   * point of THIS R interval with an account ≥ 0.3 m/s — or null. Read only
+   * by the coach (`advisor.ts reverseWarningForSession`): grades nothing,
+   * ends nothing, never reaches the sheet. Absent when the runtime has no
+   * account query wired.
+   */
+  reverseBrakedFor?: ReverseBrakedFor | null;
 }
 
 /** The ending's sentence as pushed — see `LessonSessionState.endingCopy`. */

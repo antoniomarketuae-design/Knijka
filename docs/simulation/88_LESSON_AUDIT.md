@@ -16894,3 +16894,975 @@ PINNED AT INTEGRATION: `npc-shell-cast-kind.test.ts` gains `bikelaneCf()`, a sec
 - The end card's count disagrees with the rule channel. On the rig-w3n L2 cut drive the end card read «20 наказателни точки «2 опасни грешки»» while the rule channel carried three 10-point events. Evidence: `scratch/rig-w3n/sc-vu-bikelane-turn/9141072b/PROGRESS.md:39`.
 - The vulnerable-pass praise's pooled «…кръстовище» explanation: an open copy row, not rendered today (condition 4). Evidence: `vbltiming-r1.json` (named contradiction 2); `vbltiming-r1-verify.json` (C4).
 - A recorded risk, not a defect (condition 7): a careful student who waits 1.0 m right of his lane centre (y −5.06) leaves 0.04 m of air to the 0.4 m proxy as the with-flow rider passes, about 0.21 m to the rig's real 0.46 m body, and at that rest the 40.97 commendation does not appear. It is unmeasured until the re-drive. Evidence: vbltiming-r1.json (owed, RECORDED RISK; sweep.log in D:/knijka-lanes/scratch/vbltiming-impl/); vbltiming-r1-verify.json (C7).
+
+## Wave C verdicts — 2026-11-04
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2ee2469bbdf1`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 7 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 14 |
+
+**Open list: 22 → 21**, out of 1559 filed across the whole programme (1537 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3r: the first drives of the fi and vt landings at `2ee2469` — `sc-follow-tailgater:63c0c28c` CLOSED on a re-judge under integrator ruling W3R-1; `sc-vu-bikelane-turn:9141072b` PARTIAL on four missing closing records (integrator note, 2026-11-04)
+
+Workflow `rig-wave-w3r` (wf_21d4bf67-f24) ran at `2ee2469`. Its specs were drafted and critic-reviewed by `F/draft-rig-w3r.js`. Journals: `handoff-2026-10-08/reports/rig-w3r-journal.jsonl`, `draft-rig-w3r-journal.jsonl` and `w3r-followups-journal.jsonl`.
+
+- **`63c0c28c` CLOSED** (critical). This is a re-judge (`w3r-followups`, wf_c550e7e8-2f2), and its verifier returned refuted=false.
+  - **The control:** the B0 control drive at PC L3 is still paid «Чисто и спокойно каране» (toast, «Похвали ✓», bullet).
+  - **Pumped drives:** PUMP245 at L3 and L4, PC and phone. Each shows the pumped brake check named under «Рязко спиране, което не влезе в точките:» with ЗДвП чл. 20, ал. 1, and the reservation in place of «Точно това иска да види изпитващият». None shows praise, «задръж това ниво» or a CLEAN_DRIVING event. The pairs have no departure.
+  - **Floored drives:** FLR at L3, PC and phone, show the floored record and the reservation, with no praise.
+  - **Bills:** unchanged (founder question 4).
+  - **The first verdict:** the wave's own judge ruled CLOSED, and its verifier refuted on procedure, not on the product. The spec's channel proof demanded «moving and steering». The keeper's deadband was never reached on the straight, so steer was commanded on 0 counts. The law recomputation had covered only the brake programme.
+  - **Integrator ruling W3R-1 (2026-11-04; the founder's to veto):** on such a straight the channel proof is met by three things: the pad moving the car, clean counters, and 0 law mismatches over EVERY count.
+  - **The re-analysis:** it recomputed the frozen law over every count of all 8 drives (26,064 counts) and found 0 mismatches. Its script is `S/rig-w3r-followups/law-all.mjs`.
+  - **Recorded, not this row:** N2-KB, the 60 Hz keyboard tap chain, did not form a pumped record, and the praise was paid 13.1 s after the chain reset.
+- **`9141072b` PARTIAL.**
+  - **The product is right on every admissible SHADOW drive:** the rider is behind-right of the waiting car and passes it while it stands (`everBehindInHold`, `carStoodThroughout`). The pairs have no departure.
+  - **The closing record:** a readable right door-mirror frame before the level step is met only on SHADOW PC L1 and PC L3.
+  - **The other four cells:** PC L2, phone L1, phone L2 and phone L3 lack the record. That is a capture limit: the frames were scheduled around keysAtRest, not the rider.
+  - **The objective sentence:** it was not photographed at L1 / L3.
+  - **CUT:** the hook card «Непропускане на велосипедист» with ЗДвП чл. 35, ал. 2 was shown on both lenses.
+  - **BEHIND and clause (b):** met or carried.
+  - **Integrator ruling VT-COVER (2026-11-04):** the vt sentence names coverage, not the 18-drive product. A right door-mirror frame meets «right mirror or the shoulder view», because no key looks over the right shoulder in a forward gear.
+  - **Next:** rig w3s re-drives the four SHADOW cells with the frames keyed on the rider.
+- **Open list: 22 → 21 (2 critical, 17 major, 2 minor).**
+
+## Wave C verdicts — 2026-11-04
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`2ee2469bbdf1`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 6 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 14 |
+
+**Open list: 21 → 20**, out of 1559 filed across the whole programme (1538 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+### rig-w3s and rig-w3t: `sc-vu-bikelane-turn:9141072b` CLOSED (integrator note, 2026-11-04)
+
+Two small waves at `2ee2469` finished what rig-w3r left owed. They are `rig-wave-w3s` (wf_6ae8da37-06e), its re-judge `w3s-followups` (wf_07a48f6f-390), and `rig-wave-w3t` (wf_5de954ae-85c). Journals are in `handoff-2026-10-08/reports/` (`rig-w3s-`, `w3s-followups-`, `rig-w3t-journal.jsonl`, `draft-rig-w3s-` and `draft-rig-w3t-journal.jsonl`).
+
+- **rig-w3s** re-drove the four SHADOW cells that had no readable closing record: PC L2, and phone L1, L2 and L3 (each phone cell twice, pre-declared under W3S-Q3). The frozen bytes were the same and only the capture schedule changed, keyed on the rider.
+  - **PC L2 met:** frame 014 shows the rider behind-right on the right door glass before he draws level.
+  - **Phone, NEW FINDING:** at the phone's KeyE pose the right door glass is a thin strip hidden by the dash moulding, so the rider cannot be seen on it. It is recorded as candidate «phonedoorglass»; founder 10-19: no new triage round.
+  - **Phone window inset:** the cockpit door-mirror window inset showed the rider behind-right on all six phone frames. M7 counted a transparent touch layer as a cover.
+- **Integrator rulings**, the founder's to veto:
+  - **W3S-Q1:** OBJECTIVE: ROW.
+  - **W3S-Q2:** WINDOW COUNTS.
+  - **W3S-Q3:** PHONE REPEATS: YES.
+  - **W3S-Q4:** a page layer is a cover only where it paints over the point.
+  - Under these rulings the re-judge found every SHADOW cell met, PC and phone at L1–L3.
+- **The one cell left:** VT-COVER also requires CUT on PC at each of L1–L3, and CUT PC L2 had never been driven at `2ee2469`. The cell was not struck; it was driven.
+- **rig-w3t** drove CUT PC L2 with rig-w3r's frozen CUT bytes (`10572b21…`).
+  - **TARGET C met:** at the latch the rider is behind-right, 4.968 m away and arc −9.33. The dip was 5.97 km/h.
+  - **Bill:** FAILED_TO_YIELD «cyclist-right-hook» at the latch.
+  - **The card:** «Непропускане на велосипедист» is whole on the glass with the chip «ЗДвП чл. 35, ал. 2; чл. 5, ал. 2, т. 1».
+  - **Checks:** law 0 mismatches; no contact.
+- **`9141072b` CLOSED; verifier refuted=false.** Clause (b) stays carried, closed.
+- **Recorded, not this row:**
+  - the «wf-level» frame was missed on every w3s drive (a capture timing note);
+  - M7's hit-stack branch names non-painting layers as covers (an instrument note);
+  - a clean drive shows the objective sentence on no surface (W3S-Q1 candidate);
+  - «phonedoorglass»;
+  - «rhrafterhook»;
+  - V1's copy debt on «Отрязване на колелото по алеята».
+- **Open list: 21 → 20 (2 critical, 16 major, 2 minor).**
+
+## Landed: after a crash pins the car, the recovery card, the peek and the banner lead now teach the look before the move («Огледай се — огледала и рамо. Щом е чисто: …»). A student reversing in R towards a vehicle or rider that has had to slow or stop for him now gets a warning on the advisor card and peek: «Спри заден ход — … намали заради теб …», with ЗДвП чл. 40, ал. 1 by retrieval. Nothing is billed (founder question 2, warn only). Nothing is shown in exam mode. A person on foot is not seen by the warning. Measured in process only. `sc-roundabout-entry:9e85f27e` (major) (2026-11-05)
+
+Lane `rbreverse` ran three rounds, each built on `479127b` (the brief was re-derived on 2026-11-04).
+- Round 1 was BLOCKED by design. STEP 0(c) met the brief's stop condition, so only the look-first copy (STEP 1) was built.
+- Round 2 built the signal and the warning under R5'. The adversarial verifier SIGNED it OFF WITH CONDITIONS, two of them gaps in the ruling.
+- Round 3 rebuilt the signal under R5''. The verifier SIGNED it OFF WITH CONDITIONS on 2026-11-04 (its PROGRESS.md, «ROUND 3 VERIFY»).
+- R5''' (condition 1) was built at integration.
+
+**Rounds and patch.**
+- **The patch.** `rbreverse-result-r3.patch`: sha256 4a537153…c633a2, 46 files, LF only, 0 CR bytes. No touched file is CRLF in base (the builder). It is cumulative against `479127b`, NOT against HEAD.
+  - From the patch's headers (the drafter's count), the 46 files are:
+    - 18 product files: LessonScene.tsx, LessonPlayShell.tsx, lessons/advisor.ts, engine.ts, index.ts and types.ts; rules/index.ts and types.ts; runtime/index.ts, reverseBrakedFor.ts (new) and worldRuntime.ts; scene/lessonWorldRecipe.ts; traces/recorder.ts; traffic/index.ts, staged.ts, system.ts, types.ts and vehicles.ts;
+    - 13 test-side files;
+    - the 15 files of the reviewed-text manifest.
+  - No file is under hud/.
+- **The verifier's own apply.** It reset its lane to tag base, applied the patch and committed it as tag r3. `git diff --binary base` matched the patch's sha exactly, with 0 untracked files and the junction intact.
+- **Against HEAD** (the builder, in a `git clone --shared --no-checkout` in scratch with a temporary index): the patch applies 3-way on `2ee2469` with 43 files clean and 3 conflicts.
+  - lessons/types.ts conflicts in the `from "../rules"` import list only: `2ee2469` adds UnbilledHardBrake and this patch adds ReverseBrakedFor. Both are kept.
+  - The manifest's manifest.json and units.source.txt conflict and are re-recorded once.
+  - The merge is under PROVEN ON 2ee2469.
+
+**Integrator rulings.** The integrator made these on 2026-11-04, under the founder's 2026-10-08 and 2026-10-19 delegations. They are not his. The founder is to be told at this landing, each his to veto (owed, below).
+- **R1.** The warning is keyed on the reverse and on the braking vehicle, not on a crash.
+- **R2.** The channel is the advisor card and peek only. With the advisor off, from L3, there is no warning; that is a recorded limit.
+- **R3 and R4** (as the builder states them).
+  - R3: the citation is ЗДвП чл. 40, ал. 1, interpolated only from the exported `REVERSE_DUTY_BEFORE.lawRef`, which a test resolves in the law corpus.
+  - R4: the banner, the task row and the follow pill are untouched.
+- **R6 and R6a (option A).** Every crashPinned card, peek and lead names the look before the move.
+- **R5, as it moved through the rounds.**
+  - R5, as revised: growth since the start of the R interval. Round 1 stopped on it.
+  - R5' (round 2): growth since the earlier of the current standstill's start or the R-interval start.
+  - R5'' (round 3): (A) growth ≥ 0.3 m/s since the R-interval start, or (B) at rest now with a drive account ≥ 0.3 m/s. As built.
+  - R5''' (built at integration): (B)'s «at rest now» reads «at rest at any point of this R interval» (condition 1 below).
+- **R9, recorded.** A person on foot is covered only by the look-first card and «Спри, ако някой идва».
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:9e85f27e` stays OPEN.
+- Every number below was measured in process: the rapier chassis, the live world through wireTrafficQueries, and a real CabinControls. R was reached by the selector or by the ra2 gesture and never set directly.
+- No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier. The judge must be told that founder question 2 rules a warning only, with no bill.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **The row** (filed 2026-10-10 by triage round 2, reproduced in process at `59be0de` on sc-roundabout-entry L3 (pc); the brief cites rig-w3b SC2). After hitting the island the student was shown «Колата е притисната след удара — измъкни се назад» / «Съвсем леко назад с прави колела, после огледай…».
+  - He then reversed on the ring at up to 4.8 km/h over 6.3 m, back towards the staged circulator. It braked from 2.9 m/s to a full stop, about 1 m (0.98–1.21 m) from his rear bumper.
+  - Nothing recorded it: no rule event, no fault card and no coach warning.
+  - Through the reverse the coach still showed «Излез от кръговото с десен мигач».
+  - This happened in 3 of 3 SC2 drives.
+  - The en landing (`230c7b8`) later made the hold conditional («Ако колата опира в удареното, първо съвсем леко назад…»). It still put the move first and the look after it.
+- **STEP 0 on base `479127b`** (round-1 builder, in process). The row reproduces on all four cells (L3/L1 × selector/gesture). On L3 by the selector:
+  - the strike is staticObject −10 at 50.883;
+  - R comes at 56.50 by the selector and 57.20 by the gesture;
+  - the car reverses 6.316 m at up to 4.32 km/h;
+  - the circulator's account goes from 0 to 2.9 m/s inside the R interval, with its centre in the car's rear half-plane on all 104 growth points;
+  - its first growth of 0.3 is at 59.95, and it stops at 61.63 with its centre 6.01 m off;
+  - the advisor showed the crashPinned «away» card 56.62–61.87, then «Излез…» 61.88–62.17, with no warning anywhere.
+- **STEP 0(c), the stop.** A car STANDING at the island also makes the circulator shed its whole 2.9 m/s. It stops 3.19 m centre to centre.
+  - In the «Risk 2» cell the car then shifts to R. The stop rule's R-interval baseline is already 2.9, so R5 gives 0 frames, and the car reverses into the circulator (COLLISION vehicle −10).
+- **The cause** (the builder).
+  - Nothing published «a vehicle behind has had to slow for this reversing car». At HEAD `playerShedMps` is read only by graded readers bound to other acts.
+  - advisor.ts `CRASH_HOLD_CARD_BG` / `CRASH_HOLD_PEEK_BG` and LessonPlayShell.tsx `CRASH_HOLD_LEAD_BG` put the move first and named no look.
+
+**What landed.** This is the builder's description, checked against the code that lands (the round-3 patch plus R5''' at integration). The verifier's measurements are under their own heading.
+- **STEP 1, the look-first copy** (advisor.ts, LessonPlayShell.tsx; 9 manifest strings, unchanged since round 1).
+  - The card and the peek start with the look («Огледай се»), and the lead names it before the move («След удара — първо се огледай; …»).
+  - All three keep the E3 conditional («опира») and the way-out word for each variant.
+  - The card also keeps the because-clause («… я притиска»). Its «Щом е чисто:» scopes both branches, so the free branch cannot be read as «drive off without the check».
+  - The peek no longer carries a because-clause. The old peeks («… напред я притиска») did; under R6a option A the look took that place, and the advisorPeekSummary pin was re-taught for crashPinned.
+- **STEP 2, the signal.** The field is `SimTick.reverseBrakedFor?: ReverseBrakedFor | null` (rules/types.ts), with {vehicleId, kind "vehicle" | "cyclist", fwdM, leftM}.
+  - undefined means no query is wired; null means wired and nobody qualifies.
+  - It is computed in one place, `runtime/reverseBrakedFor.ts` `ReverseBrakedForTracker`, which worldRuntime.sample steps once per graded grid point.
+  - The tracker reads `TrafficSystem.playerShedAccounts()`. The query is pure and returns one row per ambient and staged vehicle agent: id, kind, position (x, y), `playerShedMps` and, from round 3, the published `speedMps`.
+  - The query is wired in wireTrafficQueries, traces/recorder.ts and captureFeedParity.
+- **The raise test.** The signal is raised for the NEAREST (by distance) qualifying vehicle when all of these hold:
+  - the car is in R (contract gear −1, in a contiguous R interval);
+  - it is reversing (signed speed < −0.8 km/h, `REAR_CUE_REVERSING_KMH`);
+  - the vehicle's centre is in the car's rear half-plane, with no corridor width;
+  - and (A) or (B) holds:
+    - (A): its account has grown ≥ 0.3 m/s since the first point of the current R interval;
+    - (B), R5'' as built in round 3: it is at rest now (|speedMps| ≤ `REVERSE_BRAKED_FOR_VEHICLE_STOPPED_MPS` 0.5) and its account is ≥ 0.3;
+    - (B), R5''' as it lands: it was at rest on some grid point of THIS R interval, reversing or not (the tracker's «seen at rest» set), and its account is ≥ 0.3.
+- **The bars.**
+  - The 0.5 m/s is `traffic/staged.ts HOLD_LIT_SPEED_MPS`, the traffic model's own stopped bar, at which the staged fleet lights a standing car's brake lamps. The ambient fleet's bar is the same 0.5 but strict (speed < 0.5). It was exported and its value is unchanged. A test pins the mirror equal to it and to 0.5.
+  - The 0.3 is `STAGED_BRAKE_LAMP_MARGIN_MPS` = `ROUNDABOUT_FORCED_SHED_MPS` = `OVERTAKE_BRAKED_SHED_MPS`. No new number.
+- **Drop and re-raise.** The signal drops on speed ≥ −0.8 km/h or on leaving R, and is re-raised inside the same R interval by the same test. Leaving R forgets both (A)'s baseline and the «seen at rest» set.
+- **The session fold** (lessons/engine.ts, lessons/types.ts). The coach is the field's only reader. `rules/__tests__/reverse-braked-for-not-graded.test.ts` pins every file under rules/ blind to it.
+- **STEP 3, the warning.** `lessons/advisor.ts reverseWarningForSession` sits after the person hold and before crashPinned, offRoad, the live yields and the objective.
+  - It returns null in exam mode, when not driving, after a person strike, and when the signal is absent or null.
+  - `REVERSE_DUTY_BEFORE` = { lawRef: «ЗДвП чл. 40, ал. 1» } is exported from lessons/index.ts, and the test checks the retrieved unit text.
+- **What did not change** (the builder; the verifier found the same for round 3).
+  - No bill, point, verdict, star, objective, gate or protected number moved.
+  - HOLD_LIT_SPEED_MPS was only exported.
+  - Round 3 changed no shown string, and the manifest was green without a re-record.
+
+**What the student sees.** These are the builder's strings.
+- **The crashPinned hold, three variants:**
+  - card (149 characters): «Огледай се — огледала и рамо. Щом е чисто: ако опира в удареното, съвсем леко назад — напред я притиска; ако не опира, потегли. Спри, ако някой идва.»;
+  - the same card with «…съвсем леко напред — назад я притиска…»;
+  - the same card with «…леко я отдръпни — към него я притиска…»;
+  - peek: «Огледай се; ако опира — леко назад.» / «…леко напред.» / «…леко я отдръпни.» (35 / 36 / 40 characters);
+  - banner lead: «След удара — първо се огледай; ако колата опира, леко назад» / «…напред» / «…я отдръпни» (59 / 60 / 64 characters). The 53-character stem is «След удара — първо се огледай; ако колата опира, леко».
+- **The warning:**
+  - card, vehicle (143 characters): «Спри заден ход — превозно средство намали заради теб, а ти се движиш към него. Огледай се: заден ход само по свободен път (ЗДвП чл. 40, ал. 1).»;
+  - card, cyclist (138): «Спри заден ход — велосипедист намали заради теб, а ти се движиш към него. Огледай се: заден ход само по свободен път (ЗДвП чл. 40, ал. 1).»;
+  - peek, both kinds (40): «Спри заден ход: някой намали заради теб.».
+- **Why the warning is true.**
+  - The round-3 verifier: «намали заради теб» holds under (A), because the vehicle shed ≥ 0.3 for him in this R interval. It holds under (B), because the vehicle shed ≥ 0.3 for him and stands now.
+  - Under R5''' (B) also covers a vehicle that stood for him inside this R interval and has since begun to move. It still shed ≥ 0.3 for him, so «намали» stays true.
+  - «ти се движиш към него» follows from reversing with the vehicle in the rear half-plane.
+  - No side, outcome or move word appears.
+
+**Rounds 1–2.**
+- **Round 1** (builder only, BLOCKED by design; no verifier ran).
+  - STEP 1 and the STEP 0 instrument were built.
+  - The census over 2,434 cells showed 0 graded differences. The 22 crashPinned cells (all «away», 7,040 frames) changed card, peek and banner from old to new.
+  - Its four copy mutants were killed on assertion text: BASE_COPY, M1, M1b and M1c.
+- **Round 2** (R5', patch sha 25cc4ebb…). The verifier reproduced the four row cells (134 / 175 / 133 / 174 points, 0 missed, 0 false) and Risk 2 (warning 64.317–66.833, contact 66.85). It SIGNED OFF WITH CONDITIONS:
+  - **V4, the nudge miss.** The circulator stops for the halted car, and the car creeps forward 0.3–0.5 m, stops and reverses. R5' restarted its baseline after the nudge, so 0 warning frames were shown on L1 selector, L3 selector and L3 gesture. On L1 the car hit the vehicle (COLLISION vehicle −10 at 71.98) while «Излез от кръговото с десен мигач» was on every reverse point.
+  - **V5, the stale vehicle.** A vehicle that slowed for him and then drove off to 85 m behind raised the warning on 110 of 110 points.
+  - **Three surviving mutants.** VM2 (the standstill baseline never reset), VM9 (the R5' rest bound 0.6 → 0.8 km/h) and VM13 (kind always «vehicle»).
+  - **Its lesson-ui + lessons/__tests__ run** was cut by the fi + vt gate and is not a result.
+  - R5'' answered V4 and V5.
+
+**What the verifier reproduced on round 3** (R5'', before R5'''). It worked on its own lane (`479127b` + the r3 patch) with its own probes. The oracle reads speeds from traffic.vehicles, independent of the query. Log: `D:/knijka-lanes/scratch/rbreverse-verify/PROGRESS.md`. Probes: `attempts/r3/`.
+- **The row's four cells** (L3 selector, L3 gesture, L1 selector, L1 gesture):
+  - 134 / 175 / 133 / 174 warned points, first at 59.95 / 59.95 / 59.90 / 59.90, unchanged from round 2;
+  - all are (A) points: 0 missed, 0 false warnings, and 0 move orders or «Излез…» on the card or peek while (A) holds;
+  - the published field equals the oracle on every point, and the peek always matches the card;
+  - at 30 Hz and on a jittered cadence: 136 and 135 points, both matching the oracle.
+- **Risk 2** (every warned point is (B) alone):
+  - L3 selector warns 64.317–66.633 (140 points) against contact at 66.85; the first warning comes 2.5 s before the contact;
+  - L1 gesture warns 64.2–66.5 (139 points) against contact at 66.717.
+  - The warning drops about 0.2 s before contact (condition 1).
+- **The nudge cells** (every warned point is (B) alone; no «Излез…» while the warning holds):
+  - L1 selector, 0.3 m nudge: 66.517–71.967 (328 points), contact 71.983;
+  - L3 selector: 66.583–72.133 (334 points), no contact;
+  - L3 gesture: 67.283–72.783 (331 points), no contact.
+- **The stale cell E1:** 0 of 110 points. In unit form the nudge (E2) gives 60 of 60.
+- **Controls,** with the field defined on every point:
+  - silent: the standing car with no reverse, T3 at φ 200, and exam L4 (the signal up on 154 points, the warning on 0);
+  - matching the oracle: the crash-free R1 reverse 154 (58.617–61.167); sweeps at φ 230 / 270 / 300 give 48 / 226 / 263; the slow reverse 461; the 12 m reverse 239.
+- **Census** (its own run, 2,434 cells, 386 s, against its own base run):
+  - 0 errors;
+  - 0 differences in graded fields, hold timeline, hold frames, crashPin hash, traffic pose and speed hash, and the playerShedMps hash;
+  - the field absent on 0 frames;
+  - the product signal on 0 frames and the warning on 0, including shadow-correct and exam cells; the offline (A) and (B) oracles also give 0;
+  - crashPinned: 22 cells, 7,040 frames, all «away»;
+  - identical to its round-2 tree census on every cell.
+- **Mutants,** each restored and sha256-checked.
+  - The ruling's mutants, each killed on an AssertionError:
+    - (B) without «at rest»: 7 failures, including «expected 110 to be +0» on the stale cell;
+    - (B) removed: 11 failures;
+    - (A) removed: 17 failures, including «expected -1 to be 6»;
+    - kind always «vehicle»: the ring VM13 test, «expected 'Спри заден ход — превозно средство на…' to be 'Спри заден ход — велосипедист намали …'».
+  - Its own: V3M1 and V3M6 killed. V3M4 equivalent (the agent lists only grow). V3M3, V3M2 and V3M9 survive (conditions 2–4).
+- **Regression on its lane.**
+  - Run A (lesson-ui/__tests__, lessons/__tests__, modules/clips, law-citations and claimGate; 2,180 s): 203 files, 201 green; 3,652 passed, 165 skipped, 1 failed. touchHintLifetime and whyPanel fail with ENOENT on tools/ and docs/, which the lane does not have. clipPlan freshness is green.
+  - Runs B + C (runtime, traffic, rules and 9 targeted scenario pins; 1,214 s): 213 of 213 files, 3,658 of 3,658 tests. The pins are the ring test, endings-chassis, reviewed-text-manifest, caption-truth, keep-right-claim-census and the four ADR-014 census files.
+  - tsc: 22 errors, the environment baseline, none in a touched file.
+  - NOT re-run by the verifier: the full lessons/scenario/__tests__ directory.
+- **The builder's numbers, not re-measured by a verifier.**
+  - Its regression runs:
+    - lessons/scenario/__tests__ + orchestrator: 246 of 246 files, 5,572 passed, 1 skipped (4,392 s);
+    - runtime, traffic, rules, scene and traces: 420 of 421 files, 6,560 of 6,561. The red is guidance-lane-align-span §7, ENOENT on tools/;
+    - lessons/__tests__, components/sim, clips, law-citations and claimGate: 252 of 255 files. The reds are whyPanel and touchHintLifetime (ENOENT) and a 60 s shellClipAffordances timeout, 40 of 40 when run alone.
+  - Its round-3 mutants: 16, each killed on an AssertionError (0 TypeError / ReferenceError / timeouts).
+  - Its query-to-card cyclist test (VM13; sc-vu-pass-clearance/mistake-squeeze through the live chain).
+
+**The conditions, and how each stands.**
+
+**1. R5''', V3-risk2-tail. BUILT AT INTEGRATION (integrator ruling, 2026-11-04; no new number).**
+- **The problem.** In Risk 2 the warning dropped about 0.2 s before contact. The circulator started moving off (0.56 m/s at 66.667) while its centre was beside him (fwd −0.33, left −1.17). So (B) dropped, and (A) had no growth inside the R interval. The advisor fell back to the look-first crashPinned card until the contact.
+- **The ruling.** (B) also counts a vehicle that was AT REST at any point of THIS R interval, with a drive account ≥ 0.3.
+  - It is built in runtime/reverseBrakedFor.ts as a «seen at rest» set for each R interval. The set is filled on every R point, reversing or not, and cleared with (A)'s baseline when the car leaves R.
+- **The verifier's offline measure** of this rule:
+  - the warning runs to 66.833 / 66.7, the last point before contact, which is +12 points on each Risk-2 cell;
+  - it adds 0 points on the row, nudge, control and sweep cells;
+  - the stale vehicle stays silent, because it drove off before R.
+- **Owed as pins:**
+  - Risk 2 warns to the last point before contact;
+  - the stale cell is silent;
+  - a vehicle that was never at rest in this interval, with no (A) growth, is silent;
+  - a mutant that drops the rule dies on assertion text;
+  - the lane's census, re-run at the landing, shows 0 committed-demo frames.
+PINNED AT INTEGRATION: built and pinned (the integrator, 2026-11-04; the merge verifier ran every mutant below again itself, one at a time, each killed on AssertionError text and restored byte for byte).
+  - **The build.** `runtime/reverseBrakedFor.ts` keeps a «seen at rest» set for each R interval (`seenAtRestInR`). It is filled on every R point, before the reversing check, and cleared with (A)'s baseline when the car leaves R. `hasSlowedFor(r, rBase, seenAtRestInR?)` passes (B) when the vehicle is at rest now or was at rest on some point of this R interval, and its account is ≥ 0.3. It adds no new number.
+  - It is the one product change beyond the lane patch. The integrator disclosed it against the template's «tests only»; the merge verifier accepted it because the condition ordered it (its F1). It is an integrator ruling under the founder's 2026-10-08 and 2026-10-19 delegations, and the founder is to be told (owed, below).
+  - The merge verifier's note (its F1): a vehicle that stood at rest inside this R interval for any reason (a red lamp, for example), with an account ≥ 0.3, now keeps (B) after it moves off. The past-tense sentence stays true.
+  - **Comments.** The sentences that no longer matched the code were corrected in advisor.ts, rules/types.ts, traffic/types.ts and the reverseBrakedFor.ts header (the integrator). The lessons/types.ts comment on `LessonSessionState.reverseBrakedFor` still said «integrator ruling R5''» and «still stands» (the merge verifier's F2). It was corrected at composition on 2026-11-05 to name R5'' and R5''' and a vehicle braking for him in this R interval, or at rest on some point of THIS R interval with an account ≥ 0.3. All of these are comments only.
+  - **The pins.** `runtime/__tests__/reverse-braked-for.test.ts` §2b (27 tests in the file, green):
+    - the Risk-2 tail: a vehicle that stopped for him and stood at rest in THIS R interval keeps the warning while it moves off beside-behind him (0.56 m/s, no growth in R), up to the last point;
+    - the interval scope: a vehicle that stood for him in an EARLIER R interval and is moving now does not raise in a new one, and one that never stood in this interval, with no (A) growth, never does;
+    - the STALE cell E1, silent in its own §2b test and in the existing §2 STALE test.
+  - In `rbreverse-ring-reverse.test.ts` the oracle was taught R5''' (rest seen per R interval). Risk 2 now asserts that the last warned point is the last graded point before the contact, and that the tail covers the circulator moving off.
+  - **R5''' dropped** (`atRest` = speed ≤ 0.5 only, the set ignored): killed on «expected [ false, false, false, false, …(8) ] to deeply equal [ true, true, true, true, true, …(7) ]» (unit) and on «Risk 2: last warned point vs the end of the reverse: expected 12 to be less than or equal to 1» (the ring's Risk-2 drive on the real Rapier ring).
+  - **The set not cleared on leaving R:** killed on «expected true to be false». reverseBrakedFor.ts was restored to sha256 fc5214bf…11e3 after each.
+  - **The census** with R5''' in the tree: 0 signal frames and 0 warning frames on committed demos (PROVEN ON 2ee2469).
+
+**2. V3M3, (A)'s baseline taken at the first REVERSING point instead of the R-interval start.** It survived 40 of 40 unit and ring tests. The verifier's probe E5 kills it with «expected +0 to be 60»: a vehicle slows from 3 to 2.5 m/s for him while he stands in R, then he reverses, and the product raises on 60 of 60 points. Owed: E5 as a committed test.
+PINNED AT INTEGRATION: E5 is a committed test, `reverse-braked-for.test.ts` §2b «V3M3 (the r3 verifier's probe E5)» (the integrator). In R at rest a vehicle behind slows 3 → 2.5 m/s for him while still moving; then he reverses, and the product must raise on every point. V3M3 is killed on «expected +0 to be 60» (the integrator, and the merge verifier again), and the file was restored by sha256.
+
+**3. V3M2, ambient vehicles dropped from playerShedAccounts.** It survived 55 of 55 unit, captureFeedParity and ring tests, because no test sends an AMBIENT vehicle through the query. Owed: an ambient vehicle through playerShedAccounts into the tracker and the card.
+PINNED AT INTEGRATION: a new describe in `rbreverse-ring-reverse.test.ts`, «the ambient vehicle's card from the real account query» (the integrator).
+  - It uses the production `createTrafficSystem` on rb-mini-v1 with an ambient fleet only (seed 11). The student stands 12 m ahead of a rolling ambient car. The real `playerShedAccounts` feeds the tracker on every step, the value goes through `applyTick` on a practice session, and the card must read «превозно средство намали заради теб». The merge verifier found no stub: the card is compared with `reverseWarningAdvisorPrompt("vehicle")`.
+  - V3M2 (`playerShedAccounts` walks only the staged vehicles) is killed on «the ambient car is a row of the real query: expected false to be true». system.ts was restored to sha256 0d1fec8f…dafe.
+  - The integrator first tried sc-follow-distance, which T4's comment calls an ambient follower. Measured, its only body is the STAGED lead `sc-fd-lead`, so it could not carry this pin. That comment is inaccurate and was left unchanged.
+
+**4. V3M9, the nearest vehicle chosen by the car's axis instead of by distance.** It survived (22 of 22). It changes only which of two qualifying vehicles is named. Owed: two qualifying vehicles, with the one nearest BY DISTANCE named.
+PINNED AT INTEGRATION: `reverse-braked-for.test.ts` §2b «V3M9 · two qualifying vehicles: the NEAREST BY DISTANCE is named, not the one nearest along the car's axis» (the integrator): A at fwd −3, left 8; B at fwd −6, left 0. V3M9 (nearest by −fwd) is killed on «expected { vehicleId: 1, kind: 'vehicle', …(2) } to match object { vehicleId: 2, fwdM: -6 }», and the file was restored by sha256. The merge verifier killed it again.
+
+**5. RECORDED, each as the verifier or the ruling states it.**
+- **E1b (ruling letter).** A vehicle that shed 4 m/s for him and later stands at an unrelated stop 82 m behind raises (B) on 110 of 110 points. A finished staged actor parked at the end of its path would do the same.
+- **E3 (mandated by stop-rule clause 2).** A vehicle that braked 0.5 m/s for him inside the R interval and then drives away at 6 m/s keeps (A) up on 480 of 480 points.
+- In both, «намали заради теб, а ти се движиш към него» stays literally true, and neither fires on any committed census cell.
+- **R9.** Pedestrians have no account, so the signal cannot see a person on foot. In the census a pedestrian is in the car's rear half-plane on 118,691 of 127,981 reverse frames (232 cells), 9,352 of them within 20 m. A person on foot is covered only by the look-first card and its stop clause «Спри, ако някой идва».
+- **R2.** With the advisor off from L3 there is no warning. Exam mode shows nothing: on exam L4 the signal is up on 154 points and the warning on 0.
+- **A base observation, not this lane.** On base, `sc-jx-giveway-b1/shadow-correct/L5` raises crashPinned on a correct demo (199 frames). This patch does not change it. It is a candidate, below.
+
+**6. THE LANDING'S OWN WORK** (owed by the builder; lanes cannot run tools tests).
+- Resolve lessons/types.ts by keeping both UnbilledHardBrake and ReverseBrakedFor in the rules import list.
+- Re-record the reviewed-text manifest once.
+- Teach `tools/mobile/lesson-audit.mjs:7895` `ROUTE_HOLD_CRASH_PINNED_BG` the new 53-character stem «След удара — първо се огледай; ако колата опира, леко». Until then route-fidelity.test.mjs:237–246 stays red (the round-1 builder).
+- Run the route-fidelity and path-follow tools tests and the /удар|притисн/ matchers. Per the builder, those matchers match the leads and cards, not the peeks, as before.
+- Run the environment-red files on the main tree: whyPanel, touchHintLifetime and guidance-lane-align-span §7.
+- The proof runs src/modules/clips/ (the clip-plan freshness gate), lessons/scenario/__tests__ (which holds the lane's census), runtime/, traffic/, rules/, lesson-ui and components.
+PINNED AT INTEGRATION: the landing's own work is done (the integrator).
+  - lessons/types.ts keeps both UnbilledHardBrake and ReverseBrakedFor in the `from "../rules"` type import, and both sides' fields (the merge verifier).
+  - The reviewed-text manifest was re-recorded once (PROVEN ON 2ee2469).
+  - `tools/mobile/lesson-audit.mjs` `ROUTE_HOLD_CRASH_PINNED_BG` (:7895 at `2ee2469`, :7898 on the landing tree) is now the 53-character stem «След удара — първо се огледай; ако колата опира, леко», with a comment naming the old stem. route-fidelity is 45/45.
+  - Its mutant STEM_OLD (the old stem restored) turns route-fidelity red on «LessonPlayShell.tsx no longer contains «След удара — ако колата опира в удареното, първо леко»», so the taught stem is load-bearing. lesson-audit.mjs was restored to sha256 2a670e78…7497. The merge verifier killed it again.
+  - path-follow (its T14 test passes, the merge verifier) and the /удар|притисн/ matchers are not among the tools failures. The merge verifier notes that those matchers read debrief text, which the lane does not change.
+  - The three environment-red files ran green in the worktree, which has tools/ and docs/: touchHintLifetime (components/sim), guidance-lane-align-span §7 (scene) and whyPanel (src/modules/clips/).
+See PROVEN ON 2ee2469.
+
+**Not cured by this landing.**
+- Nothing bills a reverse that endangers a vehicle with priority (founder question 2: warn only). In the L1 nudge cell (and in Risk 2) the car can still reverse into the circulator after being warned. Nothing stops or bills the reverse itself; only the contact is billed, as a collision.
+- A person on foot is not seen by the warning (R9).
+- With the advisor off from L3 (R2), or in exam mode, there is no warning.
+- The banner, the task row and the follow pill are untouched (R4). The builder records that the banner may still state the task while the warning holds; that is unmeasured on a device.
+- A vehicle whose speed a runner commands may never grow its account. On sc-follow-tailgater's brake check the round-2 builder measured 0 playerShedMps growth for every vehicle (L1 and L3, mistake and shadow), so the signal cannot see that tailgater.
+- E1b and E3 (condition 5).
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's working copy of doc 88 on 2026-11-04. They were re-checked against it on 2026-11-05 and still hold.
+- :15232–:15234, the en landing's «Changed, the crashPinned hold» card, peek and banner lead. They are replaced by the look-first copy above. The new stem «След удара — първо се огледай; ако колата опира, леко» is also 53 characters, and the leads stay at 59 / 60 / 64 characters.
+- :15236: «The card that `sc-roundabout-entry:9e85f27e` quotes is among the removed strings. This lane leaves that row's bill untouched, and the row stays open.» This landing builds the row's coach half in process: the look-first copy and the reverse warning. Under founder question 2 there is still no bill, and the row stays open.
+- :15317 and :15375, the tools stem «След удара — ако колата опира в удареното, първо леко». lesson-audit.mjs takes the new stem at this landing (condition 6).
+
+ADR-011 carries this landing's amendment in this commit, with a cross-reference from ADR-015's «New vocabulary».
+
+**PROVEN ON 2ee2469** (the integrator's run on 2026-11-04 in the worktree `D:/knijka-lanes/integ-rb`, log `D:/knijka-lanes/scratch/rb-land/PROGRESS.md`, mutant logs in `scratch/rb-land/mut/`. The census probe was copied in for the run and moved out afterwards, to `scratch/rb-land/tmp-rbr-census-r3.test.ts.moved`. The merge verifier ran lessons/scenario/__tests__, one combined run of eight directories, the ring test, the mutants and the tools tests itself.) This landing, wp and sc go through ONE main-tree gate as ONE commit, as `479127b` (ra2 + e2) and `2ee2469` (fi + vt) did. The three together are proven on the TEMP commit `7547a0c` = `2ee2469` + gate-rb + gate-wp, with sc on top (PROVEN ON 7547a0c, in the sc section).
+- **The apply.** The worktree was clean at `2ee2469`, and the patch's sha256 matched (4a537153…). `git apply --3way --index --binary` landed all 46 files: 43 clean (the new files by direct application) and 3 conflicts, each resolved mechanically:
+  - lessons/types.ts, in the rules import list only: both ReverseBrakedFor and UnbilledHardBrake are kept;
+  - manifest.json and units.source.txt: the HEAD side was taken as a placeholder, then the manifest was re-recorded once (below).
+- **What the stage holds beyond the lane patch** (the merge verifier applied the lane patch 3-way to a temporary index on `2ee2469` and compared blob by blob):
+  - R5''' in runtime/reverseBrakedFor.ts, the one product change beyond the lane (condition 1);
+  - comment-only edits in advisor.ts, rules/types.ts and traffic/types.ts;
+  - the lessons/types.ts conflict resolution;
+  - the two test files carrying the pins, the manifest re-record, the lesson-audit.mjs stem, and docs/architecture/07 (the ADR texts).
+  - At composition on 2026-11-05 one comment changes on top: the lessons/types.ts doc comment (condition 1).
+- **The gate patch.** `D:/knijka-lanes/gate-rb.patch`, sha256 b144715fd46d6992341788284f9f3e74eb681307d5ebc84e14821aaca4b764a8, 48 files: the lane's 46, plus tools/mobile/lesson-audit.mjs and docs/architecture/07_ARCHITECTURE_DECISION_RECORDS.md. It has 0 CR bytes, all 48 files are i/lf, and hud/ is untouched. The merge verifier found `git diff --cached --binary 2ee2469` hashing to the same sha, with nothing unstaged or untracked.
+- **The pins:** conditions 1–4 and 6 above.
+- **A lane-verifier mutant** (the merge verifier). VM12, the warning moved below the crashPinned card in advisorPromptForSession, is killed by `lesson-ui/__tests__/reverseWarning.test.ts` «over the PINNED RECOVERY…»: 1 failed, 10 passed, on «expected 'Огледай се — огледала и рамо. Щом е ч…' to be 'Спри заден ход — превозно средство на…'». advisor.ts was restored to sha256 e11c7710…9641.
+- **The reviewed-text manifest.** Before the re-record it was red on 3 tests (fingerprint and counts, 6 ids with no stored text, 12 «source» strings differing), from the placeholder resolution. It was re-recorded once with RECORD_REVIEWED_TEXT_MANIFEST=1 and is 49/49 green. 12 entries moved, all in lessons/advisor.ts and all the lane's own:
+  - CHANGED #36, #37 and #38, the look-first card (back, forward, away);
+  - CHANGED #40, #41 and #42, the peek;
+  - ADDED #56–#61, the warning: «ЗДвП чл. 40, ал. 1», «превозно средство», «велосипедист», «Спри заден ход —», «намали заради теб, а ти се движиш към него. / Огледай се: заден ход само по свободен път (» and the peek «Спри заден ход: някой намали заради теб.».
+  - R5''' moved no shown text. Report: `scratch/rb-land/manifest-record-report.txt`. The sc landing re-records the manifest once more, on the combined tree.
+- **The landing census.** The builder's census probe ran on the landing tree with R5''' in it (2,434 cells, 461 s, 0 errors):
+  - the product signal on 0 frames in 0 cells, the warning on 0 frames, the field absent on 0 frames, and the R5'' oracle 0;
+  - crashPinned 22 cells, 7,040 frames, all «away»;
+  - 127,981 reverse frames in 232 cells, with a pedestrian in the rear half-plane on 118,691 of them (9,352 within 20 m).
+  - Against the round-3 lane-tree census the only differences are in sc-vu-bikelane-turn: graded fields in 10 cells (cut-path and shadow-correct), world 15, pin 5, hold timeline 4, shed 5. The integrator attributes them to that lesson's re-stage (9141072b), which is in `2ee2469` and not in the lane's tree (`scratch/rb-land/cmp-land-vs-r3tree.json`).
+  - The merge verifier's note (its F6): the comparison is against the r3 lane tree on `479127b`, not a `2ee2469`-base census, so that attribution is reasoning, not a same-base measurement. It is not blocking: the field is display-only, and rules/__tests__/reverse-braked-for-not-graded.test.ts is green.
+- **The integrator's directories,** one at a time, all green:
+  - src/modules/clips/: 19 files, 302 passed. The clipPlan freshness gate is green, with no regeneration;
+  - lessons/__tests__: 127 files, 2,456 passed, 165 skipped (941 s);
+  - lessons/scenario/__tests__: 212 files, 5,198 passed, 1 skipped (5,341 s), including rbreverse-ring-reverse, reviewed-text-manifest, endings-chassis, caption-truth and keep-right-claim-census. The integrator's report gave the ring test 21 tests; it has 19 (`scratch/rb-land/ring-full.log`, and the merge verifier's F5);
+  - components/sim: 108 files, 1,790 passed (1,569 s), including touchHintLifetime, reverseWarning, advisorPeekSummary, crashCoachWithdrawal, crashLeadClearance and toastReadFold;
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 109 files, 1,912, including reverse-braked-for-not-graded; traffic 53, 675, including player-shed; runtime/__tests__ 49, 902, including reverse-braked-for's 27 tests;
+  - scene 47, 787, including guidance-lane-align-span §7; vehicle 22, 299; world 135, 2,409; hud/__tests__ 71, 1,401; traces 170, 2,372.
+- **The merge verifier's own runs,** to completion, --maxWorkers=1, one at a time:
+  - lessons/scenario/__tests__: 212 files, 5,198 passed, 1 skipped;
+  - one run over lessons/__tests__, rules, runtime, traffic, scene, traces, src/modules/clips and components/sim: 682 files, 11,196 passed, 165 skipped (3,804 s), the clip-plan freshness gate inside;
+  - the ring test alone: 19/19.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment (api/health 4, lib/db 1, the admin, auth, learning, outcomes, payments and privacy stores, lesson/progress, sim/lessons/store 2, traces/attemptStore 1). None is in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4/4 runs it): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo. The merge verifier's own run gave the same.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are the worktree's environment. build-redrive §9(a), (b), (d) and (e), count-agreement and finding-reader fail with «could not find .audit-frames/findings»: the worktree has no .audit-frames corpus. lane-evidence fails with «could not resolve the playwright package».
+  - Re-run of the three audit files with cwd `E:\AI driver`, reading the main corpus only (outputs to tmp; main's git status unchanged): 90 tests, 89 pass, 1 fail. The one is count-agreement, «apply-reroute.mjs printed no WORKED line»: apply-reroute resolves .audit-frames from its own file's location, which is the worktree, so it is the same environment cause. lane-evidence with KNIJKA_PLAYWRIGHT_ROOT pointing at the main tree's tools/clips/headless: 10/10.
+  - No tools test was taught; the only tools change is the owed lesson-audit.mjs stem. The main-tree gate decides.
+- **Left as found.** The worktree is staged with no untracked or temporary file, and no node process runs on integ-rb (the integrator). The merge verifier restored every mutant byte for byte and left the staged sha unchanged; main stayed at `2ee2469` with only doc 88 modified.
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` (ADR-017) on the PC keyboard and the phone lens:
+  - sc-roundabout-entry at L3 with the advisor on, and at L1, SC2. The frames needed:
+    - the look-first hold card, peek and folded lead (W6/W7);
+    - the warning's first frame and the circulator's stop;
+    - no «Излез…» or crashPinned move order while the warning holds;
+    - the warning gone after the stop;
+    - a control reverse with no warning;
+    - the NUDGE and Risk-2 cells;
+    - the reader state on every frame;
+  - the same hold strings on sc-pk-driveway and sc-hz-brake-dont-swerve CUT-R, on both lenses;
+  - an exam drive with a reverse, where nothing is shown;
+  - an advisor-off L3 drive (the R2 limit).
+  Whether those frames close `9e85f27e` is for that wave's judge and verifier, under founder question 2.
+- **With wcafterpaint** (`sc-roundabout-entry:ad192bc4`, the wp landing in this commit). On sc-roundabout-entry the reversing warning on the advisor card may wait under a standing fault for up to its remaining 8 s (wp's R7), and under a stand that praise provokes (wp's condition 3a). Both landings' device drives list those frames (the wp section).
+- **Overlap with `sc-roundabout-entry:b63a8fea`** (lane tapswallow). The warning replaces the phone advisor-row peek mid-reverse. List the warning in tapswallow's census. Whichever lane lands second rebases.
+- **The founder is told:**
+  - question 2 is built as a warning only, under R5'' and R5''' (R5''' built at integration as the one product change beyond the lane);
+  - rulings R1, R2 (and the advisor-off limit), R3, R4, R6a (A) and R9;
+  - E1b and E3;
+  - the giveway-b1 candidate.
+- **The tools/ tests on the main tree.** The main-tree gate decides.
+- **Recorded, not filed:** the docs agent's candidates (below).
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds). Several restate items above. Each is listed with its evidence.
+- `sc-jx-giveway-b1/shadow-correct/L5` raises crashPinned on a correct demo, 199 frames, on base and unchanged (round-1 builder census).
+- R9, the signal cannot see people on foot: a pedestrian is in the rear half-plane on 118,691 of 127,981 reverse frames (round-1 builder and round-3 verifier censuses).
+- The rear badge's 4 m corridor on the ring: the badge read null throughout the row's reverse, with the circulator 50°–75° off the rear axis (round-1 STEP 0).
+- Runner-commanded vehicles: sc-follow-tailgater's brake check has 0 account growth for every vehicle (round-2 builder).
+- The circulator stopping with its body about touching a standing car: 3.19 m centre to centre in STEP 0(c) (round-1 builder).
+- E1b and E3 (round-3 verifier, V3-ruling-notes).
+- The banner may state the task during the warning (round-2 builder; unmeasured on a device).
+- The limits of founder question 2's warning (round-3 verifier). With the advisor off from L3 (R2) there is no warning. In exam mode nothing is shown: on exam L4 the signal is up on 154 points and the warning on 0. Nothing bills the reverse itself: in Risk 2 (L3 selector, contact 66.85) and in the L1 nudge cell (contact 71.983) the car still reverses into the circulator.
+
+## Landed: the toast queue's cap no longer removes a graded fault or «Научи» card from the queue inside its own life, whatever arrives after it; only praise and info can still be capped. In quiet mode a fault followed by four praise cards now stays the one painted card for its 8 s. In the roomy column the same fault stays in the queue for its 8 s, but newer cards can still push it below the column's capacity, where it runs part of its life off the glass (W12). Measured in process only. `sc-roundabout-entry:ad192bc4` (major) (2026-11-05)
+
+Lane `wcafterpaint`, two rounds, built on `2ee2469`. The builder brought the lane onto the fi and vt landings: its platform tree hash equals `2ee2469:platform` (14f52de9). The row is the whycut landing's carried condition C2, the candidate «wcafterpaint» (:12892). Triage round 3 filed it on 2026-10-17 at `1f1536d`.
+- The adversarial verifier REFUTED round 1 (below). It SIGNED OFF round 2 WITH CONDITIONS on 2026-11-04 (its PROGRESS.md). The conditions are below.
+- **The patch.** `wcafterpaint-result-r2.patch`: sha256 87dff073…5d5ca, 5 files, all under hud/ (`HudToasts.tsx` and four hud test files), +1332/−35, LF only, 0 CR bytes (the builder). The verifier counted the same 5 files and 0 CR bytes, and found that the builder's temporary probe is not in it.
+  - It is cumulative against `2ee2469`, which is HEAD. `git apply --check` is clean there (the builder).
+- **The verifier's own apply.** It returned its lane to base: the diff was empty and nothing was untracked. It then applied the patch and tagged the result `tree2`. HudToasts.tsx is sha256 42d00e3e…, the builder's hash. Against base the only non-comment line that changed is the capExempt line. Between rounds 1 and 2, HudToasts.tsx differs only in comments.
+- **One gate with rb and sc.** This landing goes through ONE main-tree gate as ONE commit with the rb landing (lane rbreverse), proven in parallel on the same head, and the sc landing (lane staticcardcopy), proven on the TEMP commit `7547a0c` = `2ee2469` + gate-rb + gate-wp, as `479127b` (ra2 + e2) and `2ee2469` (fi + vt) went through one gate each. This landing touches hud/ only, and neither rb nor sc touches a hud/ file. rb does edit two readers this lane's evidence leans on: tools/mobile/lesson-audit.mjs (its crash-pin banner stem, not the 8000 constant) and lesson-ui's toastReadFold.test.ts; it also rewrites the pinned crash banner's wording. The main-tree gate runs all three landings' readers together. See PROVEN ON 2ee2469.
+
+**Integrator rulings.** These were made under the founder's 2026-10-08 and 2026-10-19 delegations; they are not his. The founder is to be told at this landing, each his to veto (owed, below).
+- **W11** (2026-10-18; confirmed 2026-11-04 as R1): the cap never removes a judged card (a graded fault or a «Научи» card) inside its own life. Praise and info stay evictable.
+- **W12** (2026-10-18): with nothing open, no clock is stopped. A judged card pushed below the column's capacity keeps running its life off the glass.
+- **R3**: the `reading` set stays in the cap's exemption.
+- **R4**: the phone is in scope. A fault stays the active phone peek for its life, and the phone's «+N» windows change.
+- **R7**: a W7/W8/W9 stand, and the advisor's wait under it, follow the stood card's own life.
+- **W11-C** (2026-11-04): the cap never lets praise decide which judged cards are kept. In the shape §3f pins — a stand forming at the crash pin — the glass with a burst of praise equals the glass without it from the pin on, and in quiet mode. It is not a claim that praise never moves the judged glass: before the pin in the roomy column, and after the pin outside that shape, praise still changes which judged cards are painted, on base and tree alike, and not because of the cap (conditions 1 and 3). The ruling's first wording asked for equality «at EVERY commit»; that is false on base and tree alike.
+- The five re-taught pins each state their W11, R1 or R3 reason in the test.
+
+**The row is NOT closed by this landing.** `sc-roundabout-entry:ad192bc4` stays OPEN.
+- Every number below was measured in process, under test timers. The instruments are the real queue hook `useHudToastQueue`, the real `visibleToasts`, the §3 stand-in column (its pixel geometry is a fixed rig, not this tree's layout) feeding the real `useToastReader`, and the catalogue replay.
+- No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier. The judge must be told W12. In the roomy column, a fault followed by four praise cards is now in the queue for its 8 s but painted for 3,700 ms of them (base: 600). That is the W12 ruling, not this lane's defect.
+- This landing does not change the open-row count.
+
+**What was wrong.**
+- **The row** (triage round 3, in process at `1f1536d`, nothing opened):
+  - Roomy column: a graded fault F, then four «Браво» cards 300 ms apart. F was painted for 600 ms and removed from the queue at 1.2 s. With only two praise cards it had 4.3 s on the glass and left at 8 s.
+  - Quiet mode («по-тихи известия», where praise is never painted): F was the only card on the glass and vanished at 1.2 s, evicted by four cards nobody could see.
+  - S10, after a closed explanation: F had 300 ms.
+- **Reproduced at `2ee2469`** by the round-1 verifier (its STEP 0, `step0-base.txt`):
+  - four praise: F on the glass 600 ms, gone at 1,200; the queue after the burst [Браво 4..1];
+  - two praise: 4,300 / 8,000;
+  - four newer faults: F 600 / 1,200;
+  - quiet: 1,200 / 1,200;
+  - S10: F on the glass 300 ms, gone at 1,800.
+- **The cause (the builder).**
+  - `push` caps the store on every push with `capToastQueue([...added.reverse(), ...prev], MAX_QUEUED, lives.capExempt())`. MAX_QUEUED is 4, and the cap is positional.
+  - `createToastLives.capExempt` exempted only the `reading` set and the judged lives with `pausedLeftMs !== null`: W5's judged cards waiting with a stopped clock behind an opened explanation.
+  - So a painted judged card with its clock running was dropped as soon as four newer cards of any kind were alive.
+  - MAX_QUEUED's own comment said «`visibleToasts` is the one place the cap is applied», which `push` contradicted.
+- **Over the catalogue** (C3, the builder's replay; the round-1 verifier recomputed it from the builder's event log):
+  - The replay covers 2,434 cells: 2,053 raise HUD events, 4,403 events in all.
+  - Base removes a judged card early in only one cell, `sc-merge-from-property/mistake-signal-and-go` L1, at both pauses. Its «Научи» card «Защо чакаш: знак Б2 „Спри! Пропусни движението!“» was capped at 23.483 s, 150 ms before its life ended at 23.633 s.
+  - No sc-roundabout-entry cell produces a burst (the builder).
+
+**What landed.** This is the builder's description, checked against the patch.
+- **One product line**, in `createToastLives.capExempt` (`HudToasts.tsx`): `for (const [id, life] of lives) if (life.waits) keep.add(id);`, which was `life.waits && life.pausedLeftMs !== null`.
+  - So every judged card is exempt for as long as its life runs: clock running or stopped, opened or not.
+  - The `reading` set stays (R3).
+- **What did not change** (the builder): capToastQueue, MAX_QUEUED, the TTLs 8000 / 4000 / 3500, toastReadMs, the clocks, add / arm / forget / holdAllBut / painted / whyChanged, visibleToasts, waitingToasts, useToastReader and the column capacities.
+  - Nothing forgets a cap-evicted life, and no clock stops while nothing is open.
+  - Nothing graded reads the queue. The round-1 verifier found HudToasts unreachable at runtime from the replay or the lesson engine; there is only a type import of hud/index.
+- **The cap no longer holds the store to four:** judged cards are kept until they expire. The tree's largest store is 6–10 in the builder's T6 variants (base: 4). In the catalogue it is 5, against base's 4 (the round-1 verifier reproduced 4 and 5).
+- **Comments rewritten**: the MAX_QUEUED doc, the capToastQueue doc (the positional rule), the W5 bullets (W11, W12, W11-C), the capExempt doc and the holdAllBut doc.
+  - The capExempt doc now says that in the product only a graded fault is ever opened, because `ToastCard` hands `onWhyChange` to `ViolationToast` alone, so `reading` holds judged ids (R3).
+  - The verifier found these byte-identical to base: lines 91–95, ttlFor and the heading «NOTHING THE STUDENT IS JUDGED BY IS LOST».
+- **Tests.** Line numbers marked «base» are those at `2ee2469`; the others are the landed tree's.
+  - New: `hud/__tests__/toast-cap-spares-judged.test.ts`, T1–T8 and T10:
+    - T1, roomy: F stays in the store until exactly 8,000. Its 3,700 ms on the glass is recorded under W12, not asserted.
+    - T2, quiet: 8,000 / 8,000.
+    - T3, S10: F leaves at 9,500, the closed card A at 21,734.
+    - T4: the same three with a «Научи» card, plus a 3.5 s rejection hint that leaves at exactly 3,500.
+    - T5: four newer faults.
+    - T6: a bound over 181,592 drives against an independent oracle of the W5 + W11 ledger.
+    - T7: the phone peek.
+    - T8: an allowlist of exactly LessonPlayShell, HudToasts, hudPreferences and hud/index.
+    - T10: two rows that kill mutant M6.
+  - `toast-standing-card.test.ts`:
+    - §3d (T9) feeds the real queue into the §3 stand-in column and `useToastReader`.
+    - §3f (round 2, :1298–1585) generalises that harness as `driveQueueColumn` (:1342). It pins V1 (:1512), V2 (:1537) and a family of 40 drive pairs (:1546).
+  - `toast-why-room.test.ts:305` (V11): an OPENED commendation is kept by the cap while it is read ([6,5,4,3,1]), and capped once closed ([7,6,5,4]).
+  - Five re-taught F9 pins. None was deleted, and each states its reason:
+    - `toast-wait-never-dropped` base :448 (tree :458) → [7,6,5,4,3,1];
+    - `toast-why-room` base :262 (tree :269, praise variant :283): every TEACH card kept, plus a praise variant that keeps the four newest;
+    - V03 (tree :324): a commendation opened, closed, then capped, plus a separate judged test (tree :339) kept to its press-extended expiry, 23,767;
+    - base :294 (tree :360): praise [7,6,5,4]; seven TEACH cards all kept;
+    - base :395 (tree :471): a commendation made to wait is capped; a judged card (tree :490) is kept to its expiry.
+
+**What the student sees.**
+- **No shown text changed.** The builder re-recorded the reviewed-text manifest once: «reviewed-text manifest: nothing changed against the previous recording», 49/49, and git shows no manifest change. The round-1 verifier ran the manifest green inside its 182/182. The round-2 verifier did not re-run it; no shown string is in the diff.
+- **The glass, tree against base, in process.** The round-1 verifier reproduced the four-praise, quiet, S10 (F) and four-newer-faults cases (`step0-tree.txt`); the closed card A and the two-praise case are the builder's.
+  - Four praise, roomy column: F stays in the queue to 8,000 (base 1,200) and is painted for 3,700 ms (base 600). This is W12.
+  - Quiet mode: F is painted for 8,000 ms and leaves at 8,000 (base 1,200 / 1,200).
+  - S10: F is painted for 4,000 ms and leaves at 9,500 (base 300 / 1,800).
+  - S10, the closed card A: it leaves at 21,734, which is 200 plus its reading time of 323 characters. It is on the glass 17,734 ms (base 1,800).
+  - Two praise: unchanged, 4,300 / 8,000.
+  - Four newer faults: the painted sets equal base's. F leaves the queue at 8,000 instead of 1,200, but it runs below the column, so it is on the glass 600 ms on both.
+- **The phone (R4, the builder).**
+  - After four praise, the peek stays on F until 8,000. Base showed F until 1,200, then «Браво 4».
+  - After four newer faults, «+N» reads +4 instead of +3 from 1,200 to 8,000.
+  - In the catalogue there is one commit per pause, on sc-merge-from-property L1: «Непропускане на предимство +3» becomes «+4» from 23.483 to 23.633 s.
+  - The active peek and the empty-queue windows are unchanged on every cell.
+- **Two phone rows wait longer** (the round-1 verifier's note). In the four-praise shape the store now stays non-empty to 8,000 instead of 5,200. That delays `ambientQueueSilent` and `legendQueueSilent` (LessonPlayShell.tsx:6497, :6646 at `2ee2469`; the rb landing in the same gate adds 8 lines above them), the compact ambient advisor row and the legend row, by about 2.8 s. R4's wording anticipates this; device cell (4) must record it (owed).
+- **Stands (R7, W11-C).**
+  - T9, the CONTROL-NOPRESS-SIM shape plus four praise (the builder):
+    - On the tree the column stands for F, held is true, and the advisor waits on every commit from 0 to 5,200. F leaves at 8,000, and on that commit the advisor card mounts.
+    - On base the stand and held ended at 1,200, at the eviction, and the advisor and praise [5,4] were painted from then.
+  - V1, the verifier's drive: H fault at 0, praise at 100/200/300, G fault at 400, the crash pin at 500.
+    - At 500 the stand-in column paints [G,H] with H cut 109.2 of 116.5 px, stands for G, bannerYields is true, and the banner is on one line (the stand-in's 48.75 px, a constant taken from a Chromium measurement of 2026-10-13, not a measurement of this tree).
+    - H leaves at 8,000. The stand ends at 8,400, when G leaves, and the advisor card mounts (the round-2 verifier).
+    - On base with the burst, G alone was painted and the banner kept both lines. On base with no praise, the frames equal the tree's (the round-1 verifier).
+
+**What the round-2 verifier reproduced.** It worked on its own lane (`2ee2469` + the r2 patch, tag `tree2`). Log: `D:/knijka-lanes/scratch/wcafterpaint-verify/PROGRESS.md`. Artefacts: `r2/`.
+- **The builder's tests.** The 4 lane files pass 223/223 on tree2. Against base's HudToasts they fail 19, every one on AssertionError text, including §3f V1, V2 and the family.
+- **The §3f V1 frame,** as above.
+- **Its own wider family** (`r2/vprobe3-big.txt`). The probe is `attempts/r2/tmp-v2-stand.test.ts`, with base's HudToasts loaded as a second module.
+  - 25,920 drive pairs × 4 drives: tree and base, each with and without the burst.
+  - The variables: the older judged card H (a fault or a «Научи» card); an extra judged card (none, a second fault or a second «Научи» card); 1–6 praise cards spaced 100 / 300 / 1,000 ms, starting at 300 or 2,500; a newer fault G before, inside or after the burst, or none; the crash pin absent, early, mid, after or late; quiet on or off; and «ЗАЩО» not opened, opened and closed (S10), or held open through the burst.
+  - At every commit where W11 changes the glass of a burst drive (tree differs from base), one of two things holds:
+    - 48,906 commits equal the same drive with no praise;
+    - 10,185 commits are before the pin, in the roomy column. There the paint, cuts, banner, trim and reading equal the no-praise drive, and only standing and held differ: a W7 stand that the praise provokes, now latched to the stood card's own life (R7).
+  - There are 0 tree-versus-base changes after the pin, 0 in quiet mode and 0 of any other kind. On drives with no praise, tree equals base everywhere. This bounds what W11 changes, not what praise changes: the same probe found praise still moving the judged glass after the pin, identically on base (condition 3).
+- **Protected strings, base against tree2.** These are identical: lines 91–95, ttlFor, the W5 heading (×1), TEACHING_TOAST_TTL_MS 8000, TOAST_TTL_MS 4000, `data-hud-toast-body=` (×1), `data-hud="toasts"` (×12), and the MAX_QUEUED and capToastQueue definitions; only their line numbers moved (+2). The raw string at `toast-why-room:150–160` is identical. hudPreferences.ts and components/ are untouched.
+- **Suites on tree2:**
+  - hud/: 1,424/1,424.
+  - lesson-ui/: 1,207/1,208. touchHintLifetime fails on ENOENT for tools/, which is the environment.
+  - tsc: 22 errors, the same files as the baseline, 0 in hud.
+- **Mutants,** each run alone, restored to sha 42d00e3e and checked before the next:
+  - M1 (back to the paused-only exemption): killed, 19 failing tests, including «praise decided which judged cards the standing column shows…».
+  - V11 (`reading` removed from the exemption): killed on «an opened card that is not judged was capped while it was being read».
+  - Its V13 (whyChanged adds only judged ids to `reading`): killed on the same text.
+  - M7: killed on «a closed explanation kept its exemption…» and «a closed commendation kept the exemption…».
+  - M8: killed on «a card that waited kept an exemption only a card being read may have».
+  - The extra T8 failure under M7 and M8 came from the verifier's own temporary module sitting in src/, not from the mutants.
+  - Two of its own mutants survive, and it argues both equivalent: V15 (`waits && (paused || expiresAtMs > now)`) under exact timers, and V16 (`waits || paragraphChars > 0`), because paragraphChars is above 0 only for violations.
+- **Not re-run by the round-2 verifier:** the reviewed-text manifest, the lessons/ directories and src/modules/clips/.
+
+**What the round-1 verifier reproduced.** It worked on `2ee2469` + the r1 patch; log as above. The product line is the same in round 2 (comment-only difference, confirmed by the round-2 verifier).
+- STEP 0 on base and on the tree (above).
+- **C1.** Base's tests against the tree's product turn exactly the five F9 pins red.
+- **T6.** 181,592 drives, 0 broken. C2 shows 0 judged cards removed early on the tree.
+- **C3.** Its independent recompute (above). It also replayed 30 cells of sc-roundabout-entry and sc-merge-from-property itself: the pushes and graded digests are byte-identical.
+- **Suites:**
+  - hud/: 1,420/1,420.
+  - lesson-ui/: 1,207/1,208 (environment).
+  - The lesson tests that read HudToasts, plus the reviewed-text manifest, caption-truth and the keep-right census: 182/182.
+  - tsc: 22 errors (environment), none in hud.
+  - It did not re-run the full lessons/ and lessons/scenario/ directories.
+- **Mutants.** M1 (16 failing tests), M6 (3), V9 (3), V10 (8) and V12 (7, including «expected 5 to be less than or equal to 4») were killed on assertion text. V11 survived: condition 6.
+
+**The builder's numbers, not re-measured by a verifier.**
+- **C2 on base:** judged cards removed early per n ≤ 6 variant. 4,608 with nothing opened and 9,984 with an explanation opened and closed; for n = 7–8, 1,438 and 2,293.
+- **The W5 §2 census:** 212,658 drives, 0 broken in all four product/test states.
+- **C4:** all 2,434 graded per-cell digests are byte-identical with base's and the tree's HudToasts. clipPlan.test.ts passes 27/27 with no regeneration.
+- **Round 1, on its tree:**
+  - lessons/__tests__: 2,456 passed, 165 skipped;
+  - lessons/scenario/__tests__: 5,178 passed, 1 skipped;
+  - clips: 287/287, with whyPanel failing to load for the lane's missing docs/;
+  - lesson-ui/__tests__: 881/882 (environment).
+- **Its §3f family:** 40 drive pairs and 440 commit times, 0 differences under (A) on the tree. Its tests are green in the verifier's 223/223.
+- **Its round-2 mutants M2–M6:** 12, 9, 25, 12 and 3 failing tests, all killed on assertion text.
+- **F14:** 13 checks of the strings that tools/ tests read, base against tree, with 0 moved.
+
+**Round 1, refuted.** The round-1 verifier found a change on the glass that C3, T9 and R7 did not list.
+- The drive was V1 above, run through a copy of the builder's T9 harness. On the tree, H was painted under the stood G as a 7.5 px sliver (109 of 116.5 px cut, stand-in geometry), and bannerYields was true from 500. On base with the burst, G alone was painted.
+- The tree's frames equal base's frames for the same drive without praise. So it is a W11 consequence in a stand, not a product bug, but it was unlisted.
+- Its remedy: widen R7, pin the shape, and add the frame to device cell (5). Round 2 did this through W11-C and §3f.
+- Its condition V11 is condition 6 below.
+
+**The conditions, and how each stands.**
+
+**1. The scope of W11-C (the round-2 verifier's R2-RULING-SCOPE, condition 1). INTEGRATOR RULING W11-C (2026-11-04): the (A) + (B) scope is CONFIRMED.**
+- The ruling's first wording asked for the tree's painted set, cuts, standing card, held, bannerYields and trim to equal the no-praise drive «at EVERY commit». The builder could not pin that literal wording and said so in §3f's scope note.
+- Before the pin, when the pin comes after the burst, it is false on base too, and not because of the cap. After the pin it holds only in the family's shape (a stand forming at the pin); outside it, praise still changes the judged glass on base and tree alike (condition 3).
+- §3f pins two things, over its 40-pair family:
+  - (A) from the pin on, and everywhere in quiet mode, the glass with the burst equals the glass without it;
+  - (B) before the pin, in the roomy column, the burst is on the glass in exactly two shapes, both also on base: praise painted by capacity and order (W12), or a W7 stand that the praise provokes.
+- The verifier's 25,920-pair family found no commit where the tree differs from base outside (A) and (B).
+PINNED AT INTEGRATION: none needed (the integrator). (A) and (B) are pinned by the lane's own §3f tests: V1, V2 and the 40-pair family. Both lane reports have them red on base's product on assertion text, and they are green on the integration tree. The merge verifier killed M1 (base's capExempt line) again: 19 failed, all on AssertionError text, through the mounted real `useHudToastQueue`.
+
+**2. The HudToasts comment over-claims (R2-RULING-SCOPE, condition 2).**
+- The W5 bullet the patch adds (HudToasts.tsx :243–247) ends «praise never decides which judged cards the student sees there (W11-C, 2026-11-04)». Read without its scope, that is false of the product (condition 3).
+- The verifier asked for it to be narrowed to «the cap never lets praise decide which judged cards are kept». This is a comment, not shown text.
+AT INTEGRATION: corrected in this commit (integrator decision of 2026-11-05; the merge verifier's F-1), comment only.
+  - The integrator had left it open, because its job allowed tests only beyond the lane patch.
+  - In this commit the bullet's last six lines say that since W11 the cap spares every judged card for its whole life, so from the pin on and in quiet mode the cap never lets praise decide which judged cards are kept (W11-C, 2026-11-04). They add that praise still moves the judged glass where the cap is not the cause, as before W11 (W12, a W7 stand it provokes, a W5 wait it prolongs), recorded as triage candidates and not ruled.
+  - Six lines replace six. No product line, shown string or manifest entry moves.
+  - The §3f describe title («from the crash pin on…»), which the merge verifier found wider than its family because the family excludes the held-open variant, is a test title and was left as it is.
+
+**3. Praise still changes the judged glass, on base and tree alike, and not because of the cap. RECORDED, not changed (R2-RULING-SCOPE, condition 3).**
+- (a) **Before the pin, in the roomy column,** praise is painted above judged cards (W12), and praise can provoke a W7 stand; both happen on base too. What the tree changes is the stand's length: under R7 its held now lasts to the stood card's life, so the advisor card can wait for up to about 8 s because of praise alone; with no praise, held is false. Those latched commits are the verifier's 10,185 pre-pin commits, where the tree differs from base only in standing and held.
+- (b) **After the pin, with no stand,** in the verifier's held-open variant: after «ЗАЩО» closes at 1,900 the column paints [p2, p1] and H is off the glass, while the no-praise drive paints H standing. This gives 6,443 commit differences, all equal to base.
+- (c) **Under W5, a stopped card restarts only when painted.** So praise painted above a waiting judged card keeps that card's clock stopped. G is still alive and stood for at 9,900 on the burst drive; on the no-praise drive it is already gone. Tree equals base here.
+- The verifier judged that the literal fix would change the column, W7 and W12, which W11-C and the lane's rulings forbid. So the ruling's wording was at fault, not the build, and this does not reach REFUTED.
+- Each is a candidate for a future column lane. None is filed (the founder, 2026-10-19). They are listed under «Recorded, not filed», beside «judgedsliver».
+
+**4. The device drive also lists the praise-provoked stand (R2-RULING-SCOPE, condition 4).** That means the pre-pin W7 stand that praise provokes, and the advisor card's wait under it, with no crash pin (R7). This matters to rbreverse's reversing warning on the advisor card. OWED (below).
+
+**5. R7: an older judged card kept under a stood card (round 1's REFUTES finding).** The verifier asked for three things: widen R7, add a pin showing the tree's V1 equals base's V1 without praise, and add the frame to device cell (5).
+- Round 2 pins V1 and V2 in §3f.
+- Under base's HudToasts (mutant M1), both fail on «praise decided which judged cards the standing column shows: the drive with the burst differs from the same drive without it». The family fails on «praise decided which judged cards the column shows (W11-C)», with 90 broken (the builder). The round-2 verifier killed M1 with the same text.
+- The device frame is owed in cell (5).
+PINNED AT INTEGRATION: none needed (the integrator). V1 and V2 are pinned in §3f and green on the integration tree. Under base's line (M1) they fail in the round-2 verifier's run, which had 19 failing tests; the merge verifier's M1 run gave the same count, 19 failed.
+
+**6. R3: the `reading` set had no pin (round 1's condition, mutant V11). SETTLED in round 2 (a lane condition, not a row).**
+- Under W11, the read exemption matters only for an opened card that is not judged. In the product that card cannot occur, because only violation cards are handed `onWhyChange`.
+- Round 2 adds the row at `toast-why-room:305` and corrects the base `:262` comment (tree :262–268) and the capExempt doc. The base `:262` pin opens a judged card, so it never observed `reading`.
+- The round-2 verifier killed V11 and its own V13 on assertion text. The row is green on base by construction: it is a pin, not a defect reproducer.
+PINNED AT INTEGRATION: none needed (the integrator). The merge verifier killed V11 (`new Set<number>()` in place of `new Set(reading)`) again: 1 failed, «an opened card that is not judged was capped while it was being read».
+
+**7. R4: the phone. RULED in scope.** The phone changes are the builder's measurements (What the student sees). Two lanes must list them:
+- tapswallow (`sc-roundabout-entry:b63a8fea`, open) shares the phone overlay. A fault now holds the peek for 8 s against a burst instead of 1.2 s, and «+N» can read one higher. That lane's census must list these frames (owed).
+- Device cell (4) must record the peek, «+N» and the ambient and legend rows' later return (the round-1 verifier's note; owed).
+
+**8. TOOLS: the readers a lane cannot run.** The builder reports that none of the strings they read moved in this lane's patch: F14, 13 checks, 0 moved. The round-2 verifier found the protected strings identical (above). In the same gate rb edits tools/mobile/lesson-audit.mjs (its crash-pin banner stem, `ROUTE_HOLD_CRASH_PINNED_BG` at :7895 on `2ee2469` and :7898 on the landing tree, not the 8000 constant) and lesson-ui's toastReadFold.test.ts, so the gate measures both landings' readers together. The main-tree gate runs:
+- driveline.test.mjs (the 8000 TTL literal, the ttlFor shape, `data-hud-toast-body=` ×1 inside ViolationToast, `data-hud="toasts"`);
+- lesson-audit.mjs (its 8000 constant);
+- the raw strings that toast-why-room reads;
+- wrong-leg-profiles.test.mjs;
+- reclosure.mjs, which will see HudToasts.tsx changed: it is this row's suspectFile;
+- touchHintLifetime and clips/whyPanel, which need tools/ and docs/.
+See PROVEN ON 2ee2469.
+
+**9. THE LANDING RE-RUNS.**
+- The proof runs these: hud/; lesson-ui/__tests__; components/sim/; src/modules/clips/, the clip-plan freshness gate (the builder reports no regeneration, since nothing graded reads HudToasts); and lessons/scenario/__tests__, the reviewed-text manifest. No manifest change is expected from this landing (rb re-records the manifest in the same gate, and sc once more on the combined tree).
+- Neither verifier ran the full lessons/scenario/__tests__ directory or src/modules/clips/ on this lane; the round-1 verifier ran the reviewed-text manifest, caption-truth and the keep-right census among its 182/182.
+See PROVEN ON 2ee2469.
+
+**10. Two surviving mutants, RECORDED as equivalent** by the round-2 verifier: V15 and V16 (above). The integrator lists both as not pinned, and the merge verifier accepted them (its N-1):
+- V15 differs only between a life's expiry instant and its own timer firing. That card is past «its own life», so the ruling allows keeping it or evicting it, and with exact fake timers the two cannot be told apart.
+- V16 adds a disjunct that can never be true while `waits` is false: paragraphChars is above 0 only for a violation, and every violation waits.
+
+**Not cured by this landing.**
+- **W12 in the roomy column.** A judged card pushed below the column's capacity runs its life off the glass. After four praise, F is painted for 3,700 of its 8,000 ms; after S10, for 4,000 of its life to 9,500. This is a ruling, and it is told to the re-drive judge.
+- **Four newer faults.** F runs below the column and is on the glass 600 ms on both base and tree, as the row said.
+- **The whycut landing's residuals (a)–(d)** are unchanged. Of residual (e), only the cap half is gone: a painted card can still be pushed below the column's capacity by newer cards.
+- **Praise still moves the judged glass**, on base and tree alike: condition 3 (a)–(c) and «judgedsliver».
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's working copy of doc 88 on 2026-11-04. They were re-checked against it on 2026-11-05 and still hold.
+- :12840 (whycut, W5): «Praise, info, and any judged card already painted are capped as at base (C2).» Now only praise and info are capped. A painted judged card is kept for its life.
+- :12841: «It gets all of that life unless newer cards arrive after its first paint (C2, residual e).» The cap no longer removes it. Newer cards can still push it below the column's capacity, where its clock keeps running (W12).
+- :12843: «the cap (`MAX_QUEUED` 4: the four newest kept, older ones dropped)». The four newest cards of any kind are kept, plus every judged card inside its life and the card being read.
+- :12892–:12896, whycut's C2 «CARRIED, not fixed», candidate «wcafterpaint». This is built in process: on S10, F is now on the glass 4,000 ms and leaves at 9,500 (this lane's S10 probe: base 300 ms; whycut's verifier recorded about 320 ms). The S11 shape (four faults after the close) was not re-measured.
+- :12902, residual (e): the cap half is gone and the capacity half stands.
+- :12947, «Triage: «wcafterpaint» (C2).»: landed in process. The row stays open.
+
+No ADR is owed. W11, W12, R3, R4, R7 and W11-C extend the layout decisions W1–W10 recorded in doc 88 (the whycut, cardstay and W10 landings), under the 2026-10-08 delegation. They change no rule, grade, points or graded clock. `docs/architecture/07` has no sentence on the PC notify column, the toast queue or its cap, so no ADR sentence is contradicted.
+
+**PROVEN ON 2ee2469** (the integrator's run on 2026-11-04 in the worktree `D:/knijka-lanes/integ-wp`, log `D:/knijka-lanes/scratch/wp-land/PROGRESS.md`, run outputs in `scratch/wp-land/runs/`. The merge verifier ran the mutants, hud/, components/sim, src/modules/clips/, lessons/scenario/__tests__ and the tools tests itself.) This landing, rb and sc go through ONE main-tree gate as ONE commit; the three together are proven on the TEMP commit `7547a0c` = `2ee2469` + gate-rb + gate-wp, with sc on top (PROVEN ON 7547a0c, in the sc section).
+- **The apply.** The worktree was clean at `2ee2469`, and the patch's sha256 matched (87dff073…d5ca). `git apply --3way --index --binary` applied all 5 files with no 3-way merge and no conflict. Every file is under hud/.
+- **The gate patch.** `D:/knijka-lanes/gate-wp.patch`, sha256 87dff0733d206a6b5c88a325a99ebe1a2f55381992848239c3910d678795d5ca, byte-identical to the lane patch: 5 files, +1332/−35, 0 CR bytes (none of the four modified files is CRLF at `2ee2469`, and the new test file is LF).
+  - The merge verifier found `git diff --cached --binary 2ee2469` hashing to the same sha, with nothing unstaged or untracked.
+  - It applied the lane patch with `git apply --cached --3way --binary` to a temporary index read from `2ee2469`. Its write-tree, 7a560d24…, equals the worktree index's, so the stage is the lane patch and nothing else.
+  - The only non-comment product line is capExempt's `for (const [id, life] of lives) if (life.waits) keep.add(id);`, and HudToasts.tsx is sha256 42d00e3e…. There is no integrator pin and no taught tools test.
+  - At composition on 2026-11-05 one comment changes on top: the W5 bullet (condition 2).
+- **The pins:** none needed; conditions 1, 5 and 6 above.
+- **Mutants** (the merge verifier, through the real mounted `useHudToastQueue`; each restored to sha256 42d00e3e… before the next). The lane's key files (toast-cap-spares-judged, toast-standing-card, toast-why-room and toast-wait-never-dropped) are 223/223 clean.
+  - M1 (base's `waits && pausedLeftMs !== null`): 19 failed, all AssertionError, for example «the cap removed the graded fault from the store before its own 8 s life: expected 1200 to be 8000» and «praise took the phone peek from a live fault».
+  - V11, the lane verifier's mutant: 1 failed (condition 6).
+  - Its own `waits && timer !== null`, which keeps running judged cards only: 8 failed, for example «the graded fault F was dropped from the queue without ever being painted».
+  - Its own «keep every live card, praise too»: 7 failed, for example «the cap stopped capping praise…».
+  - T7's shell regex and T8's allowlist also hold on integ-rb's tree (the same 3 mappings at offset 99853, the same 4 allowlisted files), so the two landings stay compatible at the shared gate. The integrator found rb's one LessonPlayShell hunk (@1256) clear of the `toasts.map((t): SimOverlayItem | null => {` block that T7 reads.
+- **The reviewed-text manifest.** Not re-recorded, because no shown text moved. reviewed-text-manifest.test.ts ran green inside lessons/scenario/__tests__, and git shows no manifest change.
+- **The integrator's directories,** one at a time, all green:
+  - hud/__tests__: 72 files, 1,424 passed;
+  - lessons/__tests__: 127 files, 2,456 passed, 165 skipped;
+  - lessons/scenario/__tests__: 211 files, 5,178 passed, 1 skipped, the reviewed-text manifest included (5,263 s, on a machine shared with integ-rb and the staticcardcopy lane);
+  - components/sim: 107 files, 1,779 passed, touchHintLifetime green (tools/ is present in the worktree);
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 108, 1,908; traffic 53, 675; runtime/__tests__ 48, 875; scene 47, 787; vehicle 22, 299; world 135, 2,409; traces 170, 2,372;
+  - src/modules/clips/: 19 files, 302 passed. The clip-plan freshness gate is green, with no regeneration.
+- **The merge verifier's own runs,** to completion: hud/ 72 files, 1,424; components/sim/ 107 files, 1,779 (1,391 s), lesson-ui and touchHintLifetime included; src/modules/clips/ 19 files, 302, the freshness gate inside; lessons/scenario/__tests__ 211 files, 5,178 passed, 1 skipped, 0 failed (4,715 s), the reviewed-text manifest included.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment (api/health/route.ts 4, lib/db.ts 1, the admin, auth, learning, outcomes, payments and privacy stores, lesson/progress, sim/lessons/store 2, sim/traces/attemptStore 1). None is in hud/ or any touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs`, as wave-cycle.sh gate 4/4 runs it, reading «ℹ fail N»). The integrator's three runs from the worktree:
+  - Run 1, under its own 590 s timeout: 1,917 tests, 1,896 pass, 10 fail. The freeze; the gitignored data that exists only on the main tree (.audit-frames/findings for build-redrive §9(a), (b), (d), (e), count-agreement and finding-reader; playwright for lane-evidence); and path-disarm and path-follow, cancelled by that timeout.
+  - Run 2, with a temporary junction from the worktree's .audit-frames/findings to the main tree's and KNIJKA_PLAYWRIGHT_ROOT: 2,048 tests, 2,029 pass, 4 fail. The freeze; count-agreement and finding-reader, which need more of .audit-frames than findings/; and lane-evidence, whose path needed a trailing slash. Those three re-run with a junction to the whole .audit-frames and the path with its slash: 31/31.
+  - Run 3, the full runner with that junction: 2,057 tests, 2,048 pass, 4 fail, 1 skipped, 4 todo. The freeze and 3 canary-pills rows («the canary printed nothing»). That is a junction artefact: canary-verdict.mjs runs main() only when `path.resolve(argv[1])` equals the real path of its own module, and through the junction they differ. With a real copy of wave-scripts/ (22 files) in place of the junction, canary-pills.test.mjs is 39/39.
+  - Every temporary artefact was moved, not deleted, to `scratch/wp-land/`: moved-partial-audit-frames, moved-full-audit-frames-junction, moved-wave-scripts-copy, and an index.lock that a killed git status left in the worktree (stale-index.lock-from-killed-git-status). driveline.test.mjs and wrong-leg-profiles, the HudToasts readers, are green.
+  - The merge verifier's run from the worktree: 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo. 1 is the deck-captions freeze; 7 are environment (build-redrive §9(a), (b), (d), (e), count-agreement and finding-reader find no .audit-frames/findings; lane-evidence cannot resolve playwright). Re-run of those 4 files with cwd `E:/AI driver` (main's corpus, read only, outputs to tmpdir) and KNIJKA_PLAYWRIGHT_ROOT: 100 tests, 99 pass. The one left is count-agreement's apply-reroute «no WORKED line»: apply-reroute.mjs resolves its repo from its own location, so it looks for .audit-frames/wave-c/verdicts.jsonl under the worktree, where it is absent. That is the environment too.
+  - No tools file and no corpus is in the patch, and no tools test was taught. The main-tree gate decides, with its in-place .audit-frames and playwright.
+- **Left as found.** The integrator left integ-wp staged at `2ee2469` with only the 5 lane files, no temporary file and no process running. The docs verifier saw an unstaged M1 mutant in integ-wp's working HudToasts.tsx (working sha 14e48d36, index 42d00e3e). The merge verifier, which ran M1 itself, reports the worktree restored clean with HudToasts.tsx at 42d00e3e… and no index.lock. The HudToasts.tsx staged in integ-sc, on which the three landings are proven together, is 42d00e3e… (checked on 2026-11-05, before the comment fix).
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` (ADR-017), on the PC keyboard and on the phone. Never inject toasts. C3 found no sc-roundabout-entry cell with a natural burst, so the drive has to find one.
+  - (1) PC roomy: a graded fault, then four newer cards within 8 s.
+  - (2) PC quiet, the same drive: the fault stays the one painted card for its 8 s.
+  - (3) PC, the S10 shape: open «ЗАЩО», close it, then a burst. Both cards stay to their lives (in process: F to 9.5 s, A to 21.7 s).
+  - (4) Phone peek: a fault, then a praise burst. The fault stays the active peek for 8 s, «+N» reads one higher, and the ambient and legend rows return later.
+  - (5) A stand, in the sc-roundabout-entry CONTROL-NOPRESS-SIM shape: a tall fault under the crash pin's banner, plus a burst. The stand, held and the advisor card's wait last to the fault's expiry. It must also show the W11-C frame: an older judged card kept under the stood card (cut about 109 px in the stand-in), with the pinned banner on one line until the stand ends. Then the advisor card and banner frames under the longer stand (R7). Record the banner's text and height: rb, in the same gate, changes the pinned banner's wording.
+  - (6) The pre-pin stand that praise provokes, and the advisor's wait under it, with no crash pin (condition 4).
+  - On every frame record: the open, standing and kept card; held; bannerYields; trimAge; whether the advisor waits; the painted ids; the store length; and «+N».
+  - Whether those frames close `ad192bc4` is for that wave's judge and verifier, told W12.
+- **With rbreverse** (`sc-roundabout-entry:9e85f27e`, open). On sc-roundabout-entry, the reversing warning on the advisor card may wait under a standing fault for up to its remaining 8 s (R7), and under a praise-provoked stand (condition 3a). Both landings' device drives list those frames.
+- **tapswallow** (`b63a8fea`, open): its census lists the changed phone-peek frames.
+- **W12 glass time** per case, on the device, for triage.
+- **The founder is told,** one plain sentence each, each his to veto: W11, W12, R3, R4, R7 and W11-C. He is also told of the recorded candidates below.
+- **The tools/ readers and touchHintLifetime on the main tree.** The main-tree gate decides.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds). Several restate items above; each is listed with its evidence.
+- **«judgedsliver»** (the builder, `r2/v1-base.txt`; the round-1 verifier's base V4 equals the tree's V1). On base with NO praise — H fault at 0, G fault at 400, crash pin at 500 — H is painted under the stood G with 109.15 of 116.5 px cut (stand-in geometry) and the pinned banner on one line (bannerYields) until G leaves at 8,400. Identical on the tree.
+- **Praise-provoked stand before the pin** (condition 3a): praise alone can make the column stand and, under R7, keep the advisor card waiting up to about 8 s.
+- **Praise after the pin with no stand** (condition 3b): in the held-open variant praise is painted over H after the close at 1,900 (6,443 commit differences, equal to base).
+- **The W5 restart under praise** (condition 3c): praise painted above a waiting judged card keeps its clock stopped; G is still stood for at 9,900 on the burst drive, gone without praise.
+- **The phone's ambient advisor and legend rows return later** (the round-1 verifier's PHONE-AMBIENT-WINDOWS; a consequence R4 anticipates, not yet seen on a device). In the four-praise shape the store stays non-empty to 8,000 ms instead of 5,200, so `ambientQueueSilent` and `legendQueueSilent` (LessonPlayShell.tsx:6497, :6646 at `2ee2469`; rb adds 8 lines above them) are delayed about 2.8 s. Device cell (4) must record it.
+
+## Landed: a strike on a held wall or prop that stands ON the carriageway no longer says the car left the carriageway, or that the obstacle did not appear suddenly. These are the in-lane debris block of sc-hz-brake-dont-swerve, the sc-merge-roadworks-shift closure cones, the sc-park-wall lot wall and the sc-ed-poligon-chain cones. Their card and debrief print a new paragraph with the peek «Не остави място за него.». The copy is chosen by where the struck body stands, not by where the car is. Every other static strike prints today's copy byte for byte. Nothing billed or graded moves. Measured in process only. `sc-hz-brake-dont-swerve:b7297cb7` (major) (2026-11-05)
+
+Lane `staticcardcopy` ran two rounds.
+- **Round 1**, on `479127b`, stopped at STEP 0 before any product edit. The brief told it to stop there. Three stops fired (below), and each needed an integrator ruling.
+- **Round 2**, rebased on `2ee2469`, was SIGNED OFF WITH CONDITIONS by the adversarial verifier on 2026-11-04 (run `wf_6ac0559c-283`; its PROGRESS.md). The conditions are below.
+- **The patch.** `staticcardcopy-result-r2.patch`: sha256 091a2a93…a6018b, 44 files, +1846/−113, 0 CR bytes, and every touched file is LF in base (the builder).
+  - The verifier built its own lane from `base-2ee2469.tar` plus doc 07 as it stands at `2ee2469`. Its platform tree hash is 14f52de9, equal to `2ee2469:platform`. The patch applied cleanly there. When the verifier finished, `git diff base..HEAD` hashed to the patch's sha and the patch reverse-applied.
+  - The patch also carries the builder's own ADR-014 paragraph. This landing commits the corrected text instead (ADR, below).
+  - It is cumulative against `2ee2469`, not against HEAD. The landing's HEAD `7547a0c` is a TEMP commit on no branch, with no ref: `2ee2469` plus `gate-rb.patch` (b144715f…, 48 files, lane rbreverse) and `gate-wp.patch` (87dff073…, 5 files under hud/, lane wcafterpaint). rb, wp and this landing go through ONE main-tree gate as ONE commit, as `479127b` did for ra2 + e2 and `2ee2469` for fi + vt. This patch shares 13 files with rb and none with wp:
+    - LessonScene.tsx, `rapierContactDrive.ts`, worldRuntime.ts, lessonWorldRecipe.ts and traces/recorder.ts;
+    - runtime/index.ts, rules/index.ts and rules/types.ts;
+    - doc 07;
+    - four reviewed-text-manifest files.
+    The merge is under PROVEN ON 7547a0c.
+
+**Integrator rulings.** These are the integrator's rulings, not the founder's, and he is to be told at this landing, each his to veto (owed, below). C1–C3 were ruled on 2026-10-18. S2(a), the centre rule, T3(1)'s replacement and the conditions F6–F8 were ruled on 2026-11-04 under the founder's 2026-10-08 and 2026-10-19 delegations.
+- **C1–C3 (2026-10-18).**
+  - C1: the copy is chosen by a fact about the STRUCK BODY, measured against the built road.
+  - C2: the four lessons where the car is lawfully off the carriageway (sc-pk-driveway, sc-merge-from-property, sc-park-wall, sc-ed-poligon-chain) keep their copy and are their own triage candidate. S2(a) (below) supersedes C2 for sc-park-wall and sc-ed-poligon-chain, so C2 now holds for sc-pk-driveway and sc-merge-from-property only.
+  - C3: the key is «staticObjectOnRoad», with the title unchanged and a peek taken from the new paragraph's first clause.
+- **S1–S10, as built, with one amendment at integration.** S1 is the fact's definition. S3 gives one repeat counter. S4 maps the detail back to staticObject for the crash pin. S5 measures the opened card. S6 is the optional contract key. S7 lists what is out of scope. S8 gives the new row no correctiveBg. S9 is the peek. S10 makes the debrief print its corrective once. As ruled, S3 and S10 kept the history rows split by copy key. F8 (below) amends that clause, so the history rows now key on the folded act. The «Какво стана» rows still split by copy key.
+- **2026-11-04, after round 1's stops. All three were built as ruled.**
+  - **S2 option (a): the surface fact governs.** The lot and poligon bodies, which measure «carriageway», print the on-road copy, and it must be true there.
+  - **The centre rule.** Only the footprint centre decides, so a straddling kerb keeps the off-road copy.
+  - **T3(1) is replaced.** In its place there is a test that the copy is chosen by the body and not by the car's pose.
+
+**The row is NOT closed by this landing.** `sc-hz-brake-dont-swerve:b7297cb7` stays OPEN.
+- Every number below was measured in process: on the reducer, the recorder, the live rung chain and the product chassis through `rapierContactDrive`. No builder, verifier or integrator drove anything in a browser or saw anything on a device.
+- A rig re-drive is owed right after the gate (below). Whether its frames close the row is for that wave's judge and verifier.
+- **The judge must be told ruling C2 and how S2(a) narrows it.** The row's text also names sc-pk-driveway and sc-merge-from-property, where the car is lawfully off the carriageway. This landing leaves their copy byte for byte; under C2 they are their own triage candidate.
+- The row's clause on sc-park-wall and sc-ed-poligon-chain is answered differently. Under S2(a) those bodies now print the on-road copy.
+- This landing does not change the open-row count.
+
+**What was wrong** (round 1's builder, at `479127b`).
+- **Where the copy came from.** `rules/engine.ts` billed every contact with an untagged body as COLLISION, with the detail `e.withWhat`, so always «staticObject». That printed the one paragraph «Удари неподвижен предмет — стълб, дърво, ограда, сграда или бордюр. Неподвижното препятствие не се появява внезапно и не може да сгреши: то е било там през цялото време, а колата е стигнала до него, защото пътят ѝ е излязъл извън платното за движение. Излизането от платното е самото произшествие, а ударът е само краят му.» (323 characters), with the peek «Не се появи внезапно.».
+- **Why it could not choose.** Nothing on the contact said where the struck body stands.
+- **The base print.** hz LATE50 (cruise 50 km/h, full brake from y 180, 60 Hz) gives the same result at L1, L3 and L5:
+  - contact at grid point 858 at 31.29 km/h;
+  - COLLISION at t 14.30: 10 points, опасна, terminateSession;
+  - the false paragraph on the card and in the debrief's «→ Какво стана»;
+  - toastReadMs 21,534 ms.
+- **A live roadworks cone** was billed the same way at 15.44 km/h.
+- **The lesson teaches the opposite.** The block stands in the student's own lane, and the lesson's teaching point is «brake in your lane».
+
+**Round 1's three stops** (the builder; round 1 had no verifier). The fact table is in `D:/knijka-lanes/scratch/staticcardcopy-impl/probes/step0a.txt`.
+- **(iii), stop S2: C2 bodies measure «carriageway».** The sc-park-wall wall (5.03, 8.6) and the two sc-ed-poligon-chain cones measure «carriageway» at the centre and at 4/4 corners.
+- **(iv): bodies listed as off the carriageway are partly on it.**
+  - the reverse-line kerb rect: centre on the footway, 3/4 corners on the carriageway;
+  - the U-turn kerb rects: 2/4 corners on it;
+  - the sc-pk-driveway wall at (9, 47.3): 2/4 corners on it;
+  - the sc-park-wall wall's recorder rect (`scParkDepth.ts:505`, which the brief listed as a garage wall off the carriageway): on the carriageway at the centre and at 4/4 corners.
+- **T3(1) could not be driven.** On hz-debris-v1 and hz-roadworks-v1 the BUILT carriageway runs from x −12.10 to 12.15, and the first taper cone stands 4.47 m inside the kerb. So no car whose centre is off the carriageway can reach the block or a taper cone: no hz or roadworks body can serve T3(1).
+- **A stale number in the brief's F4.** The block's outer face is 7.29 m from the built kerb, not 3.27 m: 8.125 is the edge network's half-width, not the built asphalt. F4's conclusion stands.
+
+**What landed.** This is the builder's description; the verifier's measurements are under their own heading.
+- **The fact (S1, S2(a), the centre rule).** `scene/scenarioSceneryProps.ts` `stampHeldOnCarriageway` marks a held WALL or PROP as on the carriageway when `surfaceAt(resolveDistrictDrivableSurface(district), centre).under === "carriageway"`. District cones count as props.
+  - It is applied in `lessonWorldRecipe.ts` `buildLessonWorldCore`, on the same cached road build the runtime grades with. That build is now exported as `worldRuntime.ts` `districtDrivableSurfaceOf`, so the two share one build.
+  - It never throws. A fuel station, vehicle, animal or worker is never stamped.
+  - Over the whole catalogue it flags 14 bodies (pinned): the hz block (4.06, 190), the 10 hz-roadworks cones, the sc-park-wall lot wall and the 2 sc-ed-poligon-chain cones.
+- **The contact.**
+  - `obstacleSpec.ts` `STATIC_ON_CARRIAGEWAY_USER_DATA` is mounted on the stamped RigidBodies only (`ScenarioObstacles`).
+  - `VehicleRig.hearChassisContact` hands it on only off a body with no NPC tag. Its threshold, thump, haptic and nudge are unchanged.
+  - `LessonScene.handleCollision` gains a 4th parameter and passes it to `worldRuntime.pushCollision(withWhat, bodyId?, onCarriageway?)`.
+  - That sets `SimTickEvent.onCarriageway: true`. On every other contact the key is omitted.
+  - The recorder (`traces/recorder.ts`) carries the same flag by value on its static rects, pinned equal to the measured fact. Authored beats never carry it.
+- **The selection.** `rules/engine.ts` picks the detail «staticObjectOnRoad» when `withWhat === "staticObject"` and `onCarriageway === true`. withWhat itself stays «staticObject».
+- **The copy.** `catalog.ts` gets a sixth `COLLISION_CONTACT_COPY` row, with the title unchanged, no lawRef and no correctiveBg (S8).
+- **The fold.** One exported fold, `foldActDetail`, serves `coach.ts` encounterKey (S3: one #staticObject repeat counter, so no escalation moves) and the debrief's scored, coached, withheld and corrective dedupe (S10: the corrective prints once). At integration it also serves the history rows (F8, below).
+- **The crash pin.** `finish.ts` `asCrashPinBody` maps the detail back to «staticObject» (S4), so the crash pin's end, way-out and corrective do not move.
+- **What did not change** (the builder; the verifier found no protected constant in the diff):
+  - the title «Удар в неподвижно препятствие», the lawRef ЗДвП чл. 20, ал. 2, and the pooled end-card corrective, whose off-road clause is conditional;
+  - every bill, point, severity, threshold and termination;
+  - every vehicle, pedestrian, cyclist and vehicleCutIn card.
+
+**What the student sees** (the builder's strings).
+- **New paragraph** (321 characters), on flagged bodies only: «Удари неподвижно препятствие, без да оставиш място за него — паднал товар, конус, стена или друго. То не отстъпва: стигаш до него, щом скоростта и вниманието не ти дават да спреш или безопасно да го заобиколиш. Затова скоростта се избира по свободното място, което виждаш, а щом се покаже препятствие — намаляваш веднага.»
+- **New peek** (24 characters): «Не остави място за него.».
+- **Where they show.** On the toast and PC peek, the phone L3 peek, the phone's paused teach card, the debrief's «→ Какво стана», the lesson-mistake sheet and rebuildRuleEvents.
+- **Timing.** The card's life after «Защо», and the debrief overlay's wait after a pinned crash, go from 21,534 to 21,400 ms on those cards.
+- **The opened card** (the builder, measured in headless Chromium and WebKit and added as fixture row 87).
+  - Height: Chromium 295.5 → 279 px; WebKit 293 → 293 px.
+  - Chromium shows it whole from 1366×768 up; WebKit from 1440×800 up.
+- **Truth check.** The builder checked every sentence true at six places:
+  - a load in the student's own lane after a late brake;
+  - the block clipped on a swerve;
+  - a closure cone knocked over;
+  - a cone brushed alongside;
+  - the car-park bay wall;
+  - a training-ground cone touched in reverse.
+  The paragraph avoids «внезап», «излез/излиз», «чл.», «улиц», «лент», «платн», «напред» and «пред колата» (pinned).
+
+**What the verifier reproduced.** It used its own lane, its own print probe and copies of the builder's census probes, with a capture of each event's actual keys. Log: `D:/knijka-lanes/scratch/staticcardcopy-verify/PROGRESS.md`; probes in `…/staticcardcopy-verify/probes/`.
+- **The fix.** The new copy prints on every surface, and none of the three false clauses appears anywhere, on all of these:
+  - the hz block at L1, L3 and L5, after a late brake from 50 km/h and with no brake at 50;
+  - a live roadworks cone;
+  - the park-wall wall;
+  - both poligon cones.
+  The bill stays 10 points, опасна, terminateSession, with the crash pin forward / staticObject / front.
+- **The controls** print today's copy byte for byte, and their events carry no key: the sc-roundabout-entry island, both sc-pk-driveway walls (the (9, 47.3) straddler included) and an l0-free-drive façade at 50 km/h.
+- **Nothing graded moved.** There were 0 changes in judged contacts, crash pin, way-out, corrective, phase, endedAtSec or verdict.
+- **The censuses.**
+  - liveChainReplay: 2,434 of 2,434 cells, 0 changed. This is invariance only: the replay hears no held static contact, so it cannot show the change.
+  - The recorder: 20 of 342 cells changed, each in copy paths only. They are hz mistake-late-brake, roadworks mistake-squeeze-cones, poligon mistake-cone and park-wall mistake-into-wall, at L1–L5 each.
+  - The rapier sweep: 123 of 249 cells changed, the builder's exact number. Only the bill's detail, the explanation and the event key moved. On the tree the bills split 123 on-road, 23 static and 10 vehicle; on base, 146 static and 10 vehicle.
+  - The key appears only on flagged static contacts (55 recorder events and 131 sweep events), always true and never undefined.
+- **The copy, sentence by sentence (its F3).** True at a street block or cone, a car-park bay wall and a training-ground cone. Its script found none of the banned words.
+- **Mutants: ten of its own, each applied alone and restored with its sha256 checked.**
+  - Killed on assertion text (nine):
+    - V1, the runtime sets the key on every event;
+    - V4, every non-vehicle body stamped («a worker is never stamped»);
+    - V6, the fold made the identity («the pooled COLLISION corrective is printed more than once: expected 2 to be 1»);
+    - V8, the selection reverted;
+    - V9, handleCollision drops the fact;
+    - V10, the rig tags every untagged static body;
+    - V11, the old peek restored;
+    - V14, the recipe stamps nothing;
+    - V15, the crash-pin mapping removed.
+  - V2 SURVIVED (condition F6).
+- **Its test runs.**
+  - The builder's new and re-taught tests: 10 unit files, 145/145; the chain chassis, collision-body-id and worldRuntime, 24/24.
+  - scene + scenarios + runtime: 100/101 files, 1,739/1,740. The one red is guidance-lane-align-span §7, ENOENT on tools/.
+  - lessons/__tests__ + lesson-ui: 183/184 files, 3,348 passed, 165 skipped. The one red is touchHintLifetime, ENOENT on tools/.
+  - Targeted gate files: 37 of 38 green, 980 tests passed (PROGRESS.md 21:45; the verifier's summary says «20 targeted gate files»). They include the reviewed-text manifest, caption-truth, the keep-right census, claimGate, law-citations, solid-cross-uturn-act and src/modules/clips/. The one red is whyPanel, ENOENT on docs/.
+  - tsc: 22 errors, the same list as base, all environmental.
+- **Not run as whole directories by the verifier:** lessons/scenario/__tests__ (it ran 16 targeted files from it), rules/, traces/, hud/, and components/sim outside lesson-ui/.
+- **The builder's numbers, not re-measured by a verifier.**
+  - Its 19 mutants, M1–M13 with variants, all killed on assertion text. M8c, M9 and M9b survived their first run and died after it added tests.
+  - Its directory runs. rules/ 109 files, 1,925 tests. lessons/__tests__ 128 files, 2,465 passed. components/sim 108/109 files.
+  - lessons/scenario/__tests__ ran 209/212 files: 24 old detail and arity pins in three files went red and were re-taught. The five re-taught files (these three, and two in traces/__tests__) were then green at 266/266. No full re-run of that directory is reported after the re-teach.
+  - The clip-plan freshness gate was green with no regeneration.
+
+**The conditions, and how each stands.**
+
+**1. S2(a), the centre rule and T3(1). INTEGRATOR RULINGS (2026-11-04): AS BUILT.** The verifier found each one holding (its F3 and F4).
+- The copy is decided by the body's centre fact alone. No pose field is read.
+- No per-lesson list is written.
+- The recorder's rect flags are pinned equal to the measured fact.
+- The T3 replacement feeds a synthetic car pose, on and off the carriageway, through the real reducer.
+
+**2. F6: the recorder's omit rule had no pin (the verifier's mutant V2 survived). PIN AT INTEGRATION.**
+- What V2 does: it replaces `if (c.onCarriageway === true) ev.onCarriageway = true;` in `traces/recorder.ts` with `ev.onCarriageway = c.onCarriageway`. The 14-file targeted set, sc-park-depth-drivable and sc-vu-bikelane-turn-traces stayed green: 255/255 and 148/148.
+- The shipped tree is right: the verifier's key capture found 0 undefined keys. The runtime twin, V1, is killed by collision-body-id.test.ts.
+- The pin asked for: a recorder test that an event on an unflagged rect carries NO onCarriageway key. V2 must die on assertion text.
+PINNED AT INTEGRATION: a new file, `traces/__tests__/recorder-carriageway-omit.test.ts`, «F6 — the recorder omits onCarriageway on an unflagged rect», 4 tests (the integrator, 2026-11-04).
+  - It captures the collision events through onTick from the real recorders (`recordScPkDrivewayDrive`, `recordScParkDepthDrive`), with no stub and no regex (the merge verifier): sc-pk-driveway mistake-wide and mistake-deep (unflagged walls), sc-park-van mistake-early-turn (an unflagged vehicle rect), and, as the positive control, sc-park-wall mistake-into-wall (a flagged wall, key true).
+  - V2, the verifier's exact edit (`(ev as { onCarriageway?: true }).onCarriageway = c.onCarriageway;`, an undefined key on every unflagged event), is killed: 3 red, «mistake-wide: an unflagged rect's event must carry no onCarriageway key, not even undefined: expected true to be false», the same for mistake-deep, and «an unflagged vehicle rect's event must carry no onCarriageway key, not even undefined».
+  - A recorder that never sets the key turns the positive control red on «expected undefined to be true».
+  - recorder.ts was restored to sha256 74292f35…bfeb6c after each, and the file is green 4/4. The merge verifier ran V2 again itself: 3 red on the same text.
+
+**3. F7: the split debrief row spends one of the debrief's four mistake lines. ACCEPTED and RECORDED.**
+- A drive with both a kerb strike and a block strike now shows two distinct, true «Какво стана» rows under one title. Base showed one row «×2». The corrective still prints once (S10).
+- `debrief.ts` `selectShownGroups` always shows the rows that end the exam, and gives MAX_MISTAKE_LINES (4) minus those rows to the rest. So one fewer other mistake fits.
+- The verifier's probe, at hz L1 and L3: a kerb strike, a block strike, TURN_WITHOUT_INDICATOR, POOR_LANE_KEEPING and LANE_CHANGE_WITHOUT_INDICATOR. Base shows «Неустойчиво движение в лентата» with its «Правилното действие». The tree hides it behind «…и още 1 вида нарушения» (`D:/knijka-lanes/scratch/staticcardcopy-verify/cap-base.txt` and `cap-tree.txt`; probe source `probes/vtmp-cap.test.ts`).
+- No sentence is false, so this does not reach the stop rule.
+
+**4. F8: two history rows that look the same. BUILD AT INTEGRATION.**
+- In the lane, `historyMistakeGroups` (`app/(dashboard)/simulator/historyMistakes.ts`, key line :64 on 7547a0c) kept the copy key, as S3 and S10 then required. So a kerb strike plus a block strike gave two history rows with count 1 each, where base gave one row with count 2. A history row carries the title, lawRef, severity, points, count and corrective, and no explanation. Between the two rows only the count differs. This is from the builder's census (`census/debrief-tree.txt`), which the verifier's F8 cites and did not re-run.
+- At integration `historyMistakeGroups` keys by the FOLDED act (`foldActDetail`), which gives base's one row with count 2.
+- Pinned: one row with count 2. A COLLISION whose copy key is NOT folded (another body kind) stays its own row. A mutant that reverts the fold must die on assertion text.
+PINNED AT INTEGRATION: built and pinned (the integrator, 2026-11-04).
+  - **The build.** In `historyMistakes.ts` the group key is now `` `${code}|${foldActDetail(e.detail as string) as string}` `` (key line :71 on the landing tree), with a comment and the import. `catalog.ts`'s foldActDetail docblock sentence that said the history «still groups by the copy key» was reworded, comment only; the catalog manifest fingerprint did not move.
+  - It is the one product change beyond the lane patch. The integrator disclosed it against the brief's generic «tests only», and the merge verifier accepted it because condition F8 ordered it (its F-3). It amends S3/S10's history clause (Integrator rulings, above).
+  - **The pins.** `historyMistakes.test.ts` gains the describe «F8 — the history folds the on-road static contact into the static row», 3 tests: a kerb strike plus a block strike is ONE row with count 2; the fold holds in either order; and a COLLISION with a copy key that is NOT folded stays its own row. The file is green 12/12.
+  - M-F8, the key back to the raw detail (`${code}|${e.detail}`): 2 red, «a kerb strike and a block strike must file as one history row: expected [ {…}, {…} ] to have a length of 1 but got 2» and «the on-road strike first must still file as one history row: … length of 1 but got 2».
+  - M-F8b, the over-fold (every COLLISION keyed on the code alone): red on «a vehicle strike is a different act from a static one: expected [ {…} ] to have a length of 2 but got 1».
+  - historyMistakes.ts was restored to sha256 e28c9318…7fae14 after each. The merge verifier ran both again itself and killed them on the same texts; the pins call the real `historyMistakeGroups`.
+
+**5. AT THE LANDING. DONE AT INTEGRATION, except the main-tree tools run (PROVEN ON 7547a0c).**
+- The reviewed-text manifest was re-recorded once, on the combined tree (PROVEN ON 7547a0c). The lane's own re-record had added 9 strings, all from the new row: title, explanation and peek under COLLISION_CONTACT_COPY and under PER_ACT_COPY, plus the same three as catalog.ts source units #455–457.
+- The tools strings the lane listed must run on the main tree; the main-tree gate decides. A grep of the main tree found no tools/ reader of the new strings, the key, the flag or the fold (builder and verifier). The title, which is unchanged, is read at `tools/mobile/lesson-audit.mjs:4956` (a comment) and `tools/mobile/__tests__/path-follow.test.mjs:2420`.
+- The proof ran src/modules/clips/, lessons/scenario/__tests__ (the census files and the manifest included), runtime/, rules/, scene/, traces/, hud/, lesson-ui and components, all green (PROVEN ON 7547a0c).
+
+**Not cured by this landing.**
+- **The C2 lessons.** The off-road copy still prints in sc-pk-driveway, where the driveway is entered lawfully, and on sc-merge-from-property's fuel station, which is never stamped. These are their own triage candidate under C2.
+- **The S7 beats.** These print what they printed before:
+  - sc-accident-own-conduct's parked-car beat;
+  - sc-sign-warning's run-off;
+  - sc-vp-telltale-red's roadside beat;
+  - sc-park-45's curb-strip beat.
+- **Straddling kerbs.** The U-turn and reverse-line kerbs keep the off-road copy. They are recorder rects whose by-value flag is pinned false under the centre rule; neither is a held body the scene stamps. The builder holds the old copy true there, because a kerb is the carriageway's edge.
+
+**What this landing supersedes in doc 88.** Line numbers are those of the main tree's working copy of doc 88 on 2026-11-04. They were re-checked against it on 2026-11-05 and still hold.
+- :12699, in the a7d0dd29 task-tick landing: «CARRIED, not fixed — the static-collision card's base copy is false here … Triage «staticcardcopy»». In process, a block strike now prints the on-road copy.
+- :12716: «Triage, filed: … «staticcardcopy»». It has landed in process.
+
+ADR-014 carries this landing's amendment in this commit, «Amendment 2026-11-05 — a static contact carries one optional, display-only fact about the struck body: `onCarriageway`». It is the docs verifier's corrected text (its R15–R18 and R20 applied) in place of the builder's paragraph that the lane patch carried, dated 2026-11-05; for R19 its pointer to the TEMP commit `7547a0c`, which no ref will reach, is replaced by «the landing commit» and doc 88's landing section. Exactly one version is kept.
+
+**PROVEN ON 7547a0c** (the integrator's run from 2026-11-04 22:49 to 2026-11-05 02:26 in the worktree `D:/knijka-lanes/integ-sc`, log `D:/knijka-lanes/scratch/sc-land/PROGRESS.md`, run logs beside it. `7547a0c` is a TEMP commit with no ref, = `2ee2469` + gate-rb + gate-wp, so these runs measure all three landings together. rb, wp and sc go through ONE main-tree gate as ONE commit, as `479127b` and `2ee2469` did. The merge verifier ran src/modules/sim/lessons/, a combined run of eight directories, components/sim, the mutants and the tools tests itself.)
+- **The apply.** The worktree was clean at `7547a0c`, and the patch's sha256 matched (091a2a93…). `git apply --3way --index --binary` applied all 44 files; the new files took direct application. Of the 13 files shared with rb, 11 merged cleanly by 3-way: doc 07, LessonScene.tsx, rapierContactDrive.ts, the manifest's strings.3, strings.e and units.source files, rules/index.ts, rules/types.ts, worldRuntime.ts (pushCollision and sample), lessonWorldRecipe.ts and traces/recorder.ts. Two conflicted:
+  - runtime/index.ts: both sides are kept. sc's `export { makeSurfaceFix, surfaceAt, type DrivableSurface, type SurfaceFix } from "./surface"` stays under its comment, after the worldRuntime export that carries districtDrivableSurfaceOf, and rb's reverseBrakedFor export block follows it. The other existing export from ./surface uses different names, so nothing is exported twice;
+  - manifest.json, in the «source» fingerprint and count only (rb 0a3be88f…, 13,375 against sc df47842c…, 13,372): a placeholder, then one re-record (below).
+- **What the stage holds beyond the lane patch** (the merge verifier applied the lane patch 3-way to a temporary index on `7547a0c` and compared blob by blob). 41 of the 44 lane files are blob-identical to the stage. The other three:
+  - runtime/index.ts, the both-sides resolution;
+  - manifest.json, re-recorded once: its 13,378 source strings are the exact union, 13,369 at `2ee2469` plus 6 from rb and 3 from sc;
+  - catalog.ts, which differs from the lane only in the F8 docblock comment.
+  - The extra staged files are historyMistakes.ts (the F8 build, the only product change beyond the lane), historyMistakes.test.ts (the F8 pins) and traces/__tests__/recorder-carriageway-omit.test.ts (the F6 pin).
+  - At composition on 2026-11-05 three texts change on top: this landing's ADR-014 amendment (above), and two comments in rb's and wp's files (lessons/types.ts and hud/HudToasts.tsx; their sections).
+- **The gate patch.** `D:/knijka-lanes/gate-sc.patch`, sha256 dd9812933acf33459d1371ac9970924dd995c2b7a3857d1b66c7ab33c27bc016, 47 files, +1990/−115, 0 CR bytes, cut from integ-sc's staged index (`git diff --cached --binary 7547a0c`) once the tools stop below was ruled. Re-hashed from the staged index on 2026-11-05: the same sha.
+- **The pins:** conditions 2 and 4 above.
+- **A lane-verifier mutant** (the merge verifier). M1, the engine's choice of detail reverted to `e.withWhat`, against static-on-road-copy, static-on-road-chain.chassis and static-on-road-lessons: 13 failed, 24 passed, all on AssertionError and none a TypeError or ReferenceError. Examples: «hz L1: the bill's detail: expected Set{ 'staticObject' } to deeply equal Set{ 'staticObjectOnRoad' }» and «the body stands on the road: the car's kerb-side pose does not decide». engine.ts was restored to sha256 47d8a868…e0a8.
+- **The reviewed-text manifest.** Before the re-record only the «source» fingerprint and count were red, with 0 strings differing: the 3-way-merged units and strings files were already the union. It was re-recorded once on the combined tree: source fingerprint f200aa26739582493a2135731d0c5b99fa163d29b1ff42ea3dde39a65a87a4e7, 487 units, 13,378 strings. No units or strings file moved, and the catalog surface fingerprint (6853de7f…) did not move with the F8 comment. 49/49 green.
+- **The integrator's directories,** one at a time, all green:
+  - lessons/__tests__: 128 files, 2,465 passed, 165 skipped;
+  - lessons/scenario/__tests__: 213 files, 5,212 passed, 1 skipped, the census files and the manifest included;
+  - components/sim: 110 files, 1,800 passed, lesson-ui included;
+  - orchestrator/__tests__ 41 files, 528; rules/__tests__ 110, 1,929; traffic 53, 675; runtime/__tests__ 49, 902; scene 48, 799; vehicle 22, 299; world 135, 2,409; hud/__tests__ 72, 1,424;
+  - traces: 171 files, 2,376 passed, the new recorder-carriageway-omit included;
+  - src/modules/clips/: 19 files, 302 passed. The clipPlan freshness gate is green, with no regeneration;
+  - `src/app/(dashboard)/simulator/historyMistakes.test.ts`: 12/12, the 3 F8 pins included.
+- **The merge verifier's own runs,** vitest with one worker, one run at a time, every one to completion:
+  - src/modules/sim/lessons/ (scenario/__tests__, the census files and the manifest included): 341 files, 7,677 passed, 166 skipped;
+  - rules, runtime, scene, traces, scenarios, hud, src/modules/clips and src/app/(dashboard)/simulator together: 484 files, 7,921 passed;
+  - src/components/sim/ (lesson-ui included): 110 files, 1,800 passed.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment (api/health/route.ts 4, lib/db.ts 1, the admin, auth, learning, outcomes, payments and privacy stores, lesson/progress.ts, sim/lessons/store.ts 2, traces/attemptStore.ts 1). None is in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, as wave-cycle.sh gate 4/4 runs it): 2,029 tests, 2,006 pass, 8 fail, 11 skipped, 4 todo. The merge verifier's own run gave the same failures.
+  - 1 is the expected deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are the worktree's environment: count-agreement and finding-reader («could not find .audit-frames/findings»), lane-evidence (playwright cannot be resolved from the worktree), and build-redrive §9(a), (b), (d) and (e) (exit 2 from the same corpus finder).
+  - The integrator re-ran those 4 files read only, with cwd `E:\AI driver` and KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/ (main's git status unchanged before and after). The first re-run read 91 tests, 89 pass, 2 fail (count-agreement and lane-evidence); a second re-run of lane-evidence read 10/10. finding-reader and build-redrive (§9 included) are green. count-agreement stayed red: «counters disagree about the open list … apply-reroute.mjs printed no WORKED line to stdout».
+  - The integrator read that red as a missing `E:\AI driver\.audit-frames\reroute.jsonl` and STOPPED at step 6, as its brief said, without cutting the patch. The merge verifier refuted the reason (its F-2): that file exists (768,377 bytes, 2026-09-15). apply-reroute.mjs resolves its repo from its own file (`REPO = path.resolve(HERE, "..", "..")`), so the worktree's copy looks for `D:/knijka-lanes/integ-sc/.audit-frames`, which does not exist, and the integrator's re-run still ran the worktree's copies of the tools/audit files. The main tree's own tools/audit/count-agreement.test.mjs, byte-identical (tools/ differs from `2ee2469` only in tools/mobile/lesson-audit.mjs), run with cwd `E:\AI driver`: 14/14 green, with main's git status unchanged.
+  - So all 8 are the freeze plus the worktree's environment; the integrator ruled the stop the known cross-tree artefact, and the patch was cut. No tools test was taught. The main-tree gate decides.
+- **Left as found** (the merge verifier): HEAD `7547a0c`, the same 47 files staged, nothing unstaged or untracked, no process running, and the main tree not edited.
+
+**Owed.**
+- **The rig re-drive, right after the gate.** It is step-keyed through `/dev/drive-rig` (ADR-017) on the PC keyboard and the phone lens, at L1 and L3, with the advisor on.
+  - **The hz LATE50 block strike.** Frames needed:
+    - the toast as it first appears;
+    - the card opened with «Защо» and its life until it leaves (expected 21,400 ms);
+    - the debrief overlay's opening after the pinned crash;
+    - the phone peek and the paused teach card;
+    - the debrief's «Какво стана» and the end-card corrective;
+    - the hold card and way-out, which should be unchanged.
+  - A roadworks cone knocked over in the taper, and one brushed alongside.
+  - The sc-park-wall wall at the end of the bay, and an sc-ed-poligon-chain cone touched in reverse.
+  - The controls, each printing today's copy: the sc-roundabout-entry island, an l0-free-drive façade at 50 km/h and an sc-pk-driveway wall.
+  Whether the frames close b7297cb7 is for that wave's judge, who must be told ruling C2 and how S2(a) narrows it.
+- **The founder is told:**
+  - the new paragraph and peek, with the strings;
+  - that the title, the corrective, the citation and every bill are unchanged;
+  - rulings C1–C3 (and that S2(a) narrows C2), S1–S10, S2(a), the centre rule and T3(1)'s replacement;
+  - S3, one repeat counter;
+  - S10 and F7, two «Какво стана» rows and one fewer other mistake in the four lines;
+  - F8, history rows folded (an amendment to S3/S10's history clause).
+- **Recorded, not filed:** the docs agent's candidates (below), with the S7 and C2 triage candidates listed under «Not cured by this landing».
+- **The tools/ tests on the main tree,** and the three files a lane cannot run there: guidance-lane-align-span §7, touchHintLifetime and clips/whyPanel. All three ran green on `7547a0c`, inside scene, components/sim and src/modules/clips/ (PROVEN ON 7547a0c). The main-tree gate decides.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds). Several restate items above; each is listed with its evidence.
+- **sc-accident-own-conduct** (S7). Both mistake demos bill an authored staticObject beat on a PARKED CAR in the lane (`scReels.ts:252`, `:278`). The struck body is a vehicle and the act is a sideswipe, yet the card prints the off-road static paragraph («…стълб, дърво, ограда, сграда или бордюр… пътят ѝ е излязъл извън платното…»). Neither the staticObject copy nor the new on-road copy is true there. Unchanged by this landing. Evidence: `D:/knijka-lanes/scratch/staticcardcopy-brief/brief.json` (S7); the recorder census, base and tree identical, in `D:/knijka-lanes/scratch/staticcardcopy-impl/census/`; `staticcardcopy-r2.json` (build owed).
+- **sc-sign-warning** (S7). The run-off demo is billed under «Удари неподвижен предмет» although it strikes nothing the world draws (`scReels.ts:116`; `templates-reels.ts:86-89`). Unchanged by this landing. Evidence: the brief (S7); `staticcardcopy-r2.json` (build owed).
+- **sc-vp-telltale-red** (S7). An authored roadside staticObject beat (`scVpTelltaleRed.ts:147`: a seized car carried into the roadside, with nothing staged there). Whether the off-road static paragraph is true there has not been judged; the census shows only that it is unchanged. Evidence: the brief (S7); `staticcardcopy-r2.json` (build owed).
+- **sc-park-45** (S7). An authored curb-strip beat in a car park (`scPark45.ts:154`) prints the off-road paragraph, including «Излизането от платното е самото произшествие», where the car is lawfully in a car park. It is the same class as the C2 lessons, but the open row b7297cb7 does not name this lesson. Unchanged by this landing. Evidence: the brief (S7); `staticcardcopy-r2.json` (build owed).
+- **The debrief's mistake-line cap** (the verifier's F7, ruled ACCEPTED and RECORDED on 2026-11-04; listed so it is not lost). A kerb strike plus a block strike are now two COLLISION rows, which selectShownGroups exempts as exam-ending, so MAX_MISTAKE_LINES (4) leaves one fewer slot for other mistakes. In the verifier's probe at hz L1 and L3, «Неустойчиво движение в лентата» and its corrective are hidden behind «…и още 1 вида нарушения», where base showed them. Evidence: `D:/knijka-lanes/scratch/staticcardcopy-verify/cap-base.txt` and `cap-tree.txt` (probe source `probes/vtmp-cap.test.ts`); `staticcardcopy-r2.json` (verify F7).
+- **Two road facts disagree on hz-debris-v1 and hz-roadworks-v1.** The edge network (DistrictIndex halfWidthM) puts the kerb at 8.125 m; the built asphalt (surfaceAt) runs from x −12.10 to 12.15. So a car centred between about 8.125 and 8.6 m is «off» by the edge-network fact while it is on the asphalt, and it can reach a taper cone. The open row names `SimTick.edgeAlignment.offCarriageway` as a road-relation signal. Whether that signal, or any other graded or shown consumer, reads the edge-network half-width rather than the built surface on these districts is unmeasured. Evidence: `D:/knijka-lanes/scratch/staticcardcopy-impl/probes/kerb-scan.txt`; `staticcardcopy-r1-journal.jsonl` (the T3(1) section, owed[2] and owed[3]).

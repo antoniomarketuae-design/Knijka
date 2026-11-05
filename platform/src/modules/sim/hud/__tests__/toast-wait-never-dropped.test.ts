@@ -31,6 +31,9 @@
  *     has always been stacked — each as the cards above it leave.
  *   · with no explanation open nothing here changes anything: the queue, the
  *     cap and the clocks are the ones the product always had.
+ *     (SUPERSEDED IN PART 2026-11-04, W11 — lane wcafterpaint: the CAP now
+ *     spares every judged card for its whole life, opened or not; the clocks
+ *     half stands as W12. `toast-cap-spares-judged.test.ts` holds W11.)
  *
  * WHAT IS TESTED, AND AT WHAT LEVEL. The REAL `useHudToastQueue` is mounted on
  * the project's hook harness and driven by an event clock that fires its real
@@ -445,12 +448,26 @@ describe("§1 W5 — judged cards wait whole and uncapped; praise keeps its own 
     }
   });
 
-  it("WITH NOTHING OPEN nothing changes: praise 4 s, faults 8 s from raise, the cap drops the oldest of seven", () => {
+  // RE-TAUGHT 2026-11-04 (lane wcafterpaint, sc-roundabout-entry:ad192bc4) — integrator
+  // decision W11 (R1, 2026-10-18; confirmed with R3 on 2026-11-04). This pin held the old
+  // half of W5's last bullet: «with nothing open … the cap … the ones the product always
+  // had», i.e. the cap dropped the oldest cards of ANY kind, judged ones included — [7,6,5,4].
+  // W11 supersedes that half: the cap now spares every judged card for its whole life and
+  // stays positional for praise and info. The clocks half (W12) is unchanged and is still
+  // checked below, for every card.
+  it("WITH NOTHING OPEN the clocks are the ones they always were: praise 4 s, faults 8 s from raise; the cap drops only the praise that four newer cards stand above (W11)", () => {
     const d = drive({ quiet: false });
     for (let i = 0; i < 7; i += 1) d.push(i * 10, [i % 2 === 0 ? fault(`F${i}`) : praise(`P${i}`)]);
-    expect(d.q.toasts.map((t) => t.id)).toEqual([7, 6, 5, 4]);
+    // F0 (#1), F2 (#3) are graded and alive: kept. P1 (#2) had four newer cards above it on the 6th push: dropped.
+    expect(d.q.toasts.map((t) => t.id), "the cap dropped a graded fault inside its own life, or kept praise four cards down").toEqual([7, 6, 5, 4, 3, 1]);
     d.drain();
-    for (const c of d.log.values()) if (c.goneAt !== null && c.id >= 4) expect(c.goneAt - c.raisedAt).toBe(lifeOf(c.event));
+    for (const c of d.log.values()) {
+      if (c.id === 2) {
+        expect(c.goneAt, "the capped praise left other than on the push that put four newer cards above it").toBe(50);
+        continue;
+      }
+      expect(c.goneAt! - c.raisedAt, `#${c.id} did not live exactly its own life`).toBe(lifeOf(c.event));
+    }
     d.m.unmount();
   });
 

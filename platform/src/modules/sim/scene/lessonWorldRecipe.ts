@@ -190,6 +190,7 @@ import type { createTrafficSystem } from "@/modules/sim/traffic";
 import {
   heldSceneryFor,
   parkedClearZonesFor,
+  stampHeldOnCarriageway,
   type ParkedClearZone,
 } from "./scenarioSceneryProps";
 import type { ScenarioObstacleSpec } from "./obstacleSpec";
@@ -257,20 +258,27 @@ export function buildLessonWorldCore(lesson: LessonSpec, raw: unknown): LessonWo
   }
   const geometry = buildWorldGeometry(district, { parkingBays: paintBays });
   // Occupied bays → precise hittable parked cars + the template's held
-  // scenery (scenario lessons only; [] everywhere else).
+  // scenery (scenario lessons only; [] everywhere else). The held walls and
+  // props whose centre stands on the built carriageway are stamped
+  // `onCarriageway` here (lane staticcardcopy, STEP 1 rule 4): `raw` is the
+  // object `createWorldRuntime` above keyed its surface cache on, so this
+  // reads the runtime's own index rather than building a second one.
   const scenarioObstacles: ScenarioObstacleSpec[] = isScenarioLessonId(lesson.id)
-    ? [
-        ...scenarioBays
-          .filter((b) => b.occupied)
-          .map((b, i) => ({
-            kind: "vehicle" as const,
-            x: b.x,
-            y: b.y,
-            headingDeg: b.headingDeg,
-            seed: i,
-          })),
-        ...heldSceneryFor(lesson.id, raw),
-      ]
+    ? stampHeldOnCarriageway(
+        [
+          ...scenarioBays
+            .filter((b) => b.occupied)
+            .map((b, i) => ({
+              kind: "vehicle" as const,
+              x: b.x,
+              y: b.y,
+              headingDeg: b.headingDeg,
+              seed: i,
+            })),
+          ...heldSceneryFor(lesson.id, raw),
+        ],
+        raw,
+      )
     : [];
   const gripPatches = resolveSurfaceGripPatches(district);
   // THE ONE VALUE HERE THAT CAN FAIL SILENTLY (2026-08-19). The consumer is
@@ -331,7 +339,7 @@ export function applySignalModes(
 }
 
 /**
- * Wire the traffic system's telemetry queries into the runtime — the eight
+ * Wire the traffic system's telemetry queries into the runtime — the nine
  * hookups LessonScene runs (and recordScriptedDrive's exact set), so
  * the rule engine's proximity detectors see the same world in every mount.
  */
@@ -357,4 +365,8 @@ export function wireTrafficQueries(
   // tracker judges a lane entry against the vehicle already travelling behind
   // him in that lane, so it needs every same-direction vehicle, not the nearest.
   runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
+  // Lane rbreverse (sc-roundabout-entry:9e85f27e; founder ruling Q2 «warn
+  // only»): every vehicle's own account, for the reverse-warning measurement
+  // `SimTick.reverseBrakedFor` — DISPLAY-ONLY, no rule reads it.
+  runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
 }

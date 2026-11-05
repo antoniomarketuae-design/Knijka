@@ -41,7 +41,7 @@ const HOLD_LIT_TARGET_MPS = 0.05;
 /** …and the actor counts as stopped at/below this. Matches the ambient
  *  fleet's own `speed < 0.5` stopped bar in vehicles.ts, so the scripted and
  *  the background car light up at the same moment. */
-const HOLD_LIT_SPEED_MPS = 0.5;
+export const HOLD_LIT_SPEED_MPS = 0.5;
 /** Default laneShift glide duration, s (the FO-03 cut-in reads as one calm
  *  lane change at urban speed — ~8 m of lateral travel over 1.5 s). */
 const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
@@ -1763,7 +1763,10 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //     and this is where the car says it: the speed it lost this frame under
   //     a player guard, less whatever its own command would have taken off
   //     anyway. Nothing here reads it — `system.ts circulatingReportFor`
-  //     publishes it. A frame no player guard bound accounts exactly nothing.
+  //     publishes it (and, since lane rbreverse, `system.ts
+  //     playerShedAccounts` for the DISPLAY-ONLY reverse warning,
+  //     `SimTick.reverseBrakedFor` — no rule reads that). A frame no player
+  //     guard bound accounts exactly nothing.
   if (playerBound || playerClamped) {
     agent.playerShedMps += playerShedThisStep(speedBefore, agent.speed, speedNoPlayer);
   }

@@ -1256,15 +1256,23 @@ export function objectiveTitleUnderHold(
  * (`advisor.ts CRASH_HOLD_CARD_BG`, `finish.ts crashPinWayOut`): «назад»
  * after a forward strike of a stationary body, «напред» after a reversing one,
  * «я отдръпни» (direction-free) for a road user or a travel the pin could not
- * read. All three share the 53-character stem «След удара — ако колата опира в
- * удареното, първо леко» (one constant serves a reader of the glass for all
- * three) and are 59 / 60 / 64 characters — none longer than the 66-character
- * lead before them, so the W6/W7 folded-banner line budget is unchanged.
+ * read. All three share one stem (one constant serves a reader of the glass
+ * for all three) and are no longer than the 66-character lead before them, so
+ * the W6/W7 folded-banner line budget is unchanged.
+ *
+ * THE LOOK FIRST (lane rbreverse, sc-roundabout-entry:9e85f27e; integrator
+ * ruling R6, 2026-11-04). Through 479127b the lead put the move first
+ * («…първо леко назад / напред / я отдръпни») and named no look, like the card
+ * under it; rig-w3b SC2 reversed on the ring into a circulator's path on that
+ * order. The stem is now the 53-character «След удара — първо се огледай; ако
+ * колата опира, леко» (tools/mobile/lesson-audit.mjs ROUTE_HOLD_CRASH_PINNED_BG
+ * reads it with `includes` and is re-taught at the gate, the E8 precedent);
+ * the leads are 59 / 60 / 64 characters. «огледала и рамо» lives on the card.
  */
 const CRASH_HOLD_LEAD_BG: Record<CrashPinWayOut, string> = {
-  back: "След удара — ако колата опира в удареното, първо леко назад",
-  forward: "След удара — ако колата опира в удареното, първо леко напред",
-  away: "След удара — ако колата опира в удареното, първо леко я отдръпни",
+  back: "След удара — първо се огледай; ако колата опира, леко назад",
+  forward: "След удара — първо се огледай; ако колата опира, леко напред",
+  away: "След удара — първо се огледай; ако колата опира, леко я отдръпни",
 };
 
 /**

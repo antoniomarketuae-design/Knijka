@@ -4809,6 +4809,16 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // Lane endings2: both additive, both written only once they exist.
       ...(personStruckAtSec !== undefined ? { personStruckAtSec } : {}),
       ...(endingCopy !== undefined ? { endingCopy } : {}),
+      // Lane rbreverse (sc-roundabout-entry:9e85f27e; founder ruling Q2 «warn
+      // only»): the tick's measurement, folded for the coach — the advisor's
+      // reverse warning is its ONLY reader (`advisor.ts
+      // reverseWarningForSession`); nothing here or in rules/ grades it.
+      // Written while a wired runtime publishes it, and once more to CLEAR it
+      // (`...prev` cannot express a field going back to null); a drive whose
+      // runtime has no account query never carries it.
+      ...(tick.reverseBrakedFor !== undefined || prev.reverseBrakedFor !== undefined
+        ? { reverseBrakedFor: tick.reverseBrakedFor ?? null }
+        : {}),
       // Same reason, same shape: every frame back on a road must clear it, and
       // `...prev` cannot express a field returning to null.
       offNetworkSinceSec: offNet.sinceSec,

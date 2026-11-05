@@ -138,3 +138,43 @@ describe("the stored drive keeps the ACT's corrective, not only its name (sc-mv-
     expect(historyMistakeGroups([ev("CROSSED_SOLID_LINE", 20.3, "forged")])[0]!.correctiveBg).toBe(pooled);
   });
 });
+
+/**
+ * F8 (lane staticcardcopy landing, integrator ruling 2026-11-04). A static
+ * contact on a body that stands on the carriageway is billed «staticObjectOnRoad»
+ * — its own paragraph on the card — while a kerb strike stays «staticObject».
+ * The history row prints title, lawRef, points and corrective, none of which
+ * differ between the two, so the list asks the FOLDED act: one row, count 2.
+ * The other COLLISION copy keys are different mistakes and stay their own rows.
+ */
+describe("F8 — the history folds the on-road static contact into the static row", () => {
+  it("a kerb strike plus a block strike is ONE row with count 2", () => {
+    const rows = historyMistakeGroups([
+      ev("COLLISION", 8, "staticObject"),
+      ev("COLLISION", 21, "staticObjectOnRoad"),
+    ]);
+    expect(rows, "a kerb strike and a block strike must file as one history row").toHaveLength(1);
+    expect(rows[0]!.count, "the one static row must count both strikes").toBe(2);
+    expect(rows[0]!.titleBg).toBe(actCopy("COLLISION", "staticObject")!.titleBg);
+  });
+
+  it("the fold holds in either order", () => {
+    const rows = historyMistakeGroups([
+      ev("COLLISION", 8, "staticObjectOnRoad"),
+      ev("COLLISION", 21, "staticObject"),
+      ev("COLLISION", 30, "staticObjectOnRoad"),
+    ]);
+    expect(rows, "the on-road strike first must still file as one history row").toHaveLength(1);
+    expect(rows[0]!.count).toBe(3);
+  });
+
+  it("a COLLISION with a copy key that is NOT folded stays its own row", () => {
+    const rows = historyMistakeGroups([
+      ev("COLLISION", 8, "staticObjectOnRoad"),
+      ev("COLLISION", 21, "vehicle"),
+    ]);
+    expect(rows, "a vehicle strike is a different act from a static one").toHaveLength(2);
+    expect(rows.map((r) => r.count)).toEqual([1, 1]);
+    expect(new Set(rows.map((r) => r.titleBg)).size).toBe(2);
+  });
+});

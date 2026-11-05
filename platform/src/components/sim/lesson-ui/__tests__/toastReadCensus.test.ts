@@ -5,7 +5,8 @@
  * sc-roundabout-entry:fe081cf1 round 2 (2026-10-13), acceptance item 3.
  *
  * TWO HALVES, AND WHY NEITHER IS ENOUGH ALONE.
- *   · MEASURED: `openedCardHeights.fixture.ts` — all 86 cards laid out by
+ *   · MEASURED: `openedCardHeights.fixture.ts` — all 87 cards (86 in round 2,
+ *     row 87 added by lane staticcardcopy and measured the same way) laid out by
  *     Chromium and WebKit with the product's compiled CSS. That same run laid
  *     each card out IN the column at each stage and read the result off the
  *     DOM: 0 of 86 × 6 × 2 cut, law chip inside the window on every one
@@ -39,13 +40,17 @@ const ADVISOR = 98.3;
 const RIG_STAGE = (467.5 + 172) / 0.76;
 const TOP_BAR = 900 - RIG_STAGE;
 
+// RE-DERIVED for row 87, COLLISION/staticObjectOnRoad (lane staticcardcopy, S5): its card was laid out in
+// each stage's column by the same browsers (scratch staticcardcopy-impl/cardcensus): Chromium — scrolls at
+// 1165×650, whole from 1366×768 up (279 px natural, 283.0 px of room there); WebKit — scrolls at 1165×650 and
+// 1366×768, whole from 1440×800 up (293 px natural). Each count below is the round-2 count plus that one card.
 const STAGES: ReadonlyArray<{ name: string; h: number; cr: [whole: number, scrolls: number]; wk: [whole: number, scrolls: number] }> = [
-  { name: "/simulator 1165×650 (1440×900 window)", h: 650, cr: [33, 53], wk: [27, 59] },
-  { name: "immersive 1366×768", h: 768 - TOP_BAR, cr: [62, 24], wk: [60, 26] },
-  { name: "immersive 1440×800", h: 800 - TOP_BAR, cr: [70, 16], wk: [69, 17] },
-  { name: "immersive 1536×864", h: 864 - TOP_BAR, cr: [74, 12], wk: [75, 11] },
-  { name: "rig cell, immersive 1440×900", h: RIG_STAGE, cr: [77, 9], wk: [77, 9] },
-  { name: "immersive 1920×1080", h: 1080 - TOP_BAR, cr: [83, 3], wk: [83, 3] },
+  { name: "/simulator 1165×650 (1440×900 window)", h: 650, cr: [33, 54], wk: [27, 60] },
+  { name: "immersive 1366×768", h: 768 - TOP_BAR, cr: [63, 24], wk: [60, 27] },
+  { name: "immersive 1440×800", h: 800 - TOP_BAR, cr: [71, 16], wk: [70, 17] },
+  { name: "immersive 1536×864", h: 864 - TOP_BAR, cr: [75, 12], wk: [76, 11] },
+  { name: "rig cell, immersive 1440×900", h: RIG_STAGE, cr: [78, 9], wk: [78, 9] },
+  { name: "immersive 1920×1080", h: 1080 - TOP_BAR, cr: [84, 3], wk: [84, 3] },
 ];
 
 const capOf = (stageH: number) =>
@@ -64,8 +69,9 @@ function layOut(naturalPx: number, pinnedPx: number, roomPx: number): { fit: Fit
 }
 
 describe("the fixture is the catalogue's cards — a paragraph that changed turns this red", () => {
-  it("86 cards, each a code (and act) the catalogue has, with a summary to open from, at the measured length", () => {
-    expect(OPENED_CARD_HEIGHTS).toHaveLength(86);
+  it("87 cards, each a code (and act) the catalogue has, with a summary to open from, at the measured length", () => {
+    // 86 → 87: COLLISION/staticObjectOnRoad (lane staticcardcopy), measured in both engines (fixture header).
+    expect(OPENED_CARD_HEIGHTS).toHaveLength(87);
     const stale: string[] = [];
     for (const [key, chars] of OPENED_CARD_HEIGHTS) {
       const [code, detail] = key.split("/") as [ViolationCode, string | undefined];
@@ -98,7 +104,7 @@ for (const [engine, natAt, pinAt] of [
   ["Chromium", 4, 5],
   ["WebKit", 8, 9],
 ] as const) {
-  describe(`THE CENSUS — ${engine}: 86 opened cards × 6 stages, a fault waiting behind each («+1» in the footer)`, () => {
+  describe(`THE CENSUS — ${engine}: 87 opened cards × 6 stages, a fault waiting behind each («+1» in the footer)`, () => {
     for (const stage of STAGES) {
       it(`${stage.name}: none cut`, () => {
         const room = roomOf(stage.h);
@@ -135,15 +141,17 @@ for (const [engine, natAt, pinAt] of [
       console.log(`[census] ${engine} · cut at base → cut after round 1 → cut after round 2: ` + STAGES.map((s, i) => `${s.name} ${table[i]![0]} → ${table[i]![1]} → 0`).join(" · "));
       if (engine === "Chromium") {
         // the round-1 table, reproduced: 1165×650 86 → 50 · 1366×768 80 → 20 · 1440×900 23 → 8 · 1920×1080 7 → 3
-        expect(table[0]).toEqual([86, 50]);
-        expect(table[1]).toEqual([80, 20]);
+        // — and with row 87 (lane staticcardcopy; its 279 px card is not whole beside the advisor at 1165×650 or
+        // 1366×768, nor at 1165×650 without it): 1165×650 87 → 51 · 1366×768 81 → 20; the rest unchanged.
+        expect(table[0]).toEqual([87, 51]);
+        expect(table[1]).toEqual([81, 20]);
         expect(table[4]).toEqual([23, 8]);
         expect(table[5]).toEqual([7, 3]);
       }
       for (const [base, r1] of table) expect(r1).toBeLessThanOrEqual(base!);
     });
 
-    it("THE BREAKPOINT, derived: the shortest stage on which every one of the 86 keeps its law chip pinned", () => {
+    it("THE BREAKPOINT, derived: the shortest stage on which every one of the 87 keeps its law chip pinned", () => {
       const worstPinned = Math.max(...OPENED_CARD_HEIGHTS.map((c) => c[pinAt]));
       // room − fold row ≥ pinned + one line, room = 0.76·H − 172 − (48.7 + 6) − (23.5 + 6)
       let h = 400;

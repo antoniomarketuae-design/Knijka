@@ -28,8 +28,19 @@
  * COLLISION CLASSIFICATION (the existing userData path): parked cars carry
  * the NpcColliders userData tag with kind "vehicle" (npcId >= 3000 — ambient
  * agents are < 1000, staged actors >= 1000), so VehicleRig's onCollisionEnter
- * grades `withWhat: "vehicle"`. Props and walls stay UNTAGGED — the rig's
+ * grades `withWhat: "vehicle"`. Props and walls carry no NPC tag — the rig's
  * fallback classifies them "staticObject". No grading code changes.
+ *
+ * …EXCEPT ONE FACT ABOUT WHERE THE BODY STANDS (lane staticcardcopy; ADR-014
+ * amendment 2026-11-04). A prop or wall whose spec the recipe stamped
+ * `onCarriageway` (its centre is on the built carriageway —
+ * `scenarioSceneryProps.stampHeldOnCarriageway`) carries
+ * `STATIC_ON_CARRIAGEWAY_USER_DATA` on its RigidBody, re-exported below as the
+ * very object `modules/sim/scene/obstacleSpec.ts` owns. It is neither an NPC
+ * tag nor the drive-over surface, so the contact still grades "staticObject"
+ * at the lesson's threshold; it only lets the rule engine pick the paragraph
+ * that is true of a body on the road. Every other prop and wall, and the fuel
+ * station, mount no `userData` at all, exactly as before.
  *
  * CONTACT THRESHOLD: street driving ignores contacts under 10 km/h
  * (VehicleRig COLLISION_MIN_KMH — nudge tolerance). In a parking task a
@@ -79,7 +90,11 @@ import type {
   ScenarioWallObstacle,
   ScenarioWorkerObstacle,
 } from "@/modules/sim/scene/obstacleSpec";
-import { PROP_COLLIDER_DIMS, WALL_DEFAULT_THICKNESS_M } from "@/modules/sim/scene/obstacleSpec";
+import {
+  PROP_COLLIDER_DIMS,
+  STATIC_ON_CARRIAGEWAY_USER_DATA,
+  WALL_DEFAULT_THICKNESS_M,
+} from "@/modules/sim/scene/obstacleSpec";
 import type { NpcColliderUserData } from "./NpcColliders";
 
 // Re-exported so a scene caller still has ONE import for "the obstacle layer";
@@ -110,6 +125,21 @@ export const PARKING_COLLISION_MIN_KMH = 0;
 
 /** Scenario-obstacle npcId space (ambient < 1000, staged >= 1000). */
 export const SCENARIO_OBSTACLE_NPC_ID_BASE = 3000;
+
+/**
+ * The one `userData` a stamped (`onCarriageway`) prop or wall carries — the
+ * SAME frozen object `modules/sim/scene/obstacleSpec.ts` owns, re-exported so
+ * the obstacle layer has one import for it (the rapier harness mounts it from
+ * here). See the header's COLLISION CLASSIFICATION.
+ */
+export { STATIC_ON_CARRIAGEWAY_USER_DATA };
+
+/** The RigidBody props a held static spec's carriageway fact adds: the tag on
+ *  a stamped prop or wall, nothing at all otherwise (the key is omitted, so an
+ *  unstamped body mounts exactly as before). */
+function staticBodyUserData(spec: { onCarriageway?: true }): { userData?: typeof STATIC_ON_CARRIAGEWAY_USER_DATA } {
+  return spec.onCarriageway === true ? { userData: STATIC_ON_CARRIAGEWAY_USER_DATA } : {};
+}
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested in scenarioObstacles.test.ts)
@@ -606,8 +636,10 @@ function PropInstances({
           colliders={false}
           position={[p.x, 0, -p.y]}
           rotation={[0, obstacleYawRad(p.headingDeg), 0]}
+          {...staticBodyUserData(p)}
         >
-          {/* Untagged ⇒ VehicleRig classifies contact as "staticObject". */}
+          {/* No NPC tag ⇒ VehicleRig classifies contact as "staticObject"; a
+              stamped cone also says it stands on the carriageway. */}
           <CuboidCollider
             args={[dims.half.x, dims.half.y, dims.half.z]}
             position={[0, dims.centerY, 0]}
@@ -632,8 +664,10 @@ function ObstacleWall({ spec }: { spec: ScenarioWallObstacle }) {
       colliders={false}
       position={[spec.x, 0, -spec.y]}
       rotation={[0, yaw, 0]}
+      {...staticBodyUserData(spec)}
     >
-      {/* Length runs along the heading (local +Z). Untagged ⇒ staticObject. */}
+      {/* Length runs along the heading (local +Z). No NPC tag ⇒ staticObject;
+          a stamped wall also says it stands on the carriageway. */}
       <CuboidCollider
         args={[thickness / 2, height / 2, spec.lengthM / 2]}
         position={[0, height / 2, 0]}

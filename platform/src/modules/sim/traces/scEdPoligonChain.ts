@@ -97,6 +97,11 @@ export function poligonChainConeObstacles(): ObstacleRect2D[] {
       halfWidthM: 0.4,
       halfLengthM: 0.4,
       withWhat: "staticObject" as const,
+      // THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, L7): the bay cone (poligon-v1, S2(a))
+      // measures `surfaceAt(...).under === "carriageway"` at its centre on the
+      // committed district, as its live twin's stamp does; pinned against that
+      // fact (scene/__tests__/static-on-carriageway-fact.test.ts).
+      onCarriageway: true as const,
     },
     {
       x: 146.5,
@@ -105,6 +110,11 @@ export function poligonChainConeObstacles(): ObstacleRect2D[] {
       halfWidthM: 0.4,
       halfLengthM: 0.4,
       withWhat: "staticObject" as const,
+      // THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, L7): the bay cone (poligon-v1, S2(a))
+      // measures `surfaceAt(...).under === "carriageway"` at its centre on the
+      // committed district, as its live twin's stamp does; pinned against that
+      // fact (scene/__tests__/static-on-carriageway-fact.test.ts).
+      onCarriageway: true as const,
     },
   ];
 }

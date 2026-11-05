@@ -509,6 +509,12 @@ export const PARK_DEPTH_WALL: ObstacleRect2D = {
   halfWidthM: 0.2,
   halfLengthM: 3.0,
   withWhat: "staticObject",
+  // THE BODY STANDS ON THE CARRIAGEWAY (lane staticcardcopy, L7, S2(a)): the
+  // wall measures `surfaceAt(...).under === "carriageway"` at its centre on
+  // lot-wall-v1 (a scenario-lot's aisle is built as roadway), as its live
+  // twin's stamp does; pinned against that fact
+  // (scene/__tests__/static-on-carriageway-fact.test.ts).
+  onCarriageway: true,
 };
 
 // ---------------------------------------------------------------------------

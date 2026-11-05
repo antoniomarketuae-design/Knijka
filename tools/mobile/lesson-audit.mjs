@@ -7892,7 +7892,10 @@ const routeHold = { offRoadTicks: 0, crashPinnedTicks: 0, clearTicks: 0, unread:
 const ROUTE_HOLD_OFF_ROAD_BG = "Колата е извън пътя — върни се на платното, за да продължиш";
 // Lane endings (rulings E5/E8/E11): the product's crash lead has three variants (назад / напред / я отдръпни)
 // sharing this 53-character stem — LessonPlayShell CRASH_HOLD_LEAD_BG. `revText.includes` matches all three.
-const ROUTE_HOLD_CRASH_PINNED_BG = "След удара — ако колата опира в удареното, първо леко";
+// Lane rbreverse (sc-roundabout-entry:9e85f27e, ruling R6a; gate rb 2026-11-04): the lead names the LOOK before
+// the move, so the stem moved from «След удара — ако колата опира в удареното, първо леко» to the one below —
+// still 53 characters, still shared by all three variants.
+const ROUTE_HOLD_CRASH_PINNED_BG = "След удара — първо се огледай; ако колата опира, леко";
 
 /* ── THE PRODUCT'S OWN «STANDING STILL IS THE MANOEUVRE» — TWO SURFACES ─────
  *

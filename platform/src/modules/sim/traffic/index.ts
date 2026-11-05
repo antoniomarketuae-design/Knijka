@@ -174,6 +174,7 @@ export type {
   DistrictNode,
   OncomingApproach,
   PedestrianVariant,
+  PlayerShedAccount,
   PlayerStepTrack,
   SignalPhaseFn,
   AmbientSignalFn,

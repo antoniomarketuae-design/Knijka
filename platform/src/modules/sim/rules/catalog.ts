@@ -2846,11 +2846,21 @@ export const RAIL_CROSSING_ACT_COPY: Record<
  * the two-second lead-car rule among them, exactly as the rail corrective walks
  * its three acts. The per-body EXPLANATION is still where the wall, the person
  * and the bicycle each get their own paragraph.
+ *
+ * …AND WHERE THE STRUCK STATIC BODY STANDS (lane staticcardcopy, 2026-11-04).
+ * The static row's paragraph says the car's path left the carriageway — true
+ * of a kerb, a façade, an island, a parapet, and false of a load fallen into
+ * the lane or a cone of a lane closure. So a static contact whose BODY carries
+ * the measured fact that its centre stands on the built carriageway
+ * (SimTickEvent `onCarriageway`, ADR-014 amendment 2026-11-04) is stamped
+ * «staticObjectOnRoad» and reads its own row below; every other static contact
+ * keeps «staticObject» byte for byte. Same title, same charge, same citation,
+ * same corrective; one repeat counter (`foldActDetail`).
  */
 export const COLLISION_CONTACT_COPY: Record<
-  "vehicle" | "pedestrian" | "cyclist" | "staticObject" | "vehicleCutIn",
+  "vehicle" | "pedestrian" | "cyclist" | "staticObject" | "staticObjectOnRoad" | "vehicleCutIn",
   // `peekBg` is REQUIRED here and optional on `ViolationSpec`: this table is
-  // four rows and every one of them is the −10 card a student meets mid-drive
+  // six rows and every one of them is the −10 card a student meets mid-drive
   // on a phone, which is the exact surface `sc-pk-driveway:fa602d10` was filed
   // against. A fifth body added without one would reintroduce the mid-clause
   // cut, and `tsc` says so before a sweep photographs it.
@@ -2885,6 +2895,41 @@ export const COLLISION_CONTACT_COPY: Record<
     // from. The clause it keeps is the explanation's own first one.
     peekBg: "Не се появи внезапно.",
   },
+  // A STATIONARY BODY THAT STANDS ON THE CARRIAGEWAY ITSELF (lane
+  // staticcardcopy, sc-hz-brake-dont-swerve:b7297cb7; integrator rulings C1–C3
+  // and S1–S10, 2026-10-18, S2(a) 2026-11-04). Not a sixth struck body — the
+  // same untagged static contact — but the one case where the row above is
+  // FALSE: «пътят ѝ е излязъл извън платното» and «Не се появи внезапно.» were
+  // printed over a fallen load struck by a car braking IN its own lane, on the
+  // very drill whose lesson is «спирай силно В лентата». The engine stamps this
+  // detail only when the struck BODY carries the fact that its footprint centre
+  // stands on the built carriageway (`onCarriageway`, measured once at scene
+  // build from `surfaceAt(resolveDistrictDrivableSurface(district))` —
+  // scene/scenarioSceneryProps.ts `stampHeldOnCarriageway`; the recorder's
+  // twins carry it by value, pinned against the same fact). Never the car's
+  // pose. What carries it today: the hz block, the ten roadworks cones, the
+  // sc-park-wall lot wall and the two sc-ed-poligon-chain cones (S2(a): the fact
+  // governs, no per-lesson list). So every sentence below is written to be true
+  // of all of them — a load struck after a late brake, the same block clipped
+  // on a swerve, a cone knocked over in a closed lane or brushed ALONGSIDE on
+  // the boundary line, a wall at the end of a car-park bay, a training-ground
+  // cone touched in reverse: no «улица», «лента», «платно», «напред» or «пред
+  // колата», no claim that the car left anything, no claim about how suddenly
+  // the body appeared. The title is the row above's, unchanged; no lawRef and
+  // no correctiveBg of its own (the block above: the citation does not split,
+  // and the pooled corrective's off-road clause is conditional, so it is true
+  // here too). The peek is the explanation's first clause and states the
+  // CAUSE, because on the phone's one-line card it is the whole reason
+  // (lessons/lessonMistake.ts). The repeat ladder and the debrief's dedupe
+  // count it as the SAME mistake as the row above (`foldActDetail` below);
+  // the crash pin reads it as "staticObject" (lessons/finish.ts).
+  staticObjectOnRoad: {
+    titleBg: "Удар в неподвижно препятствие",
+    explanationBg:
+      "Удари неподвижно препятствие, без да оставиш място за него — паднал товар, конус, стена или друго. То не отстъпва: стигаш до него, щом скоростта и вниманието не ти дават да спреш или безопасно да го заобиколиш. Затова скоростта се избира по свободното място, което виждаш, а щом се покаже препятствие — намаляваш веднага.",
+    // One line under the two-line title (25–27 characters a line): 24.
+    peekBg: "Не остави място за него.",
+  },
   // A VEHICLE CONTACT THAT IS THE TAIL OF A BILLED CUT-IN (founder ruling
   // 2026-09-30; sc-merge-lane-end:0487bcec round 3). Not a fifth struck body —
   // the same "vehicle" contact — but the one case where the vehicle row above is
@@ -2907,6 +2952,25 @@ export const COLLISION_CONTACT_COPY: Record<
     peekBg: "Тя имаше предимство.",
   },
 };
+
+/**
+ * ONE MISTAKE, TWO SENTENCES — the fold every «is this the same mistake?»
+ * question asks (lane staticcardcopy, integrator rulings S3 and S10).
+ * «staticObjectOnRoad» is a static contact whose body stands on the
+ * carriageway: it gets its own true paragraph, but no founder ruling prices it
+ * as a different mistake from «staticObject». So the repeat ladder
+ * (`scenarios/coach.ts encounterKey`) counts both on one «#staticObject»
+ * counter, and the debrief's two dedupe sets (`lessons/debrief.ts`: the
+ * corrective already on the page, and the acts the изпитен лист already
+ * charged) ask the folded act. The debrief's ROWS (`groupMistakes`) still
+ * group by the copy key, because the two paragraphs differ and that row prints
+ * them; the history rows (`historyMistakes.ts`) print no paragraph, so they
+ * ask the folded act too (integrator ruling F8, 2026-11-04). The identity for
+ * every other detail.
+ */
+export function foldActDetail(detail: string | undefined): string | undefined {
+  return detail === "staticObjectOnRoad" ? "staticObject" : detail;
+}
 
 /**
  * WRONG_WAY's two roads — w10-4, `sc-merge-accel-lane:93685d58`, 2026-08-25.

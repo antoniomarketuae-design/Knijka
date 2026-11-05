@@ -38,6 +38,7 @@ import type { VehicleSample } from "@/modules/sim/contracts";
 import { surfacePatchGripAt, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import { isDistrictSurfaceUserData, setWindSway } from "@/modules/sim/world";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
+import { isStaticOnCarriagewayUserData } from "@/modules/sim/scene/obstacleSpec";
 import type { SimAudio } from "@/modules/sim/scene/simAudio";
 import { updateVehicleSample } from "@/modules/sim/scene/vehicleSample";
 import { recordPhysicsStep, type PlayerStepTrackRecorder, type StepContact } from "@/modules/sim/traffic";
@@ -152,8 +153,12 @@ export function gradedContactMinKmh(otherUserData: unknown, collisionMinKmh: num
 export interface ChassisContactEffects {
   /** The audible contact, every contact (volume 0..1). */
   thump(volume01: number): void;
-  /** A graded contact: the collision itself and its haptic pattern. */
-  graded(impactKmh: number, withWhat: CollisionWithWhat): void;
+  /** A graded contact: the collision itself and its haptic pattern.
+   *  `onCarriageway` is the struck BODY's fact (lane staticcardcopy): `true`
+   *  only for an untagged held body whose collider carries
+   *  `STATIC_ON_CARRIAGEWAY_USER_DATA`, and then passed as a third argument;
+   *  every other contact is reported with two, exactly as before. */
+  graded(impactKmh: number, withWhat: CollisionWithWhat, onCarriageway?: true): void;
   /** A sub-threshold contact (a kerb scuff, a bumper nudge): one short tap. */
   nudge(): void;
 }
@@ -164,8 +169,11 @@ export function hearChassisContact(
   fx: ChassisContactEffects,
 ): boolean {
   // A11: classify the contact — NPC shells carry a userData tag
-  // (NpcColliders); anything untagged (world meshes, props, kerbs) stays a
-  // static object.
+  // (NpcColliders); anything without one (world meshes, props, kerbs) stays a
+  // static object. A held prop or wall the scene stamped as standing on the
+  // carriageway carries `STATIC_ON_CARRIAGEWAY_USER_DATA` instead — still no
+  // NPC tag, so still a static object; see the graded branch below (lane
+  // staticcardcopy).
   const tag = readNpcColliderUserData(contact.otherUserData);
   // Impact severity = RELATIVE speed at the step the contact began: a moving
   // NPC striking a stopped player is still a real crash. Static geometry has
@@ -175,7 +183,16 @@ export function hearChassisContact(
   // The body decides the threshold, not the lesson alone — see
   // `gradedContactMinKmh`.
   if (impactKmh >= gradedContactMinKmh(contact.otherUserData, collisionMinKmh)) {
-    fx.graded(impactKmh, tag?.kind ?? "staticObject");
+    // WHERE THE STRUCK BODY STANDS (lane staticcardcopy; ADR-014 amendment
+    // 2026-11-04): a held wall or prop the scene stamped as standing on the
+    // carriageway says so on its collider. Read only off an UNTAGGED body — an
+    // NPC shell never carries it — and it moves no threshold, thump, haptic or
+    // nudge: it is handed on so the rule engine can pick the true paragraph.
+    if (tag === null && isStaticOnCarriagewayUserData(contact.otherUserData)) {
+      fx.graded(impactKmh, "staticObject", true);
+    } else {
+      fx.graded(impactKmh, tag?.kind ?? "staticObject");
+    }
     return true;
   }
   // Sub-threshold contact — a kerb scuff or a bumper nudge. NOT graded, and
@@ -442,8 +459,16 @@ export function VehicleRig({
    *  A11: `withWhat` classifies the contact from the other body's NPC-shell
    *  userData tag — untagged bodies (world meshes) are static objects.
    *  `student` is the car at the grid point of the step the contact began
-   *  (sc-hz-brake-dont-swerve:a7d0dd29) — the pose a contact is named from. */
-  onCollision?: (impactKmh: number, withWhat: CollisionWithWhat, student: Readonly<VehicleSample>) => void;
+   *  (sc-hz-brake-dont-swerve:a7d0dd29) — the pose a contact is named from.
+   *  `onCarriageway` is the struck BODY's fact (lane staticcardcopy): `true`
+   *  only for a held wall or prop stamped as standing on the carriageway,
+   *  `undefined` on every other contact. */
+  onCollision?: (
+    impactKmh: number,
+    withWhat: CollisionWithWhat,
+    student: Readonly<VehicleSample>,
+    onCarriageway?: true,
+  ) => void;
   /** Where the rig puts its ear for the step record's contacts
    *  (`hearChassisContact` with this rig's threshold, audio, haptics and
    *  `onCollision`); LessonScene's grid hook calls it at each contact's own
@@ -745,8 +770,8 @@ export function VehicleRig({
     contactListenerRef.current = (contact, student) => {
       hearChassisContact(contact, collisionMinKmh, {
         thump: (volume01) => audioRef.current?.thump(volume01),
-        graded: (impactKmh, withWhat) => {
-          onCollision?.(impactKmh, withWhat, student);
+        graded: (impactKmh, withWhat, onCarriageway) => {
+          onCollision?.(impactKmh, withWhat, student, onCarriageway);
           // F5: the graded-collision pattern, redundant with the thump and
           // with the terminating „опасна" verdict on screen.
           hapticsRef.current?.collision(impactKmh);

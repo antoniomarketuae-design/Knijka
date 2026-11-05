@@ -23,6 +23,9 @@ export {
   /** Which rule bans the stop in a `noStopping` span — the citation
    *  discriminator authored on the zone (see catalog.ts NO_STOP_BASIS_COPY). */
   type NoStopBasis,
+  /** Lane rbreverse: the display-only reverse-warning measurement
+   *  (the SimTick field of that name) — no rule reads it. */
+  type ReverseBrakedFor,
   type RuleEngineConfig,
   type RuleEvent,
   type ScorableEvent,
@@ -47,6 +50,9 @@ export {
 
 export {
   COLLISION_CONTACT_COPY,
+  // lane staticcardcopy (S3/S10): the one fold «staticObjectOnRoad» →
+  // «staticObject» that the repeat ladder and the debrief's dedupe ask.
+  foldActDetail,
   COMMENDATIONS,
   /**
    * ILLEGAL_STOP_IN_BAN_ZONE's five bases and their RETRIEVED citations. Same
