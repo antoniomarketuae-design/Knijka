@@ -2157,6 +2157,14 @@ export interface StagedEventOutcome {
    * printed the first sentence for both.
    */
   committed?: boolean;
+  /**
+   * oncomingLeftTurn: present (always `true`) when `committed` came from an
+   * ADDED-path `turnStarted` (runtime/turns.ts; ruling R11) — a slow or
+   * stop-interrupted turn. Such a commit records no `acceptedGapSec`, and the
+   * Интервал row (`oncomingGapDetail`) does not narrate it: the figure is not
+   * yet true of a slow turn (candidate «slowcredit»). Absent everywhere else.
+   */
+  addedPathCommit?: true;
 }
 
 // ---------------------------------------------------------------------------

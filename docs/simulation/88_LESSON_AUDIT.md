@@ -18575,3 +18575,356 @@ This commit also carries the integrator ruling P-A9, made on 2026-11-05 under th
 - **Rig wave w3z** (2026-11-05, at `a981f78`) measured the pull and the correction size on the device under this reading.
 - **The row stays open** on its other clauses. The founder's manual drive via the rig on the keyboard path, PC and phone (his 2026-10-08 item 4), stays owed.
 - Evidence: `D:/knijka-lanes/scratch/wtus-land/adr-fixes.json` and `comment-fixes.json`, written by `make-pa9-fixes.cjs`, which checks that each replaced text occurs once in the main tree; the ruling's text in `C:/Users/Ljh/.claude/projects/E--AI-driver/finish-2026-09-26/make-rig-wave.cjs` (LATER_RULINGS, «P-A9»).
+
+## Wave C verdicts — 2026-11-06
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1feba3ab356d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 6 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 9 |
+
+**Open list: 16 → 15**, out of 1559 filed across the whole programme (1543 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-06
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1feba3ab356d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 8 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 6 |
+
+**Open list: 15 → 14**, out of 1559 filed across the whole programme (1544 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-06
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1feba3ab356d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 7 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 6 |
+
+**Open list: 14 → 13**, out of 1559 filed across the whole programme (1545 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-08
+
+This run retired 1 row(s). Their evidence frames were driven at (unattributable: 1 of 1) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1feba3ab356d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 1 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 6 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 6 |
+
+**Open list: 13 → 12**, out of 1559 filed across the whole programme (1546 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Wave C verdicts — 2026-11-08
+
+This run retired 2 row(s). Their evidence frames were driven at (unattributable: 2 of 2) — the commit the harness attested on the drive that produced each frame, not the
+commit HEAD was on when these verdicts were posted (`1feba3ab356d`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row. The other verdict counts below are the standing split of
+the open list, not a claim that every open row was re-driven.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 2 |
+| REFUTED (finding was never true) | 0 |
+| PARTIAL (some clauses gone, some not) | 4 |
+| STILL (symptom reproduces) | 0 |
+| UNJUDGED (re-drive did not exercise it) | 6 |
+
+**Open list: 12 → 10**, out of 1559 filed across the whole programme (1547 were already retired before this run).
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## Landed: a junction turn taken slowly, or interrupted by a stop, now emits `turnStarted`, so a slow left turn is adjudicated and billed like a brisk one. runtime/turns.ts keeps its 3 s window unchanged and adds a second, road-referenced path. Over one junction visit, and with no time window, it sums how far the car turns against the road, and it fires at the unchanged 55°. On every committed tape every base event keeps its grid step; on uncommitted inputs an added event can pre-empt one («slowcredit», below). A slow cut in front of an oncoming car bills FAILED_TO_YIELD and refuses the ✓, a slow left turn without a signal bills «Завиване без мигач», and a slow right turn across a rider can bill the hook. When the measured gap stays above 2.0 s only because the oncoming car braked for him, a slow (added-path) left turn is billed only on a car that was oncoming and going straight on or turning right, judged on that car's own planned route, whose route met his car and which braked while his car lay on that route ahead of it (ruling R13'''). A slow careful turn still earns no praise and no «Интервал» row (ruling R11). No shown sentence moves. Measured in process only. `sc-turn-left-oncoming:1613ef2c` (major) (2026-11-08)
+
+Lane `slowturn` ran six rounds on its measuring base `mbase`. That is lane tag f83cc47 in `D:/knijka-lanes/slowturn-impl` and `slowturn-verify`: `7547a0c` + staticcardcopy-r2, with docs/ and tools/ excluded.
+- **The verdict.** Round 1 stopped blocked at step 0 with no product edit. The integrator then ruled R11 and R8'. Rounds 2–5 were each REFUTED by a fresh adversarial verifier:
+  - round 2: a 5–7 km/h turn got no event at all, the 10–11 km/h cut at L2 was not convicted, and a call-site ring mutant survived;
+  - round 3: R13 convicted careful turners who had waited 20 s, on cars that were not oncoming;
+  - round 4: R13' admitted a departing oncoming left-turner;
+  - round 5: R13'' admitted an oncoming left-turner still in its approach lane, and latched as «held» a car that stopped for its own reason.
+  Round 6 was SIGNED OFF WITH CONDITIONS on 2026-11-08 by a verify-only run (wf_549183be-070). Its log is `D:/knijka-lanes/scratch/slowturn-verify/PROGRESS.md`, entries 2026-11-06 11:06 to 2026-11-08 15:16. No stop-rule refutation applied. The reports are `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/slowturn-r2.json` … `slowturn-r6.json`.
+- **The patch.** `slowturn-result-r6-onto-mbase.patch`: sha256 a4199f8c…e8e602b, 28 files, 209,185 bytes, 0 CR bytes. It is cumulative against `mbase`. The cumulative patch against `2ee2469` is `slowturn-result-r6.patch` (afc7e69b…, 101 files).
+  - The verifier applied the patch to `mbase` on its own branch and tagged the result tree6 (e79608f). Its tree hash equals the builder's r6final.
+  - `mbase` is not HEAD. HEAD `1feba3a` carries `a981f78` (wt + us: waitcard, tapswallow, uismall) and `1feba3a` on top of `2ee2469`. The 3-way apply is under PROVEN ON 1feba3a; no file conflicted.
+
+**The row is NOT closed by this landing.** `sc-turn-left-oncoming:1613ef2c` stays OPEN.
+- Every number below was measured in process: recorded and scripted drives folded through the live chain (`liveChainReplay`) and the committed-trace census. No builder, verifier or integrator drove a slow turn in a browser or saw one on a device.
+- The row has two halves, and this landing cures neither:
+  - The false sentence «Интервал: завоят не беше започнат…» was already cured by `2e9268f` (ltapnote round 2).
+  - «Gets no credit» is NOT cured. Under ruling R11 the added event does not credit or narrate. A slow careful turner still gets no YIELDED_TO_PRIORITY, no «Интервал» row, no cyclist credit and no micro-quiz. That omission is the candidate «slowcredit».
+- What this landing does is make a slow turn billable, and adjudicable for the yield fault.
+- A rig re-drive is owed after the gate (Owed, below). Whether its frames leave the row PARTIAL is for that wave's judge and verifier.
+- This landing does not change the open-row count: 10 open (1 critical, 9 major, 0 minor) after rig w4a4, 2026-11-08.
+
+**What was wrong.**
+- **The row's own measurement (filed).** The test drive was the lesson's correct demo `scLtapShadowScript` on sx-v1, with only the turn leg slowed to 10–14 km/h. On that drive the runtime never emitted `turnStarted`.
+  - The cause is `runtime/turns.ts`. It fired only on more than 55° of heading change inside a sliding 3 s window, within 40 m of a node, which makes it a minimum-speed gate.
+  - The pure detector's lowest firing speed: about 7 km/h at R6, 10.5 at R9, 13 at R11, 17.5 at R15 and 25.5 at R22.
+  - With no event there was no N1 `prioritySituation` and no YIELDED_TO_PRIORITY, and both LTAP runners reported `committed:false`.
+  - The same event gates TURN_WITHOUT_INDICATOR, TURN_WITHOUT_OBSERVATION and the right-turn cyclist runner, so a slow turn escaped those too.
+- **Measured by the lane** (the builder; the round-2 and round-3 verifiers reproduced it on their own probes).
+  - A slow cut in front of the tight car was graded as if the student had driven straight on: no bill, and the ✓ «Завърши левия завой на юг, след като пропуснеш насрещните» ticked.
+  - A slow left turn without a signal was not billed.
+- **A second gap the lane found** (round-2 verifier F-B, reproduced by the round-3 builder). Once a slow turn did emit an event, the 10 and 11 km/h cuts at L2 and the 11 km/h cut at L4 were still not convicted. The tight car's guard had braked it for him (cut-10 L2: 6.0 → 0.55 m/s; cut-11 L2 and L4: down to 1.35 and 0.96 m/s), so the least gap N1 measured stayed at 2.01–2.09 s, above the 2.0 s line. The ✓ ticked and the drive passed.
+
+**What landed.** This is the builder's description, checked against the patch's own headers. The verifier's measurements are under their own heading.
+- **runtime/turns.ts: a second, ADDED path beside the unchanged base window.**
+  - **What it measures.** It works over one junction visit: the nearest node within 40 m, reset when that node changes or the car leaves the area. It counts only moving grid points, with forward speed ≥ 2 km/h and ≥ 3 m travelled. On each of them it adds Δheading − Δroad. The road reference is the tangent of the lane fix's edge at the visit start, carried through the node onto its least-deflection continuation when that bends less than 55°.
+  - **What it ignores.** There is no time window: a stop pauses the measure and never resets it. A car following a bending road nets about 0°.
+  - **When it fires.** It fires at |measure| > 55° (TURN_THRESHOLD_DEG, unchanged). It never fires on a ring node, fires at most once per visit, and never fires in a visit the base already reported.
+  - **The deferral (rulings R8' and R12; base events never move on committed tapes).** It waits for (a) or (a'), and then for (b):
+    - (a) the base window, counted over moving time, has held above TURN_REARM_DEG for longer than TURN_WINDOW_SEC;
+    - (a') the point at which the measure passed 55° (and stayed past) is more than TURN_WINDOW_SEC old. This bound means the deferral can delay the event but never starve it;
+    - (b) the base window is not still rising on that grid point. The builder added (b) after a measured case where an event was taken from the base: a recorded sc-vu-bikelane-turn right turn at 6/8/10 km/h.
+  - **The suppression.** After an added event, the next base event in the same visit is suppressed until the base window re-arms below TURN_REARM_DEG.
+  - **The flag.** An added event carries the internal `addedPath: true`, which is never shown.
+- **What reads the flag (ruling R11).** The consumers that BILL read an added event as a turn: the N1 tracker (FAILED_TO_YIELD), TURN_WITHOUT_INDICATOR, WRONG_LANE_FOR_DIRECTION, TURN_WITHOUT_OBSERVATION where a lesson enables it (billed 0 times in the census), and the right-turn cyclist hook. The consumers that CREDIT or NARRATE skip it:
+  - the N1 yield praise, which is never emitted at an added commit;
+  - the oncoming runner's accepted gap, and with it the «Интервал» row (objectives.ts skips an `addedPathCommit` outcome unless it is a collision);
+  - the cyclist credit (`turnedRight` is not latched);
+  - the micro-quiz (`quiz-trigger.ts` returns no concept).
+- **The forced-braking evidence at an ADDED left commit (ruling R13''', 2026-11-06).** It is read only where the tight-gap conviction did not convict, and never at a base commit. It lives in the new runtime/leftTurnGiveWay.ts. A vehicle is evidence only if ALL of these hold:
+  - (1) **A vehicle he must give way to.** Its own planned route arrives by the opposite approach: its arrival lane ends more than 130° (LEFT_TURN_ONCOMING_MIN_DEG = traffic ONCOMING_MIN_DEG) off his approach heading, frozen at the visit start.
+    - Its movement there is STRAIGHT or RIGHT, by `turnSpeedCap`'s bands. This is ЗДвП чл. 37, ал. 1, retrieved from content/law/acts/zdvp.json, and content/concepts.json c-left-turn-oncoming.
+    - It has not passed the node.
+    - It is approaching now: radial closing > 0, and the larger of the radial and crossing-frame closings is ≥ LEFT_TURN_MIN_CLOSING_MPS. Or it is held for him. The builder kept this arithmetic from R13'' as his reading of R13''' (RULING OWED, below).
+  - (2) **Its route across the junction met his chassis box** (within the vehicle's half body width) on a grid point of its present approach. «Across» runs from where the route comes within the node's junction open radius, onward.
+  - (3) **Its `playerShedMps` account grew ≥ 0.3 m/s** (LEFT_TURN_FORCED_SHED_MPS = ROUNDABOUT_FORCED_SHED_MPS) only over grid points on which his chassis lay on its planned route ahead of it, in its present approach. HELD means its speed fell below 1.0 m/s while its speed plus that in-the-way shed was ≥ 1.0.
+  - (4) **It is within LEFT_TURN_ONCOMING_RADIUS_M (36 m),** and its route reaches the node within that reach.
+- **The vehicle's route.** It is read through a new read-only accessor, `TrafficSystem.plannedRouteThrough(id, nodeId, reachM)` (traffic/plannedRoute.ts):
+  - for an ambient car, its lane loop (`route.laneIndices`, `routePos`, `s`) and the connector it drives;
+  - for a staged car, its resolved `pathNodes`.
+  The runtime receives it through `setPlannedRouteQuery`, wired in scene/lessonWorldRecipe.ts `wireTrafficQueries` and in traces/recorder.ts. `PlayerShedAccount` gains `dirX`/`dirY`. A conviction names the car on the internal `prioritySituation.forcedById`, which is never shown and is read by no rule.
+- **New and rewritten tests** (the builder): traffic/__tests__/planned-route.test.ts (new, 7); runtime/__tests__/left-turn-forced-braking.test.ts (new to the tree, rewritten in round 6 for R13''', 22); turns-added-path, slowturn-added-path-runners, slowturn-added-path-narration, slowturn-base-preservation, slowturn-bend-follow-built, slowturn-live-wiring and slowturn-ltap.live.
+  - slowturn-ltap.live's truth instrument is now `drivenPathTruth`. It uses the named car's raw rows over the whole cell, independent of the product predicate.
+  - The mv-uturn-ban-edge-handoff-praise witness §H4b is repinned to its measured R13''' sheet: no bill, an added turnStarted, no praise.
+- **What did not move** (the builder; the verifier found the same).
+  - LEFT_TURN_GAP_MEMORY_SEC and YIELD_CONVICT_SUSTAIN_SEC are untouched. LEFT_TURN_MIN_CLOSING_MPS only gained «export».
+  - TURN_THRESHOLD_DEG, TURN_WINDOW_SEC and TURN_REARM_DEG are unchanged.
+  - oncoming-left-turn-hold-radius.test.ts, ltap-early-stop-band.live.test.tsx and content/ are byte-unchanged.
+  - No shown string changed, and the reviewed-text manifest was not re-recorded.
+
+**What the student sees.** No sentence was added, removed or changed. On a slow (added-path) turn:
+- A slow cut in front of the tight car on sc-turn-left-oncoming bills «Непропускане на предимство» at every level, and the ✓ «Завърши левия завой на юг, след като пропуснеш насрещните» is refused.
+- A slow left turn without a signal bills «Завиване без мигач». It is coached under ruling 16 and booked as the lesson's mistake.
+- A slow right turn with the rider alongside can bill the cyclist hook.
+- A slow turner who crawls or stands across the path of an oncoming car going straight on or turning right, while it brakes for him, is billed FAILED_TO_YIELD at the added commit, where the tight-gap rule did not already convict.
+- A slow careful turn prints what base printed: no praise, no «Интервал» row and no micro-quiz.
+- The fault card is the pooled FAILED_TO_YIELD copy, which cites «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1» and speaks of the right-hand rule. That is pre-existing and recorded below; this landing does not change it.
+
+**What the verifier reproduced** (round 6, on tree6, with the round-5 verifier's own probe plus an independent driven-path truth test: the named car's raw rows over the whole cell. Outputs are under `D:/knijka-lanes/scratch/slowturn-verify/r6/`.) Where an L4 cell is cited below as not driven-true, the session ended at the commit, so the instrument has no path for the car after it. Its L1–L3/L5 siblings name the same car at the same step and are true.
+- **The three round-5 refutations are cured.** All 9 refuting specs at L1–L5, 45 cells, print base's sheet and name no car: R13PP-LEFTTURNER-IN-APPROACH, R13PP-OWN-STOP-HELD and R13PP-MERGE-FOLLOW.
+  - On the merge-follow cell the verifier read id3's own planned route with `plannedRouteThrough`: a wide right-turn arc. Its account grew 0.02 → 2.47 m/s over k4010–4150 while his chassis was 8.08 → 2.70 m off that route, so clause (3) fails. The builder quoted 7.5–8.6 m; the verdict is the same.
+- **The full ow sweep, 480 cells.**
+  - Against base: 41 added FAILED_TO_YIELD and 0 removed. 14 name a car under R13'''. All 14 are staged cars 1000/1001 going straight, and all are driven-true: in-the-way drop 1.30–7.00 m/s. The other 27 are tight-gap convictions that were already on tree5.
+  - Against tree5: 35 bills lost, matching the builder's figures exactly.
+- **The sw sweep, 750 cells.**
+  - Against base: 107 added FAILED_TO_YIELD and 0 other differences; 42 cells go from pass to fail. 61 cells name a car: 1000 ×36 and 1001 ×25, never an ambient car. 59 of the 61 are driven-true. The other 2 are L4 cells that end at the commit.
+  - Against tree5: 18 lost. These are the §H4b anticipatory-braking family (condition ST-H4b).
+- **The ruling's own adversarial sets.** On all three, no car braking for its own lamp, no cross car, no left-turner and no car from another arm is named anywhere.
+  - The late-commit set, 300 cells: 68 cells name a car, always staged 1000/1001. All are driven-true except 13 L4 cells that end at the commit.
+  - The merge-follow / stop-in-lane set, 240 cells: 36 cells name a car, all driven-true.
+  - The stretch set: every committed tape with a base left turn (24 tapes, 12 lessons), with the student slowed 2/3/5× around the turn, at L1 and L3, which makes 144 cells. 12 cells name a car. Each is an oncoming car on its road's straight line that crossed his path and braked while he was on it. The verifier traced two sc-ed-d2-priority-run cells that only its own coarse 35° movement cut flagged, on a bending road.
+- **The evidence table, 175 cells.**
+  - 0 FAILED_TO_YIELD changes against tree5.
+  - 29 cells name a car, driven-true except 5 L4 cells that end at the commit.
+  - The cuts at 10–14 km/h and the shipped 24 km/h cut are convicted at L1–L5; cut-10 L2 and cut-11 L2/L4 are convicted on car 1000.
+  - shadow-10..20-stop20v3 give base sheets, so round 3's R13-FALSE stays cured.
+- **The committed census, 2,434 cells** (503 tapes × L1–L5).
+  - Against `mbase`: 0 base events moved, 0 sheet differences, and 64 cells on 14 tapes gain only an added turnStarted. Identical against tree5.
+  - TURN_WITHOUT_OBSERVATION is billed 0 times.
+  - No committed demo carries an R13''' conviction.
+- **The added path's timing,** reproduced by the round-3 verifier on its own matrix: each slow cell whose session outlives the true moving 55° point gets exactly one turnStarted, at the lag the builder tabulated. That is 3.00 s on the 5–7 km/h R15 crawls. Rounds 4–6 changed only the header of turns.ts.
+- **Mutants: ten, each restored and checked by sha256.**
+  - Killed on assertion text, never on a timeout:
+    - the three required ones: M1, drop the movement filter; M2, drop «while in its way»; M3, drop clause (2). Each gives 2 failures, «expected [ { kind: 'prioritySituation', …(4) } ] to deeply equal []»;
+    - X3, the movement bands swapped: «expected 'left' to be 'right'»;
+    - X4, the staged passed-node check, and X5, the ambient reach: «expected true to be false»;
+    - X6, the opposite-approach line at 60°.
+  - X10, X1 and X8 are the conditions below.
+- **Its test runs.**
+  - Lane suite: 13 files, 628/628.
+  - traffic 54 files, 682 tests; runtime 51, 941; sim/traces 170, 2,372, with 0 freshness reds; lessons/__tests__ plus witness-junctions-live-rungs, 130 files, 2,477 passed and 165 skipped.
+  - scene 798/799 and clips 287/287. Each has one environmental ENOENT, on tools/ and docs/, which the lane lacks.
+  - tsc: 22 errors, the same set as r5.
+- **Restored clean:** HEAD equals tree6, git status is clean and the product shas match.
+
+**The builder's numbers, not re-measured by a verifier.**
+- 26 mutants, all killed on assertion text. Five were killed only by cells added for them: Q_DROP_RADIAL_POS, Q_MET_NO_RESET, P_BASE_TOO, Q_BODY_FROZEN and Q_WIRE_RECORDER. Q_WIRE_RECORDER gives 3 failures, «expected [] to include 'FAILED_TO_YIELD'».
+- orchestrator 42 files, 536 tests; rules 110, 1,929; lessons/scenario/__tests__ 217 files, 5,639 passed and 1 skipped; lesson-ui 56 of 57 files, 894/895, with one environmental ENOENT.
+- The offline base-preservation count: on 503 committed demos + 28 rig tapes, 0 of 43 base events move, and 14 visits gain an added event.
+- The tail set, 150 cells: 16 lost against tree5 (the §H4b family) and 8 R13''' convictions remaining, all true by the builder's instrument.
+
+**The conditions, and how each stands.**
+
+**X10. The HELD return must sit behind clause (1)'s filters. PINNED AT INTEGRATION.** The product's order is right today. But the verifier's mutant X10, which moves the held return ahead of the movement and opposite-approach filters, survives every lane test: both unit files (29 tests), live-wiring, ltap.live and the witness (528), and the other 8 lane files.
+- On committed inputs it bills two correct demos at L5:
+  - sc-junction-rhr/shadow-correct, forcedById 3, a car queued behind him on his own approach;
+  - sc-junction-left/shadow-correct, forcedById 1, a cross-traffic left-turner.
+- Only the catalogue witness witness-junctions-live-rungs (sc-junction-rhr:83b4fd69) kills it: «L5: expected false to be true».
+- The condition asked for: a unit cell in the lane's evidence test for a HELD car that is (a) on his own approach behind him and (b) a cross-traffic left-turner, each giving no evidence. X10 must die on assertion text in the lane's own files.
+PINNED AT INTEGRATION: the integrator added one describe block of 5 cells, «R13''' pins at integration», to `runtime/__tests__/left-turn-forced-braking.test.ts` (+79/−1 on the lane's version; the file 27/27). Two of them are the X10 cells, and both run through the real runtime:
+  - (a) a car HELD for him on his own approach, behind him (the sc-junction-rhr shadow-correct shape): 34 m behind him, straight, arriveDeg 180, braked to rest by shed taken while he drove down its line ahead of it. No evidence;
+  - (b) a cross-traffic left-turner HELD for him (the sc-junction-left shadow-correct shape): eastbound, arriveDeg 90, movement left, braked to rest while he lay on its route. No evidence.
+  - The mutant X10_HELD_BEFORE_FILTERS (the verifier's r6/mut.cjs: `if (this.held.has(row.id)) return row.id;` inserted right after `if (plan === null) continue;` in evidence(), ahead of clause (1)'s movement and opposite-approach filters) dies 2 red, both cells, on «AssertionError: expected [ { kind: 'prioritySituation', …(4) } ] to deeply equal []». leftTurnGiveWay.ts was restored by copy and its sha256 (ed9a1fc2…) checked. The merge verifier killed it again itself, on the same text. X10 now dies on assertion text in the lane's own file.
+
+**X1 and X8. The held latch and the shed line. PINNED AT INTEGRATION.** X1_HELD_TOTAL (the held latch reads the car's total shed instead of its in-the-way shed) and X8_SHED_LINE_LOW (the evidence check reads 0.05 in place of 0.3) survive every lane and live test. Both change 0 of 120 committed cells, over the 8 lessons that carry every ADDED commit.
+- The condition asked for:
+  - a unit cell with in-the-way shed between 0.05 and 0.3 m/s: no evidence;
+  - a unit cell with in-the-way shed of at least 0.3 but below 1.0, plus a later own-reason shed, at rest: not held.
+- X1 and X8 must die on assertion text.
+PINNED AT INTEGRATION (the integrator, in the same describe block; each mutant run alone and restored by copy with sha256 checked):
+  - X8: «(3) nothing when the shed accrued while he was on its route is above 0.05 but below the 0.3 m/s line (0.2 m/s), the car still coming», the oncoming straight car with its in-the-way shed capped at 0.2. Its twin, the same car at 0.4 m/s, convicts car 7, which shows the only thing in question is the line. It runs through the real runtime. X8_SHED_LINE_LOW (the clause-(3) check `shed < this.shedLineMps` read as `shed < 0.05`) dies 1 red, the 0.2 cell, on «AssertionError: expected [ { kind: 'prioritySituation', …(4) } ] to deeply equal []».
+  - X1: «(3) NOT HELD»: 0.35 m/s of shed while he was on its route (at least the line, below LEFT_TURN_MIN_CLOSING_MPS), then a stop for its own reason after he was clear (account 1.5 m/s in all), at rest at the commit. It asserts an in-the-way shed of about 0.35, routeMet true, isHeld false and evidence null; a twin still coming at 5 m/s gives evidence 7. X1_HELD_TOTAL (the held latch reads the total account in place of the in-the-way shed) dies 1 red on «expected true to be false» (isHeld).
+  - The X1 cell drives LeftTurnGiveWayEvidence directly, through track() and evidence(), not the runtime. On the runtime's reference sweep his body stays on the oncoming lane from sweep frame about 36 until the commit, so a stop after he was clear cannot be staged there. The merge verifier accepted that reason (its OBS-1): the cell first fails on the isHeld diagnostic, and under X1 its evidence assertion would fail too, because a held car returns id 7.
+  - The merge verifier killed X8 and X1 again itself, on the same texts.
+
+**ST-H4b. The anticipatory-braking family. RECORDED, a stated limit (integrator ruling ST-H4b, 2026-11-08).**
+- These cells no longer convict:
+  - sc-mv-uturn-ban §H4b L1–L5 (the builder: stream car 1000 shed 11.7 → 3.3 m/s while his chassis was still 1.7–3.3 m clear of its body corridor);
+  - sw-w14-6-st0, sw-w18-8-st0, sw-w22-10-st0 and sw-w22-12-st0 at L1/L2/L3/L5, and sw-w10-6-st5 L1/L2 (reproduced by the round-6 verifier);
+  - tail-w18-8 and tail-w22-12, exit3 and exit5, at L1/L2/L3/L5 (the builder; the round-6 verifier did not re-run the tail set).
+- In each, the car's shed accrued while he was still clear of its corridor: 0.86–3.71 m at least, on the sw cells (the builder's figure, which the round-6 verifier repeats for this family). Under R13''' clause (3) as ruled, that is not evidence, and it is not a defect.
+- What the sheets now show: §H4b L1–L5 carries no bill at all (its witness is repinned to bill [], an added turnStarted and no praise). sw-w10-6-st5 L1/L2 return to base's clean pass. The other drives still carry base's COLLISION or RED_LIGHT_CROSSED bills (the builder).
+
+**slowcredit. A slow turn can pre-empt the base credit. RECORDED (filed condition from round 3).**
+- On committed tapes every base event keeps its step. On uncommitted inputs the added event can fire first and suppress the base event before the window re-arms, and the praise is then lost:
+  - the verifier's stretched sc-mv-uturn-ban/mistake-into-stream at 2×, L1/L3: base fires its left at k2425 and pays YIELDED_TO_PRIORITY; the tree fires an ADDED left at k2380, and the base event is suppressed. This is a mistake tape;
+  - round 3's constructed tighten-10-24-v4 on the R15 correct demo (a 7.5 s wait, the first 45° at 10 km/h, the rest at 24 km/h): a careful turner loses his praise and his «Интервал» row.
+- Both are omissions, never false sentences, and both are on uncommitted inputs. They belong to «slowcredit» (Recorded, below).
+
+**The full lessons/scenario/__tests__ directory.** The round-6 verifier did not re-run it, because two other lanes were running it on the same machine. The builder reports it green. On 1feba3a the integrator ran it: 218 files, 5,655 passed, 1 skipped, and the merge verifier ran it within src/modules/sim/lessons/ (PROVEN ON 1feba3a, below).
+
+**RULING OWED (the builder's owed item 2).** The builder kept R13'''s «approaching now» gate inside clause (1): radial closing > 0 and the larger of radial and crossing-frame closing ≥ 1.0, or held. He reads R13'''s redefinition of the held latch as keeping it. The verifier's adversarial sets were run with it in place. INTEGRATOR RULING ST-APPR (2026-11-08; the founder's to veto): CONFIRMED — R13''' redefines only the held latch; the «approaching now» arithmetic of clause (1) stays as built, and the verifier's adversarial sets were measured with it.
+
+**The new seam (the builder's owed item 3).** The integrator reviews `TrafficSystem.plannedRouteThrough` (traffic/types.ts, system.ts, plannedRoute.ts) and `runtime.setPlannedRouteQuery`, wired in scene/lessonWorldRecipe.ts and traces/recorder.ts beside the rb/wp/sc wiring, at landing. The integration log does not record that review, so it stays owed (Owed, below). The merge verifier found every staged product file byte-identical to the lane's own trees.
+
+**LANDING ORDER (UC-1).** slowturn lands BEFORE uturncorr.
+
+**Not cured by this landing, and stated limits.**
+- **«No credit» (R11; candidate «slowcredit»).** A slow careful turn still earns no praise, no «Интервал» row, no cyclist credit and no micro-quiz. The figures those consumers print were built for a fast turn, and the gap-figure family (`7974670c` C1/C2) must first be made true for slow turns.
+- **Split nodes (ruling R10).** The visit is keyed to the nearest node. Where two intersection nodes lie within 40 m along a turning path (in the catalogue only d2-v1, about 46 pairs; the builder), a slow turn can be split across two visits and missed. The base window is unaffected.
+- **U-turns at a junction (ruling R2 (a))** are treated as the base treats them at speed.
+- **The lag.** The added commit lands up to one window after the true moving 55° point: 3.00 s on a 5–7 km/h R15 crawl, 1.6–2.4 s on a turn stopped mid-way, and ≤ 0.05 s on a continuous 8–14 km/h turn (the builder's table; lags reproduced by the round-3 verifier). A crawl whose session ends inside that window gets no event.
+
+**What this landing supersedes in doc 88.** In the ltapnote landing (`sc-turn-left-oncoming:d079e687`, 2026-10-10), condition C3 (main tree's working copy, :11933–:11936) says the detector «never fires when the tape's turn is slowed by ×1.3 or more», and that «the runner then never commits». Neither is now true of the turn event. The added path fires, apart from the split-node, ring and lag cases above, and the oncoming runner commits on it, marked `addedPathCommit`, recording no accepted gap. The rest of that bullet, «there is no YIELDED_TO_PRIORITY, and no Интервал row is printed», stays true (R11).
+
+**ADR.** ADR-014 gains «Amendment 2026-11-08». It states the two-path turn decision and the planned-route evidence, read at grid state. It also adds a dated note, «Update 2026-11-08», to ADR-011's 2026-11-04 amendment: the `playerShedMps` account gains a fourth reader, and this one is graded, when the other conditions of the ADR-014 amendment hold. In ADR-015's «New vocabulary», the bullet on `StagedActorView.playerShedMps` now also names that fourth, graded reader.
+
+**PROVEN ON 1feba3a** (the integrator's run in the worktree `D:/knijka-lanes/integ-st`, log `D:/knijka-lanes/scratch/st-land/PROGRESS.md`; the mutant tooling in `scratch/st-land/mut/`, a copy of the verifier's r6/mut.cjs with its path set to integ-st. The merge verifier re-ran the lessons directory with scenario, eight module directories in one run, and the tools tests itself):
+- The lane patch's sha256 matched (a4199f8c…e602b). It went in with `git -c core.autocrlf=false apply --3way --index --binary`: 28 files (16 modified, 12 added), exit 0. No 3-way merge was needed and nothing conflicted.
+  - Every modified file's patch preimage blob is byte-identical to the 1feba3a blob. That includes the 9 files that a981f78 or 1feba3a touched after 2ee2469: captureFeedParity.test.ts, rules/types.ts, runtime/index.ts, reverseBrakedFor.ts, worldRuntime.ts, lessonWorldRecipe.ts, traces/recorder.ts, traffic/system.ts and traffic/types.ts.
+  - The «Falling back to direct application» lines were only the 12 new files. Every staged blob equals the patch postimage.
+- The gate patch `D:/knijka-lanes/gate-st.patch`, sha256 ccbdc7724d70252f8701befa3f7ad59d922afe39d96077e14e7ffc143201f99e, 28 files, +3828/−31, 0 CR bytes (no touched file is CRLF in the repo). The merge verifier found `git diff --cached --binary 1feba3a` byte-identical to it.
+  - On a temporary index the merge verifier applied the lane patch alone to 1feba3a (`apply --cached --3way`, exit 0, no conflicts). That tree (d3400306) differs from the staged tree (851ced34) in one file only, `runtime/__tests__/left-turn-forced-braking.test.ts`, +79/−1: the pins block plus its imports. There is no product change beyond the lane.
+  - The 27 other staged files are byte-identical to the lane's own trees, slowturn-impl (r6final) and slowturn-verify (tree6).
+  - No protected constant moved. LEFT_TURN_MIN_CLOSING_MPS only gained «export»; LEFT_TURN_GAP_MEMORY_SEC and YIELD_CONVICT_SUSTAIN_SEC are untouched.
+  - The cumulative 2ee2469 patch does not apply cleanly to 1feba3a, which is expected: it carries content that a981f78 already landed. It is not the landing input.
+- The pins: X10, X1 and X8 above.
+- The lane's own tests and one lane mutant (the merge verifier): 11 lane files green, 610/610 (left-turn-forced-braking, turns-added-path, turns, planned-route, slowturn-added-path-runners, slowturn-added-path-narration, the slowturn-* scenario files and mv-uturn-ban-edge-handoff-praise). M3_DROP_MET, killed by the lane verifier, died again on the same 2 clause-(2) cells with the same assertion text, and was restored with sha OK.
+- The integrator's directories, all green, EXIT 0:
+  - lessons/__tests__ 129 files, 2,472 passed, 165 skipped;
+  - lessons/scenario/__tests__ 218 files, 5,655 passed, 1 skipped (the catalogue witness witness-junctions-live-rungs, sc-junction-rhr:83b4fd69, and reviewed-text-manifest among them);
+  - components/sim 111 files, 1,846 passed;
+  - orchestrator 42, 536; rules 110, 1,929; traffic 54, 682; runtime 51, 946 (the 5 pin cells included; left-turn-forced-braking.test.ts 27/27);
+  - scene 48, 799; vehicle 22, 299; world 135, 2,409; hud 74, 1,454; traces 171, 2,376;
+  - src/modules/clips/ 19, 302, the clip-plan freshness gate green with no regeneration.
+- The merge verifier's runs, all to completion, one at a time with --maxWorkers=1:
+  - src/modules/sim/lessons/ including scenario: 347 files, 8,127 passed, 166 skipped. witness-junctions-live-rungs (no skip in the file) and reviewed-text-manifest are inside, and both counts match the integrator's;
+  - runtime/, traffic/, orchestrator/, rules/, scene/, traces/, src/modules/clips/ and src/components/sim/ in one run: 606 files, 9,416 passed, the clip-plan freshness gate inside.
+- Reviewed-text manifest: green inside the lessons/scenario run, so no shown text moved against the patches. It was not re-recorded, and no entry moved.
+- tsc (`npx tsc --noEmit --incremental false`): at its baseline, 21 errors, all environment (api/health/route.ts 4, lib/db.ts 1, admin/store 3, auth/store 2, learning/store 3, lesson/progress 1, outcomes/store 1, payments/store 2, privacy/store 1, sim/lessons/store 2, sim/traces/attemptStore 1), none in a touched file.
+- tools-tests (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what gate 4/4 of wave-cycle.sh runs): 2,030 tests, 2,007 pass, 8 fail, 11 skipped, 4 todo, the same in the merge verifier's own run.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are environment: gitignored main-tree resources absent from the worktree. count-agreement.test.mjs, finding-reader.test.mjs and build-redrive §9(a), §9(b), §9(d), §9(e) fail on «could not find .audit-frames/findings»; lane-evidence.test.mjs fails on «could not resolve the playwright package».
+  - Re-measured by the integrator with that environment present, read only, the main tree's `git status --porcelain` md5 ffa59223 before and after: finding-reader + build-redrive (worktree copies) with cwd `E:\AI driver` 76/76; lane-evidence with `KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/` 10/10; count-agreement (worktree copy, main cwd) 13/14, the one red the known cross-tree artefact «apply-reroute.mjs printed no WORKED line», as in en-land and fi-land; count-agreement on the main tree's own copy 14/14 (the patch touches no tools file, main tools/ is clean and main HEAD is 1feba3a). Net: only the freeze.
+  - No tools test was taught. The main-tree gate decides.
+- The worktree was left staged, with no temporary file and no process running. The merge verifier left HEAD at 1feba3a, the staged diff sha unchanged, no unstaged changes and no untracked files apart from the ignored node_modules junction.
+- Not re-run by the merge verifier: tsc, the vehicle/, world/ and hud/ sets, and the read-only re-runs of the 7 environmental tools tests against the main tree.
+- Not re-run on 1feba3a by the integrator or the merge verifier: the lane verifier's census of 2,434 cells, its sweeps, adversarial and stretch sets and evidence table, and its mutants beyond those named above. Those numbers are the round-6 verifier's (or, where stated, the builder's or an earlier round's), measured on the lane's trees: tree6 (`mbase` + the r6 patch) for round 6.
+
+**Owed.**
+- **The rig re-drive of 1613ef2c,** through `/dev/drive-rig` (ADR-017), on PC and phone, L1 and L3 of sc-turn-left-oncoming:
+  - a 7.5 s wait, then a turn at about 11 km/h, photographing that no commendation and no «Интервал» row print under the ✓ (R11), on the compact and full layouts;
+  - the same turn with a 5 s stop mid-turn;
+  - a slow cut at about 12 km/h, at L2 too: the FAILED_TO_YIELD card and the refused ✓;
+  - a slow left turn without a signal: «Завиване без мигач»;
+  - with the quiz on «occasional»: no quiz opens at the slow turn.
+  The row moves only on frames judged after this landing.
+- **sc-vu-cyclist-hook,** on the rig: a slow right turn with the rider alongside, and the same turn after letting the rider past. The hook on an added event is proven only at port level and on recorded probes. With the shipped staging, a 6 km/h crawl commits about 3 s late, when the rider is already past (the builder).
+- **ltap2** (`52a3516f`, `bc162f55`) builds on this landing. For uturncorr, see LANDING ORDER, above.
+- **The integrator's remaining item:** the review of the new seam (above) is not recorded, so it stays owed. The «approaching now» gate is ruled (ST-APPR, above).
+- **The tools/maps wording (F12).** `gen_rural_curve.mjs:28-40`, `gen_ov_crest.mjs:36-46` and `gen_mw_exit.mjs:646-653` still say turnStarted needs > 55° within a 3 s window. That is no longer the whole rule. The builder reports that those maps have no intersections, so nothing they generate changes.
+- **The founder is told:** a slow or stopped turn is now a turn that can be billed; it still earns no praise or interval figure; and a car that brakes for where he is about to be, before he is on its path, does not convict a slow left turn. So on sc-mv-uturn-ban §H4b, a 2 s cut that made the stream car shed 11.7 → 3.3 m/s now passes with no bill.
+- **Housekeeping.** A failed edit chain in round 6 made npx fetch vitest into `C:/Users/Ljh/AppData/Local/npm-cache/_npx/69c381f8ad94b576`, outside every repo. The processes were killed and `E:\AI driver` was unchanged. The user may prune it.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D1, 2026-11-08). Several restate items above; they are listed here with the docs agent's evidence.
+- **slowcredit, the pre-emption variant.** A turn begun gently and then tightened, or slowed before a brisk finish, can lose the base event and with it the praise and the row it earns today. Uncommitted inputs only: tighten-10-24-v4 goes from base k2181, with praise and row, to an ADDED k2119 with neither; the stretched sc-mv-uturn-ban/mistake-into-stream at 2×, L1/L3, from base k2425 with praise to an ADDED k2380 with none. Evidence: `scratch/slowturn-verify/r3/probe-tree3y` against `probe-base3y` (tighten-10-24-v4, a careful turner on the correct demo); `r6/stretch-tree6` against `r6/stretch-mbase` (mistake-into-stream f2); `slowturn-verify/PROGRESS.md` (round 3 «CONSTRUCTED base-move»; round 6, 13:30:32); `slowturn-r6.json` verify R6-SLOWCREDIT-SUPPRESSION.
+- **One manoeuvre, two turnStarted.** On round 3's constructed slow-stop-brisk left (a unit cell), the visit gets an ADDED event (k314) and then, after the window re-arms, a base event (k598). Whether this can double-bill TURN_WITHOUT_INDICATOR or the yield fault is unmeasured. Evidence: `scratch/slowturn-verify/r3/defer/cells.jsonl`; `r3/probes/tmp-v3-defer.test.ts`; `slowturn-r3.json` verify DEFER-MOVES-BASE.
+- **The left-turn FAILED_TO_YIELD card cites the wrong duty.** It is the pooled copy, «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1», with a right-hand-rule body; the duty is чл. 37, ал. 1. Pre-existing; this landing bills it on more drives. Evidence: `slowturn-r3.json` and `slowturn-r4.json`, the builders' owed items; rules/catalog.ts FAILED_TO_YIELD.
+- **A praise and a dangerous fault for one turn.** On the stretched sc-jx-equal-left/shadow-correct at 3×, L1/L3, the tree bills a driven-true FAILED_TO_YIELD (car 1001) beside base's right-hand-rule YIELDED_TO_PRIORITY for another car. Evidence: `slowturn-r6.json` verify R6-NOTES.
+- **A ✓ beside a collision.** On base, shadow-*-stop5 L3/L5 tick ✓ sc-ltap-turn beside a COLLISION with the oncoming car. Evidence: `slowturn-r4.json` build owed; `D:/knijka-lanes/scratch/slowturn-impl/r4/table/tree.jsonl`.
+- **The slow right-turn cyclist hook may be unreachable** (also under Owed). The added commit lands up to 3.00 s after the true 55° point, so with the shipped sc-vu-cyclist-hook staging a 6 km/h crawl commits after the rider is past, and a 3 km/h crawl gets no turnStarted. The hook on an added event is proven only at port level and on the probe hookstop-18-0.3-v5 L1. Evidence: `slowturn-r2.json` build owed items 5–6 and verify F-D; `D:/knijka-lanes/scratch/slowturn-impl/PROGRESS.md` round 3 lag table.
+- **Split nodes** (ruling R10, a stated limit, also above). On d2-v1 (about 46 intersection-node pairs within 40 m) a slow turn can be split across two junction visits and get no turnStarted, so it escapes every turn bill there. Evidence: the turns.ts header «KNOWN LIMIT — SPLIT NODES» in `D:/knijka-lanes/slowturn-result-r6-onto-mbase.patch`; `slowturn-r2.json` build owed.
+- **The gap figure C1** (the `7974670c` family, owed as a row in the ltapnote landing, doc 88 main tree :11924). The «Интервал» figure is distance ÷ speed at the commit, so a follow car braking to its own red 44 m out prints 9.96–10.19 s. A future slow-turn credit depends on it. Evidence: `slowturn-r3.json` and `slowturn-r4.json` build owed «Still open from 2e9268f … C1/C2»; doc 88 main tree :11924–:11928.
+- **The disclosed no-row case.** No «Интервал» row prints under a ✓ turn when no oncoming encounter resolved before the session ended (both staged cars standing at the commit). It may overlap the open row `bc162f55`, which is the early-stop instance. Evidence: `slowturn-r3.json` and `slowturn-r4.json` build owed «the no-row case»; doc 88 main tree :11937 and :11959.
+- **«The 8 km/h crawl meeting the following oncoming car».** Every builder round lists it as still open from 2e9268f; its measurement was not found in doc 88 or the lane logs. Evidence: `slowturn-r3.json`, `slowturn-r4.json` and `slowturn-r6.json` build owed («Still open, outside this lane»).
+- **Stale comments in tools/maps** (F12, also under Owed): `gen_rural_curve.mjs:28-40`, `gen_ov_crest.mjs:36-46` and `gen_mw_exit.mjs:646-653` say turnStarted needs > 55° within a 3 s window. That is no longer the whole rule; those maps have no intersections. Evidence: `slowturn-r2.json` build owed (F12).
+- **A stale comment introduced by the patch.** In `runtime/reverseBrakedFor.ts`, ShedAccountRow.dirX/dirY says «Read only by the N1 tracker's ruling-R13' evidence (worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS)». The reader is now `runtime/leftTurnGiveWay.ts` under R13''' (traffic/types.ts already says so). Evidence: `D:/knijka-lanes/slowturn-result-r6-onto-mbase.patch`, the reverseBrakedFor.ts hunk @@ -94,6 +94,11 @@.

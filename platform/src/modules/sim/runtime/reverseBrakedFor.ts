@@ -94,6 +94,11 @@ export interface ShedAccountRow {
   readonly playerShedMps: number;
   /** The vehicle's own speed, m/s. */
   readonly speedMps: number;
+  /** Its unit heading (0° = north = +y) — `PlayerShedAccount.dirX/dirY`. Read only by the N1
+   *  tracker's ruling-R13' evidence (worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS); a row
+   *  without it is never that evidence. */
+  readonly dirX?: number;
+  readonly dirY?: number;
 }
 
 /** The runtime's account query — `traffic.playerShedAccounts()`. Pure. */

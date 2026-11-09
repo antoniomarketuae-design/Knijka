@@ -67,6 +67,13 @@ export {
   type PlayerShedAccountsQuery,
   type ShedAccountRow,
 } from "./reverseBrakedFor";
+// Lane slowturn (ruling R13'''): the N1 tracker's forced-braking evidence at an ADDED-path left commit.
+export {
+  LeftTurnGiveWayEvidence,
+  boxPolylineClearanceM,
+  type PlannedRouteQuery,
+  type PlannedRouteRow,
+} from "./leftTurnGiveWay";
 export {
   parseDistrict,
   BG_URBAN_DEFAULT_KMH,

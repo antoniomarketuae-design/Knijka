@@ -56,8 +56,14 @@ import {
 } from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
 import { ReverseBrakedForTracker, type PlayerShedAccountsQuery } from "./reverseBrakedFor";
+import { LeftTurnGiveWayEvidence, type PlannedRouteQuery } from "./leftTurnGiveWay";
 import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
-import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
+import {
+  createTurnRoadPort,
+  JUNCTION_AREA_RADIUS_M,
+  TurnDetector,
+  type TurnRoadSample,
+} from "./turns";
 import {
   makeSurfaceFix,
   resolveDistrictDrivableSurface,
@@ -564,7 +570,7 @@ export const LEFT_TURN_CONVICT_RADIUS_M = 20;
 export const LEFT_TURN_GAP_MEMORY_SEC = 1.5;
 /** Below this closing speed an "oncoming" makes no arrival claim (stopped at
  * ITS red / queue creep / turning away — all A12-innocent), m/s. */
-const LEFT_TURN_MIN_CLOSING_MPS = 1.0;
+export const LEFT_TURN_MIN_CLOSING_MPS = 1.0;
 /**
  * OVERTAKE-CORRIDOR adjudication (doc 72 OV-05/OV-08 — „изпреварване срещу
  * насрещен", the head-on family; the N1 oncoming machinery composed with the
@@ -837,6 +843,67 @@ export const RB_ON_RING_DEG = 35;
  * every clean leg of the roundabout family — the lane's census).
  */
 export const ROUNDABOUT_FORCED_SHED_MPS = 0.3;
+/**
+ * «A VEHICLE HE HAD TO GIVE WAY TO HAD TO BRAKE FOR THE TURN», m/s — lane
+ * slowturn, ruling R13''' (integrator, 2026-11-06, replacing the evidence rule
+ * of R13' and R13''; under the founder’s forced-braking rulings: 2026-09-30
+ * «a cut-in that forces hard braking IS the push-out» and 2026-10-05 «bill it
+ * only when the other vehicle actually has to brake or swerve because of him,
+ * or there is contact»).
+ *
+ * WHAT IT CLOSES. The N1 tracker convicts a left turn on the GAP it measured:
+ * a convict-tight observation (≤ LEFT_TURN_CONVICT_GAP_SEC) while he was moving,
+ * inside LEFT_TURN_GAP_MEMORY_SEC of the commit. On a SLOW turn (the ADDED path
+ * of runtime/turns.ts) the staged oncoming’s player guard brakes it for him
+ * while he crawls across its lane, so the gap the probe reads never falls to
+ * 2.0 s — measured: sc-turn-left-oncoming’s cut at 10 km/h, L2, the tight
+ * car shed 6.0 → 0.55 m/s in the 0.75 s before the commit and the probe’s
+ * least gap was 2.01 s; the ✓ «…след като пропуснеш насрещните» ticked over a
+ * car that had to brake hard for him. The examiner grades the cut, not the
+ * victim’s rescue (LEFT_TURN_GAP_MEMORY_SEC’s own words).
+ *
+ * THE EVIDENCE is a vehicle he had to give way to, judged on its OWN planned
+ * route through the node (traffic/plannedRoute.ts) — never on its heading or
+ * closing alone, which twice admitted an oncoming LEFT-turner whose route
+ * turned away in front of him (verifier R13P-DEPARTING, round 4;
+ * R13PP-LEFTTURNER-IN-APPROACH, round 5). At an ADDED-path left commit with
+ * no tight evidence, a vehicle is evidence only if ALL hold — the full text,
+ * the law it retrieves and the geometry are at runtime/leftTurnGiveWay.ts:
+ *  (1) a vehicle he must give way to: its route arrives by the OPPOSITE
+ *      approach (its arrival lane ends more than LEFT_TURN_ONCOMING_MIN_DEG
+ *      off his frozen approach heading) and goes STRAIGHT or RIGHT there
+ *      (ЗДвП чл. 37, ал. 1; content/concepts.json c-left-turn-oncoming), it
+ *      has not passed the node, and it is approaching now — radial closing
+ *      > 0 and the larger of the radial and the crossing-frame closing ≥
+ *      LEFT_TURN_MIN_CLOSING_MPS (R13'') — or held for him (3);
+ *  (2) its route ACROSS the junction (inside the node’s junction open radius,
+ *      and on along the lane it leaves by) met his body on a grid point of
+ *      this visit — it crosses his path, or joins his exit arm;
+ *  (3) its account grew ≥ this line over grid points on which his body lay on
+ *      its route AHEAD of it, in its present approach to the node; HELD = on
+ *      such an approach its speed fell below LEFT_TURN_MIN_CLOSING_MPS while
+ *      its speed plus that in-the-way shed was at or above it;
+ *  (4) within LEFT_TURN_ONCOMING_RADIUS_M of the node.
+ *
+ * NOT A NEW NUMBER: the traffic model’s own line between «holding its speed»
+ * and «braking» (`traffic/staged.ts STAGED_BRAKE_LAMP_MARGIN_MPS`), the size
+ * of ROUNDABOUT_FORCED_SHED_MPS and OVERTAKE_BRAKED_SHED_MPS, and the floor
+ * under it is nil — a car he is not the binding obstacle of accounts exactly 0.
+ * BASE commits are untouched (a base commit with the same hole is recorded as
+ * the candidate «guardbrakedcut», not changed here); LEFT_TURN_GAP_MEMORY_SEC,
+ * YIELD_CONVICT_SUSTAIN_SEC and LEFT_TURN_MIN_CLOSING_MPS are unchanged (R7b).
+ */
+export const LEFT_TURN_FORCED_SHED_MPS = ROUNDABOUT_FORCED_SHED_MPS;
+/**
+ * The traffic probe’s «heading roughly opposite» line, degrees — a mirror of
+ * `traffic/system.ts ONCOMING_MIN_DEG` (the runtime does not import traffic;
+ * the two are pinned equal, behaviourally, against `oncomingApproachFor` in
+ * runtime/__tests__/left-turn-forced-braking.test.ts). Read only by the
+ * R13''' evidence (runtime/leftTurnGiveWay.ts (1)): a vehicle’s arrival lane
+ * ending more than this off his approach heading arrives by the OPPOSITE
+ * approach.
+ */
+export const LEFT_TURN_ONCOMING_MIN_DEG = 130;
 /**
  * «ANY SPEED AT ALL», m/s — the yield COMMENDATION's line. «Правилно отстъпено
  * предимство» says nobody paid for the entry, so a car with priority that
@@ -1249,6 +1316,12 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    *  it). Default: none — the field is then ABSENT from every tick («cannot
    *  answer»), never null. */
   setPlayerShedAccountsQuery(fn: PlayerShedAccountsQuery | null): void;
+  /** Install the traffic module's planned-route lookup
+   *  (`traffic.plannedRouteThrough`) for the N1 tracker's forced-braking
+   *  evidence at an ADDED-path left commit (lane slowturn, ruling R13''' —
+   *  runtime/leftTurnGiveWay.ts). Default: none — no vehicle is then that
+   *  evidence (the tight-gap conviction is unchanged). */
+  setPlannedRouteQuery(fn: PlannedRouteQuery | null): void;
   /**
    * Physics layer reports a contact; drained into the next sample().
    *
@@ -1359,6 +1432,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let sameDirQuery: SameDirVehiclesQuery = () => [];
   // Lane rbreverse: null = not wired (the tick then carries no reverseBrakedFor).
   let shedAccountsQuery: PlayerShedAccountsQuery | null = null;
+  // Lane slowturn (ruling R13'''): null = not wired (no forced-braking evidence).
+  let plannedRouteQuery: PlannedRouteQuery | null = null;
   const reverseBrakedFor = new ReverseBrakedForTracker();
 
   // Junction node positions (district space) for priority conflict lookups.
@@ -1520,6 +1595,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     roundaboutNodeIds.add(e.from);
     roundaboutNodeIds.add(e.to);
   }
+  /** The grid state the turn detector's added, road-referenced path reads
+   *  (turns.ts; lane slowturn) — one reused record, filled at step 4. */
+  const turnRoadSample: TurnRoadSample = {
+    nodeId: null,
+    ring: false,
+    edgeIdx: -1,
+    sM: 0,
+    port: createTurnRoadPort(index),
+  };
   const uncontrolledJunctions = district.intersections
     .filter((it) => !it.signalized && it.degree >= 3 && !guardedNodeIds.has(it.id))
     .map((it) => ({ id: it.id, x: it.x, y: it.y }));
@@ -1795,6 +1879,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let ltSustainedRecentT = -Infinity; // last frame with ≥ sustain visibility
   let ltLastTightT = -Infinity; // last convict-tight observation while moving
   let ltTightGapSec: number | undefined; // gap recorded at that observation
+  // Ruling R13''' (LEFT_TURN_FORCED_SHED_MPS; runtime/leftTurnGiveWay.ts): the
+  // vehicles of this visit whose planned route arrives at the node, the speed
+  // each shed while his body lay on that route ahead of it, whether it was held
+  // for him, and whether its route across the junction met his body. Cleared
+  // with the visit.
+  const ltGiveWay = new LeftTurnGiveWayEvidence(
+    LEFT_TURN_FORCED_SHED_MPS,
+    LEFT_TURN_MIN_CLOSING_MPS,
+    LEFT_TURN_ONCOMING_MIN_DEG,
+  );
+  const ltMe = { x: 0, y: 0, headingDeg: 0, halfLengthM: PLAYER_HALF_LENGTH_M, halfWidthM: PLAYER_HALF_WIDTH_M };
 
   // OVERTAKE-CORRIDOR tracker (doc 72 OV-05/OV-08) — one adjudication per
   // opposing-bank EXCURSION (the solidCross excursion discipline), with the
@@ -2317,14 +2412,26 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         JUNCTION_AREA_RADIUS_M,
       );
       const beforeTurns = events.length;
-      turns.update(tSec, v.headingDeg, nearestIx !== null, events, v.speedKmh);
+      // The added, road-referenced path (turns.ts header; lane slowturn) reads
+      // the grid state already computed above: the nearest node and the lane
+      // fix of step 3. No frame-end pose, no clock of its own (ADR-014).
+      turnRoadSample.nodeId = nearestIx !== null ? nearestIx.id : null;
+      turnRoadSample.ring = nearestIx !== null && roundaboutNodeIds.has(nearestIx.id);
+      turnRoadSample.edgeIdx = fix.edgeIdx;
+      turnRoadSample.sM = fix.sM;
+      turns.update(tSec, v.headingDeg, nearestIx !== null, events, v.speedKmh, turnRoadSample);
       // Left-turn commit this frame? Adjudicated by the N1 tracker below
       // (after the braking-response band is known — see 4a').
       let leftTurnCommitted = false;
+      // …and whether that commit came from the ADDED path (ruling R11): such a
+      // commit may CONVICT exactly as a base one, but never earns the yield
+      // praise and publishes no gap figure — see 4a'.
+      let leftTurnCommitAdded = false;
       for (let i = beforeTurns; i < events.length; i++) {
         const te = events[i];
         if (te.kind === "turnStarted" && te.direction === "left") {
           leftTurnCommitted = true;
+          leftTurnCommitAdded = te.addedPath === true;
           break;
         }
       }
@@ -2375,6 +2482,21 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           ltSustainedRecentT = -Infinity;
           ltLastTightT = -Infinity;
           ltTightGapSec = undefined;
+          ltGiveWay.reset();
+        }
+        if (shedAccountsQuery !== null && plannedRouteQuery !== null) {
+          ltMe.x = v.position.x;
+          ltMe.y = v.position.y;
+          ltMe.headingDeg = v.headingDeg;
+          ltGiveWay.track(
+            shedAccountsQuery(),
+            plannedRouteQuery,
+            nearestIx.id,
+            nearestIx.x,
+            nearestIx.y,
+            LEFT_TURN_ONCOMING_RADIUS_M,
+            ltMe,
+          );
         }
         const probe = oncomingQuery(
           nearestIx.x,
@@ -2438,16 +2560,54 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           const visibleLongEnough = tSec - ltSustainedRecentT <= LEFT_TURN_GAP_MEMORY_SEC;
           const standDown =
             brakingResponse && tSec - ltOnsetT <= YIELD_BRAKE_RESPONSE_MAX_SEC;
-          if (tightRecent && visibleLongEnough && !standDown) {
+          const tightConvicts = tightRecent && visibleLongEnough && !standDown;
+          // R13''' is read only where the tight evidence did not convict, and
+          // only at an ADDED-path commit (base commits are untouched).
+          const forcedById =
+            !tightConvicts && leftTurnCommitAdded && shedAccountsQuery !== null && plannedRouteQuery !== null
+              ? ltGiveWay.evidence(
+                  shedAccountsQuery(),
+                  plannedRouteQuery,
+                  nearestIx.id,
+                  nearestIx.x,
+                  nearestIx.y,
+                  LEFT_TURN_ONCOMING_RADIUS_M,
+                  ltApproachHeading,
+                )
+              : null;
+          if (tightConvicts) {
             const ev: Extract<SimTickEvent, { kind: "prioritySituation" }> = {
               kind: "prioritySituation",
               situation: "left-turn-oncoming",
               violated: true,
             };
-            if (commitGap !== undefined) ev.gapSec = commitGap;
+            // An ADDED-path commit (ruling R11) convicts on exactly the same
+            // evidence, but publishes no figure: the gap the commit step reads
+            // on a slow turn is not yet a true account of the interval he took
+            // (candidate «slowcredit»), and the bill does not need it.
+            if (leftTurnCommitAdded) ev.addedPath = true;
+            else if (commitGap !== undefined) ev.gapSec = commitGap;
             events.push(ev);
             ltAdjudicated = true;
-          } else if (ltConflictSeen && ltSlowed) {
+          } else if (forcedById !== null) {
+            // Ruling R13''' (LEFT_TURN_FORCED_SHED_MPS; runtime/leftTurnGiveWay.ts):
+            // an ADDED-path commit across the route of a vehicle he had to give
+            // way to (oncoming, straight on or turning right), still arriving or
+            // held for him, that braked for him while he was on its route ahead
+            // of it in this approach. The same bill, no figure (ruling R11);
+            // which vehicle, on the internal diagnostic channel only.
+            events.push({
+              kind: "prioritySituation",
+              situation: "left-turn-oncoming",
+              violated: true,
+              addedPath: true,
+              forcedById,
+            });
+            ltAdjudicated = true;
+          } else if (!leftTurnCommitAdded && ltConflictSeen && ltSlowed) {
+            // (Never at an ADDED-path commit — ruling R11: the added path
+            // convicts, it does not credit. A slow careful turn earns no praise
+            // here until the interval family is true of slow turns.)
             // Waited for the gap, then turned — the JU-10 correct resolution.
             const ev: Extract<SimTickEvent, { kind: "prioritySituation" }> = {
               kind: "prioritySituation",
@@ -2470,6 +2630,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ltSustainedRecentT = -Infinity;
         ltLastTightT = -Infinity;
         ltTightGapSec = undefined;
+        ltGiveWay.reset();
       }
 
       // 4b. Right-hand rule: entering an uncontrolled junction's core while a
@@ -4261,6 +4422,10 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setPlayerShedAccountsQuery(fn: PlayerShedAccountsQuery | null): void {
       shedAccountsQuery = fn;
+    },
+
+    setPlannedRouteQuery(fn: PlannedRouteQuery | null): void {
+      plannedRouteQuery = fn;
     },
 
     debugUncontrolledJunctions() {

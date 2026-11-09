@@ -1781,8 +1781,12 @@ export class CyclistRightHookRunner implements EventRunner {
     for (const e of input.tickEvents) {
       if (e.kind === "turnStarted" && e.direction === "right" && dPJ <= 40) {
         // Latched for the credit branch below — see `turnedRight`. Set on the
-        // SAME event the hook reads, so „he turned" means one thing here.
-        this.turnedRight = true;
+        // SAME event the hook reads, so „he turned" means one thing here —
+        // except for an ADDED-path turn (a slow crawl the 3 s window cannot
+        // see; runtime/turns.ts, ruling R11): it is billed by the hook below
+        // exactly as a base turn, but it does not earn the credit, which
+        // stays the fast turn's until slow-turn credit is made true.
+        if (e.addedPath !== true) this.turnedRight = true;
         if (cyclistArc < CYCLIST_CLEAR_ARC_M && dPC <= s.dangerRadiusM) {
           out.push({ kind: "prioritySituation", situation: "cyclist-right-hook", violated: true });
           return this.resolve(input, false, "violation");
@@ -2162,6 +2166,8 @@ export class OncomingLeftTurnRunner implements EventRunner {
 
   private gapSec = 0;
   private committed = false;
+  /** `committed` came from an ADDED-path turnStarted (ruling R11). */
+  private addedPathCommit = false;
   private acceptedGapSec: number | undefined;
 
   /** The oncoming car — a moving body from the first frame. */
@@ -2198,6 +2204,7 @@ export class OncomingLeftTurnRunner implements EventRunner {
     this.phase = "armed";
     this.outcome = null;
     this.committed = false;
+    this.addedPathCommit = false;
     this.acceptedGapSec = undefined;
     this.contacted = false;
   }
@@ -2222,13 +2229,24 @@ export class OncomingLeftTurnRunner implements EventRunner {
         !this.committed
       ) {
         this.committed = true;
-        if (carArc < -0.5 && actor.speedMps >= 1) {
+        if (e.addedPath === true) {
+          // A slow / stop-interrupted turn the runtime's ADDED path saw
+          // (ruling R11). He did turn — `committed` says so — but the figure
+          // below is the fast turn's account of the interval and is not yet
+          // true of a slow one, so it is not recorded; the outcome says why.
+          this.addedPathCommit = true;
+        } else if (carArc < -0.5 && actor.speedMps >= 1) {
           // Seconds until the oncoming reaches the junction — the accepted gap.
           this.acceptedGapSec = -carArc / actor.speedMps;
         }
       }
       if (e.kind === "prioritySituation" && e.situation === "left-turn-oncoming") {
-        if (this.acceptedGapSec === undefined && e.gapSec !== undefined) {
+        if (
+          this.acceptedGapSec === undefined &&
+          e.gapSec !== undefined &&
+          e.addedPath !== true &&
+          !this.addedPathCommit
+        ) {
           this.acceptedGapSec = e.gapSec;
         }
         if (e.violated) return this.resolve(input, false, "violation");
@@ -2329,6 +2347,7 @@ export class OncomingLeftTurnRunner implements EventRunner {
       // clear lane» from «never turned», which without it read identically to
       // every consumer (see StagedEventOutcome.committed).
       committed: this.committed,
+      ...(this.addedPathCommit ? { addedPathCommit: true as const } : {}),
     });
     return this.outcome;
   }

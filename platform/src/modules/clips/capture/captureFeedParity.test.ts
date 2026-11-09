@@ -145,6 +145,8 @@ function buildCaptureStack(clipId: string): CaptureStack {
   // Lane rbreverse: the reverse-warning account query, as wireTrafficQueries
   // and traces/recorder.ts wire it (display-only; grades nothing).
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
+  // Lane slowturn (ruling R13'''): the planned-route query, as both wire it.
+  runtime.setPlannedRouteQuery((id, nodeId, reachM) => traffic.plannedRouteThrough(id, nodeId, reachM));
 
   // KNOWN DIVERGENCE, left deliberately (ledger T17 surfaced it; it is not this
   // lane's to close). The capture CLIENT re-enacts a clip against

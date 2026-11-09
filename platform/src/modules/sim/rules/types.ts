@@ -159,8 +159,18 @@ export type SimTickEvent =
    * is the engine's duty whenever it drops a zone for any reason other than a pass.
    */
   | { kind: "crossingZoneExited"; crossingId: string }
-  /** Vehicle committed to a turn at an intersection (steering into it). */
-  | { kind: "turnStarted"; direction: TurnDirection }
+  /**
+   * Vehicle committed to a turn at an intersection (steering into it).
+   *
+   * `addedPath` (lane slowturn, ruling R11): present — always `true` — only on
+   * an event the runtime's ADDED, road-referenced path emitted (runtime/
+   * turns.ts: a slow or stop-interrupted junction turn the 3 s window cannot
+   * see). Absent on every base-window event. The consumers that BILL read the
+   * event exactly as a base one; the consumers that CREDIT or NARRATE (yield
+   * praise, the Интервал row, the cyclist credit, the micro-quiz) skip it. An
+   * internal diagnostic channel — never a shown field.
+   */
+  | { kind: "turnStarted"; direction: TurnDirection; addedPath?: true }
   /**
    * Physical contact with another body.
    *
@@ -370,6 +380,23 @@ export type SimTickEvent =
       violated: boolean;
       yielded?: boolean;
       gapSec?: number;
+      /**
+       * Present (always `true`) only when this adjudication was made at an
+       * ADDED-path `turnStarted` (see that event). Such an adjudication only
+       * ever convicts (`violated: true`) and carries no `gapSec`: it bills, it
+       * does not narrate — the micro-quiz and the oncoming runner's gap record
+       * skip it (ruling R11).
+       */
+      addedPath?: true;
+      /**
+       * Present only on a ruling-R13''' conviction at an ADDED-path left commit
+       * (runtime/worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS, runtime/leftTurnGiveWay.ts):
+       * the traffic id of the vehicle he had to give way to whose forced braking
+       * for him is the evidence. An
+       * internal diagnostic channel, like `addedPath` — never shown, read by no
+       * rule; it lets an instrument check the bill against THAT car's raw rows.
+       */
+      forcedById?: number;
     };
 
 /**

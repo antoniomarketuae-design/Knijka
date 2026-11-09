@@ -3496,6 +3496,20 @@ function oncomingGapReport(
   let commitKnown = false;
   for (const o of stagedOutcomes) {
     if (o.kind !== "oncomingLeftTurn") continue;
+    // A turn only the runtime's ADDED path saw (a slow or stop-interrupted
+    // turn; runtime/turns.ts, ruling R11) is not narrated here: every ending
+    // below but the impact is an account of the interval, built for the fast
+    // turn and not yet true of a slow one («лентата беше чиста» with a car
+    // nine seconds out; a figure the guard had already shed for him). Its
+    // conviction is the bill's to tell. An impact is still an impact.
+    if (o.addedPathCommit === true) {
+      if (o.detail === "collision") {
+        seen = true;
+        collided = true;
+        released = true;
+      }
+      continue;
+    }
     seen = true;
     if (o.detail === "collision") collided = true;
     if (o.detail === "violation") cut = true;

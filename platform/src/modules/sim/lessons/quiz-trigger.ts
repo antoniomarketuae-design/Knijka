@@ -187,10 +187,14 @@ export function conceptForEvent(event: SimTickEvent): string | null {
       return event.control === "stopSign"
         ? "c-give-way-stop-behavior"
         : "c-traffic-light-signals";
+    // An ADDED-path turn and the conviction made at it (runtime/turns.ts,
+    // ruling R11) open no quiz: that path exists to bill a slow turn, and its
+    // events land inside the junction while the encounter it adjudicates is
+    // still live — the one moment a pause must not take the student's eyes.
     case "turnStarted":
-      return "c-driver-signals";
+      return event.addedPath === true ? null : "c-driver-signals";
     case "prioritySituation":
-      return "c-priority-concept";
+      return event.addedPath === true ? null : "c-priority-concept";
     default:
       return null;
   }

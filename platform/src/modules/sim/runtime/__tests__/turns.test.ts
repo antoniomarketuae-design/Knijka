@@ -68,9 +68,15 @@ describe("turn detection", () => {
     expect(eventsOf(ticks, "turnStarted")).toHaveLength(0);
   });
 
-  it("ignores slow drift: 90° spread over 9 s never accumulates 55° in 3 s", () => {
+  it("slow drift: 90° spread over 9 s never accumulates 55° in 3 s — the base window ignores it, the ADDED path reports it once", () => {
+    // Lane slowturn (sc-turn-left-oncoming:1613ef2c): a 90° change in the
+    // direction of travel at a junction is a turn at any pace. The 3 s window
+    // still never fires on it (no base event); the road-referenced added path
+    // (runtime/turns.ts) reports it exactly once, flagged `addedPath`.
     const ticks = run(sweepPoses(J, 178, 268, 180), 0.05); // 0.5°/frame
-    expect(eventsOf(ticks, "turnStarted")).toHaveLength(0);
+    const turns = eventsOf(ticks, "turnStarted");
+    expect(turns.filter((e) => !("addedPath" in e))).toHaveLength(0);
+    expect(turns).toEqual([{ kind: "turnStarted", direction: "right", addedPath: true }]);
   });
 
   it("re-arms after straightening out — two turns emit two events", () => {

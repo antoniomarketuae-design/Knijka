@@ -1107,6 +1107,54 @@ export interface PlayerShedAccount {
    *  rest» half (integrator rulings R5'' / R5''') reads against the traffic model's
    *  stopped bar (`staged.ts HOLD_LIT_SPEED_MPS`). */
   speedMps: number;
+  /** The published state's unit heading (`state.dirX`, `state.dirY`; 0° = north = +y), which a
+   *  standing car keeps. Read only by the runtime's N1 tracker, for the closing of a vehicle
+   *  on the node at an ADDED-path left commit (lane slowturn, ruling R13''' (1) «approaching
+   *  now» — runtime/leftTurnGiveWay.ts). */
+  dirX: number;
+  dirY: number;
+}
+
+/** A vehicle's movement at a junction node, by traffic/vehicles.ts `turnSpeedCap`'s bands (traffic/plannedRoute.ts). */
+export type PlannedMovement = "straight" | "right" | "left" | "uturn";
+
+/**
+ * ONE VEHICLE'S PLANNED ROUTE THROUGH ONE JUNCTION NODE — the row
+ * `TrafficSystem.plannedRouteThrough` fills (lane slowturn, integrator ruling
+ * R13''' 2026-11-06). Read from the route the traffic model already drives
+ * the vehicle on (an ambient agent's lane loop, a staged actor's resolved
+ * lane path — traffic/plannedRoute.ts); nothing is planned for it here.
+ * Read only by the runtime's N1 tracker, to tell a vehicle a left-turner must
+ * give way to (oncoming, straight on or turning right — ЗДвП чл. 37, ал. 1;
+ * content/concepts.json c-left-turn-oncoming) from one whose route turns away
+ * in front of him or never meets his path.
+ */
+export interface PlannedRouteThroughNode {
+  /** The published vehicle state's id. */
+  id: number;
+  /** Its movement at the node: the lane it arrives by against the lane it leaves by. */
+  movement: PlannedMovement;
+  /** Unit end direction of the lane it arrives at the node by (DirectedLane.endDirX/Y; 0° = north = +y). */
+  approachDirX: number;
+  approachDirY: number;
+  /** Half its body's width, m (`vehicleHalfWidthM(profile)`) — the corridor its route sweeps. */
+  halfWidthM: number;
+  /**
+   * Its planned centre-line, travel order: from its present centre along the
+   * rest of its approach, across the junction (the connector the model drives
+   * it on, or the staged path's join), and on along the lane it leaves by for
+   * the query's reach (or to that lane's end). `n` points are valid; the
+   * arrays are reused.
+   */
+  px: number[];
+  py: number[];
+  n: number;
+  /**
+   * The node's drawn junction open radius, m (LaneGraph.junctionRadiusM — the
+   * mouth ambient cars stop at): the part of the route inside it, and on along
+   * the lane it leaves by, is its route ACROSS the junction.
+   */
+  junctionRadiusM: number;
 }
 
 /**
@@ -1224,6 +1272,17 @@ export interface TrafficSystem {
    * Q2 2026-10-19, «warn only»). Pedestrians have no account and are not here.
    */
   playerShedAccounts(): readonly PlayerShedAccount[];
+  /**
+   * THE PLANNED ROUTE of vehicle `id` (a published state id) through junction
+   * node `nodeId`, or null when its route does not arrive at that node within
+   * `reachM` of arc ahead of it (it has passed the node — it is on the lane it
+   * left by — the node is further on, it is not on its route, or it rides an
+   * authored rail line). PURE: reads the agent, its route and the lane graph;
+   * the returned row is reused and overwritten by the next call. Lane slowturn
+   * (ruling R13'''): read only by the runtime's N1 tracker — see
+   * traffic/plannedRoute.ts.
+   */
+  plannedRouteThrough(id: number, nodeId: string, reachM: number): PlannedRouteThroughNode | null;
   /**
    * O62: hand `rearGapMeters` the STATIC bodies the scene actually mounted, as
    * oriented boxes in district space — the held scenery and hittable obstacles

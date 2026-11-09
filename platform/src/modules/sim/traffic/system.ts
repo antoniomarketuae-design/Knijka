@@ -47,6 +47,7 @@ import {
   type PedestrianAgent,
   type PedestrianEnv,
 } from "./pedestrians";
+import { ambientRouteThrough, emptyPlannedRoute, stagedRouteThrough } from "./plannedRoute";
 import { mulberry32, rngRange } from "./rng";
 import { buildRoutes, DEFAULT_ROUTE_OPTIONS, type TrafficRoute } from "./routes";
 import {
@@ -82,6 +83,7 @@ import {
   type CyclistApproach,
   type DistrictEdge,
   type OncomingApproach,
+  type PlannedRouteThroughNode,
   type PlayerShedAccount,
   type RearBodyBehind,
   type SameDirVehicle,
@@ -446,6 +448,8 @@ class TrafficSystemImpl implements TrafficSystem {
   /** playerShedAccounts' reused rows (lane rbreverse) — one pool, no
    *  allocation after warm-up; the pool is the query's own, never world state. */
   private readonly shedAccountRows: PlayerShedAccount[] = [];
+  /** plannedRouteThrough's reused row (lane slowturn, ruling R13'''). */
+  private readonly plannedRouteRow: PlannedRouteThroughNode = emptyPlannedRoute();
   private readonly stagedEnv: StagedEnv;
   /** sc-roundabout-entry:7b747c15 — see `StagedSubstepListener`. */
   private stagedListener: StagedSubstepListener | null = null;
@@ -1399,7 +1403,7 @@ class TrafficSystemImpl implements TrafficSystem {
       for (const a of list) {
         let row = rows[n];
         if (row === undefined) {
-          row = { id: 0, kind: "vehicle", x: 0, y: 0, playerShedMps: 0, speedMps: 0 };
+          row = { id: 0, kind: "vehicle", x: 0, y: 0, playerShedMps: 0, speedMps: 0, dirX: 0, dirY: 0 };
           rows[n] = row;
         }
         row.id = a.state.id;
@@ -1408,11 +1412,35 @@ class TrafficSystemImpl implements TrafficSystem {
         row.y = a.state.y;
         row.playerShedMps = a.playerShedMps;
         row.speedMps = a.state.speedMps;
+        row.dirX = a.state.dirX;
+        row.dirY = a.state.dirY;
         n++;
       }
     }
     rows.length = n;
     return rows;
+  }
+
+  /**
+   * A VEHICLE'S PLANNED ROUTE THROUGH A NODE (lane slowturn, ruling R13''') —
+   * see `TrafficSystem.plannedRouteThrough` and traffic/plannedRoute.ts. PURE:
+   * the agents are read and never touched; only this query's own row is written.
+   */
+  plannedRouteThrough(id: number, nodeId: string, reachM: number): PlannedRouteThroughNode | null {
+    const row = this.plannedRouteRow;
+    for (const a of this.vehicleAgents) {
+      if (a.state.id !== id) continue;
+      if (!ambientRouteThrough(this.graph, a, nodeId, reachM, row)) return null;
+      row.halfWidthM = vehicleHalfWidthM(a.state.profile);
+      return row;
+    }
+    for (const a of this.stagedVehicles) {
+      if (a.state.id !== id) continue;
+      if (!stagedRouteThrough(this.graph, a, nodeId, reachM, row)) return null;
+      row.halfWidthM = vehicleHalfWidthM(a.state.profile);
+      return row;
+    }
+    return null;
   }
 
   /**

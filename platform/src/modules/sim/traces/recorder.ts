@@ -719,6 +719,9 @@ export function recordScriptedDrive(
   // …and the reverse-warning measurement's account query (lane rbreverse), as
   // wireTrafficQueries gives the live lesson. Display-only: it grades nothing.
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
+  // Lane slowturn (ruling R13'''): each vehicle's planned route through a junction node, for the N1
+  // tracker's forced-braking evidence at an ADDED-path left commit (runtime/leftTurnGiveWay.ts).
+  runtime.setPlannedRouteQuery((id, nodeId, reachM) => traffic.plannedRouteThrough(id, nodeId, reachM));
   const staged = options.stagedEvents ?? [];
   const director =
     staged.length > 0

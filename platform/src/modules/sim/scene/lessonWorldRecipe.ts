@@ -369,4 +369,7 @@ export function wireTrafficQueries(
   // only»): every vehicle's own account, for the reverse-warning measurement
   // `SimTick.reverseBrakedFor` — DISPLAY-ONLY, no rule reads it.
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
+  // Lane slowturn (ruling R13'''): each vehicle's planned route through a junction node, for the N1
+  // tracker's forced-braking evidence at an ADDED-path left commit (runtime/leftTurnGiveWay.ts).
+  runtime.setPlannedRouteQuery((id, nodeId, reachM) => traffic.plannedRouteThrough(id, nodeId, reachM));
 }

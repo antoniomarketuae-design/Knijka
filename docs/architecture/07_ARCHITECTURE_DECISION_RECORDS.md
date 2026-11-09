@@ -292,6 +292,12 @@ began, or that stood at rest — ≤ 0.5 m/s, `HOLD_LIT_SPEED_MPS` — on some p
 `SimTick.reverseBrakedFor`, read only by the advisor's reverse warning (`lessons/advisor.ts reverseWarningForSession`).
 No rule reads it: `rules/__tests__/reverse-braked-for-not-graded.test.ts` pins every file under rules/ blind to the field.
 
+**Update 2026-11-08 (lane `slowturn`, `sc-turn-left-oncoming:1613ef2c`; ADR-014 «Amendment 2026-11-08»).** The account gains a FOURTH reader, and this one is graded.
+- At an ADDED-path left commit where the tight-gap rule did not convict, the runtime's N1 tracker reads `TrafficSystem.playerShedAccounts()` (through the runtime's shed-accounts query) in `runtime/leftTurnGiveWay.ts`.
+- It bills FAILED_TO_YIELD on an oncoming straight or right-turning vehicle whose account grew ≥ 0.3 m/s while the student's body lay on that vehicle's planned route ahead of it, when the other conditions of ADR-014 «Amendment 2026-11-08» also hold (ruling R13''').
+- Each row now also carries the vehicle's unit heading (`dirX`, `dirY`).
+- The reverse warning above is unchanged: `SimTick.reverseBrakedFor` is still read by no rule.
+
 ## ADR-012: A crosswind steers the front wheels — the «yaw pull» (Founder ruling, 2026-10-05 «Ship the pull»)
 
 **Status.** Accepted. Founder rulings 2026-10-04 «Stronger wind» and 2026-10-05 «Ship the pull»; lane `crosswind`, rounds 1–3, each
@@ -657,6 +663,47 @@ the trace's samples, looks and indicator edges. LessonScene owns the grid's life
   - the key appears only on flagged static contacts (55 recorder events and 131 sweep events), and is always true.
   The proof of the combined tree on which the landing commit is built (this lane with rbreverse and wcafterpaint) is recorded in doc 88's landing section; the main-tree gate measures the commit itself.
 
+**Amendment 2026-11-08 — a junction turn is decided on the grid by two paths, and a slow left turn's forced-braking evidence is read from the other vehicle's own planned route.** Lane `slowturn`, rounds 1–6, row `sc-turn-left-oncoming:1613ef2c`. Rounds 2–5 were each REFUTED. Round 6 was SIGNED OFF WITH CONDITIONS on 2026-11-08 by a verify-only run, and it landed with the commit that carries this paragraph (doc 88). It rests on integrator rulings R2 (a), R4, R8', R10, R11, R12 and R13''' (2026-11-06; R13''' replaces R13, R13' and R13'') and on ST-H4b (2026-11-08), under the founder's forced-braking rulings of 2026-09-30 and 2026-10-05. It is not a founder ruling, and there is no new ADR. It closes no row: the evidence is in process only, and the device re-drive is owed (doc 88).
+- **What was true before.** `turnStarted` had one rule. `runtime/turns.ts` fired when the signed heading change summed over a sliding 3 s window exceeded 55° (TURN_THRESHOLD_DEG), within 40 m of an intersection node, with forward speed ≥ 2 km/h and ≥ 3 m travelled in the window. That made it a minimum-speed gate: about 17.5 km/h on an R15 corner. A careful 6–14 km/h turn, or any turn interrupted by a stop, produced no event. So it could be neither billed (the N1 left-turn yield fault, TURN_WITHOUT_INDICATOR, WRONG_LANE_FOR_DIRECTION, TURN_WITHOUT_OBSERVATION where a lesson enables it, the right-turn cyclist hook) nor credited.
+- **Decision: the base window stays, and an ADDED, road-referenced path decides once per fixed 1/60 s grid point,** from grid state the runtime already holds at that point. That state is the pose, the signed speed, the step-3 lane fix's edge and arclength, the nearest intersection node within 40 m, and the roundabout node set. There is no frame-end pose and no clock of the path's own.
+  - **What it measures.** It runs over one junction visit (the nearest node; reset when that node changes or the car leaves the area) and over moving grid points only (the base gate). It sums Δheading − Δroad, where the road reference is the lane fix's edge at the visit start, in its travel sense. The reference is carried through the node onto that edge's least-deflection continuation when it bends less than 55°. There is no time window: a stop pauses the sum.
+  - **When it fires.** It fires at |sum| > 55°, never on a ring node, at most once per visit and never in a visit the base already reported. It fires on the first grid point on which (a) or (a') holds, and (b) also holds:
+    - (a) the base window, counted over moving time, has held above TURN_REARM_DEG for longer than TURN_WINDOW_SEC;
+    - (a') the point at which the sum went past 55°, and stayed past, is more than TURN_WINDOW_SEC old. This is the R12 bound: the deferral delays the event but never starves it;
+    - (b) the base window's |sum| is not still rising on that point.
+    Every condition is read off the base window's own constants; there is no new number.
+  - **The suppression.** After an added event, the next base event in the same visit is suppressed until the window re-arms below TURN_REARM_DEG.
+- **The flag (R11).** An added event carries `turnStarted.addedPath: true`, an internal channel that is never shown. Consumers that BILL read it as any turn. Consumers that CREDIT or NARRATE skip it:
+  - the N1 yield praise, which is never emitted at an added commit; a conviction there carries `prioritySituation.addedPath` in place of a `gapSec` figure;
+  - the oncoming runner's accepted gap and the «Интервал» row (`StagedEventOutcome.addedPathCommit`, skipped by `oncomingGapReport` unless it is a collision);
+  - the cyclist credit;
+  - the micro-quiz.
+- **The forced-braking evidence at an ADDED left commit (R13''').** Where the tight-gap rule does not convict, the N1 tracker convicts FAILED_TO_YIELD on a vehicle he had to give way to that had to brake for him (`runtime/leftTurnGiveWay.ts`). Which vehicle that is, is decided by the vehicle's OWN route through the node as the traffic model drives it, never by its heading or closing alone. A vehicle is that evidence only if all of these hold:
+  - (1) Its route arrives by the opposite approach: its arrival lane ends more than LEFT_TURN_ONCOMING_MIN_DEG (= traffic ONCOMING_MIN_DEG, 130°) off his approach heading, frozen at the visit start.
+    - Its movement there is STRAIGHT or RIGHT, by `turnSpeedCap`'s bands. That is ЗДвП чл. 37, ал. 1 (content/law/acts/zdvp.json), and the course's reading «пропускаш насрещно движещите се направо или надясно» (content/concepts.json c-left-turn-oncoming).
+    - It has not passed the node.
+    - It is approaching now, or held for him (3). «Approaching» means radial closing > 0, and the larger of the radial and crossing-frame closings ≥ LEFT_TURN_MIN_CLOSING_MPS.
+  - (2) Its route across the junction met his chassis box, within the vehicle's half body width, on a grid point of its present approach. The route across runs from where it comes within the node's junction open radius (`LaneGraph.junctionRadiusM`) and on along the lane it leaves by. So an oncoming straight car's crossing counts, and so does an oncoming right-turner's join of his exit arm.
+  - (3) Its `playerShedMps` account grew ≥ LEFT_TURN_FORCED_SHED_MPS (= ROUNDABOUT_FORCED_SHED_MPS, 0.3 m/s) only over grid points on which his chassis lay on its planned route ahead of it, in its present approach. A grid point on which its route does not reach the node within the reach ends that approach. HELD means its speed fell below LEFT_TURN_MIN_CLOSING_MPS while its speed plus that in-the-way shed was at or above it.
+  - (4) It is within LEFT_TURN_ONCOMING_RADIUS_M (36 m), and its route reaches the node within that reach.
+  Base commits are untouched.
+- **New vocabulary.** All of it is internal, and none of it is shown.
+  - `TrafficSystem.plannedRouteThrough(id, nodeId, reachM)`, with `PlannedRouteThroughNode` and `PlannedMovement` (`traffic/plannedRoute.ts`). It is pure and read-only. It reads an ambient agent's `route.laneIndices`/`routePos`/`s` and the lane connector, or a staged actor's resolved `pathNodes`. It returns null once the vehicle is on the lane it leaves by. The N1 tracker is its only product reader.
+  - `WorldRuntime.setPlannedRouteQuery`, wired in `scene/lessonWorldRecipe.ts wireTrafficQueries` and in `traces/recorder.ts`. The runtime does not import traffic: `PlannedRouteRow` is a structural twin.
+  - `PlayerShedAccount.dirX/dirY`.
+  - `turnStarted.addedPath`, `prioritySituation.addedPath` and `prioritySituation.forcedById`. The last is a diagnostic that names the evidence vehicle and is read by no rule.
+  - `StagedEventOutcome.addedPathCommit`.
+- **On this ADR's grid.** Everything is read at the grid point being graded: his grid pose, and the accounts and planned routes as they stand at it.
+- **Proven by census, not for every drive (R4).** The lane verifier's census, 2,434 cells (503 committed tapes × L1–L5), against the measuring base: 0 base events moved, 0 sheet differences, and 64 cells on 14 tapes that gain only an added turnStarted. TURN_WITHOUT_OBSERVATION is billed 0 times, and no committed demo carries an R13''' conviction.
+  - The verifier also ran the round-5 sweeps again (480 + 750 cells), the evidence table (175), and the ruling's adversarial sets: 300 late-commit cells, 240 merge-follow cells, and 144 cells from the 24 committed tapes with a base left turn, over 12 lessons, slowed 2/3/5× at L1 and L3. Every vehicle named there is a staged car from the opposite approach, on its road's straight line, whose driven path crossed his body while it braked ≥ 0.3 m/s. The rows its own instrument marked false were traced: L4 cells that end at the commit, whose sibling levels name the same car at the same step and are true; and two cells on a bending D2 road that only its 35° cut flagged.
+- **Stated limits.**
+  - **The lag.** The added commit lands at most one window after the true moving 55° point: 3.00 s at 5–7 km/h on R15, 1.6–2.4 s on a turn stopped mid-way, ≤ 0.05 s on a continuous 8–14 km/h turn. A crawl whose session ends inside that window gets no event.
+  - **Split nodes (R10).** Where two intersection nodes lie within 40 m along a turning path (d2-v1 only, about 46 pairs), a slow turn can be split across two visits and missed.
+  - **U-turns at a junction (R2 (a))** are treated as the base treats them at speed.
+  - **No credit for a slow careful turn (R11, candidate «slowcredit»).** It earns no praise and no «Интервал» row. On uncommitted inputs, a turn begun gently and then tightened can let the added event suppress the base one and lose its praise.
+  - **No predicted path (ST-H4b).** A car that brakes for where he is about to be, while he is still clear of its corridor, is no evidence. That is the sc-mv-uturn-ban §H4b family, 0.86–3.71 m clear.
+- **Unchanged.** TURN_THRESHOLD_DEG, TURN_WINDOW_SEC, TURN_REARM_DEG, LEFT_TURN_GAP_MEMORY_SEC and YIELD_CONVICT_SUSTAIN_SEC are unchanged. LEFT_TURN_MIN_CLOSING_MPS only became exported. No shown string changed.
+
 ## ADR-015: A pass is judged by what the overtaken vehicle really had to do
 
 **Status.** Accepted by the integrator under the founder's delegation of 2026-10-08 (doc 88, «Founder delegation», item 2: restage the truck-pass
@@ -708,7 +755,7 @@ from its own traffic-model account (`StagedActorView.playerShedMps`).
   only where a lesson authors `physics.crosswind` and stages an actor with `windShelter: true`. Today that is this lesson alone.
 - **New vocabulary.** All of it is opt-in:
   - the SimTickEvent `laneEntryAnswer` (watching / clear / lift / braked, with heldSec and qualifiedSec);
-  - `StagedActorView.playerShedMps` and `stateId` (its third, display-only reader — the reverse warning — is recorded in the ADR-011 amendment of 2026-11-04);
+  - `StagedActorView.playerShedMps` and `stateId` (its third, display-only reader — the reverse warning — is recorded in the ADR-011 amendment of 2026-11-04; a fourth, graded reader of the same account through `TrafficSystem.playerShedAccounts()` — the slow left turn's forced-braking evidence — is recorded in ADR-014 «Amendment 2026-11-08»);
   - `CutInLeadCarSpec.overtake`, `ReachZoneParams.stagedPass` and the outcome details drewLevel / overtaken.
 - **On ADR-014's grid.** The watch and the harsh-brake step read the truck and the car at the fixed 1/60 s grid point, never a frame-end pose. The one
   exception is not graded. The lee, stepped before each physics step, reads the truck's newest grid state, so inside a long frame it can be up to one

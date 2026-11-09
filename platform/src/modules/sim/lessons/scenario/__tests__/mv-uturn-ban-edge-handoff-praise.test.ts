@@ -189,8 +189,32 @@ function stopAtThenTurn(stopY: number, stepDeg = 3): DriveScript {
  * turn-round, begun there too), then takes the lesson's route to the opening
  * and makes the lawful turn there. Every task completes; only «began where the
  * axis is solid» can withhold the praise.
+ *
+ * THE WAIT AT THE OPENING (lane slowturn, round 3). This drive used to set off
+ * on the lawful turn 2 s after stopping at the opening, at 8 km/h. That slow
+ * U-turn got no `turnStarted` at all until the runtime's added turn path
+ * (runtime/turns.ts, ruling R12) — and once it was seen, it was a cut: stream
+ * car 1000, 10 m up the boulevard, had to shed 4.7 m/s for it, so N1 bills
+ * FAILED_TO_YIELD (ruling R13', worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS) and
+ * the premise «nothing the praise refuses on» was false of the drive. It now
+ * waits `waitSec` (10 s, measured: no bill at any level, every premise below
+ * intact) — a lawful turn at the opening is one made when the stream is clear.
+ * The 2 s drive is kept as §H4b, pinned to what it now earns.
+ *
+ * ROUND 6 (ruling R13''', 2026-11-06): §H4b is NO LONGER BILLED. R13''' counts
+ * only the speed a vehicle shed while his body lay on its route ahead of it
+ * («shed accrued … before he entered its corridor does not count»). At the
+ * ADDED commit (car 1000 at (−4.1, 281.2), straight on south, 3.3 m/s) every
+ * metre per second it had shed (11.7 → 3.3) was shed while his chassis was
+ * still 1.7–3.3 m clear of its body corridor — he was swinging toward its
+ * lane, not yet in it; he enters it only after the commit (clearance 0.73 m
+ * at 2.0 m/s). So no vehicle is R13''' evidence at the commit and the drive
+ * earns the base sheet — measured, and recorded for the integrator as the one
+ * round-3..5 true conviction R13''' does not keep (lane slowturn PROGRESS.md,
+ * ROUND 6). The pin below is that measurement, not a claim that the U-turn was
+ * lawful.
  */
-function turnBegunAt217ThenLawful(): DriveScript {
+function turnBegunAt217ThenLawful(waitSec = 10): DriveScript {
   const a = arc(LANE_IN, 217, 0, 8.125, 180);
   const back = [...a.pts].reverse();
   const lawful = arc(LANE_IN, 264, 0, 8.125, 180);
@@ -211,7 +235,7 @@ function turnBegunAt217ThenLawful(): DriveScript {
       { kind: "drive", points: [[LANE_IN, 217], [LANE_IN, 264]], targetKmh: 22 },
       { kind: "glance", mirror: "left" },
       { kind: "indicator", setting: "left" },
-      { kind: "pause", sec: 2, brake: true },
+      { kind: "pause", sec: waitSec, brake: true },
       { kind: "drive", points: lawful.pts, targetKmh: 8, stopAtEnd: false },
       { kind: "drive", points: [[r3(lawful.x), r3(lawful.y)], [r3(lawful.x), r3(lawful.y - 1)]], targetKmh: 8 },
       { kind: "indicator", setting: "off" },
@@ -531,6 +555,21 @@ describe("§H4 a turn-round begun at y 217, inside the span, crossing only on th
       const place = uTurnPlaceRecord(o.session.rules);
       expect(place.atBrokenAxis).toBe(1);
       expect(place.elsewhere).toBe(truth.turnRounds.length - 1);
+      expectNowhere(o);
+    });
+  }
+});
+
+describe("§H4b the same drive setting off 2 s after stopping at the opening — seen, never praised; NOT billed under R13''' (its braking came before he entered its corridor — measured, lane slowturn round 6)", () => {
+  for (const level of ALL_RUNGS) {
+    it(`L${level}: the slow U-turn at the opening is seen (an ADDED turnStarted), names no vehicle, bills nothing and is not praised`, () => {
+      const o = drive("h4b", () => turnBegunAt217ThenLawful(2), level);
+      expect(o.scored).toEqual([]);
+      expect(o.coached).toEqual([]);
+      expect(o.ticks.some((t) => t.events.some((e) => e.kind === "turnStarted" && e.addedPath === true))).toBe(true);
+      // R13''': stream car 1000 shed its speed while his body was still clear of its route.
+      const named = o.ticks.flatMap((t) => t.events).flatMap((e) => (e.kind === "prioritySituation" && e.forcedById !== undefined ? [e.forcedById] : []));
+      expect(named).toEqual([]);
       expectNowhere(o);
     });
   }
