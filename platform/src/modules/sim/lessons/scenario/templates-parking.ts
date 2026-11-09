@@ -139,7 +139,7 @@ export const SC_PARK_PARALLEL: ScenarioSpec = {
     {
       n: 4,
       textBg:
-        "Върни бавно назад, докато колата застане под около 45° към реда. Това е ориентир 2.",
+        "Върни бавно назад, докато колата застане под около 40° към реда. Това е ориентир 2.",
     },
     {
       n: 5,
@@ -205,7 +205,7 @@ export const SC_PARK_PARALLEL: ScenarioSpec = {
       },
       titleBg: "Твърде далеч от предната кола",
       whatWentWrongBg:
-        "Изходната позиция започна на близо два метра от предната кола — геометрията на маневрата се разпадна: ъгълът не стигна до бордюра и при опита за корекция задницата удари задната кола. Правилно: около половин метър странично от съседа.",
+        "Изходната позиция започна на повече от два метра от предната кола — геометрията на маневрата се разпадна: ъгълът не стигна до бордюра и при опита за корекция задницата удари задната кола. Правилно: на половин до един метър странично от съседа.",
       codeRefs: ["COLLISION"],
     },
     {
@@ -305,7 +305,7 @@ export const SC_PARK_45: ScenarioSpec = {
     {
       n: 4,
       textBg:
-        "Завий плавно надясно, щом предната броня се изравни с близкия ъгъл на мястото, и влез напред под 45° — следи съседната кола в дясното огледало.",
+        "Завий плавно надясно, щом предната броня се изравни с ъгъла на паркираната кола преди мястото, и влез напред под 45° — следи съседната кола в дясното огледало.",
     },
     {
       n: 5,
@@ -320,9 +320,10 @@ export const SC_PARK_45: ScenarioSpec = {
       // DOC 86 D11. The old gate (x 0, y −8, r 7, ≤15 km/h) was satisfied from
       // the RIGHT lane at x = 4.06 (3.06 m < 7) at 15 km/h — i.e. by doing
       // nothing the instructions ask for, which is why the drill read as one
-      // task. This one is a real, checkable act: the left-of-centre setup pose
-      // the shadow drives (traces/scPark45.ts veerPoints ends at x = 1.0,
-      // y = −9.5) at the taught approach speed. r 3.0 EXCLUDES the right lane
+      // task. This one is a real, checkable act: the left-of-centre line the
+      // shadow drives (traces/scPark45.ts: since lane curvpark2 the line x = 0.8,
+      // passing 0.34 m from this centre at 5.5 km/h — the setup pace over its
+      // last 12 m, no stop — before its 45° turn on the 4.6 m circle). r 3.0 EXCLUDES the right lane
       // (|4.06 − 0.5| = 3.56 > 3.0), so a student who never opens the swing
       // sees „Задача 1/2" stay open and knows why.
       // NOT a halt gate, unlike the reverse drills: a 45° entry is ONE smooth
@@ -381,7 +382,7 @@ export const SC_PARK_45: ScenarioSpec = {
       "Косото място прощава по-малко, отколкото изглежда: подранил завой подрязва съседа, закъснял — качва колата на линията. Един плавен завой с точен момент на завиване е разликата между едно движение и три корекции с чакаща колона отзад.",
     lawRef: "ЗДвП чл. 25",
     examinerBg:
-      "Изпитващият гледа момента на завиване (предната броня срещу близкия ъгъл на мястото), плавната крива с пешеходна скорост и крайния резултат — центрирано в очертанията, без опрян бордюр и без навлизане в съседното място.",
+      "Изпитващият гледа момента на завиване (предната броня срещу ъгъла на колата преди мястото), плавната крива с пешеходна скорост и крайния резултат — центрирано в очертанията, без опрян бордюр и без навлизане в съседното място.",
   },
   levels: [
     { level: 1, toleranceScale: 1.5 },
@@ -424,7 +425,7 @@ export const SC_PARK_NARROW: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "тясно място", "прецизност"],
   titleBg: "Тясно гнездо",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция покрай реда, на около метър странично; после паркирай на заден ход в тясното 2,5-метрово място — с по-стръмен замах от обичайния, непрекъснато наблюдение и точно центриране в очертанията.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай реда, на около три и половина метра странично; после паркирай на заден ход в тясното 2,5-метрово място — по-изправено от обичайното, с непрекъснато наблюдение и точно центриране в очертанията.",
   // Doc-72 provenance: PK-02 (perpendicular bay reverse) — the tight-pocket
   // parameter variant, both neighbors occupied.
   archetypeIds: ["PK-02"],
@@ -458,12 +459,12 @@ export const SC_PARK_NARROW: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Задача 1: подмини тясното място и спри, когато задната броня подмине съседната кола — дръж около метър странично разстояние от реда. От тази позиция зависи целият замах.",
+        "Задача 1: покрай реда остани в дясната половина на алеята. Замахът започва от лявата половина — чак накрая, щом е свободна напред, отмести се в нея и спри, когато задната броня подмине съседната кола; дръж около три и половина метра странично разстояние от реда.",
     },
     {
       n: 3,
       textBg:
-        "Включи на задна. Огледай се — двете огледала, после през рамо — и завий към мястото с по-стръмна дъга от обичайната: в тясното гнездо широкият замах закача съседа.",
+        "Включи на задна. Огледай се — двете огледала, после през рамо — пропусни всеки, който минава отдясно, и завий към мястото. Дъгата е като на широкото място, но отдалеч задницата влиза по-изправена.",
     },
     {
       n: 4,
@@ -481,8 +482,11 @@ export const SC_PARK_NARROW: ScenarioSpec = {
       id: "sc-pnr-position",
       titleBg: "Задача 1: спри в изходната позиция покрай тясното място",
       // DOC 86 D11 — see the sc-park-parallel note. Was (0, 6) r 7 ≤15 km/h:
-      // a drive-by. Now AT REST at the pose the shadow stops on
-      // (traces/scParkNarrow.ts X_SETUP 0.9 / Y_SETUP 5.8), radius 5.
+      // a drive-by. Now AT REST near the pose the shadow stops on, radius 5.
+      // Since lane curvpark2 (integrator rulings R1(a) and R9(b), 2026-11-05)
+      // the shadow stops at (−1.6, 5.96) (traces/scParkNarrow.ts): the setup
+      // the car's own 4.6 m swing needs in a 2.5 m bay, 2.5 m from this centre,
+      // inside radius − 2. The zone itself did not move.
       params: { kind: "reachZone", x: 0.9, y: 5.8, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
@@ -518,9 +522,12 @@ export const SC_PARK_NARROW: ScenarioSpec = {
       traceRef: {
         path: "content/traces/sc-park-narrow/mistake-wide-swing.trace.json",
       },
-      titleBg: "Широк замах в тясното място",
+      // CP2-2 (2026-11-06): the close setup is a mistake in EITHER bay —
+      // sc-park-perp-rev's «mistake-wide-approach» shows it failing in the 2.7 m
+      // bay; here it fails sooner and more askew (measured, park-family-drivable).
+      titleBg: "Подход на метър от реда",
       whatWentWrongBg:
-        "Дъгата, която работи на широкото място, тук е твърде широка — по средата на завъртането задният калник закачи съседната кола. В тясно гнездо се влиза по-стръмно: по-късен и по-остър завой, с половин око на всяко огледало.",
+        "Подходът започна на около метър от колите — твърде близо и за широкото място, а тук замахът се провали още по-рано: колата беше още по-накосо, когато задният калник закачи съседната кола. На широкото място се започва на около два и половина метра от колите, в тясното — още по-отдалеч, на около три и половина, за да влезе задницата по-изправена, с око на всяко огледало.",
       codeRefs: ["COLLISION"],
     },
     {
@@ -537,10 +544,14 @@ export const SC_PARK_NARROW: ScenarioSpec = {
     whenBg:
       "Пълните градски паркинги, подземните гаражи и „последното останало място“ между два джипа — тясното гнездо е ежедневието на шофьора в големия град.",
     whyBg:
-      "Точно в тесните места стават повечето паркинг-удари: широкият замах, който минава на просторното място, тук струва калник. По-стръмен подход, пешеходна скорост и постоянна работа с огледалата правят тясното място рутинно.",
-    lawRef: "ЗДвП чл. 40",
+      "Точно в тесните места стават повечето паркинг-удари: подход на метър от реда закачва съседа и на широкото място, а тук — още по-рано и още по-накосо. Подход отдалеч, пешеходна скорост и постоянна работа с огледалата правят тясното място рутинно.",
+    // ЗДвП чл. 35, ал. 2 (content/law/acts/zdvp.json): the set-up stop left of
+    // the aisle centre line is the reverse turn's start, begun «и от друга част
+    // на платното за движение» — lane curvpark2 rounds 4–5, integrator rulings
+    // CP2-1bis/-ter/-quater (2026-11-08); instruction 2 and 3 teach it and its duty.
+    lawRef: "ЗДвП чл. 40; чл. 35, ал. 2",
     examinerBg:
-      "Изпитващият гледа адаптацията: по-късен завой със стръмна дъга, скорост на кретане, непрекъснато наблюдение в двете огледала и краен резултат точно между линиите — без докосване на съседите и без излишни корекции.",
+      "Изпитващият гледа адаптацията: изходна позиция по-далеч от реда, за да влезе задницата по-изправена, скорост на кретане, непрекъснато наблюдение в двете огледала и краен резултат точно между линиите — без докосване на съседите и без излишни корекции.",
   },
   levels: [
     { level: 1, toleranceScale: 1.5 },
@@ -649,12 +660,12 @@ export const SC_PARK_PERP_FORWARD: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Задача 1: дръпни се вляво към средата на алеята и намали под 8 км/ч. Влизането напред не се прави от дясната лента — там дъгата просто не се побира и предният десен ъгъл минава през съседа.",
+        "Задача 1: завоят напред започва от лявата половина на алеята — дръпни се в нея, щом е свободна напред, и намали под 8 км/ч; от дясната лента дъгата не се побира.",
     },
     {
       n: 3,
       textBg:
-        "Пусни десен мигач и изчакай: завърташ, когато предната ти броня се изравни с ближния ъгъл на свободното място, не по-рано.",
+        "Пусни десен мигач, погледни вдясно и пропусни всеки, който минава отдясно; завий, щом предната ти броня се изравни с колата преди свободното място.",
     },
     {
       n: 4,
@@ -677,14 +688,23 @@ export const SC_PARK_PERP_FORWARD: ScenarioSpec = {
       id: "sc-ppf-setup",
       titleBg: "Задача 1: дръпни се вляво в алеята и намали",
       // A REAL first task (doc 86 D11), and a lateral one: the gate is centred
-      // on the setup line the shadow drives (x = 0.9 — as far left as the lane
-      // detectors allow, |laneOffset| 3.16 < 3.25) and its radius 3.0 EXCLUDES
-      // the right-hand lane (|4.0625 − 0.9| = 3.16 > 3.0). A student who never
-      // opens the swing sees „Задача 1/2" stay open and is told why by
-      // instruction 2 — instead of clipping the neighbour and wondering.
-      // Cap 8 = the „намали под 8 км/ч" instruction 2 states out loud (doc 86
-      // D4: no hidden speed contracts); the shadow passes here at 6.
-      params: { kind: "reachZone", x: 0.9, y: -6.5, radiusM: 3, maxSpeedKmh: 8 },
+      // on the setup line the shadow drives and its radius 3.0 EXCLUDES the
+      // right-hand lane. A student who never opens the swing sees „Задача 1/2"
+      // stay open and is told why by instruction 2 — instead of clipping the
+      // neighbour and wondering. Cap 8 = the „намали под 8 км/ч" instruction 2
+      // states out loud (doc 86 D4: no hidden speed contracts).
+      // RE-CENTRED x 0.9 → −4.6 (lane curvpark2, integrator ruling R3(d) of
+      // 2026-11-05 under the founder's 2026-10-19 delegation; the founder is
+      // told). The old centre sat «as far left as the lane detectors allow»,
+      // but the aisle north of y −30 is the unpainted `service` class, where no
+      // lane detector arms (world/builders/constants.ts MARKED_CLASSES), and on
+      // the car's own 4.6 m circle a forward swing begun anywhere inside the
+      // old disc keeps only 0.11–0.12 m from the north neighbour on the real
+      // car's pose. The re-recorded shadow (traces/scParkPerpForward.ts) runs
+      // up the line x = −4.63 and passes this centre 0.03 m off at 5.5 km/h,
+      // with no stop; its swing begins at y = −5.88. The right lane is
+      // |4.0625 + 4.6| = 8.7 m away.
+      params: { kind: "reachZone", x: -4.6, y: -6.5, radiusM: 3, maxSpeedKmh: 8 },
     },
     {
       id: "sc-ppf-park",
@@ -732,9 +752,15 @@ export const SC_PARK_PERP_FORWARD: ScenarioSpec = {
       "Всеки ден, на всеки паркинг пред магазин, блок или офис — влизането напред е това, което правят почти всички, защото е едно движение и изглежда по-лесно. Този урок не ти забранява да го правиш; учи те да го правиш правилно и да знаеш какво плащаш след това.",
     whyBg:
       "Влизането напред и влизането на заден са различни маневри, не две посоки на една. При заден ход колата се върти около задната си ос: задницата отива там, накъдето я насочиш, а предницата замахва широко в алеята, която виждаш. Напред е обратното — задницата замахва през алеята ЗАД теб, вътрешното предно колело реже ъгъла, а целият завой трябва да е купен предварително, от отсрещната страна на алеята и цял радиус преди мястото. Оттук идват двете типични щети: подрязаният ъгъл на съседа отпред и закачената минаваща кола отзад. И оттук идва цената: паркиран с нос навътре, ти си насрочил излизане на заден между две коли, в алея, по която вървят хора. Статистиката на паркинг-щетите не е за влизането — тя е за излизането.",
-    lawRef: "ЗДвП чл. 25",
+    // + чл. 35, ал. 2 (lane curvpark2 round 3, integrator ruling CP2-1bis):
+    // the forward entry BEGINS in the aisle's left half because no entry
+    // begun wholly from the right half reaches this bay clean even at the
+    // car's full lock (traces/__tests__/park-family-limit.test.ts) — the
+    // provision that lets such a turn begin «и от друга част на платното за
+    // движение», with its duty to let through those passing on the right.
+    lawRef: "ЗДвП чл. 25; чл. 35, ал. 2",
     examinerBg:
-      "Изпитващият гледа три неща при влизане напред: подготовката (изнесен вляво, пешеходна скорост, мигач), момента на завиване (бронята срещу ближния ъгъл на мястото) и контрола докъде стигат предният десен ъгъл и задницата — едната към съседа, другата към алеята. Краен резултат: центрирано в очертанията, успоредно на линиите, без опрян бордюр. И ако мястото позволява, изпитващият очаква да чуе защо би влязъл на заден вместо това.",
+      "Изпитващият гледа три неща при влизане напред: подготовката (изнесен вляво, пешеходна скорост, мигач), момента на завиване (бронята срещу колата преди мястото) и контрола докъде стигат предният десен ъгъл и задницата — едната към съседа, другата към алеята. Краен резултат: центрирано в очертанията, успоредно на линиите, без опрян бордюр. И ако мястото позволява, изпитващият очаква да чуе защо би влязъл на заден вместо това.",
   },
   levels: [
     { level: 1, toleranceScale: 1.5 },

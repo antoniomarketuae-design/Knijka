@@ -370,7 +370,7 @@ describe("§2 the footprint callback really publishes — taken off the rendered
 });
 
 describe("§3 the lesson that mounts NOTHING — where the callback cannot be the publisher", () => {
-  it("no ScenarioObstacles in the tree at all, and the district's 66 warnings become 0", () => {
+  it("no ScenarioObstacles in the tree at all, and the district's 236 warnings become 0", () => {
     // `buildLessonWorldCore` builds obstacles only for a SCENARIO lesson id, so
     // a hand-authored lesson on a bay-carrying district shows PAINTED bays with
     // no cars in them. The traffic system's district-seeded default would warn
@@ -414,7 +414,11 @@ describe("§3 the lesson that mounts NOTHING — where the callback cannot be th
     // effect is the whole seam on this lesson.
     expect(obstacleProps).toHaveLength(0);
     // …and what the district would have said on its own.
-    expect(districtOnly("lot-narrow-v1", samples).finite).toBe(66);
+    // (159 since lane curvpark2 re-authored the narrow shadow, 2026-11-06; 66
+    // before; 236 since its round 5, the two-stage set-up, 2026-11-08 — the
+    // class, «the district would warn, the mount publishes nothing», is
+    // unchanged.)
+    expect(districtOnly("lot-narrow-v1", samples).finite).toBe(236);
     expect(after.finite).toBe(0);
   });
 });

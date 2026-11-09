@@ -10,27 +10,49 @@
  * scManeuver3Point curbs precedent).
  *
  * The trace gate replays exactly these through the production stack:
- *   - shadow: ZERO violations; pulls PAST the driveway, observes (mirrors +
- *     shoulder) and REVERSES into it, coming to rest centered in the bay facing
- *     the street — completes the parkInBay objective (reverse used, aligned);
- *   - „Твърде широк замах" grades EXACTLY COLLISION (the tail swings north onto
- *     the driveway's fence at creep speed);
+ *   - shadow: ZERO violations; signals, pulls PAST the driveway, observes
+ *     (mirrors + shoulder) and REVERSES into it, stopping half-way round to
+ *     look again, coming to rest centered in the bay facing the street —
+ *     completes the parkInBay objective (reverse used, aligned);
+ *   - „Твърде късен замах" grades EXACTLY COLLISION (the swing starts 1.5 m
+ *     too far past the mouth and the tail sweeps onto the driveway's fence);
  *   - „Твърде дълбоко назад" grades EXACTLY COLLISION (backs past the mark into
  *     the garage's back wall).
  *
  * Geometry pinned to content/world/pk-drive-v1.json: a 90 m residential street
  * on x = 0, right-lane center x = 4.06, limit 30, spawn pkd-spawn-approach
  * (4.06, 15). The driveway opens on the EAST kerb at y ≈ 45; the target bay
- * lot-drive center (8.0, 45), axis east-west (headingDeg 90). Reverse gear is
- * exempt from lane/wrong-way detectors and every FORWARD move is a creep
- * (≤ 8 km/h), so the ONLY gradeable events are the maneuver and the wall
- * contacts — the sc-park-perp-rev discipline.
+ * lot-drive center (8.0, 45), axis east-west (headingDeg 90).
+ *
+ * EVERY PATH IS ONE THE PRODUCT CAR CAN DRIVE (catalogue-demo-curvature:
+ * dae908c7, family «curvpark2», 2026-11-06). The swing used to be a 4 m
+ * polyline quarter circle (2.59 m over its tightest metre; the wide mistake
+ * 1.587 m). It is now the parking kit's `bayReverse` (./parkKit) on the 4.6 m
+ * drivable circle: the setup is x = 2.4, the left half of the right lane —
+ * from the lane centre the swing ends past the bay — reached by one gentle S
+ * at walking pace, and the setup stop is 1.5 m from the Задача 1 marker.
+ * Reverse gear is exempt from lane/wrong-way detectors and every FORWARD move
+ * is under the 15 km/h the briefing states, so the ONLY gradeable events are
+ * the maneuver and the wall contacts — pinned in
+ * traces/__tests__/park-family-drivable.test.ts.
  */
 
 import type { ParkingBaySpec } from "../contracts";
 import {
+  authoredDrive,
+  DRIVABLE_MIN_CENTRE_RADIUS_M,
+  sShift,
+  straight,
+  swingForShift,
+  turn,
+  withRunOut,
+  type AuthoredPath,
+} from "./drivablePath";
+import { bayReverse, CREEP_KMH, leftSetUpMove, LOOK_BEFORE_REVERSE, REVERSE_KMH, SETTLE, untilContact, type BayReverse } from "./parkKit";
+import {
   recordScriptedDrive,
   type DriveScript,
+  type DriveStep,
   type ObstacleRect2D,
   type RecordedDrive,
   type RecordScriptedDriveOptions,
@@ -48,19 +70,27 @@ export const PK_DRIVE_TARGET_BAY: ParkingBaySpec = {
   widthM: 2.7,
   lengthM: 5,
 };
-/** Reverse-arc radius (car-center path), m — mirrors sc-park-perp-rev. */
-const ARC_R = 4.0;
-/** Pull-past lateral position (in the lane; arc ends ~0.13 m short of the bay). */
-const X_SETUP = 3.87;
-/** Pull-past stop: rear bumper north of the driveway mouth. */
-const Y_SETUP = 51.3;
+/** The setup line: the left half of the right lane (see header). */
+const X_SETUP = 2.4;
+/** The swing: straight back 1 m, wound on over 1.5 m, held, unwound over 1.2 m. */
+const SWING = { radiusM: DRIVABLE_MIN_CENTRE_RADIUS_M, s0M: 1.0, rampInM: 1.5, rampOutM: 1.2 };
+const DW: BayReverse = bayReverse(1, X_SETUP, { x: PK_DRIVE_TARGET_BAY.x, y: PK_DRIVE_TARGET_BAY.y }, SWING);
+/** How much further past the mouth the late swing (mistake 1) begins, m. */
+const LATE_M = 1.5;
+
+/** Geometry the drivability pin reads (traces/__tests__/park-family-drivable.test.ts). */
+export const SC_PK_DRIVEWAY_GEOMETRY = {
+  radiusM: SWING.radiusM,
+  setup: { ...DW.setup },
+  lateM: LATE_M,
+} as const;
 
 /**
  * The driveway's two walls — the headless twins of the scene's kerb/fence
  * colliders. A clean reverse threads BELOW the north fence (its south edge at
  * y = 47.0; the parked car's north edge rests at y ≈ 45.85) and stops SHORT of
  * the back wall (its west edge at x = 10.7; the car's east edge rests at
- * x ≈ 10.02). A wide swing mounts the fence; a too-deep reverse hits the wall.
+ * x ≈ 10.02). A swing begun too late mounts the fence; a too-deep reverse hits the wall.
  */
 export function drivewayObstacles(): ObstacleRect2D[] {
   return [
@@ -74,24 +104,35 @@ export function drivewayObstacles(): ObstacleRect2D[] {
   ];
 }
 
-/** Quarter arc (path heading south → east), car-center path — sc-park-perp-rev. */
-function reverseArc(startX: number, startY: number, r: number): Array<[number, number]> {
-  const cx = startX + r;
-  const cy = startY;
-  const out: Array<[number, number]> = [];
-  for (let k = 1; k <= 8; k++) {
-    const th = (k / 8) * (Math.PI / 2);
-    out.push([cx - r * Math.cos(th), cy - r * Math.sin(th)]);
-  }
-  return out;
+/**
+ * Up the street to a setup at (`x`, `y`): straight in the lane to y = 30, one
+ * gentle S (radius 30) onto the line `x`, straight on to the stop — slowing to
+ * the setup pace over the last 12 m (parkKit `toSetup`). The S is a set-up move
+ * of 1.66 m to the left (more than the car's half width), so it is signalled
+ * LEFT and the indicator goes off where the car is square on its line (parkKit
+ * `leftSetUpMove`, ЗДвП чл. 26; lane curvpark2 round 2, CP2-6) — the bay's
+ * right signal is given at the setup stop, never during the drift. `look`:
+ * the left mirror before the move.
+ */
+function streetTo(x: number, y: number, look = true) {
+  const fromY = 30;
+  const shift = x - LANE_X;
+  const k = Math.sign(shift) / 30;
+  const s = sShift(swingForShift(shift, k, 1.5), k, 1.5);
+  const sLen = authoredDrive({ x: 0, y: 0, headingDeg: 0 }, s, 1).end.y;
+  const p = authoredDrive({ x: LANE_X, y: 16, headingDeg: 0 }, [straight(fromY - 16), ...s, straight(y - fromY - sLen)], 1);
+  // The signal is given 6 m before the S (y 24), not at the spawn: the first
+  // stretch is driven as its own step, run 5 cm on along the path (the recorder
+  // ends a step 5 cm short) so the next one starts on the pose it ended on.
+  const iSignal = p.points.findIndex(([, py]) => py >= SIGNAL_AT_Y);
+  const path: AuthoredPath = { ...p, points: p.points.slice(iSignal), end: { x, y, headingDeg: 0 } };
+  return [
+    { kind: "drive", points: p.points.slice(0, iSignal + 1 + 50), targetKmh: 8, stopAtEnd: false } as DriveStep,
+    ...leftSetUpMove(path, 8, fromY + sLen, look),
+  ];
 }
-
-/** Approach: spawn → right-lane cruise up to the driveway. */
-const APPROACH: Array<[number, number]> = [
-  [LANE_X, 16],
-  [LANE_X, 20],
-  [LANE_X, 40],
-];
+/** Where the set-up move's left signal is given: 6 m before its S. */
+const SIGNAL_AT_Y = 24;
 
 // ---------------------------------------------------------------------------
 // The correct demonstration (shadow) — pull past, observe, reverse in
@@ -102,72 +143,59 @@ export function scPkDrivewayShadowScript(): DriveScript {
     steps: [
       { kind: "annotation", textBg: "Заден ход в алея вдясно: карай спокойно и подмини входа, преди да започнеш." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 16 },
-      { kind: "annotation", textBg: "Подмини алеята и спри, когато задната броня подмине входа ѝ." },
       {
-        // Ease past the driveway to the setup pose (still in the lane).
-        kind: "drive",
-        points: [[LANE_X, 40], [LANE_X, 46], [X_SETUP, Y_SETUP]],
-        targetKmh: 8,
+        kind: "annotation",
+        textBg: "Отдалечи се от бордюра с ляв мигач — замахът иска място. Подмини алеята и спри, когато задната броня подмине входа ѝ.",
       },
-      { kind: "pause", sec: 1.0, brake: true },
-      { kind: "annotation", textBg: "Преди задната: двете огледала, после през рамо — и чак тогава завивай назад." },
-      { kind: "glance", mirror: "left" },
+      ...streetTo(DW.setup.x, DW.setup.y),
+      { kind: "pause", sec: 1.2, brake: true },
+      { kind: "annotation", textBg: "Сега десен мигач. Преди задната: двете огледала, после през рамо — и чак тогава завивай назад." },
       { kind: "glance", mirror: "right" },
-      { kind: "glance", mirror: "rear" },
-      {
-        // Full-lock reverse swing into the driveway (car-center quarter arc).
-        kind: "drive",
-        points: [
-          [X_SETUP, Y_SETUP],
-          [X_SETUP, 49.0],
-          ...reverseArc(X_SETUP, 49.0, ARC_R),
-        ],
-        targetKmh: 5,
-        reverse: true,
-      },
+      { kind: "indicator", setting: "right" },
+      ...LOOK_BEFORE_REVERSE,
+      // The gear goes in after the looks, never on the instant of the last one
+      // (so every look is heard before R on every display — grade-grid ROUND 8).
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "drive", points: withRunOut(DW.a.points), targetKmh: REVERSE_KMH, reverse: true },
+      { kind: "annotation", textBg: "Спри на половината завой и погледни назад — и в дясното огледало." },
+      { kind: "pause", sec: 1.0, brake: true },
+      { kind: "glance", mirror: "right" },
       { kind: "glance", mirror: "rear" },
       { kind: "annotation", textBg: "Следи стените на алеята в огледалата и изправи волана." },
-      {
-        // Straighten: dead-center stop on the bay center (8.0, 45).
-        kind: "drive",
-        points: [[X_SETUP + ARC_R, 45.0], [8.0, 45.0]],
-        targetKmh: 3,
-        reverse: true,
-      },
-      { kind: "glance", mirror: "left" },
-      { kind: "glance", mirror: "right" },
-      { kind: "pause", sec: 2.2, brake: true },
+      { kind: "drive", points: withRunOut(DW.b.points), targetKmh: CREEP_KMH, reverse: true },
+      ...SETTLE,
       { kind: "annotation", textBg: "Готово: центрирано в алеята, с нос към улицата, без да опреш стените." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Твърде широк замах" (tail onto the north fence = COLLISION)
+// Mistake demo 1 — „Твърде късен замах" (tail onto the north fence = COLLISION)
 // ---------------------------------------------------------------------------
 
 export function scPkDrivewayMistakeWideScript(): DriveScript {
+  // The same swing, begun 1.5 m further past the mouth: the tail is aimed
+  // north of the driveway and sweeps onto its fence — cut where that contact
+  // has happened (parkKit `untilContact`).
+  const setup = { x: X_SETUP, y: DW.setup.y + LATE_M, headingDeg: 0 };
+  const swing = authoredDrive(
+    setup,
+    [straight(SWING.s0M), ...turn(Math.PI / 2, 1 / SWING.radiusM, SWING.rampInM, SWING.rampOutM), straight(4)],
+    -1,
+  );
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешката: замахът назад е твърде широк и задницата отива към оградата." },
+      { kind: "annotation", textBg: "Грешката: замахът назад започва твърде късно и задницата отива към оградата." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 16 },
-      { kind: "drive", points: [[LANE_X, 40], [LANE_X, 46], [X_SETUP, Y_SETUP]], targetKmh: 8 },
-      { kind: "pause", sec: 0.8, brake: true },
+      ...streetTo(setup.x, setup.y),
+      { kind: "pause", sec: 1.0, brake: true },
+      { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "rear" },
-      { kind: "annotation", textBg: "Волан наляво, но без да следиш докъде стига задницата…" },
+      { kind: "annotation", textBg: "Волан надясно, но без да следиш докъде стига задницата…" },
       {
-        // Over-rotated reverse: the tail sweeps north onto the driveway's fence.
         kind: "drive",
-        points: [
-          [X_SETUP, Y_SETUP],
-          [X_SETUP, 50.0],
-          [5.0, 48.5],
-          [6.5, 47.4],
-          [8.0, 46.7],
-        ],
-        targetKmh: 4.5,
+        points: untilContact(swing.points, -1, drivewayObstacles()[0], "wall"),
+        targetKmh: CREEP_KMH,
         reverse: true,
       },
       { kind: "pause", sec: 1.2, brake: true },
@@ -184,26 +212,25 @@ export function scPkDrivewayMistakeWideScript(): DriveScript {
 // ---------------------------------------------------------------------------
 
 export function scPkDrivewayMistakeDeepScript(): DriveScript {
+  // A clean swing into the bay… but then it keeps rolling back east into the
+  // garage's back wall instead of stopping on the mark.
+  const deep = authoredDrive(
+    DW.setup,
+    [straight(SWING.s0M), ...turn(Math.PI / 2, 1 / SWING.radiusM, SWING.rampInM, SWING.rampOutM), straight(DW.b.lengthM + 3)],
+    -1,
+  );
   return {
     steps: [
       { kind: "annotation", textBg: "Грешката: заден ход без спиране — колата се врязва в дъното на алеята." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 16 },
-      { kind: "drive", points: [[LANE_X, 40], [LANE_X, 46], [X_SETUP, Y_SETUP]], targetKmh: 8 },
-      { kind: "pause", sec: 0.8, brake: true },
+      ...streetTo(DW.setup.x, DW.setup.y),
+      { kind: "pause", sec: 1.0, brake: true },
+      { kind: "indicator", setting: "right" },
       { kind: "glance", mirror: "rear" },
       {
-        // A clean swing into the bay… but then it keeps rolling back east into
-        // the garage's back wall instead of stopping on the mark.
         kind: "drive",
-        points: [
-          [X_SETUP, Y_SETUP],
-          [X_SETUP, 49.0],
-          ...reverseArc(X_SETUP, 49.0, ARC_R),
-          [8.0, 45.0],
-          [9.6, 45.0],
-        ],
-        targetKmh: 4,
+        points: untilContact(deep.points, -1, drivewayObstacles()[1], "wall"),
+        targetKmh: REVERSE_KMH,
         reverse: true,
       },
       { kind: "pause", sec: 1.2, brake: true },

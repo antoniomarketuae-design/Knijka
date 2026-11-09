@@ -220,7 +220,10 @@ describe("§2 every committed pathref, from the outside", () => {
         // (curvdepth landing): re-planned on their re-authored demos, they record the cap.
         // sc-park-wall came off it on 2026-10-16 (cdtools, CD-1): re-planned on its
         // re-authored demo with the CD-1 deviation pull-in, it records the cap.
-        const PLANNED_BEFORE_THE_CAP = ["sc-pk-driveway", "sc-ed-poligon-chain"];
+        // sc-pk-driveway came off it on 2026-11-09 (curvpark2 landing): re-planned on its
+        // re-authored demo (build-pathrefs.mjs EXIT 0, problems [] and emitBlocked []), it
+        // records the cap (reverseAuthority 0.892).
+        const PLANNED_BEFORE_THE_CAP = ["sc-ed-poligon-chain"];
         const reverse = ref.segments.filter((sg) => sg.gear === -1);
         if (!reverse.length) return; // nothing to cap: a lesson with no reverse segment
         const auth = ref.generator.reverseAuthority;
@@ -399,7 +402,8 @@ describe("§2 every committed pathref, from the outside", () => {
         // worse. Both are outside the 0.5 m the harness judges with, so that segment's
         // park is UNJUDGED either way and the 27 mm changes nothing; it is named here
         // so it cannot spread to a lesson that WAS re-planned without anyone noticing.
-        const NOT_REPLANNED = ["sc-pk-driveway", "sc-ed-poligon-chain", "sc-park-gap-long"];
+        const NOT_REPLANNED = ["sc-ed-poligon-chain", "sc-park-gap-long"];
+        // sc-pk-driveway left this list on 2026-11-09 (curvpark2 landing): its demo was re-authored and re-planned, and every witness of the graded reverse carries the clearance objective (R1 3/3, planned body clearance ≥ 0.6455 m, worst mounted 0.6951 m), so an entry here would only excuse a regression.
         // sc-park-judge and sc-park-45-rev left this list on 2026-10-15 (curvdepth landing): their demos were re-authored drivable and re-planned, and every witness of the graded reverse carries the clearance objective (judge R1 3/3, body ≥ 0.58 m; 45-rev R1 3/3, body ≥ 0.45 m), so an entry here would only excuse a regression. The judge R1 0.771 m note above predates that re-plan.
         // sc-park-bay-exit-rev left this list on 2026-10-06: its demo was re-authored drivable and re-planned WITH the clearance objective (pathref R0 rung 0.5, planned 0.459 m), so an entry here would only excuse a regression.
         for (const w of seg.witnesses) {

@@ -81,7 +81,7 @@ const FINAL_WINDOW_SEC = 5;
 // MEASURED, on a committed trace, on a shipped drill — the reason this is not
 // a tidiness change. `content/traces/sc-park-parallel-exit/mistake-no-look.
 // trace.json` contains exactly ONE glance and it is `glance-rear`, the
-// INTERIOR mirror. `SC_PARK_PARALLEL_EXIT` (templates-parking.ts:888) authors
+// INTERIOR mirror. `SC_PARK_PARALLEL_EXIT` (templates-parking.ts:922) authors
 // its second moment as „Огледало и през ЛЯВО РАМО преди изнасянето в лентата".
 // Before this change the mapper returned `["obs-before-moveoff"]` for that
 // drive: a look in the interior mirror printed a ✓ against a check over the

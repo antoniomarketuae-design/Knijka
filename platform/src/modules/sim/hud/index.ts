@@ -153,6 +153,10 @@ export {
   // was the two being kept apart by hand in `LessonPlayShell`.
   overlayHoldsDrive,
   overlayPriority,
+  // sc-ac-crosswind:a9db1738 clause 4 (R-SC1 (A)): which active row the
+  // compact «втори замах» cue may stand in for — read by the shell's
+  // `swingCueYieldAttr`, decided beside `overlayPriority`.
+  overlayYieldsToSwingCue,
   overlaySheetHoldsDrive,
   overlayQueueMaySpeak,
   overlaySilencesQueue,

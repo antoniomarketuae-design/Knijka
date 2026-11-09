@@ -180,6 +180,30 @@ describe("demo curvature census — every committed demo against the product car
     expect(census.offenders.filter((r) => FAMILY.includes(r.lesson))).toEqual([]);
   });
 
+  it("PINNED: every demo of the six remaining parking lessons re-authored on the car's own circle (catalogue-demo-curvature:dae908c7, family curvpark2)", () => {
+    // traces/scParkPerpRev, scParkNarrow, scParkParallel, scPark45,
+    // scPkDriveway and scParkPerpForward, each cut from the parking kit
+    // (traces/parkKit.ts); the full drivability proof (the two radius numbers,
+    // steering, clearance, the marker, the live rung chain at three cadences)
+    // is traces/__tests__/park-family-drivable.test.ts.
+    const FAMILY = [
+      "sc-park-perp-rev",
+      "sc-park-narrow",
+      "sc-park-parallel",
+      "sc-park-45",
+      "sc-pk-driveway",
+      "sc-park-perp-forward",
+    ];
+    for (const lesson of FAMILY) {
+      const rows = all.filter((r) => r.lesson === lesson);
+      expect(rows, lesson).toHaveLength(3);
+      for (const r of rows) {
+        expect(r.worstRadiusM, `${lesson} ${r.demo}`).toBeGreaterThanOrEqual(KINEMATIC_CENTRE_RADIUS_M);
+      }
+    }
+    expect(census.offenders.filter((r) => FAMILY.includes(r.lesson))).toEqual([]);
+  });
+
   it("REPORTED: the offenders are exactly the committed census (a change here must be looked at)", () => {
     if (WRITE) writeFileSync(CENSUS_FILE, JSON.stringify(census, null, 2) + "\n");
     const pinned = JSON.parse(readFileSync(CENSUS_FILE, "utf-8")) as Census;

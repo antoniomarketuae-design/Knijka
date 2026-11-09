@@ -4366,7 +4366,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     //     same number as a car pressed into a building. `rules/engine.ts:1748`
     //     names the identical expression `offCentre` and grades
     //     POOR_LANE_KEEPING off it: lane-keeping, not membership.
-    //     `scenario/templates-parking.ts:626-632` already wrote this down —
+    //     `scenario/templates-parking.ts:641-647` already wrote this down —
     //     `lot-spawn-approach` reads laneOffsetM 4.06 and „Thirty-one shipped
     //     scenarios do that". Landing the exemption would have closed the drive,
     //     at ten seconds, of every one of those students who took a shunt and

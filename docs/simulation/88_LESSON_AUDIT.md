@@ -18928,3 +18928,558 @@ PINNED AT INTEGRATION (the integrator, in the same describe block; each mutant r
 - **«The 8 km/h crawl meeting the following oncoming car».** Every builder round lists it as still open from 2e9268f; its measurement was not found in doc 88 or the lane logs. Evidence: `slowturn-r3.json`, `slowturn-r4.json` and `slowturn-r6.json` build owed («Still open, outside this lane»).
 - **Stale comments in tools/maps** (F12, also under Owed): `gen_rural_curve.mjs:28-40`, `gen_ov_crest.mjs:36-46` and `gen_mw_exit.mjs:646-653` say turnStarted needs > 55° within a 3 s window. That is no longer the whole rule; those maps have no intersections. Evidence: `slowturn-r2.json` build owed (F12).
 - **A stale comment introduced by the patch.** In `runtime/reverseBrakedFor.ts`, ShedAccountRow.dirX/dirY says «Read only by the N1 tracker's ruling-R13' evidence (worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS)». The reader is now `runtime/leftTurnGiveWay.ts` under R13''' (traffic/types.ts already says so). Evidence: `D:/knijka-lanes/slowturn-result-r6-onto-mbase.patch`, the reverseBrakedFor.ts hunk @@ -94,6 +94,11 @@.
+
+## Landed: the demos of the six remaining parking lessons (sc-park-45, sc-park-narrow, sc-park-parallel, sc-park-perp-forward, sc-park-perp-rev and sc-pk-driveway) now turn on the kit's 4.6 m programme (4.5952–4.6003 m over any 1 m). That is wider than the product car's reversing circle: 4.1716 m on the physics car, with a floor of 4.3801 m. Every correct demo keeps 0.25 m from every body and passes clean. Every mistake demo hits only the body it names. The two reverse lessons keep right past the row and move left, signalled, only for the start of the swing; the second move is a crawl. Measured in process only. `catalogue-demo-curvature:dae908c7` (critical), family curvpark2 (2026-11-09)
+
+Lane `curvpark2` ran five rounds, built on `1feba3a`.
+- **The verdict.**
+  - Round 1 was REFUTED on two counts. First, keep-right-claim-census was red on the tree (2 failed, 22 passed). Second, new sc-park-narrow strings taught a close approach, about 1 m, and the same patch's sc-park-perp-rev shows that approach clipping the neighbour.
+  - Round 2 stopped BLOCKED on the integrator's ruling CP2-1, by design: the ruling said to stop if the law forbids the sentence there. On lot-perp-v1's two-way unpainted aisle чл. 15 ал. 1 binds, and perp-forward kept the car about 20 m in the oncoming half. Round 2 had no verifier.
+  - Round 3 built perp-forward under ruling CP2-1bis. It stopped BLOCKED on the two reverse set-ups: a right-half reverse that touches nothing exists only at full lock, wound at rest, below the 0.25 m demo floor. Round 3 had no verifier.
+  - Round 4 was SIGNED OFF WITH CONDITIONS. Its C1 measured a two-stage set-up that shortens the left-half travel 11.90 → 3.18 m (perp-rev) and 12.36 → 5.31 m (narrow). Ruling CP2-1quater sent the lane to round 5.
+  - Round 5 was SIGNED OFF WITH CONDITIONS on 2026-11-09 by a new verifier run, wf_a73bec7d-d53.
+    - It reused round 4's verify lane, reset to `1feba3a`.
+    - Its session died at about 01:12 and resumed at 04:12, picking up the regression list at file 20.
+    - Its log is `D:/knijka-lanes/scratch/curvpark2-verify2/PROGRESS.md`, round-5 entries 2026-11-09 01:04 to 06:55. Nothing it measured reached the stop rule.
+  - The reports are in `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/`: `curvpark2-r1.json`, `curvpark2-r2.json`, `curvpark2-r3-journal.jsonl` (round 3 has no .json), `curvpark2-r4.json`, `curvpark2-r5.json` and `curvpark2-r5-verify-journal.jsonl`.
+- **The patch.** `D:/knijka-lanes/curvpark2-result-r5.patch`: sha256 65972670…13b5, 90 files, +4887/−1567, 0 CR bytes (the builder's figures).
+  - It is cumulative against `1feba3a`, not against HEAD.
+  - The verifier reset its lane to `1feba3a` and applied the patch. The lane's `git diff --binary base` hashed to the same sha.
+  - HEAD `ab78b58` is `1feba3a` plus the slowturn landing, so the patch goes in 3-way. PROVEN ON ab78b58 (below) records how it applied.
+- **Product files** (the patch's file list):
+  - the new leaf module `traces/parkKit.ts`, the parking kit;
+  - the six builders `traces/scParkPerpRev.ts`, `scParkNarrow.ts`, `scParkParallel.ts`, `scPark45.ts`, `scParkPerpForward.ts` and `scPkDriveway.ts`;
+  - `traces/scParkDepth.ts`, which now imports the kit and re-exports from it;
+  - `lessons/scenario/templates.ts`, `templates-parking.ts` and `templates-pk.ts`. These carry text and lawRefs, plus one graded change: perp-forward's Задача 1 zone moves from x 0.9 to −4.6 (ruling R3(d)). The round-4 verifier found no other graded change;
+  - `scene/scenarioSceneryProps.ts` and `hud/rearProximity.ts`, comments only;
+  - `clips/clipPlan.generated.ts` and `public/clips/manifest.json`, with two clips retired (CP2-7);
+  - the family's 17 re-authored demos × 2 committed traces (content/ and public/), 34 files. The family's 18th demo, sc-park-parallel/mistake-no-observation, is not a census offender and is byte-identical to base.
+- **Test-side files.**
+  - New: `traces/__tests__/park-family-drivable.test.ts`, `park-family-chassis.test.ts`, `park-family-limit.test.ts`, `parkChassisDrive.ts`, `parkLimitEntry.ts` and `clips/retiredClips.test.ts`.
+  - Re-derived:
+    - the demo-curvature census (.json and test) and `parkDepthProduct.ts`;
+    - `sc-park-perp-forward-traces`;
+    - `traffic/rear-static-gap`, `rearStaticBodies` and `rearStaticBodiesSeam`;
+    - `task-cap-round14`;
+    - the compile snapshot, `templates.test.ts` and `rapierContactDrive.ts`;
+    - the keep-right census (.json and counts.json);
+    - the reviewed-text manifest.
+- **Added at integration** (the integrator, 2026-11-09; PINNED AT INTEGRATION and PROVEN ON ab78b58, below). The landing stages 97 files: the patch's 90, two of them edited (the duty reason in `keep-right-claim-census.json` reworded, and the r5 C2 pin added to `park-family-drivable.test.ts`), plus seven more:
+  - from the driveway re-plan (cp2tools): `tools/mobile/path-refs/sc-pk-driveway.pathref.json`, `tools/mobile/lib/path-plan/policy.mjs` (one COMMITTED line) and `tools/mobile/__tests__/path-plan.test.mjs` (the lists);
+  - from the T9.h.2n re-derivation (cp2t9): `tools/mobile/__tests__/path-follow.test.mjs` (the sc-pk-driveway row and comments), and three comment-only cite corrections in `lessons/engine.ts`, `lessons/scenario/observation.ts` and `lessons/__tests__/b5-crash-pin-rescue.test.ts`.
+
+**The row is NOT closed by this landing.** `catalogue-demo-curvature:dae908c7` stays OPEN.
+- Every number below was measured in process: recorded demos folded through the live chain, plus the lane's chassis and kinematic probes. No builder, verifier or integrator saw the new demos in a browser or on a device.
+- It is a FAMILY row. curvdepth and curvring landed earlier families, and the row also spans the curvmanoeuvre, curvlanes and curvvru families.
+- The round-1 builder measured the census going from 65 to 48 offenders: correct demos 21 → 15, mistake demos 44 → 33. The round-1 verifier reproduced 65 → 48, with exactly the family's 17 rows removed. The census at HEAD holds 65 offenders, the same as at `1feba3a`.
+- The row moves only on rig frames judged after this landing (Owed, below).
+- This landing does not change the open-row count: 10 open (1 critical, 9 major, 0 minor).
+
+**What was wrong** (the round-1 builder, re-verified at base).
+- The six builders authored polylines with no fillets on 3–4 m arcs (3.0 m on narrow), and the recorder pivots at every vertex.
+- The census measured 1.295–3.249 m over a 1 m window. The car's limit is 3.955 m kinematic and about 4.17 m physics. Every trace peaked at 0.600 rad of wheel.
+- A student copying a demo would learn a path the car cannot follow.
+- On the product's boxes, three correct demos touched a parked car and scored 10 т at every rung:
+  - perp-rev on dret_90#2 (−0.003 m);
+  - narrow on vela_h3#1 (−0.014 m);
+  - perp-forward on vela_h3#1 (−0.031 m).
+- Every reverse shadow, the driveway shadow and sc-park-45 at L3–L5 printed «Стигна точката, но твърде бързо».
+
+**The integrator's rulings for this lane** (each the founder's to veto). Until now they were recorded only in the integration log (`HANDOFF-2026-09-29-running.md`), so they are recorded here.
+- **CP2-1 to CP2-7** (2026-11-06):
+  - CP2-1: read perp-forward's «лявата половина» sentence against чл. 15, retrieved;
+  - CP2-2: the close approach is a mistake in either bay;
+  - CP2-3: the chassis strikes every named body;
+  - CP2-4: task-cap-round14 G gets a real over-cap leg;
+  - CP2-5: taught numbers are read from the shown sentence;
+  - CP2-6: indicator timing follows чл. 25 / чл. 26, with no unexplained drift away from the signalled side;
+  - CP2-7: retire the stale sc-park-perp-rev__m0 and sc-park-parallel__m0 clips.
+- **CP2-1bis** (2026-11-06). ЗДвП чл. 35, ал. 2 (retrieved from content/law/acts/zdvp.json) governs the START of a turn whose radius is larger than the bend's. It applies over чл. 16, ал. 1, т. 1 and чл. 15, ал. 1, on four conditions:
+  - the precondition is measured;
+  - the left-half travel is only the turn's start, shortened to the geometry's minimum and pinned;
+  - the clear-ahead check and ал. 2's yield duty are taught;
+  - the lawRefs and the census reason cite ал. 2.
+- **CP2-1ter** (2026-11-08). Ал. 2's «радиус на завиване» is the radius the car is DRIVEN on. The precondition is therefore read on the 4.6 m programme with the 0.25 m floor, not at full lock.
+- **CP2-1quater** (2026-11-08). For the two reverse lessons the geometry's minimum is the TWO-STAGE set-up: keep right past the row, and move left only for the start of the swing.
+- **CP2-1quinquies** (2026-11-09) settles the round-5 conditions, below: (1) C1 accepted, (2) C2 a landing condition, (3) C3 corrected; r4 C4 and r5 N5 carried.
+
+**What landed.** This is the builder's description; the verifier's measurements are under the next heading.
+- **The kit.** All 17 re-authored demos (6 correct, 11 mistake) are built by `parkKit.ts` from ramped curvature programmes on DRIVABLE_MIN_CENTRE_RADIUS_M 4.6.
+- **The two reverse lessons (CP2-1quater).** `twoStageSetUp` / `twoStageSteps` build the set-up in three parts:
+  - S1, the kit's S (radius 6, ramps 1.5), moves the car from the drawn lane centre onto the right-half line x 1.2 before the row;
+  - the car passes the row on that line;
+  - S2, the same S, moves it onto the setup line and ends AT the setup stop.
+  - Each lateral move is signalled on its own: the left signal at least 3.0 s ahead, off when the move is over, one lamp blink between the two signals, and the right signal only at rest.
+  - S2 and its signal stretch run at S2_KMH 4.5 km/h. As S2 turns left, its tail swings toward the parked noses. At 5.5 km/h the rear cue would have painted that row red on the drive taught as correct.
+- **perp-forward (CP2-1bis, round 3).** A 90° forward turn on 4.6 m from a run-up across the aisle. Its Задача 1 zone was re-centred to x −4.6 (R3(d)).
+- **lawRef.** «ЗДвП чл. 40; чл. 35, ал. 2», both retrieved from content/ and pinned verbatim.
+- **The keep-right census** (by its re-record convention): total 573 → 575, duty 83 → 85, other 469, UNREVIEWED 0.
+  - The two new right-half sentences are classed duty («shown-only-where-al1-binds»).
+  - The ал. 2 sentences are classed other, each with a measured reason.
+  - Round 4's false perp-rev clause «lands past the tightest rung's tolerance» is gone, and the pin reads the overlap figures from the reason.
+- **Downstream pins, re-derived, each by its own convention:**
+  - rear-static-gap §1 / §3 and the corpus, with a dated history line;
+  - rearStaticBodies and Seam, 159 → 236 finite;
+  - task-cap-round14 G, whose perp-rev synthetic over-cap leg also replaces the S2 stretch with 8 km/h;
+  - the compile snapshot (perp-rev instruction 2 only);
+  - the clip plan, regenerated.
+
+**What the student sees** (status draft; sign-off owed).
+- Against HEAD, the landing changes many shown strings across rounds 1–5: the reviewed-text manifest's string lists gain 53 entries and lose 46 (the docs verifier's count, `git diff` of `reviewed-text-manifest/strings.*.txt`).
+- Round 5 alone moved three (the builder's `scratch/curvpark2-impl/r5/manifest-strings-diff-r5.txt`). Rounds 1–4's are in `r2/manifest-strings-diff-cumulative.txt`, `r3/manifest-strings-diff-r3.txt` and `r4/manifest-strings-diff-r4.txt`.
+- sc-park-perp-rev, instruction 2 (templates.ts:121):
+  - At HEAD: «Задача 1: подмини свободното място и спри — под 6 км/ч, практически в покой — когато задната броня подмине съседната кола; дръж около метър и половина странично разстояние от реда. От тази позиция зависи целият замах.»
+  - Now: «Задача 1: покрай реда остани в дясната половина на алеята. Замахът започва от лявата половина — чак накрая, щом е свободна напред, отмести се в нея и спри под 6 км/ч, когато задната броня подмине съседната кола; дръж около два и половина метра странично разстояние от реда.»
+  - The lane's round-4 wording, which never shipped, began «Задача 1: замахът започва от лявата половина на алеята — …».
+- sc-park-narrow, instruction 2 (templates-parking.ts:462):
+  - At HEAD: «Задача 1: подмини тясното място и спри, когато задната броня подмине съседната кола — дръж около метър странично разстояние от реда. От тази позиция зависи целият замах.»
+  - Now: the same new wording as perp-rev, with «три и половина» and no km/h.
+- A new caption on both shadows, shown with S1's signal: «Преди реда се отмести наляво с ляв мигач, по-далеч от предниците на колите — но остани в дясната половина на алеята.»
+- On the two reverse lessons, a student who copies the demo's S2 crawl (at most 4.67 km/h) sees the amber rear badge «Кола отзад» on the parked row. At 5 km/h or more the same row paints red (C1, below).
+- The round-5 verifier found the three round-5 strings true of the drives, and exactly three moved in round 5.
+
+**What the verifier reproduced** (round 5, lane `D:/knijka-lanes/curvpark2-verify2` = `1feba3a` + the r5 patch; artefacts under `scratch/curvpark2-verify2/r5/`):
+- **Curvature.** The physics reverse radius is 4.1716 m on VehicleSim, so the floor is 4.3801 m (1.05 ×).
+  - All 17 re-authored demos measure 4.5952–4.6003 m on the census window.
+  - Early-turn's S measures 4.9396 m, and the radius-6 S of the no-observation demos 5.99–6.00 m.
+  - The 3-point check gives at least 4.5736 m.
+- **Steering and rests.** Heading step at most 1.203°, peak wheel 0.474–0.525 rad, wheel rate at most 0.764 rad/s, and a rest of at least 0.95 s at every gear change.
+- **Clearance.** Every correct demo keeps at least 0.25 m on the recorded, bicycle and driven-from-square poses: perp-rev 0.451 / 0.384 / 0.395 m, narrow 0.347 / 0.468 / 0.469 m.
+- **The live chain, 510 runs** (L1–L5 × 60 Hz, 30 Hz, the phone cadence and a jittered cadence).
+  - Every correct demo: 0 т., passed, both tasks, ★3, no card.
+  - Every mistake commits only COLLISION, on its named body.
+  - blind-exit: 0 т., passed, ★3.
+  - Early-turn's Задача 1: ✓ at L1/L2, ✗ at L3–L5.
+- **CP2-2 to CP2-7.**
+  - The verifier reports drift against the signalled side of 0.000 m «on 16 of the 17 demos». The 17th it names, sc-park-parallel/mistake-no-observation, is not one of the family's 17 re-authored demos. It is the family's 18th demo: byte-identical to base, outside the brief, and drifting 0.382 m under its right indicator.
+  - The driveway's first signal is the left one, at 4.15 s.
+  - Both clips are gone from the manifest.
+  - 34 trace files changed, exactly the family's 17 × 2, and every public copy equals its content copy.
+  - No family builder imports scParkDepth.
+- **The law.** чл. 15, 16 and 35 were read from content/law/acts/zdvp.json, and чл. 35, ал. 2 matches the ruling's quote verbatim. Round 4's verifier also read чл. 40.
+- **The precondition** (its own chassis sweep: 699 forward drives, 104 from skewed starts).
+  - perp-forward: 0 clean, best −0.065 m into vela_h3#1.
+  - perp-rev: 12 of 120 park clean at full lock, best +0.152 m.
+  - narrow: 2 of 120, best +0.004 m.
+  - The perp-rev and narrow results are full-lock facts below the floor, so under CP2-1ter they do not refute.
+  - On the 4.6 m programme it swept with a 1 cm start grid and asymmetric ramps. Every right-half swing ending on the bay axis overlaps dret_90#2: perp-rev by at least 0.203 m recorded / 0.373 m bicycle, narrow by 0.352 / 0.521 m. These equal the census reasons.
+- **The left-half travel** (its own path builder, 1 cm grid).
+  - perp-rev: minimum 3.175 m at xm 1.32; the demo measures 3.192 m.
+  - narrow: minimum 5.307 m at xm 1.40; the demo measures 5.360 m.
+  - Round 4 measured 11.90 / 12.36 m. The single-S minima are 11.79 / 12.26 m.
+  - The floor allows a right-half line up to x 1.41 (perp-rev) and 1.40 (narrow).
+  - Before S2 the car is wholly right of the centre line, its left side at least 0.35 m off it.
+- **The signals.**
+  - S1 lead 3.18–3.20 s, S2 lead 3.75–3.77 s, 0.90 s between them.
+  - Each left signal goes off within 0.1 m of the end of its S (S2's at the stop), and the right signal comes on only at rest.
+  - S2 runs at most 4.67 km/h.
+- **The sentences.**
+  - The S1 caption is shown with S1's signal.
+  - The clear-ahead caption is shown with S2's signal, before the car crosses the centre line.
+  - The yield caption is shown at rest at the setup, followed by the look right.
+- **Mutants: 12, one at a time, each restored with sha256 EQUAL.**
+  - 10 were killed on assertion text: round 1's VM1–VM4, VM6, VM7 and its own MW1, MW5, MW6, MW8.
+  - For example, MW5 (XM 1.43) died on «the line keeps the floor (the floor's own line is x 1.415): expected 1.43 to be ≤ 1.4154», and MW6 (S2 signalled right) on «shadow-correct t=30.55 x=1.20: expected 'right' to be 'left'».
+  - MW2 and MW3 survived (C2).
+- **Its runs, all after the last edit:**
+  - the regression list: 69 of 69 files green, every count equal to the builder's (park-family-drivable 141, chassis 13, limit 3, keep-right-claim-census 24, caption-truth 58, manifest 49, rear-static-gap 28, compile 17);
+  - traces/: 174 files, 2,534 passed;
+  - hud: 74 files, 1,454 passed;
+  - lessons/__tests__: 128 files, 2,465 passed, 165 skipped;
+  - lessons/scenario/__tests__: 214 files, 5,227 passed, 2 skipped;
+  - two environment ENOENTs, the same as the builder's, because the lane has no tools/ or docs/: lesson-ui 894/895 (touchHintLifetime) and clips 19/20 files with 291/291 tests (whyPanel);
+  - tsc: 22 errors, the same files as the lane baseline.
+- **Its own mistake, recorded.** A mistyped launch ran VM1, VM2 and part of VM3 while the regression list was running.
+  - The verifier killed that runner, restored by git and re-checked the diff sha.
+  - It re-ran the two regression files that overlapped (static-contact-cadence 8/8, grade-grid-cadence 11/11) and all six round-1 mutants.
+- **Restored clean:** the lane equals base + patch (diff sha 65972670), git status is clean, and no probe is left.
+
+**The builder's numbers, not re-measured by the round-5 verifier.**
+- **Mutants.** The builder reports 23 run. Its `r5/mutants/_report.txt` holds 21 runs of 20 distinct mutants: MQ1–MQ11, plus MR4–MR6, MR8, MR9, VM1, VM1b, VM3 and VM6 carried. Each was killed on assertion text and restored with sha256 EQUAL. MQ1 first ran at 2 m, where the kit refused it, and was re-run at 0.5 m.
+- **The rear cue on narrow's shadow:** 159 → 236 finite reads, 77 of them forward.
+  - The first read is forward, at 31.30 s and 1.19 m. The first reverse read is 6.17 m, at 42.30 s.
+  - The corpus goes 40,869 → 41,044 samples, badgeUp 4,794 → 5,082 and red 2,030 → 2,028. slowReverseClearAir stays 711, and both zeroes stay zero.
+  - These figures are pinned in rear-static-gap.test.ts, which was green 28/28 in the verifier's run.
+- **The keep-right counts** 573 → 575 (keep-right-claim-census green 24/24 in the verifier's run).
+- **perp-forward's left-of-line travel** (round 3): 17.94 → 14.505 m, against the first-principles minimum of 14.541 m.
+- **Directories the round-5 verifier did not run:** components/sim/__tests__ 25 files, 358 tests; traffic 53 files, 675 tests; world 135 files, 2,409 tests; scene 798/799, with one environment ENOENT (guidance-lane-align-span, tools/ fixtures). All of them ran green on ab78b58 at integration; components/sim and world went green only after their load artefacts were re-run alone (PROVEN ON ab78b58).
+
+**The conditions, and how each stands** (integrator ruling CP2-1quinquies, 2026-11-09, made under the founder's delegation and the founder's to veto).
+
+**C1, CP2-1quinquies (1). The amber rear badge on S2's forward crawl. ACCEPTED** (the founder's to veto).
+- On the demos, at the S2 crawl, the rear cue reads the parked row on 67 forward frames per perp-rev drive and 77 per narrow drive. All are amber «Кола отзад», never red.
+- The badge is TRUE: a parked car lies 0.7–2.9 m from the swinging tail.
+- The class change of rear-static-gap is accepted as re-measured, with its written reason:
+  - §1's «in reverse, not on the approach» is now «forward only while the tail swings, never red»;
+  - §3's silent drives go 19 → 17, and narrow no-observation is asserted silent only in its reverse, where the hazard is;
+  - badgeUp goes 4,794 → 5,082.
+- `rearCueClosing` counts any |v| ≥ REAR_CUE_MOVING_KMH (5) as closing, even when the car drives forward, away from the parked car. A student copying S2 at 5.5 km/h would get a red badge.
+- These are the cue's own semantics, identical on base. They are RECORDED BY NAME for the cue's owner: not on this row and not as a new row (founder, 2026-10-19: no new triage rounds). Not pinned at integration: changing it would be a product change, outside a test-only landing, and the amber forward reads are already pinned by rear-static-gap §1 / §3 (the integrator).
+
+**C2, CP2-1quinquies (2). Two figures in the census reasons no pin read. LANDING CONDITION** (the founder's to veto).
+- The verifier's mutants MW2 and MW3 both survived park-family-drivable (141/141) and keep-right-claim-census (24/24):
+  - MW2: the duty reason's «0.475 m (sc-park-perp-rev)» → 0.900;
+  - MW3: the ал. 2 reason's «(to x 1.415)» → 1.900.
+- The values are true on the verifier's own measurement:
+  - the floor-limited line is x ≤ 1.41 / 1.40;
+  - the set-up drive keeps 0.474–0.475 m (perp-rev) and 0.454–0.455 m (narrow) from vela_h3#1.
+- But the duty reason puts that clearance «on the line x 1.2». The straight line itself keeps 0.725 m on both lessons; the 0.474 m binds in S2's tail swing. The reasons are not shown to students.
+- Ruled:
+  - reword that reason: the set-up drive keeps ≥ 0.474 m in S2's tail swing (narrow ≥ 0.454 m), while the straight line past the row keeps 0.725 m;
+  - pin both figures, the S2-swing clearance and the floor's limit line x 1.415 / 1.405. Read them from the reason string and compare them with the pin's own re-measure within 0.01 m, as the pin already does for the overlap figures;
+  - re-run MW2 and MW3, one at a time. BOTH must die on assertion text, each restored with sha256 equal.
+
+PINNED AT INTEGRATION: reworded and pinned (the integrator, 2026-11-09, in `D:/knijka-lanes/integ-cp2`; log `D:/knijka-lanes/scratch/cp2-land/PROGRESS.md`, mutant report `scratch/cp2-land/mutants/_report.txt`).
+- **The reason**, reworded at both occurrences in `keep-right-claim-census.json` (a test fixture reason, not shown text). It now says the straight line past the row keeps 0.725 m on both lessons, the set-up drive keeps ≥ 0.474 m (perp-rev) / ≥ 0.454 m (narrow) in S2's tail swing, and the floor's line is x 1.415 / 1.405. It no longer puts 0.475 m «on the line x 1.2».
+- **The pin**: one test per reverse lesson in `traces/__tests__/park-family-drivable.test.ts` (+55 lines on the lane's version, the merge verifier), «sc-park-perp-rev: the keep-right census reasons' clearance and floor-line figures are read from them and re-measured (r5 C2)» and its sc-park-narrow twin. Each reads every figure from the duty and ал. 2 reasons and compares it, within 0.01 m, with the pin's own re-measure:
+  - the line and S2-swing clearances, measured on the committed shadow-correct trace on the envelope;
+  - S2's swing as the set-up drive's binding point;
+  - agreement with the built path's clear(g.xm);
+  - the floor line, as twoStageMinimum().xmMax.
+  - The merge verifier: the measured values come from executed product code (the committed trace through parseScenarioTrace, the product world districts through lessonBoxSets, and twoStageMinimum built on the product's authoredDrive/kitSLength). A regex only reads the stated number out of the reason; no stub is involved.
+- **The mutants**, each run alone and restored with sha256 2dd79969… EQUAL:
+  - MW2, carried onto the reworded text because the old «0.475 m … on the line x 1.2» wording no longer exists: «≥ 0.474 m (sc-park-perp-rev)» → «≥ 0.900 m (sc-park-perp-rev)». Killed: «AssertionError: Задача 1: покрай реда остани в дясната половина на алеята.: S2's tail swing (vela_h3 #1): stated 0.900, measured 0.474: expected 0.4255223945900998 to be less than 0.01»;
+  - MW3, the ал. 2 reason's «(to x 1.415)» → «(to x 1.900)». Killed: «AssertionError: Замахът започва от лявата половина — чак накрая, …: the floor's own line: stated 1.900, measured 1.415: expected 0.48457… to be less than 0.01»;
+  - three extra: MW2n (the duty reason's narrow figure «≥ 0.454 m (sc-park-narrow)» → 0.900), killed on «S2's tail swing (vela_h3 #1): stated 0.900, measured 0.454»; MW3d (the duty reason's floor line «x 1.415 (sc-park-perp-rev)» → 1.900), killed on «the floor's own line: stated 1.900, measured 1.415»; MWL (the straight-line figure «keeps 0.725 m (sc-park-perp-rev)» → 0.900), killed on «the line past the row (dret_90 #0): stated 0.900, measured 0.725».
+- The merge verifier ran MW2 and MW3 again itself, one at a time: both died on the same texts, and the file was restored to sha256 2dd79969…8c2f, EQUAL. The pins are green: 2 passed on `-t 'r5 C2'`; traces/ 174 files, 2,536 tests, the builder's 2,534 plus these 2.
+
+**C3, CP2-1quinquies (3). The ruling sentence of CP2-1quater. CORRECTED by the integrator** (the founder's to veto).
+- The ruling said «the right-half line as far left as the 0.25 m floor allows past the row». That was a slip.
+- It reads «as far RIGHT, toward the row, as the 0.25 m floor allows». That is what чл. 15, ал. 1 («възможно най-вдясно») and the ruling's own fact ask for.
+- The floor bounds the line on the right: x ≤ 1.415 / 1.405 by the builder's 1 mm bisection, 1.41 / 1.40 on the verifier's 1 cm grid. The half width bounds it on the left (x ≥ 0.85).
+- The built x 1.2 is ACCEPTED. It is 0.2 m inside the floor's limit, and the builder puts its cost at no more than 0.054 m of extra left-half travel.
+- On the verifier's scan, every right-half line passes the pinned 0.15 m on either reading. The worst is narrow at x 0.85: 5.455 m against the 5.307 m minimum, 0.148 m over.
+- No new pin: the existing pins (the line is at most xmMax, 2 cm past xmMax breaks the floor, and the measured value is within 0.15 m of the minimum) already pin it (the integrator).
+
+**CARRIED, as ruled earlier** (CP2-1quinquies; the founder's to veto).
+- **r4 C4, doc 92 §9 items.**
+  - perp-forward/mistake-early-turn's Задача 1 is ✓ at L1/L2 and ✗ at L3–L5 (base ✓ at every rung); points and verdict are unchanged.
+  - blind-exit gives 0 т., passed, ★3, no card, at every rung and cadence.
+- **r5 N5, RECORDED for the THEO-4 owner.**
+  - Задача 1 «спри в изходната позиция» is a reachZone (templates.ts:156, cap 6, r 5). It ticks when the car enters the zone under the cap, not when it stops.
+  - On the two-stage drives it now ticks during S2's crawl: perp-rev at 30.40 s (L1) and 32.33 s (L3–L5), against the stop at 36.73 s.
+  - These are the product's existing semantics; the zone is unchanged.
+- Neither is this landing's to pin (the integrator).
+
+**The three environment ENOENTs** (clips whyPanel, lesson-ui touchHintLifetime, scene guidance-lane-align-span) had to go GREEN in the landing worktree, which has tools/ and docs/. All three are GREEN there (PROVEN ON ab78b58).
+
+**The policy.mjs item. SETTLED at integration** (cp2tools).
+- The builder flagged «policy.mjs cites (templates.ts 345 → 356, templates-parking.ts 954 → 980)». Those figures are the two files' line counts at HEAD and on the tree, not cites. The flag is in curvpark2-r5.json (build owed O6); the cp2tools integrator did not find it in the logs it read.
+- `tools/mobile/lib/path-plan/policy.mjs` at ab78b58 cites neither file. Its only cite into the family's templates is `templates-pk.ts:276-282,347-360` (sc-pk-driveway, policy.mjs:289). templates-pk.ts changed only at lines 384/386 (the mistake-wide title and text), its line count did not change, and lines 276-282 (PK_DRIVE_TARGET_BAY) and 347-360 (the sc-pkd-park objective) are byte-identical at HEAD and in the tree. So no policy.mjs cite moved, and none was edited. Nothing in tools/ outside the frozen fixture cites templates-parking.ts or templates.ts.
+- Outside tools/, three platform comment cites into templates-parking.ts had drifted. cp2t9 corrected them (PROVEN ON ab78b58).
+
+**PROVEN ON ab78b58** (the integrator's runs on 2026-11-09 in the worktree `D:/knijka-lanes/integ-cp2`, log `D:/knijka-lanes/scratch/cp2-land/PROGRESS.md` with its «cp2tools» and «cp2t9» parts; reports `land-cp2-results.json`, `land-cp2tools-journal.jsonl` and `land-cp2t9-journal.jsonl` in `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/`; the config with ruling CP2-1quinquies `D:/knijka-lanes/scratch/land-cp2.config.json`. The merge verifier ran the pins, one lane mutant, four directory runs and the tools tests itself; the cp2t9 verifier ran the re-derivation, two mutants and path-follow.) The integration took three passes: the first stopped on a stale tools artefact, the second on a measured pin that the re-plan moved. In order:
+- **The apply.** The worktree was clean at ab78b58, and the patch sha256 matched (65972670…13b5). It went in with `git apply --3way --index --binary`: 90 files (83 modified, 7 added), no 3-way merge, no conflict. The 7 «Falling back to direct application» lines were the new files. None of the patch's files changed in the slowturn landing (1feba3a..ab78b58). At this step none of land-uc's named sources (lessons/engine.ts, finish.ts, objectives.ts, taskCapFeatures.ts, types.ts, templates-parking2.ts) was staged; cp2t9 later staged a comment-only edit to lessons/engine.ts (below).
+- **The C2 pins:** PINNED AT INTEGRATION, above.
+- **The reviewed-text manifest:** not re-recorded in the worktree. The integrator's edits are a test and an internal census reason, which is not shown text, and reviewed-text-manifest.test.ts ran green inside the scenario run. The patch's own manifest records 3 moved strings: perp-rev instruction 2, narrow instruction 2 and the new S1 caption.
+- **The directories** (on the 90-file tree, before the two tools passes), all green or at baseline:
+  - lessons/__tests__ 129 files, 2,472 passed, 165 skipped;
+  - lessons/scenario/__tests__ 218 files, 5,655 passed, 1 skipped (reviewed-text-manifest, keep-right-claim-census and the compile snapshot inside);
+  - components/sim 111 files, 1,846 tests. The one red was a TIMEOUT, not an assertion: shellClipAffordances.test.ts «THE GENERAL FORM: no sub-1 shrink weight anywhere under the sim trees» hit 60,000 ms while other lanes loaded the host; re-run alone, 40/40. lesson-ui touchHintLifetime is green;
+  - orchestrator 42, 536; rules 110, 1,929; traffic 54, 682; runtime 51, 946; scene 48, 799 (guidance-lane-align-span green); vehicle 22, 299;
+  - world 135 files, 2,409 tests. The run exited 1 on two unhandled «Failed to start forks worker … Timeout waiting for worker to respond» errors: lot-apron-and-bay-default.test.ts and sign-post-distinct.test.ts never started on the loaded host. Re-run alone: 2 passed, 11 tests;
+  - hud 74, 1,454; traces 174, 2,536 (the builder's 2,534 plus the 2 C2 pins);
+  - src/modules/clips/ 20 files, 306 passed: whyPanel green, and the clip-plan freshness gate green, so nothing was regenerated.
+  - tsc (`npx tsc --noEmit --incremental false`): 21 errors (baseline 21–22): api/health/route.ts 4, lib/db.ts 1, admin/store.ts 3, auth/store.ts 2, learning/store.ts 3, lesson/progress.ts 1, outcomes/store.ts 1, payments/store.ts 2, privacy/store.ts 1, sim/lessons/store.ts 2, sim/traces/attemptStore.ts 1. None is in a touched file.
+- **The first tools run, and the stop (11:14).** `node platform/scripts/tools-tests.mjs` from the worktree root: 1,924 tests, 1,900 pass, 13 fail.
+  - 1 standing: the deck-captions freeze («the corpus has not changed since it was measured»; frozen 1,811 captions / 503 traces, tree 1,826 / 503).
+  - 7 from the worktree's environment: build-redrive §9(a), §9(b), §9(d), §9(e), count-agreement.test.mjs and finding-reader.test.mjs fail on «could not find .audit-frames/findings by walking up from this file or the cwd» (that data is untracked and exists only under E:\AI driver, and was not walked); lane-evidence.test.mjs fails on «could not resolve the playwright package», and passes 10/10 with KNIJKA_PLAYWRIGHT_ROOT pointing at the main tree's copy.
+  - 5 REAL, caused by this landing: `tools/mobile/path-refs/sc-pk-driveway.pathref.json` pinned the samplesDigest sha256:d463cc94cb4f… of the OLD sc-pk-driveway/shadow-correct trace, which the patch re-authored (digest now sha256:2dd6e81bad61…). path-plan.test.mjs «is not stale, and its car is VEHICLE», «the stored worst deviation agrees with a global point-to-segment measure» («sc-pk-driveway seg 0 witness 0: global 1.681 > stored 0.087 + 0.025») and «its speed profiles are the trace's, with no empty bin»; path-evidence.test.mjs «overshootFromSamples recomputes vAuthMove from the trace … for every pathref»; and path-follow.test.mjs crashed at load on «reference-stale». The lane had no tools/; the builder had flagged it (O6, R8).
+  - Re-planning a committed tools artefact was not in the brief, so the integrator STOPPED: 90 files staged, +4,942/−1,567, staged diff sha256 1a799b0f…, 0 CR bytes, and no gate patch.
+- **The merge verifier: REJECT, for that one reason only.** The gate patch did not exist (V1), and the 5 tools reds were real and caused by this landing (V2). It re-ran the tools suite itself (1,924 tests, 1,900 pass, 13 fail, the same set) and computed both digests with tools/mobile/lib/path-plan/geom.mjs samplesDigest: the ab78b58 trace gives the pathref's sha256:d463cc94cb4f…103f7, the staged trace sha256:2dd6e81bad61…f53b8. So base was consistent, and the landing made the pathref stale. A rig drive steered by that pathref would fail the same way, and a rig re-drive is the only thing that can close dae908c7. Everything else it checked held:
+  - the lane patch applied alone to a temporary index on ab78b58 (tree 0970c515…) differs from the staged tree (5c1ff673…) in two files only, keep-right-claim-census.json (the reworded reasons) and park-family-drivable.test.ts (the pin). No product source differs;
+  - MW2 and MW3 died in its own runs (PINNED AT INTEGRATION, above);
+  - the lane verifier's MW5 (scParkPerpRev.ts `const XM = 1.2;` → 1.43) still fails 6 tests of park-family-drivable, among them «the line keeps the floor (the floor's own line is x 1.415): expected 1.43 to be less than or equal to 1.4154…», restored to sha256 d17edb1e…a598, EQUAL;
+  - its suites, every red a timeout or an unstarted worker on a loaded host, green alone: traces/ 174 files, 2,536 tests (2 caption-scan timeouts); lessons/scenario/__tests__ 218 files (1 timeout in reviewed-text-manifest §3 and 14 unstarted files, 1,173 passed on re-run); clips, hud, traffic, scene and lessons/__tests__ in one run, 325 files, 5,713 passed, 165 skipped; components/sim 111 files, 1,846 passed;
+  - the deck-captions freeze is standing: base already fails it, 1,822 captions against the frozen 1,811. The landing brings it to 1,826, so the next re-freeze must lay out the 4 new captions, including the new S1 caption (V3).
+- **cp2tools: the driveway re-plan (15:30–17:07).** From the worktree, on the 90 staged files (sha 1a799b0f…, unchanged):
+  - `node tools/mobile/lib/path-plan/build-pathrefs.mjs sc-pk-driveway` exited 0 after 294,875 ms: problems [], emitBlocked [], and one caveat, the standing dual-wording one. The new pathref's sha256 is 9f210f64…dd3f (HEAD's was 1822ab5a…c6c9). Its trace.samplesDigest is sha256:2dd6e81b…53b8, the re-authored shadow-correct. It now records generator.reverseAuthority 0.892; HEAD's recorded none.
+  - Segments: seg0 D is TRACK with dev 0.087, unchanged. The seg1 R witnesses at grid −0.5 / 0 / 0.5 are TRACK with dev 0.239 / 0.229 / 0.091. One declared corner (along −0.5, lat −0.25, yaw 2.5) came out ENDPOSE 0.592, so the builder's own tightened re-screen narrowed the band to lat ±0.15 / yaw ±1.5, and all 8 corners are TRACK there; no CD-1 pull was needed. All 3 R witnesses carry clearancePlan.objective (planned clearance 0.6455 / 0.7105 / 0.695 m); the worst mounted clearance is 0.6951 m (floor 0.15). The segments moved with the re-authored trace: R arc 8.69 → 9.97 m, a new authored 1.15 s stop at 40.94 m, teleportDropped 249 → null.
+  - The other 10 pathrefs are byte-identical. sc-park-45, -narrow, -parallel, -perp-forward and -perp-rev have no pathref.
+  - `repin-committed.mjs`: the print showed 1 lesson differing, sc-pk-driveway R1, corridorM 0.771 → 0.802, band lat ±0.25 → ±0.15 and yaw ±2.5 → ±1.5; D0 stays at 0.437. --write printed «re-pinned COMMITTED from 11 pathrefs (1 lesson(s) moved)», and a second print «COMMITTED already matches the pathrefs on disk — nothing to re-pin». The policy.mjs diff is that one COMMITTED line.
+  - The lists in path-plan.test.mjs (the curvdepth precedent's «The lists», doc 88 :13496): sc-pk-driveway came off PLANNED_BEFORE_THE_CAP (it now records the cap) and off NOT_REPLANNED (its R1 witnesses, 3 of 3, carry the clearance objective), each with a dated comment.
+  - The tools: path-plan 123/123, path-evidence 12/12; path-follow 107 tests, 102 pass, 1 fail, 4 todo. The full runner: 2,030 tests, 2,005 pass, 10 fail — the freeze, the 7 environment reds, one load flake (road-witness-wiring «EXECUTED: a read that fits the budget does NOT lengthen the tick», a file the landing does not touch, 24/24 alone), and ONE new red caused by the landing: path-follow.test.mjs:3501 «T9.h.2n the gate on the live corpus», which expects sc-pk-driveway engage [true, true, false] and got [true, false, false]. The five pathref reds of the 11:14 stop were gone.
+  - The pin's own comment says «a re-plan that moves a tail moves this», and its precedent (cdtools CD-3) re-derived T9.h.2n in a lane with a builder and a verifier. Re-deriving a measured pin was not in this brief, so the integrator STOPPED again: 93 files staged (+4,950/−1,571), staged diff sha256 c3e77498…76ae, 0 CR, no gate patch.
+- **cp2t9: the T9.h.2n driveway row re-derived (17:11–18:37).** By hand from the raw rows of the committed pathref (`scratch/cp2-land/cp2t9/derive.mjs`): s = col0, ψ = col5, REST_BACK_M 0.3, the rest row the last row with s ≤ s_end − 0.3, ψT = seg.authoredEnd.psi = 270 with no designedNegative, owed = |ψT − ψrest| − |ψT − ψend|, engage = owed > 0. Every hand reading agrees with terminalHeadingGate().
+  - HEAD's pathref (the saved 9390622 copy): witness −0.5 owes +1.17, witness 0 +0.79, witness +0.5 −0.98, so [true, true, false], the old row.
+  - The re-plan: witness −0.5 owes +0.12 (ψ −92.151 → −92.028), witness 0 −0.96 (ψ −90.898 → −91.859), witness +0.5 −0.36, so [true, false, false].
+  - Why witness 0 moved: on HEAD it rested 5.9° clockwise of 270 and its tail turned back toward 270. On the re-authored trace (R arc 8.69 → 9.97 m) it rests 0.9° off 270 and its tail turns further away, to 1.86°, so nothing is owed.
+  - Only that row of path-follow.test.mjs was edited, with a dated provenance comment (2026-11-09, curvpark2 landing, cp2t9: the re-plan, the arithmetic, the old row and why it moved). No other row, invariant, threshold, Slice 0 field or pin was touched.
+  - **The consequence, measured** (`cp2t9/measure.log`, `measure-w0.log`). On the bench, full plan, seeds 1–20, every clean drive selects witness −0.5, which still engages (handed 1.68–1.79 m): 0 refusals, 20/20 in the product box, worst final heading 0.95° against a 10° tolerance, stopErr 0.268–0.358 m. With witness 0 forced by the T9.b cornerRun method (R1 alone from the gear-change pose shifted along −0.3…1.0 with lat/yaw 0/0, +0.1/+1 and −0.1/−1, seeds 3, 7 and 8: 81 runs, witness 0 selected on 36), the gate was shut on all 36 and all 36 matched the law-off drive pose for pose: 0 refusals, 36/36 in the box, worst heading 0.62°, worst yawErr at rest 0.94° (inside the ±1.5° arm band), worst |lon| 0.468 m (lonTol 0.5) and |lat| 0.049 m, stopErr 0.184–0.358 m, worst held body 0.919 m (floor 0.15). Witness +0.5 was selected on 18 runs: shut, identical to law-off, 18/18 in the box, worst heading 2.11°. Every other driveway assertion in path-follow stayed green (T1 cursor, T9.c, T9.k.2, T13.5b, T13.5c), and so did T9.h.4n. Lawful, so no stop.
+  - **Three comment cites, corrected to where the content is** (each checked with git log -S on the commit that wrote it). «templates-parking.ts:626-632» was written in 2706813 (2026-08-25) for the 7-line «NOT `lot-spawn-approach` … Thirty-one shipped scenarios … centre of the same edge» block; that block was already at 630-636 at HEAD and is at 641-647 in the tree. The cite now says 641-647 in `lessons/engine.ts:4369` and `lessons/__tests__/b5-crash-pin-rescue.test.ts` at lines 220, 240 and 391. «templates-parking.ts:888» in `lessons/scenario/observation.ts:84`, written in f91dd1c, points at the obs-before-moveoff moment «Огледало и през ляво рамо преди изнасянето в лентата», now at 922; the cite now says 922. cp2tools' first reading (637-643 and 914) was wrong, and the cp2t9 brief's «rules/engine.ts» named the wrong file: the cite is in lessons/engine.ts. git grep finds no other reader of these strings.
+  - **Its runs:** path-follow.test.mjs alone (2,120 s), 107 tests, 103 pass, 0 fail, 4 todo, EXIT 0. The tools runner: 2,030 tests, 2,007 pass, 8 fail, 11 skipped, 4 todo — the freeze and the 7 environment reds, nothing caused by the landing, and the road-witness-wiring flake did not recur. The environment files re-run from cwd E:\AI driver with KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/, one at a time: build-redrive 69/69, finding-reader 7/7, lane-evidence 10/10, count-agreement 13/14; the one red, «apply-reroute.mjs printed no WORKED line», is because the worktree's apply-reroute.mjs reads REPO=<worktree>/.audit-frames/reroute.jsonl, which a worktree does not have (the main tree does). vitest on the touched platform files (b5-crash-pin-rescue, scenario/observation-one-glance-one-moment, lessons/s1-scenario): 3 files, 43/43. tsc was not re-run, because the platform edits are comments only.
+  - Its gate patch: 97 files, +4,967/−1,577, sha256 d33cb0f4…db41, equal to the staged diff.
+- **The cp2t9 verifier: ACCEPT_WITH_FIXES.**
+  - It re-derived the row itself from the raw JSON without loadPathRef (owed +0.123 / −0.961 / −0.361, so [true, false, false]; HEAD's copy gives [true, true, false]), and all 8 T9.h.2n rows equal `want` through loadPathRef + terminalHeadingGate.
+  - The 93-file part of the staged diff still hashed to c3e77498…76ae, so cp2t9 touched only its 4 files. policy.mjs differs from ab78b58 only by the cp2tools COMMITTED re-pin.
+  - Mutants on copies outside the worktree (the worktree file's sha 2094b377… before and after): the old row [true, true, false] and witness 2 flipped [true, false, true] both died on «AssertionError … sc-pk-driveway: …».
+  - The cites 641-647 and 922 point at the content they name. path-follow re-run alone (2,014 s): 107 tests, 103 pass, 0 fail, 4 todo (the standing T9.b ×2, T9.c poligon and poligon atGearChange), EXIT 0.
+  - Its one fix, comment only: cp2t9's claim that «T13.4's loop breaks on sc-park-wall before it reaches the driveway» is false. Both runs log «T13.4 control witness: sc-park-45-rev — calibrated 0.881 vs revKappaScale 1 0.991», and sc-park-45-rev comes after sc-pk-driveway in the control list (path-follow.test.mjs:4114). So the loop did read the re-planned driveway pathref through headOrCorpus; it does not saturate at both scales, and the control is unchanged. But T13.4's control search, which CD-3 pinned to the frozen pairs, now reads one live re-planned pathref, and the comment at path-follow.test.mjs:4044-4045, «(sc-pk-driveway's pathref and trace are 9390622's, byte for byte)», became false.
+- **The fix, APPLIED by the integrator** (the running note, 2026-11-09 19:27): the comment now says the driveway's pathref and trace «were 9390622's, byte for byte, until 2026-11-09», when the curvpark2 landing re-authored the trace and re-planned the pathref, so headOrCorpus serves the re-planned driveway, T13.4's control loop reads it, it does not saturate at both scales, and the control witness is still sc-park-45-rev with the same figures. Comment only, re-staged; the sources record no test run after it.
+- **The gate patch.** `D:/knijka-lanes/gate-cp2.patch`, sha256 0600f02791930fb3948e652c8d165ef555c84420e4bcabf3c3f396417b740b79, 97 files, +4,971/−1,578 (the worktree's staged diff), 0 CR bytes. The worktree was left staged, with no temporary file in it and no process running.
+- **The main apply** (the integrator, 2026-11-09, in E:/AI driver on ab78b58). gate-cp2 was applied 3-way, and the main tree, ea8273a9ff432b8ea1206fd9eb59b1cc9933fe03, equals integ-cp2's index tree byte for byte. gate-sc2 then went on top 3-way (the swingcue section): ONE conflict, reviewed-text-manifest/manifest.json, the «source» surface fingerprint, which both landings move. It was resolved by RECORD_REVIEWED_TEXT_MANIFEST=1 on the combined tree, which printed «nothing changed against the previous recording»: the string files had merged cleanly, and the source surface now holds 13,388 strings, fingerprint e47abc06…. reviewed-text-manifest.test.ts then ran 49/49 green; a 60 s timeout of its public-copy parity test under disk load passed with a longer timeout (a timeout, not an assertion). The combined staged tree is d6f01086e141afd90670fc99a8c2a55272b31e29, 109 files. The main-tree gate decides, the 7 worktree environment reds included.
+- **Not re-measured on ab78b58** by the integrator or a merge verifier: the round-5 verifier's own probes (its 510 live runs, its chassis sweep, its curvature, clearance, travel and signal measurements) and its mutants beyond MW2, MW3 and MW5. The lane's pins (park-family-drivable, park-family-chassis, park-family-limit) ran green in the traces/ runs above, 174 files, 2,536 tests. Those numbers are the round-5 verifier's (or, where stated, the builder's or an earlier round's), measured on the lane, `1feba3a` + the r5 patch. The directory runs above preceded the two tools passes, whose edits are tools files and platform comments only.
+
+**Owed.**
+- **The rig re-drive of dae908c7**, through `/dev/drive-rig` (ADR-017), on PC and phone. At a minimum:
+  - a careful human-style drive at L3 of sc-park-perp-rev and sc-park-narrow with the two-stage set-up and the S2 crawl, photographing the amber «Кола отзад» during S2;
+  - the forward lessons perp-forward and sc-park-45;
+  - the ghost poses, the L2 ribbon, the red mistake ghosts and the marker frames (O1/O1b/O2/O9). Times moved: by the committed traces, perp-rev reverses at 38.40 s and narrow at 39.05 s.
+  - The sc-pk-driveway pathref now pins the re-authored trace, so path-follow no longer refuses it as reference-stale (PROVEN ON ab78b58).
+  - The row moves only on frames judged after this landing. It also needs the curvmanoeuvre, curvlanes and curvvru families.
+- **Tools (O3, O6, R8):**
+  - a tools-only pathref lane for the other five lessons: sc-park-45, -narrow, -parallel, -perp-forward and -perp-rev have no pathref (cp2tools). The two-stage set-up changes the perp-rev and narrow paths, and the pc-path follow leg needs those pathrefs (O3);
+  - the tools readers of `public/clips/manifest.json` (44 entries); the worktree's tools runs show no red beyond the freeze and the environment;
+  - perp-forward's old zone (0.9, −6.5) was the builder's conditional: a grep of tools/ at ab78b58 finds no fixture holding it, sc-park-perp-forward appears in tools/ only in `tools/audit/lesson-mistake-census.expected.json`, and the worktree's tools runs show no red from it;
+  - the next deck-captions re-freeze must lay out the 4 captions this landing adds, including the new S1 caption (corpus 1,826 captions; the merge verifier's V3). Nobody has measured whether the new caption renders whole on a phone profile;
+  - the main-tree gate: the 7 worktree environment reds must come back as the freeze alone.
+- **Clips (O5):**
+  - re-capture sc-park-perp-rev__m0 and sc-park-parallel__m0 (retired, so MistakeMedia shows the 3D replay meanwhile);
+  - re-capture the gallery stills sc__{45, narrow, parallel, perp-rev, driveway};
+  - re-capture or re-title the out-of-family clips sc-pe-parked-row-scan__m0 and sc-speed-creep__m0.
+- **Doc 92 §9** (carried r4 C4): early-turn, blind-exit (F12), and sc-park-parallel/mistake-no-observation's too-fast card and its 0.38 m drift.
+- **Sign-off of the changed sentences** (status draft): every string this landing moves against HEAD, the three round-5 strings above included.
+- **The «докрай» wording** (R5, triage «dokrai»): the peak steer is 0.474–0.525 rad of the 0.60 rad lock.
+- **The row text and the Product Map.**
+  - Doc 88 :10865–10867 still says 36 lessons' correct demos + 72 mistake demos, and :13640 owed 82 after curvdepth. The open-list wording is the same.
+  - Both should say 48 offenders (15 correct demos, 33 mistake demos). The row stays open.
+- **land-uc**, held (the running note, 2026-11-09 13:05; since 18:34 it lands with lane uturnyield), must be re-proven on the new HEAD. This landing now stages `lessons/engine.ts` (a comment cite, cp2t9), one of land-uc's named sources; it shares keep-right-claim-census.json and 18 reviewed-text-manifest files with the uturncorr patch, so the manifest is re-recorded and the keep-right census re-classified once, on the combined tree (the docs agent); and it stages task-cap-round14.test.ts, which tests the task cap that land-uc's taskCapFeatures.ts feeds (the docs verifier).
+- **The founder is told:**
+  - the two reverse lessons keep right past the row and move left only for the start of the swing, with two signals and a crawl for the second move;
+  - the amber rear badge during that crawl, and that it turns red at 5 km/h or more;
+  - the corrected census reasons;
+  - the changed strings;
+  - the integrator rulings CP2-1bis to CP2-1quinquies, each the founder's to veto.
+- **Out of scope, recorded:**
+  - the ghost's chord-heading crab on the correct demos (13.8–15.8°);
+  - observation during the reverse is also credited by the final glances;
+  - the recorder's wheel-estimate artefact;
+  - perp-forward's whyBg «вътрешното предно колело реже ъгъла», which is pre-existing. The round-4 verifier notes it is the inner rear wheel that cuts the corner in a forward turn.
+- **Recorded, not filed:** the docs agents' candidates (below).
+
+**Recorded, not filed** (the docs agents' new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-09). Several restate items above; each is listed with its evidence.
+- **The rear cue turns red on a car driving away.** rearCueClosing treats any |v| ≥ REAR_CUE_MOVING_KMH (5 km/h) as closing in either direction, so a car driving FORWARD away from a parked car inside the red distance paints the rear badge red. On sc-park-perp-rev / sc-park-narrow a student who copies S2 at 5.5 km/h gets a red «Кола отзад» on the manoeuvre taught as correct; the demo avoids it only by crawling at 4.5 km/h. Doc 88's O61 note, that every new red is a frame where the student reverses toward something inside 4 m, was measured over the 51 parking drives of its day. Recorded by name under CP2-1quinquies (1) for the cue's owner. Evidence: `curvpark2-r5.json` verify C1 and build owed[0]; `traces/parkKit.ts` S2_KMH; `hud/rearProximity.ts`; doc 88 :5853–5866.
+- **Задача 1 ticks before the stop.** On sc-park-perp-rev, «спри в изходната позиция» ticks while the car is still moving at about 4.5 km/h, not when it stops: the reachZone (cap 6, r 5) ticks on entry under the cap at 30.40 s (L1) and 32.33 s (L3–L5), against the stop at 36.73 s. The ✓ is shown before the act the task names (THEO-4). Recorded for the THEO-4 owner (r5 N5). Evidence: `D:/knijka-lanes/scratch/curvpark2-verify2/r5/probe/tree-live.json`; `curvpark2-r5.json` verify N5; templates.ts:156.
+- **perp-forward's whyBg teaches false geometry.** It says «Напред е обратното — задницата замахва през алеята ЗАД теб, вътрешното предно колело реже ъгъла». In a forward turn it is the inner REAR wheel that cuts the corner. Pre-existing, unchanged by the lane. Evidence: `curvpark2-r4.json` verify N3; templates-parking.ts:734 (at ab78b58).
+- **blind-exit does not commit its mistake.** sc-park-perp-forward/mistake-blind-exit passes with 0 т., passed, ★3 and no card at every rung and cadence (F12; on doc 92's R10 allowlist, not an open row). Evidence: `curvpark2-r5.json` verify summary (510 live runs); `curvpark2-r1.json` build report item 6; `docs/simulation/92_ADR009_LESSON_MISTAKE_SPEC.md`:1090.
+- **early-turn's task tick depends on the rung.** sc-park-perp-forward/mistake-early-turn's Задача 1 ticks ✓ at L1/L2 and ✗ at L3–L5, the same at every cadence (base ✓ at every rung). Points and verdict are unchanged (doc 92 §9, carried as r4 C4). Evidence: `curvpark2-r4.json` verify C4; `curvpark2-r5.json` verify summary.
+- **The one family demo still breaking CP2-6.** sc-park-parallel/mistake-no-observation drifts 0.382 m against its signalled side and keeps its «твърде бързо» card. It is byte-identical to base and was excluded from the lane. Evidence: `curvpark2-r5.json` verify summary (CP2-2..7) and build owed O6b.
+- **Two out-of-family clip titles drift.** The shipped clips sc-pe-parked-row-scan__m0 and sc-speed-creep__m0 carry titles that differ from their lessons' titles; the lane's new retiredClips.test.ts lists them as known drifts. Evidence: `curvpark2-r2.json` build report (retiredClips.test.ts); `curvpark2-r5.json` build owed; `clips/retiredClips.test.ts` in `D:/knijka-lanes/curvpark2-result-r5.patch`.
+- **«докрай» on a ghost that never reaches full lock.** The full-lock wording on the parking lessons is shown with a ghost whose peak steer is 0.474–0.525 rad of the 0.60 rad lock (triage «dokrai», carried from curvdepth F2). Evidence: `curvpark2-r4.json` verify N3; `curvpark2-r5.json` build owed (R5).
+- **The ghost crabs.** On the family's correct demos the ghost's chord heading crabs 13.8–15.8° off the car's heading; the round-1 verifier measured 10–16° between the ghost's heading and the bicycle car's, under its 25° bound. Recorded out of scope. Evidence: `curvpark2-r1.json` verify N3; `curvpark2-r5.json` build owed (last item).
+- **Observation in the reverse credited by the final glances.** A reverse taken without looking can still be credited by looks taken at the end; the recorder also shows a wheel-estimate artefact. Both recorded out of scope by the lane. Evidence: `curvpark2-r4.json` verify N3; `curvpark2-r5.json` build owed (last item).
+- **A stale code comment outside the section** (the docs verifier). templates.ts at about line 150 says the perp-rev ghost «arrives at 5.5 km/h over its last 12 m». Since round 5 that stretch is the 4.5 km/h S2 crawl (at most 4.67 km/h), so the comment is false. Evidence: `land-cp2-results.json` docCheck report («A stale code comment outside the draft»); templates.ts in `D:/knijka-lanes/integ-cp2`.
+
+## Landed: on the phone, the crosswind's «Втори замах!» swing cue is now drawn when it mounts while the compact overlay slot holds the task standby, a task announcement, the legend, the advisor, the predrive row or a praise card. That row steps back for as long as the cue is mounted. It is hidden by visibility only, never by display:none, and the cue takes the column's top. There are two exceptions: while the touch hint is up the cue stays hidden and the row stays visible, as on base; and the landscape car sheet hides both, as on base. The cue still waits behind a hint, a warning, a violation, a teach or end card, any blocking or sheet-only card, the read sheet and the touch hint. A pause modal empties the slot, so the cue is drawn there, as on base. The PC is untouched. No sentence, bill, point, threshold, timing or TTL moves. Measured in process only. `sc-ac-crosswind:a9db1738` (major), clause 4, the phone half (2026-11-09)
+
+Lane `swingcue` ran one round on its base `1feba3a`. The builder worked in `D:/knijka-lanes/swingcue-impl` and the verifier in `D:/knijka-lanes/swingcue-verify`, each built from base-1feba3a.tar.
+- **The verdict.** SIGNED OFF WITH CONDITIONS on 2026-11-09 by a fresh adversarial verifier, which refuted nothing. Its log is `D:/knijka-lanes/scratch/swingcue-verify/PROGRESS.md`, entries 10:34 to 12:20. The builder's log is `D:/knijka-lanes/scratch/swingcue-impl/PROGRESS.md`. The report is `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/swingcue-r1.json`.
+- **The patch.** `D:/knijka-lanes/swingcue-result-r1.patch`: sha256 0558ab0a…4dd4dd, 16 files, +2489/−7, LF only. It is cumulative against `1feba3a`, not HEAD. `ab78b58` adds the slowturn landing on top of `1feba3a`, so the patch goes in 3-way. The slowturn landing touched none of the 16 files, and the staged diff of those 16 files on this tree reproduces the patch sha256 byte for byte, so the 3-way apply had no conflict. The verifier applied the patch to its base with `git apply --check` exit 0, and `git diff base patch --binary` reproduced the sha256 byte for byte.
+- **What this landing stages:** 17 files, +2607/−7. The 16 from the patch are LessonPlayShell.tsx, PlayAreaStyles.tsx, hud/overlayQueue.ts, hud/index.ts, secondSwing.test.ts, the five reviewed-text manifest files (manifest.json, strings.6, strings.7, strings.e, units.source.txt) and the six new test files below. The 17th is one integrator-added pin, lesson-ui/__tests__/swingCueMenuN4.test.ts (118 lines), which executes the verifier's N4 reading (PINNED AT INTEGRATION, under N4).
+- **The ruling it was built under.** Integrator ruling R-SC1 (A), the founder's to veto. On a compact stage the swing cue outranks every active overlay row of overlayPriority ≤ praise that is neither blocking nor sheetOnly: task standby and announcement, legend, advisor, predrive and praise. It waits for hint and above, every blocking or sheetOnly item, the read sheet, the pause modals and the touch hint.
+
+**The row is NOT closed by this landing.** `sc-ac-crosswind:a9db1738` stays OPEN (PARTIAL, w3z).
+- Every repair measurement below was made in process, on the rendered stylesheets and a cascade evaluator. No builder, verifier or integrator saw the cue on a phone after the change.
+- The row moves only on a rig re-drive judged after this landing: the W3Z-3 device drive (Owed, below).
+- The landing does not change the open-row count: 10 open (1 critical, 9 major, 0 minor), from the docs agent's list-open.mjs run on 2026-11-09; the 2026-11-09 recap gives the same.
+
+**What was wrong.**
+- **The row's own measurement (rig w3z, phone).** The briefing warns about a «втора корекция», but on the phone that warning had no observable trigger. On both rig-w3z phone drives the «Втори замах!» cue MOUNTED for the act but had no client rects for its whole 4 s life. The push chip is removed one frame after the cue mounts, so the student saw the gust chip vanish with nothing in its place.
+- **The cause** (the builder, re-verified at 1feba3a). The rule at PlayAreaStyles.tsx:1526-1530 sets display:none on `[data-hud="wind-swing-cue"]` (at :1528) whenever the root carries `data-sim-overlay-active="on"`.
+  - LessonPlayShell.tsx:7851-7853 writes that attribute whenever a compact overlay row is active or the read sheet is open.
+  - While driving, the slot is almost never empty. The W8 task standby (:7132 → taskOverlayRow :2716), announcements and praise flashes keep it full.
+  - The cue mounts at LessonScene.tsx:3598-3605, and the push chip yields to it in JSX (:3645).
+  - On the PC nothing hides the cue. A roomy stage has no overlay candidates (:6741), and both hide rules are compact-scoped.
+
+**What landed.** This is the builder's description, checked by the verifier against the rendered CSS.
+- **hud/overlayQueue.ts** gains `overlayYieldsToSwingCue(item)` beside overlayPriority, re-exported from hud/index.ts. It returns true when item !== null && blocking !== true && sheetOnly !== true && priority ≤ praise.
+- **LessonPlayShell.tsx** gains two things:
+  - the exported pure function `swingCueYieldAttr(compact, sheetOpen, active)`;
+  - exactly one new root attribute beside data-sim-overlay-active: `data-sim-overlay-yields={swingCueYieldAttr(compact, overlaySheetOpen, overlay.active)}`.
+  - It adds no new `data-hud="notify-column"` node. The string still occurs twice in the shell: once in the N4 comment, then on the node.
+- **PlayAreaStyles.tsx.** Every change is scoped to `[data-sim-compact="on"]`:
+  - the :1528 selector is narrowed with `:not([data-sim-overlay-yields="on"])`, and :1526-1527 are untouched;
+  - (1b) a hide for the read sheet's one-commit lag;
+  - (2) the column yields by visibility;
+  - (1c) the cue is hidden again under the landscape car sheet, in a new `@media (orientation: landscape)` block;
+  - (4a) cockpit, (4b) chase and (4c) rear and right glance tops, so the cue takes the column's top.
+- **secondSwing.test.ts:455-457.** Its old pin of the hide is amended to the narrowed selector, plus a line-start check that the bare head is gone. The old pin asserted the very hide that the w3z ruling W3Z-2 (3) named a defect.
+- **New tests** (the builder):
+  - hud/__tests__/swing-cue-yield.test.ts, 95 tests;
+  - lesson-ui/__tests__/swingCueYield.test.tsx, 207 tests;
+  - lesson-ui/__tests__/cssCascadeEvaluator.ts with cssCascadeEvaluator.test.ts, 14 tests;
+  - lesson-ui/__tests__/swingCueCensus.ts;
+  - lesson-ui/__tests__/swingCueYield.base.fixture.ts, the rendered 1feba3a CSS.
+- **What did not move** (the builder; the verifier found the PC and every rule without the compact scope unchanged). No bill, point, threshold, timing, TTL, shown string, plate, alpha or scrim changed. secondSwing.ts, the recorder, TouchControls, SimOverlay and LessonScene are byte-unchanged. No PC rule changed.
+
+**What the student sees.** No sentence was added, removed or changed. The cue's text (LessonScene.tsx:3604-3605) is unchanged.
+- On a phone, one of those rows may hold the column when, as the gust eases, the student snaps the held correction back through centre to the downwind side (the second swing secondSwing.ts detects). «Втори замах!» is now drawn at the column's top (by the cascade; the device frame is owed), and the row is hidden by visibility while the cue is mounted. There are two exceptions. With the touch hint up, the cue stays hidden and the row stays visible, as on base. The landscape car sheet hides both, as on base.
+- The cue stays hidden, exactly as on base, under a hint, a warning, a violation, a teach or end card, a blocking or sheet-only card, the read sheet or the touch hint. With a pause modal up there is no overlay row, and the cue is drawn as on base (census C14); only its top moves, to the column's top.
+- **The cost of R-SC1, per kind** (the builder's figures, for the founder):
+  - task (7 s), advisor (6 s) and legend (8 s) windows lose up to about 4 s each, and no whole window fits inside one cue life;
+  - a praise flash (2.6 s) CAN fall wholly inside one cue life, and is then never shown;
+  - a praise toast (4.0 s TTL) is borderline and can also be wholly covered;
+  - spent windows are not re-opened (ambientQueueSilent is unchanged).
+- While the column yields, its +N and ✕ cannot be pressed. This lasts at most the cue's life and affects non-blocking rows only. The builder states it as a side effect, not a defect.
+
+**What the verifier reproduced** (on its own lane, outputs under `D:/knijka-lanes/scratch/swingcue-verify/`):
+- **Rendered CSS.** Its own render of base PlayAreaStyles, with comments stripped, equals the builder's base fixture byte for byte (`base.nc.css`, `tree.nc.css`). The base-to-tree difference is exactly the narrowed :1528 selector plus the six new rules (4a, 4b, 4c, 1b, 2, 1c), all compact-scoped. Every rule without that scope, every grouped list and SimOverlay's own style block are unchanged.
+- **The cascade, worked by hand.**
+  - The cue is hidden exactly when one of four holds: compact + a row active + no yield; compact + a row active + the read sheet mounted; compact + the touch hint mounted; or landscape + car sheet + compact + a row active.
+  - The column-yield rule (0,6,0) matches only while a row is active. In that state the only rule that can still hide the cue is (1c), and there base's :1673 landscape rule already hides the column. So the column never yields while the cue is hidden. The one exception is the landscape car sheet, where the slot is empty exactly as on base.
+  - The tops: (4b) at (0,3,1) beats base's chase rule (0,2,1); (4c) at (0,3,1) beats base's rear rule and comes after (4b). They equal the column's top in cockpit, chase, rear, right, chase+rear and left.
+- **Containing blocks (F8).** Both percentage tops resolve against the same `[data-sim-stage]` height from the same origin. The chain is LessonPlayShell.tsx:8244, a static wrapper, SceneSlot, then LessonScene.tsx:2912, with the cue a direct child.
+- **Shell and queue.**
+  - The JSX argument list is exactly `(compact, overlaySheetOpen, overlay.active)`.
+  - SimOverlay's peek shows only overlay.active, so a yielding row can never hide a louder card behind it.
+  - Every item built blocking or sheetOnly is a hint, teach or end card.
+  - No product code reads the column's computed visibility.
+- **Paper replay** (a prediction, not a closure), re-read from both w3z raws:
+  - PE-2: the task standby, then a praise flash at 27.117 s (hud log) / 27.217 s (cards), then «Задача 2/2» at 29.717 / 29.883;
+  - PE-1: the standby, then praise at 30.10 / 30.25;
+  - neither window has a hint, warning or violation, so the cue would be drawn on every instant of both.
+- **Red on base.** Restoring only PlayAreaStyles gives 73 failures on assertion text, e.g. «C1 task STANDBY tree (cue drawn, column visible): expected { cue: false, column: true } to deeply equal { cue: true, column: false }».
+- **Mutants.** All 10 of its own mutants were killed on assertion text, with no timeouts, and each was restored and checked by sha256. Among them:
+  - V3, (4c) on COMPACT_COLUMN: «|cue top − column top| px: expected 73.884 to be less than 0.01»;
+  - V6, visibility → opacity:0: killed at C1;
+  - V7, the JSX attribute renamed: «expected [] to have a length of 1».
+- **Its test runs.**
+  - Targeted gate, 17 files: 702/703. The one red was the reviewed-text manifest picking up the verifier's own probe file. With the probe moved out, the manifest test re-ran alone 49/49.
+  - lesson-ui directory: 1440/1442. The 2 reds are environmental:
+    - shellClipAffordances «THE GENERAL FORM» timed out at 60 s under load; it was green in the targeted run;
+    - touchHintLifetime failed ENOENT on tools/mobile/lesson-audit.mjs, because the lane has no tools/.
+  - tsc: 22 errors, the environment baseline, none in a touched file.
+- **The 780×340 wrap (C3).** It reproduced the builder's wrap with IBM Plex Sans Bold advances: 5 lines of 135.8 / 127.1 / 132.1 / 142.0 / 80.9 px in a 150 px box.
+- **Restored clean:** the lane tree equals the patch tag.
+
+**The builder's numbers, not re-measured by the verifier.**
+- **The cue's position.** On the phone at 852×393 with any yielding row, the cue goes from display:none to DRAWN at top 81.88 px. That is the column top, the mirror lane's 0.188·H + 8. Portrait 393×852: 64 → 227.18 px. Glance tops: 139 px landscape / 198 px portrait. The chase top moves from base's 161 to 81.88 px.
+- **The hazard bound (T8).** The cue bottom as a fraction of the stage, at measured IBM Plex Sans wght-700 advances +5% (hazard band top 0.53):
+  - 852×393: 0.4475;
+  - 844×390: 0.4495;
+  - 780×360: 0.4713;
+  - 780×340: 0.4880;
+  - 393×852: 0.4333;
+  - 360×780: 0.3803.
+  Every landscape profile lies above the column box's 0.40 ceiling. 852×393, 844×390 and 780×360 lie within the peek's painted floor (0.480). 780×340 (0.4880) lies past that floor but within the shortest card's 0.478–0.523 range. All six are below 0.53.
+- **The census:** 37 cells × landscape/portrait, base → tree (`D:/knijka-lanes/scratch/swingcue-impl/census-out.txt`).
+  - The yielding cells go from cue hidden to DRAWN at the column top, with the column yielding: C1–C6, C15a–e, C16a and C16p.
+  - The cells that must stay hidden stay hidden: C7a–e, C8–C11, C12/a/b, C13/C13b, C20 and C21.
+  - C0, C14 (pause modal) and C16c stay drawn, with the top moved to the column's.
+  - C17 (exam), C18 (telltale) and C19 (follow chip) never mount the cue. A test compiles every rung and mistake index of both wind lessons.
+- **Mutants:** 30/30 killed on assertion text, with no timeouts (`scratch/swingcue-impl/mutants/`).
+- **Test runs:**
+  - targeted, 16 files: 652;
+  - hud + vehicle, 97 files: 1848;
+  - lesson-ui + touchSurfaces: 1462/1464 (the same 2 environmental reds);
+  - lessons/__tests__, 128 files: 2465 passed and 165 skipped;
+  - a scenario + clips subset, 10 files: 375, with clipPlan green and no regeneration;
+  - reviewed-text-manifest: 49/49 after the re-record.
+- **The full lessons/scenario/__tests__ directory did NOT complete in the lane.** The builder's own 58-minute timeout killed it under load. It ran green at integration: 218 files, 5,655 passed, 1 skipped (PROVEN ON ab78b58).
+
+**The conditions, and how each stands** (integrator ruling SC-C, 2026-11-09, the founder's to veto).
+
+**C1, SC-C (1). The reviewed-text manifest was re-recorded. ACCEPTED** (the founder's to veto).
+- The 5 hunks: the manifest.json fingerprint, strings.6 −1, strings.7 +1, strings.e +1 and units.source.
+- They record PlayAreaStyles template-literal CSS fragments only (#17 CHANGED, #18 ADDED: selectors, declarations, comments). None of them is student-visible.
+- The re-record cannot be avoided. studentText.ts reads every literal part between `${…}`, and the mandated :1528 narrowing sits inside one.
+- The builder's re-record printed «reviewed-text manifest: 2 string(s) differ from the previous recording — READ EACH before committing: [source] …/PlayAreaStyles.tsx · #17 — CHANGED … · #18 — ADDED» (`scratch/swingcue-impl/manifest-rerecord-report.keep.txt`).
+- This tree's manifest does not differ from the lane's base: slowturn left the five manifest files byte-identical at ab78b58. The staged hunks are therefore the lane's own, and no re-record was needed here.
+PINNED AT INTEGRATION: nothing to pin, because C1 is a ruling, not a behaviour (the integrator, 2026-11-09). In `D:/knijka-lanes/integ-sc`, reviewed-text-manifest.test.ts was 49/49 green on ab78b58 with the lane's 5 hunks, run alone and again inside the full lessons/scenario/__tests__ run with the N4 test present, so it was not re-recorded there. On the main tree gate-sc2 went in on top of gate-cp2, which also stages the reviewed-text manifest: manifest.json conflicted on the «source» fingerprint and was re-recorded once, on the combined tree (PROVEN ON ab78b58).
+
+**C2, SC-C (2). The landscape car sheet's opening commit (C16a). ACCEPTED as recorded** (the founder's to veto).
+- TouchControls.tsx:2362-2372 writes the html attribute in an effect, so for one commit (1c) does not match. The cue is drawn and the column yields, where base hid the cue and drew the column (z-30) above the sheet.
+- The cue (z-10) paints under the touch root (z-10, later in tree order), and the sheet strip covers only its top part. No two surfaces fight for readable glass.
+- The brief contradicted itself on C16a.
+- Already pinned by the lane: the cell «C16a car sheet: its opening commit» in swingCueYield.test.tsx expects the cue drawn. The one-commit lag comes from an effect, which a static cascade test cannot time beyond what that cell models (the integrator).
+
+**C3, SC-C (3). The hazard margin at 780×340 is less than one wrap. RECORDED; the device measurement is owed** (the founder's to veto).
+- At measured advances the cue wraps to 5 lines, with its bottom at 0.4880 of the stage.
+- The verifier found that at ×1.10 advances the text wraps to 6 lines, with its bottom at 181.92 px = 0.535 of 340, past HAZARD_BAND_TOP_FRACTION 0.53. The break point is about +5.6%, the size of a fallback font. 780×360 has room for one extra line (0.516).
+- The W3Z-3 device drive must measure the cue box on the phone lens. A real wrap past 0.53 is a STOP for a follow-up, never a pass.
+- Not pinnable by a test: T8 bounds only the measured IBM Plex advances with a +5% margin, and the real wrap depends on the font the device renders (an Arial size-adjust fallback) and on its real stage height (the integrator).
+
+**N4, SC-C (4). The census left out the lesson menu. RECORDED** (the founder's to veto).
+- The census did not include «Меню на урока» opened while the cue is mounted and a yielding row is up.
+- The play menu (LessonPlayShell.tsx:4774, z-20, top-left) pauses the scene but does not empty overlayCandidates.
+- On the tree the cue draws at the column top and the column yields. Base showed the column in the same place, so nothing new is stacked.
+- The follow-hint twin hides under an open menu; the cue does not. That was already true on base in C0.
+- N4 is settled only on the W3Z-3 device drive.
+PINNED AT INTEGRATION: pinned in process (the integrator, 2026-11-09; log `D:/knijka-lanes/scratch/sc2-land/PROGRESS.md`). The new `platform/src/components/sim/lesson-ui/__tests__/swingCueMenuN4.test.ts`, 6 tests: the menu open with the cue up and the task standby active, landscape and portrait. Base: the cue hidden and the column visible. Tree: the cue drawn at the column top and the column yielding by visibility, never both drawn. A first check shows the menu selector really matches in this DOM, because the demo deck stands down under it.
+- Mutants, one at a time, each restored byte for byte (PlayAreaStyles.tsx sha256 4924b096d6964782d0408ff61515cbf43e69b4aaaf4ab103b237161455fe2bc2), the test 6/6 green again after each:
+  - M1, `[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="wind-swing-cue"]` added to the menu's visibility:hidden rule (~:1912), so the cue hides under the open menu: 2 failed (landscape and portrait), «N4 tree under the open menu (cue drawn, column visible): expected { cue: false, column: false } to deeply equal { cue: true, column: false }»;
+  - M2, yield rule (2) (:1608) gains `:not(:has([data-hud="play-menu"] [role="menu"]))`, so under the menu the column stays visible while the cue is drawn: 2 failed, «N4 tree under the open menu (cue drawn, column visible): expected { cue: true, column: true } to deeply equal { cue: true, column: false }».
+- The merge verifier killed both again itself, on the same texts, each restored by copy to sha256 4924b096…e2bc2. It states the pin's reach and its limit: the CSS is the real PlayAreaStyles and SimOverlay rendered with renderToStaticMarkup, and the attribute comes from the product's swingCueYieldAttr, evaluated by the lane's cascade evaluator, not a regex; but the DOM is a hand-built model with the cited classes, not a render of LessonPlayShell. Its shape matches LessonPlayShell.tsx:4774 (data-hud="play-menu") and :4844 (role="menu").
+- The device half (the lesson-menu state on the phone) stays owed.
+
+**The lane had no tools/.** touchHintLifetime's ENOENT had to go GREEN in this landing; any other red is real. It is GREEN: inside components/sim (114 files, 2,073/2,073) in the integrator's run and in the merge verifier's own run (PROVEN ON ab78b58).
+
+**What the brief got wrong** (the builder; the verifier's C2 reading also puts the touch root at z-10, and it did not re-check the import or the raise at :2100).
+- The shell did NOT already import overlayPriority; the new name was added to the hud import block.
+- The car sheet's root is z-10, raised to 40 by :2100, not «z-20».
+
+**ADR.** No ADR text is owed. No ADR sentence describes the compact HUD stacking, the overlay queue or when the swing cue is shown. ADR-012's «the second-swing cue reads the student's hand» and its «Amendment 2026-11-05» stay true. R-SC1 and SC-C are integrator rulings, recorded here.
+
+**PROVEN ON ab78b58** (the integrator's run on 2026-11-09 in the worktree `D:/knijka-lanes/integ-sc`, log `D:/knijka-lanes/scratch/sc2-land/PROGRESS.md`; report `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/land-sc2-results.json`; the config with ruling SC-C `D:/knijka-lanes/scratch/land-sc2.config.json`. The merge verifier ran the pins, one lane mutant, two directory runs and the tools tests itself.)
+- **The apply.** The worktree was clean at ab78b58, and the patch sha256 matched (0558ab0a002c8c2f2b9f79b0fddaa10865242d9294f996771c0a5f9b894dd4dd). It went in with `git -c core.autocrlf=false apply --3way --index --binary`: 16 files (10 modified, 6 new), no 3-way merge, no conflict. The «Falling back to direct application» lines were the new files. The slowturn commits (1feba3a..ab78b58) touch none of the 10 modified files, the reviewed-text manifest included.
+- **The conditions:** C1 needed no pin and no re-record on this tree (above); C2 is already pinned by the lane's C16a cell; C3 cannot be pinned by a unit test; N4 is pinned by swingCueMenuN4.test.ts (above). No product code changed beyond the lane patch.
+- **The directories**, one vitest at a time with --maxWorkers=1, all green, exit 0:
+  - lessons/__tests__ 129 files, 2,472 passed, 165 skipped;
+  - lessons/scenario/__tests__ 218 files, 5,655 passed, 1 skipped (6,727 s), the full directory the lane could not finish, reviewed-text-manifest inside;
+  - components/sim (lesson-ui and the new N4 test included) 114 files, 2,073/2,073: touchHintLifetime (ENOENT in the lane) and shellClipAffordances are green;
+  - orchestrator 42, 536; rules 110, 1,929; traffic 54, 682; runtime 51, 946; scene 48, 799;
+  - vehicle 22, 299 (the amended secondSwing.test.ts inside); world 135, 2,409;
+  - hud 75, 1,549 (swing-cue-yield.test.ts inside); traces 171, 2,376;
+  - src/modules/clips/ 19, 302: the clip-plan freshness gate is green (grading untouched), so clipPlan.generated.ts was not regenerated.
+  - Around 14:31 a vitest from `D:/knijka-lanes/integ-cp2` ran at the same time as the scenario run; that run stayed green.
+- **tsc** (`--noEmit --incremental false`): 21 errors, all prisma/env (api/health/route.ts 4, lib/db.ts 1, admin/store 3, auth/store 2, learning/store 3, lesson/progress 1, outcomes/store 1, payments/store 2, privacy/store 1, sim/lessons/store 2, sim/traces/attemptStore 1), none in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what wave-cycle.sh gate 4 runs): 2,030 tests, 2,007 pass, 8 fail, 11 skipped, 4 todo, exit 1 (2,885 s).
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 come from the worktree, not this landing: count-agreement.test.mjs and finding-reader.test.mjs fail at file level on «could not find .audit-frames/findings», and build-redrive.test.mjs §9(a), §9(b), §9(d), §9(e) on the same message (the corpus lives only in E:\AI driver, untracked); lane-evidence.test.mjs fails on «could not resolve the playwright package» (playwright exists only as an untracked install under the main tree's tools/clips/headless/node_modules).
+  - With the environment supplied: the three corpus files from cwd E:\AI driver (read only; the main tree's git status the same before and after) 89/90, the one red count-agreement's «apply-reroute.mjs printed no WORKED line to stdout», because apply-reroute.mjs hard-codes REPO = HERE/../.. (the worktree) and exits 2 on the missing .audit-frames/reroute.jsonl, which the main tree has (768,377 B); lane-evidence with KNIJKA_PLAYWRIGHT_ROOT="E:/AI driver/tools/clips/headless/" 10/10.
+  - The patch touches no tools/ file and nothing these tests read. No tools test was taught. The main-tree gate decides.
+- **The gate patch.** `D:/knijka-lanes/gate-sc2.patch`, sha256 6c78c90a0c48cc871fa18c40935c23bdaa8547589d1bb5bd3556d75e7ab5a478, 17 files, 242,029 bytes, 0 CR bytes (no touched file is CRLF at ab78b58). The worktree was left fully staged, with no untracked or temporary file and no process running; the mutant helper and the PlayAreaStyles backup are in `D:/knijka-lanes/scratch/sc2-land`.
+- **The merge verifier: ACCEPT.**
+  - `git diff --cached --binary ab78b58` (sha256 6c78c90a…a478) is byte-identical to gate-sc2.patch; HEAD ab78b58, 17 files staged.
+  - The lane patch applied 3-way to a temporary index on ab78b58: all 16 files clean. Its tree (06c58984) differs from the staged tree (c41a6177) only by the new swingCueMenuN4.test.ts (+118 lines). No product change goes beyond the lane, and no tools test was taught.
+  - M1 and M2: killed again (PINNED AT INTEGRATION, under N4).
+  - The lane verifier's V2 ((1b) reads touch-hint instead of overlay-read) still dies: 7 failed, 206 passed, the same 7 the lane recorded; the behavioural kill is «C12a read sheet: its opening commit tree (cue drawn, column visible): expected { cue: true, column: null } to deeply equal { cue: false, column: null }». Restored by sha256.
+  - Its runs, one at a time with --maxWorkers=1: src/components/sim/ + src/modules/sim/hud/ + src/modules/sim/vehicle/, 211 files, 3,921/3,921, exit 0 (the integrator's 2,073 + 1,549 + 299); lessons/scenario/__tests__, 218 files, 5,655 passed, 1 skipped, exit 0; the tools suite as gate 4 runs it, 2,030 tests, 2,007 pass, 8 fail, the same set as the integrator's. It did not re-run tsc.
+  - It left the worktree staged exactly as found: staged diff sha 6c78c90a…a478, PlayAreaStyles.tsx at sha256 4924b096…, no unstaged or untracked file. The unstaged PlayAreaStyles.tsx edit that the docs verifier saw at 17:08 (its R13), after the gate patch was cut at 17:06, has the shape of the merge verifier's own M1 mutant (V-3), which it restored; the N4 sentence above stands.
+- **The main apply** (the integrator, 2026-11-09, in E:/AI driver on ab78b58). gate-cp2 went in first: the main tree, ea8273a9ff432b8ea1206fd9eb59b1cc9933fe03, equals integ-cp2's index tree byte for byte (the curvpark2 section). gate-sc2 was then applied 3-way on top, with ONE conflict: reviewed-text-manifest/manifest.json, the «source» surface fingerprint. The overlap between the two landings is exactly the five reviewed-text manifest files (the docs verifier's comparison of the two staged lists). It was resolved by RECORD_REVIEWED_TEXT_MANIFEST=1 on the combined tree, which printed «nothing changed against the previous recording»: the string files had merged cleanly, and the source surface now holds 13,388 strings, fingerprint e47abc06…. reviewed-text-manifest.test.ts then ran 49/49 green; a 60 s timeout of its public-copy parity test under disk load passed with a longer timeout (a timeout, not an assertion). The combined staged tree is d6f01086e141afd90670fc99a8c2a55272b31e29, 109 files. The main-tree gate decides.
+- **Not re-measured on ab78b58** by the integrator or the merge verifier: the builder's census table (census-out.txt), its T8 table and cue positions, its 30 mutants, and the lane verifier's 10 mutants beyond V2. Those numbers are the lane's, measured on `1feba3a` + the patch. The lane's own test files (swingCueYield.test.tsx with its census cells, swing-cue-yield.test.ts) ran green inside the directory runs above.
+
+**Owed.**
+- **The W3Z-3 device drive of a9db1738, after the gate,** through `/dev/drive-rig` (ADR-017).
+  - **The drive.** The patch head, sc-ac-crosswind L1, the KEYBOARD path, the named act XW13. Shutter calibration Z2-X8 comes first.
+  - **The lenses.** PC, plus two phones: iPhone 16 landscape 852×393 DPR 3, and Samsung 780×360.
+  - **Closure,** as W3Z-2 (1) and W3Z-3 (i) state it: the swing-mount still; the cue node with client rects and the same text on every rAF of the span; ≥ 0.90 inside at the pre read.
+  - **Recorded on the same drive** (findings, not closure):
+    - a per-rAF log of the cue's and the peek's computed visibility and data-sim-overlay kind. A hidden rAF is an R-SC2 finding carrying the column's kind;
+    - an occlusion read calibrated for a pointer-events-none node, not elementFromPoint;
+    - the column back with the identical card on the first rAF after the cue unmounts;
+    - the PC cue on the lens, unchanged.
+  - **Census frames** for each yielding kind seen (standby; a praise flash if PE-2 repeats; chase if the rig can hold it). Each frame records:
+    - the cue box against the mirror band;
+    - the cue top against the peek top, ±0.5 CSS px;
+    - the cue bottom against 0.53 × the MEASURED stage height (C3), plus that height;
+    - the fallback-font wrap, which T8 does not bound.
+    Portrait 393×852 frames are taken if the rig can drive portrait; otherwise the portrait cells stay owed.
+  - The lesson-menu state (N4).
+- **The two-landings-one-gate proof with land-cp2** (lane curvpark2). At the main apply the two patches were combined: one conflict, manifest.json, re-recorded on the combined tree, and reviewed-text-manifest.test.ts 49/49 (PROVEN ON ab78b58). No other suite has run on the combined tree d6f01086… yet. The main-tree gate on it is the proof, and its tools run must show the freeze alone.
+- **The founder is told.** On a phone the swing cue now outranks the task, announcement, legend, advisor, predrive and praise rows (R-SC1, the founder's to veto). A praise flash can be wholly covered by one cue life and never shown. SC-C's C1–C3 and N4 are the founder's to veto too.
+- **Recorded, not built** (the builder): the R-SC3 twins «chipsbehindstandby» and «pushyieldstohidden»; the Z2-OCC elementFromPoint instrument note for the w3z2 builder; C6 reachability on a rung that spawns moving.
+- **Recorded, not filed:** the docs agent's candidates (below).
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-09). Several restate items above; each is listed with its evidence.
+- **A praise line can be lost under R-SC1.** A praise flash (2.6 s) can fall wholly inside one 4 s swing-cue life on a compact stage and is then never shown; a 4.0 s praise toast can too, and spent windows are not re-opened (ambientQueueSilent unchanged). Evidence: `swingcue-r1.json` (build report «PER-KIND COST (R-SC1)»).
+- **«pushyieldstohidden»** (an R-SC3 twin the builder named, recorded and not built). The push chip still yields to the cue in JSX (LessonScene.tsx:3645) in every cell where the cue stays hidden: C7a–e hints and the blocking or sheet-only cards, C8 warning, C9 violation, C10 teach, C11 end, C12 read sheet, C13 touch hint. So on the phone the gust chip can still vanish with nothing in its place there. This is the docs agent's inference from the census plus the cause; no lane measured it. Evidence: `swingcue-r1.json` (build report CAUSE and census; owed item 7); `D:/knijka-lanes/scratch/swingcue-impl/census-out.txt`.
+- **«chipsbehindstandby»** (an R-SC3 twin the builder named, recorded and not built). Its scope is not defined in either lane log. Evidence: `swingcue-r1.json` (build owed item 7).
+- **The 780×340 margin.** The cue's bottom sits less than one line wrap below the 0.53 hazard band: 5 lines, bottom 0.4880. At ×1.10 advances it wraps to 6 lines with its bottom at 0.535. T8 does not bound the fallback-font (Arial size-adjust) wrap, so a real device could put the cue into the hazard band. Unmeasured on a device (C3, owed above). Evidence: `swingcue-r1.json` (verify C3; build owed item 3); `D:/knijka-lanes/scratch/swingcue-verify/PROGRESS.md` (conditions, item 3).
+- **A dead predicate.** overlayQueueMaySpeak has no product consumer, and the open lesson menu («Меню на урока», LessonPlayShell.tsx:4774) pauses the scene without emptying overlayCandidates (:6773). Evidence: `swingcue-r1.json` (verify N4).
+- **The cue stays drawn under the open menu.** The swing cue stays drawn while the lesson menu is open and the scene is paused, while its follow-hint twin hides under the menu (the PlayAreaStyles.tsx:1912 rule, sc-ed-reverse-line:d6fb0f3c). Pre-existing on base in C0. Evidence: `swingcue-r1.json` (verify N4); `D:/knijka-lanes/scratch/swingcue-verify/PROGRESS.md` (conditions, item 4).
+- **The yielding column's controls.** While the column yields to the cue (for at most the cue's life, non-blocking rows only), its +N and ✕ controls cannot be pressed. The builder states this as a side effect, not a defect. Evidence: `swingcue-r1.json` (build report SIDE EFFECTS (b)).
+- **Instrument: the w3z hud log lags the card log** by about 2 rAFs. The push chip's re-mount is logged at 30.133 s (PE-2) and 30.10 s (PE-1), before the logged cue «(gone)». Evidence: `swingcue-r1.json` (build report PAPER REPLAY note).
+- **Instrument (Z2-OCC).** An occlusion read built on elementFromPoint cannot see a pointer-events-none node such as the swing cue. The w3z2 occlusion measure needs a calibrated read. Evidence: `swingcue-r1.json` (build owed items 2(ii) and 7).
+- **C6 reachability.** C6 (the predrive row up while the cue fires) is unreachable only on a drive that starts at rest: preDrive locks the drive (engine.ts:2417) and the detector needs ≥ 20 km/h. Unproven for a rung that spawns moving. Evidence: `swingcue-r1.json` (census «Reachability»; build owed item 7).
+- **Test infrastructure.** lesson-ui shellClipAffordances «THE GENERAL FORM» hits its 60 s timeout under machine load. It did so in both the builder's and the verifier's directory runs, and in the curvpark2 integrator's components/sim run; it is green standalone and in the targeted runs. Evidence: `swingcue-r1.json` (build regression; verify F5); `D:/knijka-lanes/scratch/swingcue-verify/gate-lesson-ui.txt`; `land-cp2-results.json` integ tests (components/sim).

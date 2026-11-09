@@ -306,10 +306,17 @@ describe("§3 the replacement is LOSSLESS where there is nothing held", () => {
     const samples = trace("sc-park-narrow", "shadow-correct");
     const before = replay("lot-narrow-v1", samples);
     const after = replay("lot-narrow-v1", samples, rearStaticBodiesFrom(sceneObstacles("sc-park-narrow")));
-    expect(before.finite).toBe(66);
+    // Re-measured by lane curvpark2 (2026-11-06) on the narrow shadow re-authored
+    // on the car's own 4.6 m circle (traces/scParkNarrow.ts): finite 66 → 159,
+    // closest 0.1157 → 0.4769 m. The CLASS claim — identical through the
+    // scene's bodies and the district's — is what the two lines below it pin.
+    // Round 5 of the lane (CP2-1quater, 2026-11-08): 159 → 236 — the two-stage
+    // set-up's second S swings the tail toward the row beside it, 77 forward
+    // reads; the closest is the same reverse pose.
+    expect(before.finite).toBe(236);
     expect(after.finite).toBe(before.finite);
     expect(after.min).toBeCloseTo(before.min, 9);
-    expect(after.min).toBeCloseTo(0.1157, 3);
+    expect(after.min).toBeCloseTo(0.4769, 3);
   });
 
   it("a lesson that mounts NOTHING publishes nothing — the painted-bay phantom", () => {

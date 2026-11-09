@@ -372,7 +372,7 @@ export const COMMITTED = Object.freeze({
   },
   "sc-pk-driveway": {
     0: { corridorM: 0.437 },
-    1: { corridorM: 0.771, band: { alongM: [-0.5,1], latM: [-0.25,0.25], yawDeg: [-2.5,2.5] } },
+    1: { corridorM: 0.802, band: { alongM: [-0.5,1], latM: [-0.15,0.15], yawDeg: [-1.5,1.5] } },
   },
   "sc-park-bay-exit-rev": {
     0: { corridorM: 1.5, band: { alongM: [-0.5,0.3], latM: [-0.3,0.3], yawDeg: [-3,3] } },

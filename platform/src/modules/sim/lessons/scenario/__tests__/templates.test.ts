@@ -47,7 +47,14 @@ describe("scenario templates — registry integrity", () => {
     );
     const reversing = concepts.find((c) => c.id === "c-reversing")!;
     expect(reversing.lawRefs).toContainEqual({ act: "ЗДвП", ref: "чл. 40" });
-    expect(SC_PARK_PERP_REV.teach.lawRef).toBe("ЗДвП чл. 40");
+    // Lane curvpark2 round 4 (integrator rulings CP2-1bis / CP2-1ter,
+    // 2026-11-08): the lesson's set-up stop left of the aisle centre line is the
+    // reverse turn's start under ЗДвП чл. 35, ал. 2, so the cite gained that
+    // unit after the reversing basis (retrieved and pinned verbatim in
+    // traces/__tests__/park-family-drivable.test.ts). The class claim holds:
+    // the lesson's law basis LEADS with c-reversing's чл. 40.
+    expect(SC_PARK_PERP_REV.teach.lawRef).toBe("ЗДвП чл. 40; чл. 35, ал. 2");
+    expect(SC_PARK_PERP_REV.teach.lawRef.split(";")[0]).toBe("ЗДвП чл. 40");
   });
 
   it("mistake-demo codeRefs cite real catalog codes", () => {

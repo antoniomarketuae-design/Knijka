@@ -83,12 +83,18 @@ describe("sc-park-perp-forward — the shadow gate (doc 76 §5)", () => {
   });
 
   it("takes its room on the LEFT before the swing — the drill's first task", () => {
-    // Every sample between the veer and the turn-in must sit at/left of the
-    // setup line, and never inside the lane-detector band (x >= 0.81).
-    const setup = shadow.trace.samples.filter((s) => s.y > -9.6 && s.y < -4.2);
+    // Every sample between the end of the S across the aisle and the turn-in
+    // sits on the setup line, in the LEFT half of the aisle (x < 0). Re-derived
+    // by lane curvpark2 (2026-11-06): this block used to pin «never inside the
+    // lane-detector band (x ≥ 0.81)», but the aisle north of y −30 is the
+    // unpainted `service` class, where no lane detector arms, and on the car's
+    // own 4.6 m circle a forward swing from x ≥ 0.81 keeps 0.11 m from the
+    // neighbour (traces/__tests__/park-family-drivable.test.ts). The CLASS
+    // claim — the room is taken on the left, before the swing — is unchanged.
+    const setup = shadow.trace.samples.filter((s) => s.y > -9.6 && s.y < -6.0 && s.gear > 0);
     expect(setup.length).toBeGreaterThan(5);
-    expect(Math.max(...setup.map((s) => s.x))).toBeLessThan(1.3);
-    expect(Math.min(...setup.map((s) => s.x))).toBeGreaterThanOrEqual(0.81);
+    expect(Math.max(...setup.map((s) => s.x))).toBeLessThan(0);
+    expect(Math.max(...setup.map((s) => s.x)) - Math.min(...setup.map((s) => s.x))).toBeLessThan(0.05);
   });
 });
 

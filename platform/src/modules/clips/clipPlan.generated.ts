@@ -541,7 +541,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-park-parallel",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-park-parallel/mistake-far-from-lead.trace.json",
-    "faultTimeSec": 38.88,
+    "faultTimeSec": 47.2,
     "requiredActors": [
       {
         "kind": "parkedVehicle",

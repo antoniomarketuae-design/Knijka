@@ -40,7 +40,13 @@
  * samples, bottoms at 0.116 m of body-to-body air at −3.828 km/h, and the
  * level over the whole drive is 739 × none + 66 × warn — **danger: 0 frames**.
  * Twelve centimetres from a parked car showed the student the same colour as
- * „something is back there somewhere".
+ * „something is back there somewhere". (That measurement is of the shadow as
+ * it stood then. Lane curvpark2 re-authored it on the car's own 4.6 m circle
+ * on 2026-11-06; the same replay now reads finite on 236 samples — 77 of
+ * them forward, amber, while its two-stage set-up swings the tail toward the
+ * row (round 5) — with a closest of 0.477 m at −2.376 km/h in reverse, red
+ * under the fix below — traffic/__tests__/rear-static-gap.test.ts §1/§5 carry
+ * both numbers.)
  *
  * THE FIX IS A SPLIT, NOT A DELETION, and the split is the point. RED is a
  * question about DISTANCE (`REAR_CUE_DANGER_M`, unchanged at 4 m); the speed

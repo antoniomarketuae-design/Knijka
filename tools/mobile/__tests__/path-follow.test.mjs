@@ -3489,11 +3489,22 @@ describe("T9.h the terminal heading law", () => {
   // RE-DERIVED on the curvdepth corpus (2026-10-16), read off the NEW pathrefs' final-reverse tails
   // (cdtools probe gates.mjs): the gate's reading of every witness is pinned EXACTLY — a set, not a count
   // — and each reading is the sign of its own owed rotation, so a re-plan that moves a tail moves this.
+  // sc-pk-driveway RE-DERIVED 2026-11-09 (curvpark2 landing, cp2t9): its demo was re-authored and its
+  // pathref re-planned (build-pathrefs.mjs, trace sha256:2dd6e81b…, R1 arc 8.69 → 9.97 m), so its tails
+  // moved. Read off the new pathref by hand (rest row = the last row ≤ end − REST_BACK_M; ψT = authored
+  // end 270°; owed = |ψT − ψrest| − |ψT − ψend|) and agreeing with terminalHeadingGate:
+  //   −0.5  ψ −92.151 → −92.028   2.151 − 2.028 = +0.12°  engage
+  //    0    ψ −90.898 → −91.859   0.898 − 1.859 = −0.96°  shut  (was 275.882 → 275.089, +0.79°, engage)
+  //   +0.5  ψ −91.602 → −91.963   1.602 − 1.963 = −0.36°  shut  (was −0.98°, shut)
+  // The old row was [true, true, false]. Witness 0 now rests 0.9° off 270° and its unreached tail turns
+  // AWAY, so nothing is owed and the drive on it is the law-off drive: forced onto witness 0 from the stop
+  // acceptance (R1 alone, 36 runs) it is pose for pose the law-off drive, 0 refusals, 36/36 in the product
+  // box, worst heading 0.62° of 10°; on seeds 1–20 every clean drive selects witness −0.5 (engaged).
   it("T9.h.2n the gate on the live corpus: which final-reverse witnesses owe rotation, witness by witness, and ψT is the authored end heading", () => {
     const want = {
       "sc-park-gap-short": [false, false, false], "sc-park-judge": [true, true, true], "sc-park-zebra": [true, true, true],
       "sc-park-left": [false, false, false], "sc-park-van": [false, false, true], "sc-park-wall": [true, false, true],
-      "sc-park-45-rev": [false, false, true], "sc-pk-driveway": [true, true, false],
+      "sc-park-45-rev": [false, false, true], "sc-pk-driveway": [true, false, false],
     };
     for (const [l, engage] of Object.entries(want)) {
       const seg = finalReverse(l);
@@ -4031,7 +4042,10 @@ describe("T13 the reverse end stop, the body-clearance guard and the calibrated 
   const CARD = Object.freeze({ k: 1, toEndM: 5.06, stallMs: 540, drainMs: 1150, worldRate: 0.5, decelMps2: 1.25 });
   const HEAD_BUDGET = { ...PATH_TUNE, runner: { ...PATH_TUNE.runner, nearLockBudgetMs: 500 }, clearance: { refuse: false } };
   // The pair a T13.4/4b/5 claim was measured on: the frozen 9390622 fixture where the lesson was re-planned,
-  // the corpus where it was not (sc-pk-driveway's pathref and trace are 9390622's, byte for byte).
+  // the corpus where it was not (sc-pk-driveway's pathref and trace were 9390622's, byte for byte, until
+  // 2026-11-09: the curvpark2 landing re-authored its trace and re-planned its pathref, so headOrCorpus now
+  // serves the RE-PLANNED driveway; T13.4's control loop reads it and it does not saturate at both scales,
+  // so the control witness is still sc-park-45-rev with the same figures — cp2t9 verifier).
   const headOrCorpus = (l) => (HEAD_FIXTURE_LESSONS.includes(l) ? headPlan(l) : plan(l));
   const trackRun = (lesson, seed, { getPlan = plan, ...opts } = {}) => {
     const rows = [];

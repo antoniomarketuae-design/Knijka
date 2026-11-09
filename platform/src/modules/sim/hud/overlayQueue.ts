@@ -603,6 +603,52 @@ export function overlayPriority(kind: SimOverlayKind): number {
   return PRIORITY[kind];
 }
 
+/**
+ * ── THE «ВТОРИ ЗАМАХ» CUE AND THE ROW IT STANDS IN FOR — sc-ac-crosswind:
+ *    a9db1738 clause 4, the phone half (rig-w3z, 2026-11-05; integrator ruling
+ *    R-SC1 (A), 2026-11-06, under the founder's 2026-10-08 / 10-19 delegations).
+ *
+ * THE DEFECT. The scene's swing cue («Втори замах! Отпускай корекцията плавно
+ * …», LessonScene) is the swing's ONLY on-glass explanation, and the briefing
+ * promises it. On a phone it was `display: none` for its whole four-second
+ * life on both rig drives: PlayAreaStyles stood it down whenever the shell's
+ * overlay row held the slot, and while driving the slot is almost never empty —
+ * the W8 task STANDBY exists precisely so that it is not. The gust chip
+ * vanished with nothing in its place.
+ *
+ * THE RANK, ON THE CORRIDOR'S OWN CRITERION — «which one the student can act on
+ * soonest» (PlayAreaStyles, row C1). The cue names what the car is doing THIS
+ * second and he answers it with the wheel. An AMBIENT row (task standby or
+ * announcement, legend, advisor, pre-drive step) is «simply not the most
+ * important thing right now» (AMBIENT, above), and a praise flash restates a
+ * decision the next row's counter and the debrief restate again. So on a
+ * compact stage the cue takes the row's place for its life when the active row
+ * is any of those — overlayPriority ≤ praise — and is neither `blocking` nor
+ * `sheetOnly`.
+ *
+ * IT WAITS FOR everything louder: a hint (60) and above (a coached hint, the
+ * world-edge warning, the mistake demonstration, a cabin warning, a graded
+ * fault, a teach moment, the end line); every BLOCKING item (it holds the drive
+ * for an answer); every SHEET-ONLY item (selectOverlay puts it first at any
+ * priority — a sheet the student asked to read). The read sheet, a pause modal
+ * and the first-run touch hint are decided in the stylesheet and the shell
+ * (`swingCueYieldAttr`), not here.
+ *
+ * WHAT IT COSTS, accepted by R-SC1 and printed by the census: a praise flash
+ * (2.6 s) that lands inside a cue life is never shown; an advisor / legend /
+ * task window loses up to the cue's remaining life and is not re-opened
+ * (`ambientQueueSilent` does not see the cue). No window, TTL or priority
+ * changes here — this is a DISPLAY rank, read by one root attribute.
+ */
+export function overlayYieldsToSwingCue(item: SimOverlayItem | null): boolean {
+  return (
+    item !== null &&
+    item.blocking !== true &&
+    item.sheetOnly !== true &&
+    overlayPriority(item.kind) <= overlayPriority("praise")
+  );
+}
+
 export function isAmbientOverlay(kind: SimOverlayKind): boolean {
   return AMBIENT.has(kind);
 }

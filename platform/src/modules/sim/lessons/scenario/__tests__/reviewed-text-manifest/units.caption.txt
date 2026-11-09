@@ -257,9 +257,9 @@ sc-ov-solid-return/shadow-correct	d2d96b08322d bf86430c14d3 6b97ca4cd609 d5933c2
 sc-park-45-rev/mistake-nose-in	0e62475a21f8 c5b2e41caa34 45523cee009d d37469f4696b
 sc-park-45-rev/mistake-shallow-swing	a9d77cc6657c a889aab13c71 f49a8e11189e
 sc-park-45-rev/shadow-correct	219fa7288ec4 8e92b2b57bd6 fe2a86866a38 c9bc03121921 6169ebfa1cf9 c7271469184f
-sc-park-45/mistake-corner-cut	232421672a07 6e1679e61d4f cc1ddb7978be 72ae09700394
-sc-park-45/mistake-overshoot	232421672a07 0bf6d8a53bc7 ef23d66ed16e 5f781bdcbd82
-sc-park-45/shadow-correct	e0c3499e6b52 8b1b326bb554 e744c8105efe 2a552430b9ab 74c4a36c86ab 07d3df84d13c
+sc-park-45/mistake-corner-cut	03ab8b9e0f41 6e1679e61d4f cc1ddb7978be 90ab8949ef3b
+sc-park-45/mistake-overshoot	03ab8b9e0f41 0bf6d8a53bc7 ef23d66ed16e 5f781bdcbd82
+sc-park-45/shadow-correct	7410e6ec6fe6 8b1b326bb554 ee5e4143d803 ddb3b157aad8 74c4a36c86ab 07d3df84d13c
 sc-park-bay-exit-rev/mistake-blind-reverse	1e458e3c9303 a0b4884a758d bcc51901f001 d65561fa7899
 sc-park-bay-exit-rev/mistake-swing-out	2753822eb992 600968b229e1 c748bb89cf2b
 sc-park-bay-exit-rev/shadow-correct	efb8c483b358 2d2314a7da0e 4b979357a486 a68b773c282e e0b03f7a3232 88240c7b582c baa71356e4fa 69be09add510 d99cbdd8d30d 8ea3bc50a754
@@ -278,24 +278,24 @@ sc-park-judge/shadow-correct	5eb6e425e774 7ff1528bf505 a2fc20d906c7 05b648c1826f
 sc-park-left/mistake-cross-blind	4546929d7543 336d0bc43480 971e03335dcc
 sc-park-left/mistake-mirrored-habit	a9d77cc6657c 8400b216e3a0 1c7bcd3756d5
 sc-park-left/shadow-correct	23cd253805a1 cda4f53e2480 dac467bb4b84 7a473e409de4 afa32bf7c3a3 7d246231b81a b7c0373dedea 31fb617a3762
-sc-park-narrow/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
-sc-park-narrow/mistake-wide-swing	6276c167ab4e 3d5888e1fefe 319ba5a03814 5cfc5c879f1a
-sc-park-narrow/shadow-correct	ad16c480a6de 8b1b326bb554 da0c891fbada 320c8e9b5387 1b18502a6c87 9a1aff73bec9 bca0c183f984
+sc-park-narrow/mistake-no-observation	03ab8b9e0f41 6807c9b0906c 02ce25766422 49d491491aa3
+sc-park-narrow/mistake-wide-swing	dab4ce6e8acd f12033413710 a38afe0d8503 ec610431cb1b
+sc-park-narrow/shadow-correct	4d1476fd491b 8b1b326bb554 aa06960da535 86035abd187d 0d0b75ac42ae 89a4ad515282 36c8a4d74f61 9a1aff73bec9 bca0c183f984
 sc-park-night/mistake-no-lights	959a4e23e6cc bea53895a1be f57a28c5b616
 sc-park-night/mistake-too-deep	a9d77cc6657c 08f785f57d8d c396972886fd
 sc-park-night/shadow-correct	18f228709d31 5f7ccec38c9d 2c70d1483039 1906de7409ff d62c0da0d6d0 7f4c826c1ffe a32146fcc81e
 sc-park-parallel-exit/mistake-no-look	0e62475a21f8 74591fed3630 5d3dbaabca42 60b4055cafcf
 sc-park-parallel-exit/mistake-no-room	0e62475a21f8 b4de36b01ba7 f4ac8f0dc263 082e31c7aab6
 sc-park-parallel-exit/shadow-correct	d56720200ec7 59e1888a1ea6 7e7dc6dadd81 ab7ed38d236e a77656d786f8 f69dd4f3a806
-sc-park-parallel/mistake-far-from-lead	6276c167ab4e a2aba3b3f51a 195a32e5c136 b7b1d14bd302
+sc-park-parallel/mistake-far-from-lead	062ebd7b3a57 8214b182eea4 195a32e5c136 6d82791fa62b
 sc-park-parallel/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
-sc-park-parallel/shadow-correct	c098c818c01a 8b1b326bb554 2b97afa5028a 5a45bdcc0e09 e79c8d26f324 6752ef2bd076 5977086a3011 a6a583d7368c
-sc-park-perp-forward/mistake-blind-exit	232421672a07 d7425ac07884 a84c696be13c 66fa41caf0cb
-sc-park-perp-forward/mistake-early-turn	0e62475a21f8 1534dbac1c9a 0734f79493da f32311fb1003
-sc-park-perp-forward/shadow-correct	426cd4c462ba 8b1b326bb554 190bffcae97c ce6e2d21f4f1 69e59fc73730 7fedb6e1d6b5
-sc-park-perp-rev/mistake-no-observation	0e62475a21f8 6807c9b0906c 02ce25766422 49d491491aa3
-sc-park-perp-rev/mistake-wide-approach	6276c167ab4e fc6c70958991 4a780317199a 3ea822dff1f2
-sc-park-perp-rev/shadow-correct	ad16c480a6de 8b1b326bb554 a9062a45ad34 320c8e9b5387 6218897198fa e6cd6b88b35b 1e5707b678c4
+sc-park-parallel/shadow-correct	d14e48efb4f1 8b1b326bb554 ff2acc9be715 5a45bdcc0e09 49e8f21fba6f 0301b4340046 5977086a3011 a6a583d7368c
+sc-park-perp-forward/mistake-blind-exit	2fa52f1456a7 d7425ac07884 a84c696be13c 66fa41caf0cb
+sc-park-perp-forward/mistake-early-turn	2fa52f1456a7 1534dbac1c9a 0734f79493da ed028a493ec5
+sc-park-perp-forward/shadow-correct	4d95630ac388 8b1b326bb554 19e07add46a1 d24248e41c10 69e59fc73730 7fedb6e1d6b5
+sc-park-perp-rev/mistake-no-observation	03ab8b9e0f41 6807c9b0906c 02ce25766422 49d491491aa3
+sc-park-perp-rev/mistake-wide-approach	dab4ce6e8acd 914505386f53 85275eb7b553 3ff736179c38
+sc-park-perp-rev/shadow-correct	d5349eb8bec8 8b1b326bb554 aa06960da535 057d32f5d4bb dc275765cbe3 13459ca4a74e 61d623b7466b e6cd6b88b35b 1e5707b678c4
 sc-park-van/mistake-blind-reverse	26350c829702 e6e73ad600ef 13a6e7979307
 sc-park-van/mistake-early-turn	a9d77cc6657c 751af080ee2e abf31433c798
 sc-park-van/shadow-correct	438e9ede320d 31f155fbfdca 83d9912401bf edf8f1835177 db688f3bdf7e 578d10e890cf bff6da3d753d
@@ -332,9 +332,9 @@ sc-pk-crossing-ban/shadow-correct	bec186952ef9 f2a2f6fb4e8b b3a017cc64d3 513c6ba
 sc-pk-double-park/mistake-oncoming-squeeze	4a5570d5e490 47f5365a2ddc 0e54649adbb5 9dd76dad8848 d4848ffa754a
 sc-pk-double-park/mistake-second-line	4a5570d5e490 3e4c9b5b19f6 93c19a7c054b 56cc3d91f064 78ff229832aa
 sc-pk-double-park/shadow-correct	4bcc3e92e83c 1e21c913e8e2 c5a1cd08e1ad 2c87f85244bd cc6d4ef61718 a348009b380c
-sc-pk-driveway/mistake-deep	26350c829702 10c4e59bb545 5c174391be9e
-sc-pk-driveway/mistake-wide	0e62475a21f8 7a4d37b0745f 1851f11244fb 345cdcc948ad
-sc-pk-driveway/shadow-correct	fb13cfc3d624 9c88d82d2a85 d1a94e78d9de 3a4b7d21b268 f31add73c41d 935458a7439e
+sc-pk-driveway/mistake-deep	81a77b97a9d9 10c4e59bb545 5c174391be9e
+sc-pk-driveway/mistake-wide	03ab8b9e0f41 f2f7a9f9a05c 6f7876b2012d 345cdcc948ad
+sc-pk-driveway/shadow-correct	d1bbd3fa692d 9c88d82d2a85 0f8f319e736c 5ef709b999e2 61d623b7466b f31add73c41d 935458a7439e
 sc-pk-move-off/mistake-curb-glance	e26fb342f6fa f3d3d0709188 9bbfd8c69153 95243e300d0c
 sc-pk-move-off/mistake-no-look	1e458e3c9303 05dc5b004c38 afa8ad640f93 bb4bc3b08ad2
 sc-pk-move-off/shadow-correct	8d3040f1089e a27c8729df43 f8533411996c f224ae6561b3 9eecfb2a0a75

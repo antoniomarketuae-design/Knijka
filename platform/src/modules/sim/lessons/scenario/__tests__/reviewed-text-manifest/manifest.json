@@ -18,19 +18,19 @@
    "strings": 138
   },
   "template": {
-   "fingerprint": "369e969ff5c98db6f2b4179f11fe4ec31e002a40a66573496fa9f1929984c05b",
+   "fingerprint": "86ddb79bbdf79a23fd97c2d22da6caa491305ad97fef05e364155fecc3ac0581",
    "units": 167,
    "strings": 4298
   },
   "compiled": {
-   "fingerprint": "ce7fceb2a1fbad70b2d84ab09b93a361300fe3fa3aa57d875b48cbfbdb11f192",
+   "fingerprint": "f0e3e5c5d2e15d73dff18d56e48475c6e8ab1cc18e7c9b01c0c254f6632b02f7",
    "units": 808,
    "strings": 9083
   },
   "caption": {
-   "fingerprint": "dd5d677d2965de7ba4943287e23d3ff69cf2d76b56c34fd53a68c7230f57a432",
+   "fingerprint": "04ae38d342f268386b982c850590b31370a2d0a64f19566b98cccb13e20ac5ea",
    "units": 503,
-   "strings": 1881
+   "strings": 1886
   },
   "theory": {
    "fingerprint": "150dc7d3b3c2858da8f3e32c3cf6df3d5ee0eefb52b781533344a75cc79ed0d4",
@@ -48,9 +48,9 @@
    "strings": 1615
   },
   "source": {
-   "fingerprint": "c0ebbb0d338a7b5197b315c6af89032c57b14694cc3b543a228b7647068251b3",
+   "fingerprint": "e47abc06327fd0908d0b1c4a57512b424c00ac5b23024445bf0b47375f64b933",
    "units": 487,
-   "strings": 13382
+   "strings": 13388
   },
   "world": {
    "fingerprint": "755b24e4dd706ac2025f5a5c71a781c93984d73f0c7a17bcf147fc61de1b69ba",
@@ -58,9 +58,9 @@
    "strings": 1391
   },
   "public": {
-   "fingerprint": "f11c425e311ec15a3bf52743b3c6d5b9ae9e0cb65bfcaacb162e8532bc420c57",
+   "fingerprint": "e2753d79c643d005dfc39e7e27feceb31643a9d70ecd14ae8a29f7929d27a435",
    "units": 15,
-   "strings": 106
+   "strings": 102
   },
   "law": {
    "fingerprint": "9b829b35f5c7b4bd9a4913320e9772d18c34a2b57c34da1a9b0f09f60c7faae3",

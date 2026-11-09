@@ -112,6 +112,8 @@ interface TraceSample {
   y: number;
   headingDeg: number;
   speedKmh: number;
+  /** −1 in reverse (round 5 reads it: the forward frames of the two-stage set-up). */
+  gear?: number;
 }
 
 function trace(lessonId: string, name: string): TraceSample[] {
@@ -408,20 +410,60 @@ describe("1 · REVERSING TOWARD A PARKED BAY OCCUPANT WARNS", () => {
     const r = replay("lot-narrow-v1", CORRECT);
     expect(r.bodies).toHaveLength(4);
     expect(r.first, "the cue must go finite somewhere in this drive").not.toBeNull();
-    // MEASURED on the shipped trace: first finite read 2.34 m at t = 32.85 s,
-    // while the car is REVERSING at 3.83 km/h.
-    expect(r.first!.tSec).toBeCloseTo(32.85, 1);
-    expect(r.first!.gapM).toBeCloseTo(2.34, 1);
-    expect(r.first!.speedKmh).toBeLessThan(0); // in reverse, not on the approach
-    expect(r.min.gapM).toBeCloseTo(0.12, 1);
-    expect(r.finite).toBe(66);
+    // MEASURED on the shipped trace: first finite read 6.17 m at t = 39.75 s,
+    // while the car is REVERSING at 3.43 km/h; its closest is 0.48 m at
+    // 2.38 km/h. RE-MEASURED by lane curvpark2 (2026-11-06): the narrow
+    // shadow was re-authored on the car's own 4.6 m circle from further out
+    // (traces/scParkNarrow.ts) — before it read 2.34 m at 32.85 s, bottomed at
+    // 0.116 m and was finite on 66 samples. The CLASS claim is unchanged: the
+    // badge rises during the reverse, never on the approach, and the drive
+    // comes within the danger band of a parked car.
+    // Round 2 of the lane: every time below +1.8 s, the aisle entered at its
+    // own pace (instruction 1: «не повече от 10 км/ч»; parkKit `lotApproach`).
+    // Round 4 (CP2-1ter): +0.1 s — the set-up S onto the setup line begins late
+    // (y −13.0) and more of it is driven at the setup pace; the reverse is the same.
+    // Round 5 (CP2-1quater, 2026-11-08): the set-up is TWO-STAGE — the car
+    // passes the row on a right-half line (x 1.2) and its second S, onto the
+    // setup line, begins BESIDE the row, at a 4.5 km/h crawl. Turning left
+    // there swings the tail right, toward the parked noses, and the cue — which
+    // reads whatever body is in the corridor behind, in any gear, as it does on
+    // the forward pulls of seven other parking shadows (gap-long, gap-short,
+    // judge, night, parallel, parallel-exit, zebra) — now speaks on those 77
+    // forward frames too: first read 1.19 m at 31.30 s, the car turned 13.5° to
+    // 33.3° left of the aisle. The CLASS claim, re-stated by the measurement
+    // and not loosened where it still holds: the badge rises during the reverse
+    // (its first reverse read 6.17 m at 42.30 s, +2.45 s: the slower set-up);
+    // on the approach it speaks ONLY while the tail swings toward the row and
+    // NEVER red there (a crawl under REAR_CUE_MOVING_KMH, not «closing»); and
+    // the drive comes within the danger band of a parked car in reverse.
+    const firstReverse = CORRECT.find(
+      (s) => s.speedKmh < 0 && Number.isFinite(rearStaticGapFor(r.bodies, s.x, s.y, s.headingDeg)),
+    )!;
+    expect(firstReverse.tSec).toBeCloseTo(42.3, 1);
+    expect(rearStaticGapFor(r.bodies, firstReverse.x, firstReverse.y, firstReverse.headingDeg)).toBeCloseTo(6.17, 1);
+    expect(r.first!.tSec).toBeCloseTo(31.3, 1);
+    expect(r.first!.gapM).toBeCloseTo(1.19, 1);
+    let forward = 0;
+    for (const s of CORRECT) {
+      const gapM = rearStaticGapFor(r.bodies, s.x, s.y, s.headingDeg);
+      if (!Number.isFinite(gapM) || s.speedKmh < 0 || (s.gear ?? 1) < 0) continue;
+      forward++;
+      const leftOfAisle = 360 - s.headingDeg;
+      expect(leftOfAisle, `t=${s.tSec.toFixed(2)}: forward reads only while the tail swings toward the row`).toBeGreaterThan(10);
+      expect(leftOfAisle).toBeLessThan(45);
+      expect(stepRearCue(null, gapM, s.speedKmh)!.level, `t=${s.tSec.toFixed(2)}: never red on the approach`).not.toBe("danger");
+    }
+    expect(forward).toBe(77);
+    expect(r.min.gapM).toBeCloseTo(0.48, 1);
+    expect(r.finite).toBe(236);
   });
 
   it("what the STUDENT sees: the badge, in Bulgarian, at the closest point", () => {
     // Credit is read off what reaches the glass, not off the number the source
     // returned. Fold the measured gap through the shipped `stepRearCue`.
     const r = replay("lot-narrow-v1", CORRECT);
-    const cue = stepRearCue(null, r.min.gapM, -3.828);
+    // (the measured speed there: −2.376 km/h; −3.828 was the old shadow's)
+    const cue = stepRearCue(null, r.min.gapM, -2.376);
     expect(cue).not.toBeNull();
     expect(rearCueLabelBg(cue!)).toBe("Кола отзад · 0 м");
     // O61, CLOSED: this used to be amber. 0.12 m from a parked car showed the
@@ -577,64 +619,91 @@ describe("3 · A STUDENT NOT CLOSE TO ANYTHING IS NOT WARNED", () => {
     }
   });
 
-  it("18 of the 51 recorded parking drives raise nothing at all, and that is correct", () => {
-    // A cue that fires on every drive is furniture. Two of the never-firing
-    // drives are named here because their hazard is real and is NOT a static
-    // body — the rear channel must stay silent and let the right instrument
-    // speak.
-    const noObservation = replay("lot-narrow-v1", trace("sc-park-narrow", "mistake-no-observation"));
-    expect(noObservation.finite, "the hazard there is a PEDESTRIAN behind the car").toBe(0);
+  it("17 of the 51 recorded parking drives raise nothing at all, and that is correct", () => {
+    // A cue that fires on every drive is furniture. Two drives are named here
+    // because their hazard is real and is NOT a static body — the rear channel
+    // must stay silent where that hazard is and let the right instrument speak.
+    // Round 5 (lane curvpark2, CP2-1quater, 2026-11-08): sc-park-narrow's
+    // no-observation demo now drives the two-stage set-up, and its second S
+    // swings the tail toward the row's noses beside it — the badge speaks on
+    // those 77 forward frames (and on sc-park-perp-rev's 67), so 19 silent
+    // drives at round 4 are 17 now. Where the hazard is — the blind reverse onto
+    // the pedestrian — it is still silent, and that is the class claim.
+    const noObsSamples = trace("sc-park-narrow", "mistake-no-observation");
+    const noObservation = replay("lot-narrow-v1", noObsSamples);
+    const inReverse = noObsSamples.filter(
+      (s) => s.speedKmh < 0 && Number.isFinite(rearStaticGapFor(noObservation.bodies, s.x, s.y, s.headingDeg)),
+    );
+    expect(inReverse.length, "the hazard there is a PEDESTRIAN behind the car").toBe(0);
+    expect(noObservation.finite, "…the 77 reads are the set-up's forward S, beside the row").toBe(77);
     const forwardPark = replay("lot-45-v1", trace("sc-park-45", "shadow-correct"));
     expect(forwardPark.finite, "a 45° bay entered nose-first has nothing behind").toBe(0);
   });
 });
 
 describe("4 · THE WARNING ARRIVES WITH TIME TO ACT", () => {
-  const WIDE_SWING = trace("sc-park-narrow", "mistake-wide-swing");
-  const CORRECT = trace("sc-park-narrow", "shadow-correct");
-  const BODIES = occupiedBayBodies(district("lot-narrow-v1"));
+  // THE WITNESS MOVED (lane curvpark2, 2026-11-06). This block was measured on
+  // sc-park-narrow's wide-swing mistake, which clipped the neighbour on its
+  // FLANK at a 2.57 m pivot. Re-authored on the car's own 4.6 m circle, that
+  // demo now stops 0.12 m into the smaller of the gate's rect and the live
+  // collider — and 0.048 m SHORT of the shorter body this cue measures
+  // (occupiedBayBodies), at a rear gap of 2.37 m: a flank contact, not one the
+  // rear cue exists for. The rear contact this cue does exist for is
+  // sc-park-parallel's far-from-lead mistake, whose doomed correction backs the
+  // tail into the car behind; its correct sibling keeps 0.457 m. The CLASS
+  // claim is unchanged: the wrong drive really touches, the right one does
+  // not, and the badge is up with time to act before the touch.
+  const WIDE_SWING = trace("sc-park-parallel", "mistake-far-from-lead");
+  const CORRECT = trace("sc-park-parallel", "shadow-correct");
+  const BODIES = occupiedBayBodies(district("lot-par-v1"));
 
-  it("POSITIVE CONTROL: the wrong drive really does clip the neighbour, the right one does not", () => {
+  it("POSITIVE CONTROL: the wrong drive really does clip the car behind, the right one does not", () => {
     // Without this the lead time below is a statement about nothing. The
-    // lesson's own debrief for this trace reads „по средата на завъртането
-    // задният калник закачи съседната кола"; the geometry has to agree.
+    // lesson's own explanation for this trace reads «…при опита за корекция
+    // задницата удари задната кола»; the geometry has to agree.
     const bad = closestApproach(WIDE_SWING, BODIES);
     expect(bad.sepM, "bodies must actually overlap").toBeLessThan(0);
-    expect(bad.sepM).toBeCloseTo(-0.164, 2);
-    expect(bad.tSec).toBeCloseTo(35.0, 1);
+    expect(bad.sepM).toBeCloseTo(-0.019, 2);
+    expect(bad.tSec).toBeCloseTo(47.55, 1);
     const good = closestApproach(CORRECT, BODIES);
     expect(good.sepM, "the correct drive must NOT touch").toBeGreaterThan(0);
-    expect(good.sepM).toBeCloseTo(0.116, 2);
+    expect(good.sepM).toBeCloseTo(0.457, 2);
   });
 
-  it("the badge is up 2.65 s and 2.8 m of travel before the contact", () => {
-    const r = replay("lot-narrow-v1", WIDE_SWING);
+  it("the badge is up 9.7 s before the contact, from the first metre of the reverse", () => {
+    const r = replay("lot-par-v1", WIDE_SWING);
     const contact = closestApproach(WIDE_SWING, BODIES);
     expect(r.first).not.toBeNull();
-    // MEASURED: first finite read 3.51 m at t = 32.35 s at 3.83 km/h in
-    // reverse; the bodies overlap at t = 35.00 s.
-    expect(r.first!.gapM).toBeCloseTo(3.51, 1);
-    expect(r.first!.tSec).toBeCloseTo(32.35, 1);
+    // MEASURED: first finite read 13.86 m at t = 37.85 s at 3.43 km/h in
+    // reverse (the car behind is in range as soon as the reverse begins); the
+    // bodies overlap at t = 47.55 s (round 2: +1.8 s, the slower aisle entry).
+    expect(r.first!.gapM).toBeCloseTo(13.86, 1);
+    expect(r.first!.tSec).toBeCloseTo(37.85, 1);
+    expect(r.first!.speedKmh).toBeLessThan(0);
     const leadSec = contact.tSec - r.first!.tSec;
-    expect(leadSec).toBeCloseTo(2.65, 1);
-    // 3.828 km/h = 1.063 m/s, so the warning stands for 2.82 m of reversing.
-    const speedMps = Math.abs(r.first!.speedKmh) / 3.6;
-    expect(speedMps * leadSec).toBeCloseTo(2.82, 1);
+    expect(leadSec).toBeCloseTo(9.7, 1);
     // Whether that is „time to act" is answerable rather than a feeling: a stop
-    // from 1.06 m/s is under a metre even at a lazy 1 m/s², and the badge is
-    // polled at 5 Hz (200 ms), so the worst display latency is 0.2 s of the
-    // 2.65. Two and a half seconds at walking pace is the difference between
-    // «спри» and «спрях».
+    // from 0.95 m/s (3.43 km/h) is under half a metre even at a lazy 1 m/s², and
+    // the badge is polled at 5 Hz (200 ms), so the worst display latency is
+    // 0.2 s of the 9.7. (On the old narrow witness it was 2.65 s.) Seconds at
+    // walking pace are the difference between «спри» and «спрях».
     expect(leadSec).toBeGreaterThan(1.0);
   });
 
   it("and it lets go once the car is straight in the bay — no badge on a finished manoeuvre", () => {
-    const r = replay("lot-narrow-v1", CORRECT);
-    expect(r.lastFiniteT).toBeCloseTo(36.1, 1);
-    const last = CORRECT[CORRECT.length - 1];
-    expect(last.tSec).toBeGreaterThan(39);
+    // On the narrow bay, as before (its shadow re-measured by lane curvpark2:
+    // the badge's last read 36.1 s → 45.85 s, the drive ends at 52.17 s;
+    // round 2: 47.65 s and 53.97 s, the aisle entered at its own pace; round 4:
+    // 47.75 s, the set-up S begun late, CP2-1ter; round 5: 50.20 s and 56.52 s,
+    // the two-stage set-up with its crawl beside the row, CP2-1quater).
+    const NARROW = trace("sc-park-narrow", "shadow-correct");
+    const NARROW_BODIES = occupiedBayBodies(district("lot-narrow-v1"));
+    const r = replay("lot-narrow-v1", NARROW);
+    expect(r.lastFiniteT).toBeCloseTo(50.2, 1);
+    const last = NARROW[NARROW.length - 1];
+    expect(last.tSec).toBeGreaterThan(50);
     expect(
-      rearStaticGapFor(BODIES, last.x, last.y, last.headingDeg),
+      rearStaticGapFor(NARROW_BODIES, last.x, last.y, last.headingDeg),
       "the drive ends parked and the badge must be gone",
     ).toBe(Infinity);
   });
@@ -661,13 +730,15 @@ describe("4 · THE WARNING ARRIVES WITH TIME TO ACT", () => {
 
 describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () => {
   it("slow reverse toward a parked car at close range is RED", () => {
-    // The exact pose block 1 measures: 0.116 m at −3.828 km/h.
+    // The exact pose block 1 measures: 0.477 m at −2.376 km/h (re-measured by
+    // lane curvpark2 on the re-authored narrow shadow; 0.116 m at −3.828 km/h
+    // before — the CLASS claim, red at close range in reverse, is unchanged).
     const r = replay("lot-narrow-v1", trace("sc-park-narrow", "shadow-correct"));
-    expect(r.min.gapM).toBeCloseTo(0.116, 2);
-    expect(stepRearCue(null, r.min.gapM, -3.828)!.level).toBe("danger");
-    // …and it is the SIGN that does it, not the magnitude: the same 0.116 m at
+    expect(r.min.gapM).toBeCloseTo(0.477, 2);
+    expect(stepRearCue(null, r.min.gapM, -2.376)!.level).toBe("danger");
+    // …and it is the SIGN that does it, not the magnitude: the same 0.477 m at
     // the same speed FORWARDS is not red, because the gap is not closing.
-    expect(stepRearCue(null, r.min.gapM, 3.828)!.level).toBe("warn");
+    expect(stepRearCue(null, r.min.gapM, 2.376)!.level).toBe("warn");
   });
 
   it("slow reverse with metres of clear air is NOT red — the false-refusal direction", () => {
@@ -802,16 +873,70 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // body the live scene mounts, and a few new looks. `badgeUp` 4 800 → 4 700,
     // `red` 1 981 → 2 018 and `slowReverseClearAir` 647 → 674 (re-measured, not
     // apportioned between those changes). The two zeroes are still zero.
-    expect(samples).toBe(39114);
+    //
+    // 39 114 → 40 385 on 2026-11-06 (lane curvpark2, the same row): the five
+    // remaining sc-park-* lessons of this corpus — perp-rev, narrow, parallel,
+    // 45 and perp-forward — were RE-AUTHORED from the parking kit
+    // (traces/parkKit.ts) on the car's own 4.6 m circle: 14 recordings, the
+    // setups of the reverse bays moved west (x −0.5 / −1.6), a stop and a look
+    // half-way round each reverse, a 0.4 s rest between the looks and R, the
+    // last 12 m to a setup (or through a forward Задача 1 disc) at 5.5 km/h,
+    // the perp-forward run-up across to x −4.63, and each contact mistake
+    // stopping on the body it touches. sc-park-parallel/mistake-no-observation
+    // and the 36 recordings of the other lessons are byte-identical.
+    // `badgeUp` 4 700 → 4 793, `red` 2 018 → 2 028 and `slowReverseClearAir`
+    // 674 → 710 are the longer, slower reverses (re-measured, not apportioned).
+    // The two zeroes are still zero, and they are the check on this story.
+    //
+    // 40 385 → 40 865 on 2026-11-06, round 2 of the same lane: every re-authored
+    // lot demo enters the aisle at its own pace (18 → 9 km/h 3 m before y −30,
+    // parkKit `lotApproach`; instruction 1 says «не повече от 10 км/ч» and the
+    // demos used to do 17.8 there), the set-up move is signalled left and the
+    // bay right at the setup (CP2-6), and the 45 corner-cut and perp-forward
+    // early-turn contacts are re-authored so the real car makes them (CP2-3).
+    // `badgeUp` 4 793 → 4 794, `red` 2 028 unchanged and `slowReverseClearAir`
+    // 710 → 711 (re-measured, not apportioned). The two zeroes are still zero.
+    //
+    // 40 865 → 40 864 on 2026-11-06, round 3 of the same lane (integrator
+    // ruling CP2-1bis): sc-park-perp-forward's shadow and blind-exit cross the
+    // aisle later — the S now ends one blink and a 3.0 s signal lead before the
+    // turn-in (18 km/h to y −33, the left signal 8 m before the S) — one sample
+    // shorter; both are forward drives, so `badgeUp` 4 794, `red` 2 028 and
+    // `slowReverseClearAir` 711 are unchanged (re-measured). The two zeroes are
+    // still zero.
+    //
+    // 40 864 → 40 869 on 2026-11-08, round 4 of the same lane (integrator
+    // rulings CP2-1bis / CP2-1ter): sc-park-perp-rev's and sc-park-narrow's
+    // shadow and no-observation demos take the aisle's left half only as the
+    // reverse's start — the set-up S begins late (y −13.4 / −13.0, as late as
+    // the real car keeps 0.25 m off lot-bay-1's car) with its left signal 8 m
+    // before it — so more of the S is driven at the setup pace: samples 1 051
+    // → 1 051, 801 → 802, 1 081 → 1 083 and 801 → 803; the reverses are the
+    // same paths. `badgeUp` 4 794 unchanged, `red` 2 028 → 2 030 and
+    // `slowReverseClearAir` 711 unchanged (re-measured, not apportioned; the
+    // reverse frames sit at a new 20 Hz phase). The two zeroes are still zero.
+    //
+    // 40 869 → 41 044 on 2026-11-08, round 5 of the same lane (integrator
+    // ruling CP2-1quater): the same four demos take a TWO-STAGE set-up — S1
+    // onto a right-half line (x 1.2) before the row, that line past the row,
+    // S2 onto the setup line beside it at a 4.5 km/h crawl, each S signalled
+    // on its own — samples 1 051 → 1 090, 802 → 840, 1 083 → 1 132 and 803 →
+    // 852; the reverses are the same paths. `badgeUp` 4 794 → 5 082 is exactly
+    // the 67 + 67 + 77 + 77 forward frames of S2, whose tail swings toward the
+    // row's noses (none red: a crawl under REAR_CUE_MOVING_KMH is not
+    // «closing»); `red` 2 030 → 2 028 (the reverse frames at a new 20 Hz
+    // phase) and `slowReverseClearAir` 711 unchanged (re-measured, not
+    // apportioned). The two zeroes are still zero.
+    expect(samples).toBe(41044);
     // …and the badge is up for all eight of them (4 350 → 4 358): the beat is
     // a braked pause in the parallel slot with the car behind still inside the
     // cue's range, so the badge state does not change — only its duration.
-    expect(badgeUp).toBe(4700);
+    expect(badgeUp).toBe(5082);
     // MEASURED: red went 82 → 2,296 frames, all of them reversing inside 4 m.
     // UNCHANGED by the eight new samples, and that is the check on the story
     // above rather than a coincidence: those samples are `speedKmh: 0` under a
     // held brake, and `danger` requires `rearCueClosing(speedKmh)`.
-    expect(red).toBe(2018);
+    expect(red).toBe(2028);
     // The two that must be zero, and they are the whole honesty argument.
     //
     // A REFUTER CALLED BOTH OF THESE TAUTOLOGIES AND THE MEASUREMENT SAYS
@@ -839,7 +964,7 @@ describe("5 · RED MEANS „CLOSING ON SOMETHING CLOSE“ — both halves", () =
     // reading it off the function — which is what the file must never start
     // doing, and is why `stepRearCue` is called rather than reimplemented.
     expect(redWhileNeither, "red while neither reversing nor at traffic speed").toBe(0);
-    expect(slowReverseClearAir, "the false-refusal population must be non-empty").toBe(674);
+    expect(slowReverseClearAir, "the false-refusal population must be non-empty").toBe(711);
     expect(slowReverseClearAirRed, "slow reverse with 4 m+ of air must never be red").toBe(0);
   });
 });

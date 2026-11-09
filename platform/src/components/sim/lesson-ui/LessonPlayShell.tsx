@@ -52,6 +52,7 @@ import {
   readStoredFlag,
   readStoredFlagOrNull,
   overlaySheetHoldsDrive,
+  overlayYieldsToSwingCue,
   selectOverlay,
   SessionEndScreen,
   SESSION_END_AUTO_DEFAULT,
@@ -2813,6 +2814,38 @@ export function advisorTaskRows(
         : null;
 
   return [advisorRow, taskRow];
+}
+
+/**
+ * ── THE PHONE'S «ВТОРИ ЗАМАХ» CUE TAKES THE ROW'S PLACE — sc-ac-crosswind:
+ *    a9db1738 clause 4, the phone half; integrator ruling R-SC1 (A), 2026-11-06.
+ *
+ * The decision behind ONE root attribute, `data-sim-overlay-yields`, and
+ * nothing else: PlayAreaStyles reads it to draw the scene's swing cue where the
+ * notification column's row stands (and to make that row yield by visibility,
+ * never by display) for as long as the cue is mounted. WHICH rows yield is
+ * `overlayYieldsToSwingCue`'s answer, in the queue module beside
+ * `overlayPriority`; this adds the two facts only the shell has:
+ *
+ *   compact    — the attribute is compact-only, exactly like
+ *                `data-sim-overlay-active`; a roomy stage never hides the cue,
+ *                so the PC is unchanged.
+ *   sheetOpen  — while the read sheet is open the lesson's own sentence is
+ *                being read, and the cue waits for it (the stylesheet also
+ *                re-hides it on the sheet's own DOM node for the one commit
+ *                this flag lags behind — see PlayAreaStyles).
+ *
+ * A pure function and not a JSX expression, for the reason `advisorTaskRows`
+ * gives (O54/O51): a condition written inline at the call site can be pinned
+ * and stay green. `swingCueYield.test.tsx` drives this over every input and
+ * parses the call site's argument list.
+ */
+export function swingCueYieldAttr(
+  compact: boolean,
+  sheetOpen: boolean,
+  active: SimOverlayItem | null,
+): "on" | undefined {
+  return compact && !sheetOpen && overlayYieldsToSwingCue(active) ? "on" : undefined;
 }
 
 /**
@@ -7851,6 +7884,11 @@ export function LessonPlayShell({
       data-sim-overlay-active={
         compact && (overlay.active !== null || overlaySheetOpen) ? "on" : undefined
       }
+      // …AND, WHILE IT SPEAKS, WHETHER ITS ROW YIELDS ITS PLACE to the scene's
+      // «втори замах» cue (sc-ac-crosswind:a9db1738 clause 4, R-SC1 (A)). Off
+      // on a roomy stage, under the read sheet, and for every row louder than
+      // praise, blocking or sheet-only — see swingCueYieldAttr.
+      data-sim-overlay-yields={swingCueYieldAttr(compact, overlaySheetOpen, overlay.active)}
       className={
         // Fullscreen: the UA sizes this element to the viewport — become a
         // padded column so the scene (flex-1) absorbs all remaining height.

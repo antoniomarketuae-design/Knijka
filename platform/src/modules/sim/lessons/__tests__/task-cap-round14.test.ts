@@ -39,13 +39,17 @@ import { ORDER_PLACEMENTS, arrPair, orderKin, stampPair } from "../../rules/__te
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { recordScPark45Drive } from "../../traces/scPark45";
+import { S2_KMH, SETUP_KMH } from "../../traces/parkKit";
+import { recordScriptedDrive, type DriveScript } from "../../traces/recorder";
+import { recordScPark45Drive, scPark45ShadowScript } from "../../traces/scPark45";
+import { lotObstacleRects, scParkPerpRevShadowScript } from "../../traces/scParkPerpRev";
 import { recordScParkDepthDrive } from "../../traces/scParkDepth";
 import { recordScParkPerpForwardDrive } from "../../traces/scParkPerpForward";
 import { applyTick, buildLessonResult, createLessonSession, finishSession } from "../engine";
 import { compileScenario } from "../scenario/compile";
 import { SCENARIO_TEMPLATES } from "../scenario/templates";
 import { SC_PARK_45, SC_PARK_PERP_FORWARD } from "../scenario/templates-parking";
+import { SC_PARK_PERP_REV } from "../scenario/templates";
 import { SC_PARK_DOUBLE } from "../scenario/templates-parking3";
 import type { ScenarioLevel } from "../scenario/types";
 import type { LessonSessionState } from "../types";
@@ -462,8 +466,47 @@ describe("G · R1 AS A CLASS — the objective's own speed toasts print numbers 
       [SC_PARK_PERP_FORWARD, 5, recordScParkPerpForwardDrive as unknown as Recorder, "mistake-early-turn"],
     ];
     expect(objectiveToasts(SC_PARK_DOUBLE, 1, DOUBLE_WIDE_RUN_UP, "mistake-wide-run-up")).toEqual([]);
-    const opened: string[] = [];
+    // ALL EIGHT LEGS LEFT THE CLASS (lane curvpark2, catalogue-demo-curvature:
+    // dae908c7, 2026-11-06) — re-pinned the way the sc-park-double leg was, never
+    // by deleting a leg. Re-authored on the car's 4.6 m circle, the sc-park-45
+    // shadow and its overshoot demo pass through their Задача 1 disc at the setup
+    // pace (5.5 km/h over the last 12 m, cap 10), so they print no «не повече от»
+    // toast at all; the sc-park-perp-forward early-turn demo now turns in from
+    // x = 1.5, 6.15 m from the re-centred disc (−4.6, −6.5) r 3, and never
+    // enters it. Each is pinned to read NO such toast, so a leg coming back into
+    // the class is looked at rather than assumed. The class claim itself —
+    // every printed number bears its comparison out — stays pinned on the
+    // reader, independently of any builder, in the next test.
     for (const [spec, lv, rec, name] of legs) {
+      expect(objectiveToasts(spec, lv, rec, name).filter((x) => x.includes("не повече от")), `${spec.id} L${lv} ${name}`).toEqual([]);
+    }
+    // THE CLASS STILL RUNS ON THE REAL PRODUCER (lane curvpark2 round 2,
+    // integrator ruling CP2-4): with every committed leg out of the class, the
+    // claim is exercised on SYNTHETIC over-cap legs — the committed sc-park-45
+    // shadow script with its Задача 1 run-up driven at 12 km/h (the rung's cap 10
+    // + 2), and the sc-park-perp-rev shadow script with its last 12 m to the setup
+    // halt at 8 km/h (cap 6 + 2) — recorded by the product's recorder and graded
+    // by the lesson engine, so the toast whose printed speed is read below is the
+    // engine's own. A synthetic leg is never committed; it only keeps the loop off
+    // an empty list (round 1 iterated `[]`).
+    const opened: string[] = [];
+    const overCap = (script: () => DriveScript, setupKmh: number, scenarioId: string): Recorder =>
+      ((d: unknown, _name: never, extra: { onTick: (t: SimTick) => void }) =>
+        recordScriptedDrive(
+          d,
+          {
+            // round 5 (CP2-1quater): the perp-rev setup is reached on the two-stage set-up, whose last stretch is S2's crawl (S2_KMH)
+            steps: script().steps.map((s) =>
+              s.kind === "drive" && !s.reverse && (s.targetKmh === SETUP_KMH || s.targetKmh === S2_KMH) ? { ...s, targetKmh: setupKmh } : s,
+            ),
+          },
+          { scenarioId, kind: "shadow", seed: 7, obstacles: lotObstacleRects(d), collisionMinKmh: 0, onTick: extra.onTick },
+        )) as Recorder;
+    const synthetic: typeof legs = [
+      [SC_PARK_45, 3, overCap(scPark45ShadowScript, 12, "sc-park-45"), "synthetic: the shadow's run-up at 12 km/h"],
+      [SC_PARK_PERP_REV, 3, overCap(scParkPerpRevShadowScript, 8, "sc-park-perp-rev"), "synthetic: the shadow's setup at 8 km/h"],
+    ];
+    for (const [spec, lv, rec, name] of synthetic) {
       const toasts = objectiveToasts(spec, lv, rec, name).filter((x) => x.includes("не повече от"));
       expect(toasts.length, `${spec.id} L${lv} ${name}`).toBeGreaterThan(0);
       for (const x of toasts) expect(falsePrintedClaims(x), `${spec.id} L${lv} ${name}: ${x.slice(0, 140)}`).toEqual([]);

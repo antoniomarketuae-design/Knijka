@@ -1271,6 +1271,35 @@ ${TOUCH_BAND_CSS_VARS}
       html[data-sim-glance="right"] [data-sim-compact="on"] [data-hud="notify-column"] {
         top: calc(${NOTIFY_COLUMN_TOP_CSS_COMPACT} + var(--sim-glance-h, 0px)) !important;
       }
+      /* THE «ВТОРИ ЗАМАХ» CUE STANDS ON THE COLUMN'S OWN TOP ON A PHONE —
+         sc-ac-crosswind:a9db1738 clause 4, R-SC1 (2026-11-09).
+
+         On a phone the cue now takes the notification row's PLACE (row C1), so
+         it takes the row's top, in every camera and glance state. Its old
+         "top-16" (64 px) is inside the interior mirror's band, which ends at
+         0.188 of the stage (73.9 px on a 393 px stage), and "the mirror does not
+         move, the HUD does" (B74/B76). These three rules give it exactly the
+         column's lengths: the column constant in the cockpit and in chase (the
+         column keeps its own top in chase), and the column's held-glance step
+         on a rear OR right glance, which is where the column steps.
+
+         THE CASCADE, stated because it is the whole mechanism: "top-16" is a
+         Tailwind utility inside @layer utilities, and every rule in this sheet
+         is unlayered, so any of these beats it at any specificity. The cockpit
+         rule is (0,2,0). The chase rule is (0,3,1), which beats the shared
+         chase step above, (0,2,1). The glance rule is (0,3,1) as well and comes
+         AFTER the chase rule, so chase with a held glance takes the glance
+         step, as the column does. No !important: the cue has no inline top. */
+      [data-sim-compact="on"] [data-hud="wind-swing-cue"] {
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};
+      }
+      html[data-sim-camera="chase"] [data-sim-compact="on"] [data-hud="wind-swing-cue"] {
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};
+      }
+      html[data-sim-glance="rear"] [data-sim-compact="on"] [data-hud="wind-swing-cue"],
+      html[data-sim-glance="right"] [data-sim-compact="on"] [data-hud="wind-swing-cue"] {
+        top: calc(${NOTIFY_COLUMN_TOP_CSS_COMPACT} + var(--sim-glance-h, 0px));
+      }
 
       /* The tier picker shares the top-right corner with the E window and with
          the toast column, and three things do not fit in one corner. It is the
@@ -1525,8 +1554,59 @@ ${TOUCH_BAND_CSS_VARS}
          surfaces deep again the moment a lesson raises an aid. */
       [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="follow-hint"],
       [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="telltale-cue"],
-      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="wind-swing-cue"] {
+      [data-sim-compact="on"][data-sim-overlay-active="on"]:not([data-sim-overlay-yields="on"]) [data-hud="wind-swing-cue"] {
         display: none;
+      }
+      /* …EXCEPT THAT THE «ВТОРИ ЗАМАХ» CUE TAKES THE ROW'S PLACE WHEN THE ROW IS
+         AMBIENT — sc-ac-crosswind:a9db1738 clause 4, the phone half (rig-w3z,
+         2026-11-05), integrator ruling R-SC1 (A) of 2026-11-06.
+
+         THE DEFECT THIS LIST HAD, MEASURED. On both rig-w3z phone drives the cue
+         MOUNTED for the act and read "(hidden)" with no client rects for its
+         whole life (26.08 to 30.35 on the rig clock), and the push chip it
+         replaces was removed one frame later. The rule above stood it down for
+         the shell's row, and while driving that row is almost never empty: the
+         W8 task STANDBY exists so that it is not, and an announcement or a
+         praise flash takes it in between. "Each surface simply waits for the
+         one above it. All of them come straight back" holds for a card that
+         keeps. It is false for a four-second cue behind a slot that is never
+         empty, and the cue is the swing's ONLY explanation on the glass.
+
+         SO THE ORDER IS DECIDED ON THIS CORRIDOR'S OWN CRITERION, which one
+         the student can act on soonest. The cue names what the car is doing
+         this second and he answers it with the wheel; a task line, the legend,
+         the advisor, a pre-drive step and a praise flash do not. The shell
+         writes "data-sim-overlay-yields" exactly when the active row is one of
+         those (overlayPriority up to praise, neither blocking nor sheet-only,
+         compact, the read sheet shut — swingCueYieldAttr), and for that state
+         the cue is no longer stood down. A hint, a cabin warning, a graded
+         fault, a teach card, the end line, any blocking or sheet-only item, the
+         read sheet and the touch hint still hold it, exactly as before.
+
+         ONE ROW AT A TIME STILL: the column yields its place for the cue's
+         life (the rule after next), so the band holds one surface, never two.
+
+         THE READ SHEET'S OPENING COMMIT. The shell learns that the sheet opened
+         one effect late, so for one commit the yield attribute can still be on
+         while the sheet's own node is already mounted. The rule below reads
+         that node, so the cue stays down exactly as it always did. */
+      [data-sim-compact="on"][data-sim-overlay-active="on"]:has([data-hud="overlay-read"]) [data-hud="wind-swing-cue"] {
+        display: none;
+      }
+      /* THE COLUMN YIELDS BY VISIBILITY, NEVER BY DISPLAY — the landscape car
+         sheet's own precedent further down, and the thumb-band rule that a
+         teaching line moves or yields rank, it does not disappear. The row's
+         node, its boxes and its observers stay exactly as they were; it simply
+         is not painted while the cue stands in its place, and it is back with
+         the identical card on the first frame after the cue unmounts.
+
+         SELF-SUFFICIENT ON PURPOSE: it yields only where the cue is mounted AND
+         nothing else holds the cue down (no touch hint, no read sheet), so in
+         every state it matches either the cue is drawn or the column was
+         already hidden by a base rule. The census test asserts that over every
+         cell. */
+      [data-sim-compact="on"][data-sim-overlay-yields="on"]:has([data-hud="wind-swing-cue"]):not(:has([data-hud="touch-hint"])):not(:has([data-hud="overlay-read"])) [data-hud="notify-column"] {
+        visibility: hidden;
       }
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="follow-hint"],
       [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="telltale-cue"],
@@ -1672,6 +1752,19 @@ ${TOUCH_BAND_CSS_VARS}
       @media (orientation: landscape) {
         html[data-sim-car-sheet="open"] [data-sim-compact="on"] [data-hud="notify-column"] {
           visibility: hidden;
+        }
+      }
+      /* …AND THE «ВТОРИ ЗАМАХ» CUE, WHICH NOW STANDS IN THE COLUMN'S PLACE,
+         YIELDS TO THE SAME SHEET — sc-ac-crosswind:a9db1738 clause 4, R-SC1.
+         Where the cue takes the row's place (the yield rule in row C1 above), it
+         takes the row's duties with it: sideways the open car sheet and the
+         column cannot share this corridor, so neither can the sheet and the cue.
+         Scoped to an ACTIVE overlay row, so with no row up the cue is exactly
+         what it was before. Upright the column keeps its card under the sheet
+         (the block above), so there the cue keeps the row's place too. */
+      @media (orientation: landscape) {
+        html[data-sim-car-sheet="open"] [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="wind-swing-cue"] {
+          display: none;
         }
       }
 

@@ -214,9 +214,6 @@
   "Влизаме в паркинга: дръж дясната страна и карай спокойно.": {
    "class": "other"
   },
-  "Влизането напред не се прави от дясната лента — там дъгата просто не се побира и предният десен ъгъл минава през съседа.": {
-   "class": "other"
-  },
   "Вместо да се прибере вдясно, водачът даде газ и остана в лявата лента — „да избяга напред“ пред линейката.": {
    "class": "other"
   },
@@ -519,9 +516,6 @@
   "За близък изход ползваш външната дясна лента.": {
    "class": "other"
   },
-  "За да влезеш НАПРЕД, първо си вземи място отляво — от дясната лента завоят просто не се побира.": {
-   "class": "other"
-  },
   "За да заобиколиш препятствие в дясната лента": {
    "class": "other"
   },
@@ -542,6 +536,14 @@
   },
   "Задача 1: дръпни се леко вляво в алеята — към средата ѝ, не по дясната лента — и намали до пешеходна скорост.": {
    "class": "other"
+  },
+  "Задача 1: завоят напред започва от лявата половина на алеята — дръпни се в нея, щом е свободна напред, и намали под 8 км/ч; от дясната лента дъгата не се побира.": {
+   "class": "other",
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the product chassis at full lock — the physics circle ≈ 4.17 m, wound at rest — no forward entry into lot-bay-3 begun with the car wholly in the aisle's right half reaches the bay without contact: 0 clean of 2884 drives, best −0.065 m on vela_h3#1; traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (14.50 m of the car's centre left of the centre line before the turn-in: the second half of the S at the kit's aisle radius 6 m, one blink, and the right signal's 3.0 s lead — park-family-drivable); the yield duty stated (instruction 3 and the shadow's caption: «пропусни всеки, който минава отдясно»). sc-park-perp-forward, lane curvpark2 round 3, integrator ruling CP2-1bis (2026-11-06)"
+  },
+  "Задача 1: покрай реда остани в дясната половина на алеята.": {
+   "class": "duty",
+   "why": "ЗДвП чл. 15 ал. 1 (retrieved: «…се движи възможно най-вдясно по платното за движение…») binds on the lot aisle where it is shown (lot-perp-v1 / lot-narrow-v1, edge lot-e-aisle: service, two-way, one lane each way — districtRoadClass «binds»): past the row the demos keep to the right half on the line x 1.2 — on the product's envelope, the straight line past the row keeps 0.725 m (sc-park-perp-rev) / 0.725 m (sc-park-narrow) from the row, and the set-up drive keeps ≥ 0.474 m (sc-park-perp-rev) / ≥ 0.454 m (sc-park-narrow) in S2's tail swing, its closest approach to the row — inside the floor's own line (x 1.415 (sc-park-perp-rev) / 1.405 (sc-park-narrow)); the left half only for the swing's start (ал. 2). Lane curvpark2 round 5, integrator ruling CP2-1quater"
   },
   "Задачата е да НЕ тръгнеш с тях: дръж 46–48 км/ч в дясната лента. 51–60 е второстепенна грешка; над 60 (+10) е опасна и на изпита значи директно отпадане.": {
    "class": "other"
@@ -591,6 +593,14 @@
   "Закъснееш ли, завиваш надясно и обръщаш по-нататък (ЗДвП, чл. 15; чл. 25).": {
    "class": "other",
    "why": "a bare reference to the article (чл. 15 holds ал. 1–7); it asserts no duty by itself"
+  },
+  "Замахът започва от лявата половина — чак накрая, щом е свободна напред, отмести се в нея и спри под 6 км/ч, когато задната броня подмине съседната кола; дръж около два и половина метра странично разстояние от реда.": {
+   "class": "other",
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the 4.6 m programme with the 0.25 m demo floor — the radius and margin integrator ruling CP2-1ter (2026-11-08) sets for this reading — no single reverse swing into lot-bay-3 begun with the car wholly in the aisle's right half parks: the kit refuses it («the swing ends … past the bay»), and every swing on the 4.6 m circle from a right-half line that ends on the bay axis with no straight-in overlaps dret_90#2 by at least 0.203 m on the recorded pose and 0.373 m on the bicycle pose; recorded fact, not the ruled radius: at FULL lock wound at rest (the physics circle ≈ 4.17 m) one right-half entry parks, 0.116 m off dret_90#2 from (0.85, 5.25) — traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (3.19 m of the car's centre left of the centre line before the reverse: only the tail of the second set-up S (the kit's aisle S, radius 6 m, ramps 1.5) from the right-half line x 1.2 past the row onto the setup line, ending at the setup stop — the two-stage minimum 3.18 m over every right-half line the 0.25 m floor allows (to x 1.415); a single S from the lane centre needs 11.79 m — park-family-drivable, integrator ruling CP2-1quater); the yield duty stated (instruction 3 and the shadow's caption at the setup: «пропусни всеки, който минава отдясно»). sc-park-perp-rev, lane curvpark2 round 5, integrator rulings CP2-1bis / CP2-1ter / CP2-1quater"
+  },
+  "Замахът започва от лявата половина — чак накрая, щом е свободна напред, отмести се в нея и спри, когато задната броня подмине съседната кола; дръж около три и половина метра странично разстояние от реда.": {
+   "class": "other",
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the 4.6 m programme with the 0.25 m demo floor — the radius and margin integrator ruling CP2-1ter (2026-11-08) sets for this reading — no single reverse swing into the 2.5 m lot-bay-3 begun with the car wholly in the aisle's right half parks: the kit refuses it («the swing ends … past the bay»), and every swing on the 4.6 m circle from a right-half line that ends on the bay axis with no straight-in overlaps dret_90#2 by at least 0.352 m on the recorded pose and 0.521 m on the bicycle pose; recorded fact, not the ruled radius: at FULL lock wound at rest (the physics circle ≈ 4.17 m) one right-half entry parks, 0.003 m off dret_90#2 from (0.85, 5.2) — traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (5.36 m of the car's centre left of the centre line before the reverse: only the tail of the second set-up S (the kit's aisle S, radius 6 m, ramps 1.5) from the right-half line x 1.2 past the row onto the setup line, ending at the setup stop — the two-stage minimum 5.31 m over every right-half line the 0.25 m floor allows (to x 1.405); a single S from the lane centre needs 12.26 m — park-family-drivable, integrator ruling CP2-1quater); the yield duty stated (instruction 3 and the shadow's caption at the setup: «пропусни всеки, който минава отдясно»). sc-park-narrow, lane curvpark2 round 5, integrator rulings CP2-1bis / CP2-1ter / CP2-1quater"
   },
   "Започваш в ЛЯВАТА лента на булеварда.": {
    "class": "other"
@@ -1031,9 +1041,9 @@
   "Мотористът е далеч напред и лявата лента е чиста.": {
    "class": "other"
   },
-  "Мястото е вдясно.": {
+  "Мястото е вдясно, но завоят напред започва отляво: щом лявата половина е свободна напред, ляв мигач и се изнеси там — от дясната лента дъгата не се побира.": {
    "class": "other",
-   "why": "where the parking place is, not a lane duty"
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the product chassis at full lock — the physics circle ≈ 4.17 m, wound at rest — no forward entry into lot-bay-3 begun with the car wholly in the aisle's right half reaches the bay without contact: 0 clean of 2884 drives, best −0.065 m on vela_h3#1; traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (14.50 m of the car's centre left of the centre line before the turn-in: the second half of the S at the kit's aisle radius 6 m, one blink, and the right signal's 3.0 s lead — park-family-drivable); the yield duty stated (instruction 3 and the shadow's caption: «пропусни всеки, който минава отдясно»). sc-park-perp-forward, lane curvpark2 round 3, integrator ruling CP2-1bis (2026-11-06)"
   },
   "Мястото му е на велоалеята, а където няма — възможно най-вдясно на платното.": {
    "class": "other",
@@ -1314,6 +1324,10 @@
   "Преди левия завой се престрой в лявата лента — първо огледало, после мигач.": {
    "class": "other"
   },
+  "Преди реда се отмести наляво с ляв мигач, по-далеч от предниците на колите — но остани в дясната половина на алеята.": {
+   "class": "duty",
+   "why": "ЗДвП чл. 15 ал. 1 (retrieved: «…се движи възможно най-вдясно по платното за движение…») binds on the lot aisle where it is shown (lot-perp-v1 / lot-narrow-v1, edge lot-e-aisle: service, two-way, one lane each way — districtRoadClass «binds»): past the row the demos keep to the right half on the line x 1.2 — on the product's envelope, the straight line past the row keeps 0.725 m (sc-park-perp-rev) / 0.725 m (sc-park-narrow) from the row, and the set-up drive keeps ≥ 0.474 m (sc-park-perp-rev) / ≥ 0.454 m (sc-park-narrow) in S2's tail swing, its closest approach to the row — inside the floor's own line (x 1.415 (sc-park-perp-rev) / 1.405 (sc-park-narrow)); the left half only for the swing's start (ал. 2). Lane curvpark2 round 5, integrator ruling CP2-1quater"
+  },
   "Предимство „по принцип“ той няма и фарът му не значи нищо особено (моторите карат с включени светлини денем): при завой наляво просто си длъжен да пропуснеш всички насрещни (ЗДвП, чл. 37 и чл. 20).": {
    "class": "other"
   },
@@ -1527,8 +1541,9 @@
   "Свободното място е вдясно, между двете коли.": {
    "class": "other"
   },
-  "Свободното място е вдясно.": {
-   "class": "other"
+  "Свободното място е вдясно, но замахът започва отляво: щом лявата половина е свободна напред, огледай се и се отмести там с ляв мигач.": {
+   "class": "other",
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the 4.6 m programme with the 0.25 m demo floor — the radius and margin integrator ruling CP2-1ter (2026-11-08) sets for this reading — no single reverse swing into lot-bay-3 begun with the car wholly in the aisle's right half parks: the kit refuses it («the swing ends … past the bay»), and every swing on the 4.6 m circle from a right-half line that ends on the bay axis with no straight-in overlaps dret_90#2 by at least 0.203 m on the recorded pose and 0.373 m on the bicycle pose; recorded fact, not the ruled radius: at FULL lock wound at rest (the physics circle ≈ 4.17 m) one right-half entry parks, 0.116 m off dret_90#2 from (0.85, 5.25) — traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (3.19 m of the car's centre left of the centre line before the reverse: only the tail of the second set-up S (the kit's aisle S, radius 6 m, ramps 1.5) from the right-half line x 1.2 past the row onto the setup line, ending at the setup stop — the two-stage minimum 3.18 m over every right-half line the 0.25 m floor allows (to x 1.415); a single S from the lane centre needs 11.79 m — park-family-drivable, integrator ruling CP2-1quater); the yield duty stated (instruction 3 and the shadow's caption at the setup: «пропусни всеки, който минава отдясно»). sc-park-perp-rev, lane curvpark2 round 5, integrator rulings CP2-1bis / CP2-1ter / CP2-1quater"
   },
   "Своевременно — с огледала и мигач заемаш дясната лента доста преди изхода.": {
    "class": "other"
@@ -1708,8 +1723,9 @@
   "Търсеше мястото с поглед вдясно и опря в стената": {
    "class": "other"
   },
-  "Тясното място е вдясно, с коли от двете страни.": {
-   "class": "other"
+  "Тясното място е вдясно, но замахът започва отляво: щом лявата половина е свободна напред, огледай се и се отмести там с ляв мигач.": {
+   "class": "other",
+   "why": "ЗДвП чл. 35 ал. 2 (retrieved): радиусът на завиване > радиуса на завоя (measured: on the 4.6 m programme with the 0.25 m demo floor — the radius and margin integrator ruling CP2-1ter (2026-11-08) sets for this reading — no single reverse swing into the 2.5 m lot-bay-3 begun with the car wholly in the aisle's right half parks: the kit refuses it («the swing ends … past the bay»), and every swing on the 4.6 m circle from a right-half line that ends on the bay axis with no straight-in overlaps dret_90#2 by at least 0.352 m on the recorded pose and 0.521 m on the bicycle pose; recorded fact, not the ruled radius: at FULL lock wound at rest (the physics circle ≈ 4.17 m) one right-half entry parks, 0.003 m off dret_90#2 from (0.85, 5.2) — traces/__tests__/park-family-limit.test.ts); the move left is the turn's start (5.36 m of the car's centre left of the centre line before the reverse: only the tail of the second set-up S (the kit's aisle S, radius 6 m, ramps 1.5) from the right-half line x 1.2 past the row onto the setup line, ending at the setup stop — the two-stage minimum 5.31 m over every right-half line the 0.25 m floor allows (to x 1.405); a single S from the lane centre needs 12.26 m — park-family-drivable, integrator ruling CP2-1quater); the yield duty stated (instruction 3 and the shadow's caption at the setup: «пропусни всеки, който минава отдясно»). sc-park-narrow, lane curvpark2 round 5, integrator rulings CP2-1bis / CP2-1ter / CP2-1quater"
   },
   "Улицата е двупосочна и напълно празна, а колата ти се движи в лявата (насрещната) лента.": {
    "class": "other"
@@ -1908,6 +1924,10 @@
    "catalog | VIOLATIONS.OFF_CARRIAGEWAY.lawRef | any | other: ал. 1's CARRIAGEWAY half — driving ON the платно (OFF_CARRIAGEWAY), not the choice of lane. The catalogue row argues that ал. 2 lifts only the choice of LANE. ROUND 5 searched the bank (content/law/acts, all nine acts) for a provision that itself forbids a car to TRAVEL off the carriageway and found none: § 6, т. 6 designates the тротоар «само за движение на пешеходци» (a definition — and the pavement only, not the shoulder, the verge or an island), чл. 15, ал. 5 opens the банкет to mopeds, bicycles and non-motor vehicles, чл. 15, ал. 7 covers parks, gardens and playgrounds, чл. 94 / чл. 98 are standing and parking, and чл. 58, т. 4 forbids travelling in the emergency lane on a MOTORWAY only. The card's explanation already cites § 6, т. 3, т. 4, т. 6 and чл. 15, ал. 5. So the citation stays, and whether ал. 1's first half survives ал. 2, т. 2 on a town street with two or more lanes one way (the ONLY roads where the reading matters: 213 committed multi-lane town edges) is owed to the founder / a legal reading",
    "consequences | ROAD_CONSEQUENCES.NOT_KEEPING_RIGHT.duties[0].citationBg | billed-only-where-al1-binds | duty:billed-only-where-al1-binds"
   ],
+  "Задача 1: покрай реда остани в дясната половина на алеята.": [
+   "template | sc-park-narrow:instructionsBg[1].textBg | lot-narrow-v1=binds | duty:shown-only-where-al1-binds",
+   "template | sc-park-perp-rev:instructionsBg[1].textBg | lot-perp-v1=binds | duty:shown-only-where-al1-binds"
+  ],
   "Задължението ти е обратното — дръж се ВДЯСНО в лентата си (чл. 15) и остави коридора му максимално широк.": [
    "template | sc-ov-being-overtaken:mistakes[1].whatWentWrongBg | ov-oncoming-v1=binds | duty:shown-only-where-al1-binds"
   ],
@@ -2070,6 +2090,10 @@
   ],
   "Правилото „дръж дясно“ се смекчава в населено място — там чл. 15 ЗДвП позволява на лекия автомобил да ползва най-удобната лента в своята посока, по всяко време на денонощието.": [
    "question | q-manevri-032:explanationBg | none | exemption:UNCONDITIONED | approved, practice SERVES it, scene town"
+  ],
+  "Преди реда се отмести наляво с ляв мигач, по-далеч от предниците на колите — но остани в дясната половина на алеята.": [
+   "caption | sc-park-narrow/shadow-correct@17.75 | lot-narrow-v1=binds | duty:shown-only-where-al1-binds",
+   "caption | sc-park-perp-rev/shadow-correct@18.52 | lot-perp-v1=binds | duty:shown-only-where-al1-binds"
   ],
   "През лявата лента се минава — в нея не се живее": [
    "theory | l-roads-motorway/b-board-left-lane:visual.captionBg | mw-v1=binds | duty:shown-only-where-al1-binds"

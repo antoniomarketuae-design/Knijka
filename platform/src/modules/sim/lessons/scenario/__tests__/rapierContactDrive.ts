@@ -698,6 +698,28 @@ export interface ContactDriveOptions {
     /** Read-only use (the drive may time itself off the staged world, as a rig script does). */
     traffic: TrafficSystem;
   }) => void;
+  /**
+   * catalogue-demo-curvature:dae908c7 (lane curvpark2, round 2) — EXTRA FIXED
+   * BODIES, each mounted as `mountCuboid` mounts a wall: one fixed cuboid at
+   * its district pose, its `userData` written as r3r writes the prop. The
+   * lane mounts a lesson's PARKED CARS with it — the bodies this harness
+   * does not mount on its own (`mountScenarioObstacles`: their colliders are
+   * measured off the GLB at load time) — with the GLB table's half extents
+   * and ScenarioObstacles' own tag (`kind: "vehicle"`,
+   * `npcId: SCENARIO_OBSTACLE_NPC_ID_BASE + i`), friction 0.5, restitution
+   * 0.05. Omitted: nothing extra is mounted; every other drive builds the
+   * world it always did.
+   */
+  extraBodies?: ReadonlyArray<{
+    x: number;
+    y: number;
+    headingDeg: number;
+    half: { x: number; y: number; z: number };
+    centerY: number;
+    friction: number;
+    restitution: number;
+    userData?: unknown;
+  }>;
   presentation?: {
     contact?(c: unknown): void;
     thump?(volume01: number): void;
@@ -794,6 +816,9 @@ export function driveIntoContact(opts: ContactDriveOptions): ContactDriveOutcome
   const core = buildLessonWorldCore(lesson, raw);
   mountWorldColliders(world, core.geometry.colliders);
   const mounted = mountScenarioObstacles(world, lesson, raw);
+  for (const e of opts.extraBodies ?? []) {
+    mountCuboid(world, e.x, e.y, e.headingDeg, e.half, e.centerY, e.friction, e.restitution, e.userData);
+  }
 
   const body = createHeadlessChassis(RAPIER as never, world as never) as unknown as RAPIER.RigidBody;
   const yaw = Math.PI - (opts.start.headingDeg * Math.PI) / 180;

@@ -707,9 +707,10 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   //     never mounts scene bodies, so all three drives are untouched
   //     (`traces/__tests__/sc-pk-driveway-traces.test.ts` stays green);
   //   • the model line — the shadow's reverse arc sweeps its high-y samples at
-  //     LOW x (centre 4.17 at y 47.47) and comes east only as y drops below the
-  //     fence, then rests at x ≈ 10.02 against the back wall's west face at
-  //     10.7. ZERO violations against these very rects is what the trace gate
+  //     LOW x (centre 2.95 at y 47.47 since lane curvpark2 re-authored it on the
+  //     4.6 m circle from the setup (2.4, 51.36), 2026-11-06; 4.17 before) and
+  //     comes east only as y drops below the fence, then rests with its tail at
+  //     x ≈ 10.03 against the back wall's west face at 10.7. ZERO violations against these very rects is what the trace gate
   //     already asserts, so the demonstrated-correct drive cannot be convicted
   //     by the bodies this entry mounts;
   //   • the graded cell at L3–L5 — `sc-pkd-park` accepts a centre within
@@ -717,8 +718,9 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   //     (CHASSIS_HALF_EXTENTS.z), so the eastern tolerance corner reaches
   //     x = 10.52: 0.18 m of daylight against the back wall;
   //   • the approach — the fence's west end stands at x = 7.0 and the ego line
-  //     is the right-lane centre 4.06 (flank 4.91): 2.09 m of clearance at
-  //     15 км/ч, and the pull-past pose (3.87, 51.3) is 4 m north of it.
+  //     past it is x = 2.4 (flank 3.25, since lane curvpark2): 3.75 m of
+  //     clearance at walking pace, and the pull-past pose (2.4, 51.36) is 4 m
+  //     north of it.
   //
   // THE ONE PLACE THE BOX OVERRUNS THE WORLD, stated because it is not free:
   // at L1/L2 `toleranceScale` widens centerTolM to 0.75/0.625, so the eastern

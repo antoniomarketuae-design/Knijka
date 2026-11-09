@@ -81,7 +81,7 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
   tagsBg: ["паркиране", "заден ход", "перпендикулярно", "изпитни упражнения"],
   titleBg: "Перпендикулярно паркиране на заден ход",
   objectiveBg:
-    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около метър и половина странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
+    "Две задачи, в този ред: първо спри в изходната позиция покрай свободното място — подминал го, на около два и половина метра странично; после паркирай на заден ход точно в очертанията, с оглеждане преди и по време на маневрата и с възможно най-малко корекции.",
   // Doc-72 provenance: PK-02 IS this maneuver (перпендикулярно паркиране на
   // заден ход, supermarket-lot geometry, swing-out awareness).
   archetypeIds: ["PK-02"],
@@ -118,12 +118,12 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Задача 1: подмини свободното място и спри — под 6 км/ч, практически в покой — когато задната броня подмине съседната кола; дръж около метър и половина странично разстояние от реда. От тази позиция зависи целият замах.",
+        "Задача 1: покрай реда остани в дясната половина на алеята. Замахът започва от лявата половина — чак накрая, щом е свободна напред, отмести се в нея и спри под 6 км/ч, когато задната броня подмине съседната кола; дръж около два и половина метра странично разстояние от реда.",
     },
     {
       n: 3,
       textBg:
-        "Включи на задна. Огледай се — двете огледала, после през рамо — и чак тогава започни да завиваш докрай към мястото.",
+        "Включи на задна. Огледай се — двете огледала, после през рамо — пропусни всеки, който минава отдясно, и чак тогава започни да завиваш докрай към мястото.",
     },
     {
       n: 4,
@@ -148,8 +148,11 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
       // student performed one act. Now it is what the instruction has always
       // said it was — AT REST at the pull-past pose, on the same geometry its
       // repaired sibling sc-park-narrow uses, pinned to the committed shadow
-      // (traces/scParkPerpRev: the ghost creeps to (0.9, 6.2) and swaps to
-      // reverse there, so ≤ 6 km/h inside 5 m is the demonstrated drive).
+      // (traces/scParkPerpRev). Since lane curvpark2 (2026-11-06) the ghost
+      // arrives at 5.5 km/h over its last 12 m and stops at (−0.5, 6.37) — the
+      // setup the car's own 4.6 m swing needs, 1.45 m from this centre, well
+      // inside radius − 2 — and swaps to reverse there, so ≤ 6 km/h inside 5 m
+      // is the demonstrated drive. The zone itself did not move.
       params: { kind: "reachZone", x: 0.9, y: 6, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
@@ -193,9 +196,13 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
       traceRef: {
         path: "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
       },
-      titleBg: "Твърде широк подход",
+      // RE-CAST by lane curvpark2 (integrator ruling R2, 2026-11-05): on the
+      // car's own 4.6 m circle the WIDE setup is the one that works, so this
+      // demo now shows the too-CLOSE one (a metre off the noses). The trace
+      // file and demo id stay «mistake-wide-approach» (internal, never shown).
+      titleBg: "Твърде близо до реда",
       whatWentWrongBg:
-        "Подходът започна твърде далеч от реда и завоят на заден ход подряза съседната кола — ъгълът на въртене не стигна и задницата навлезе в чуждото място.",
+        "Подходът започна на около метър от реда — твърде близо: колата не успя да се изправи и задният калник закачи съседната кола, покрай която току-що беше минала. Правилно: изходна позиция на около два и половина метра от предниците на колите.",
       codeRefs: ["COLLISION"],
     },
     {
@@ -213,7 +220,11 @@ export const SC_PARK_PERP_REV: ScenarioSpec = {
       "Винаги когато паркираш перпендикулярно — в паркинг на магазин, пред блока или на изпита. На заден ход колата завива по-остро и виждаш по-добре мястото, затова обратното паркиране е и по-безопасно при потегляне после.",
     whyBg:
       "Повечето леки удари в паркингите стават при заден ход без оглеждане или с подценен замах на предницата. Който владее задното паркиране, контролира и мъртвите зони, и габаритите на колата — умение, което спасява ламарини и пешеходци всеки ден.",
-    lawRef: "ЗДвП чл. 40",
+    // ЗДвП чл. 35, ал. 2 (content/law/acts/zdvp.json): the set-up stop left of
+    // the aisle centre line is the reverse turn's start, begun «и от друга част
+    // на платното за движение» — lane curvpark2 rounds 4–5, integrator rulings
+    // CP2-1bis/-ter/-quater (2026-11-08); instruction 2 and 3 teach it and its duty.
+    lawRef: "ЗДвП чл. 40; чл. 35, ал. 2",
     examinerBg:
       "Изпитващият гледа три неща: непрекъснато наблюдение (огледала + рамо, преди и по време на маневрата), контролирана пешеходна скорост и краен резултат в очертанията без излишни корекции. Прекъсни маневрата и пропусни, ако се появи пешеходец или кола.",
   },

@@ -576,58 +576,6 @@
       "quality": "high"
     },
     {
-      "id": "sc-park-parallel__m0",
-      "templateId": "sc-park-parallel",
-      "mistakeIndex": 0,
-      "tracePath": "content/traces/sc-park-parallel/mistake-far-from-lead.trace.json",
-      "src": "/clips/sc-park-parallel__m0.webm",
-      "durationSec": 12,
-      "recordedAt": "2026-07-21T20:23:49.294Z",
-      "titleBg": "Твърде далеч от предната кола",
-      "keyframes": [
-        "/clips/sc-park-parallel__m0.k0.webp",
-        "/clips/sc-park-parallel__m0.k1.webp",
-        "/clips/sc-park-parallel__m0.k2.webp",
-        "/clips/sc-park-parallel__m0.k3.webp",
-        "/clips/sc-park-parallel__m0.k4.webp"
-      ],
-      "actors": [
-        {
-          "kind": "parkedVehicle",
-          "label": "Паркирани автомобили в съседните клетки",
-          "present": true
-        }
-      ],
-      "view": "exterior",
-      "quality": "high"
-    },
-    {
-      "id": "sc-park-perp-rev__m0",
-      "templateId": "sc-park-perp-rev",
-      "mistakeIndex": 0,
-      "tracePath": "content/traces/sc-park-perp-rev/mistake-wide-approach.trace.json",
-      "src": "/clips/sc-park-perp-rev__m0.webm",
-      "durationSec": 12,
-      "recordedAt": "2026-07-21T11:46:25.967Z",
-      "titleBg": "Твърде широк подход",
-      "keyframes": [
-        "/clips/sc-park-perp-rev__m0.k0.webp",
-        "/clips/sc-park-perp-rev__m0.k1.webp",
-        "/clips/sc-park-perp-rev__m0.k2.webp",
-        "/clips/sc-park-perp-rev__m0.k3.webp",
-        "/clips/sc-park-perp-rev__m0.k4.webp"
-      ],
-      "actors": [
-        {
-          "kind": "parkedVehicle",
-          "label": "Паркирани автомобили в съседните клетки",
-          "present": true
-        }
-      ],
-      "view": "exterior",
-      "quality": "high"
-    },
-    {
       "id": "sc-pe-parked-row-scan__m0",
       "templateId": "sc-pe-parked-row-scan",
       "mistakeIndex": 0,

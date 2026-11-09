@@ -97,7 +97,29 @@ export interface ProductBoxSets {
 }
 
 export function productBoxSets(districtRaw: unknown, drillId: ParkDepthDrillId): ProductBoxSets {
-  const pairs = bodyPairs(districtRaw, drillId);
+  const rects: ObstacleRect2D[] = parkDepthObstacles(districtRaw, drillId);
+  const occupied = scenarioBaysOf(districtRaw).filter((b) => b.occupied);
+  const extras = PARK_DEPTH_DRILLS[drillId].extraObstacles ?? [];
+  if (rects.length !== occupied.length + extras.length) {
+    throw new Error(`${drillId}: obstacle list is not bays + extras`);
+  }
+  return lessonBoxSets(districtRaw, drillId, rects);
+}
+
+/**
+ * THE SAME FOUR BOX SETS FOR ANY LESSON (family «curvpark2»): `rects` is the
+ * recorder's obstacle list for that lesson — the district's occupied bays
+ * first, in district order (`lotObstacleRects`), then the lesson's own extra
+ * bodies (the van, the garage wall, the driveway's fence and back wall) — and
+ * `heldSceneryFor(`${lessonId}@L1`)` is the live scene's held scenery. Each
+ * occupied bay is the GLB of `FLEET[assignCivilianModel(i)]` (i = the occupied
+ * index — scene/lessonWorldRecipe.ts `seed: i`); each extra rect must have a
+ * held-scenery twin at its centre, and every hittable held body must be one
+ * of the rects. What it returns for the nine curvdepth drills is
+ * `productBoxSets`'s, unchanged (that function is this one, plus its count check).
+ */
+export function lessonBoxSets(districtRaw: unknown, lessonId: string, rects: readonly ObstacleRect2D[]): ProductBoxSets {
+  const pairs = bodyPairs(districtRaw, lessonId, rects);
   const make = (pick: (g: number, l: number) => number | null): ProductBox[] =>
     pairs.map(({ base, gate, live }) => ({
       ...base,
@@ -118,9 +140,8 @@ interface BodyPair {
   live: { halfWidthM: number; halfLengthM: number };
 }
 
-function bodyPairs(districtRaw: unknown, drillId: ParkDepthDrillId): BodyPair[] {
-  const env = productEnvelopeRaw(districtRaw, drillId);
-  const rects: ObstacleRect2D[] = parkDepthObstacles(districtRaw, drillId);
+function bodyPairs(districtRaw: unknown, lessonId: string, rects: readonly ObstacleRect2D[]): BodyPair[] {
+  const env = productEnvelopeRaw(districtRaw, lessonId, rects);
   return env.map((b) => {
     const r = rects[b.index];
     const { halfWidthM: _w, halfLengthM: _l, liveHalfWidthM, liveHalfLengthM, ...base } = b;
@@ -134,13 +155,15 @@ function bodyPairs(districtRaw: unknown, drillId: ParkDepthDrillId): BodyPair[] 
 
 type RawBox = ProductBox & { liveHalfWidthM: number; liveHalfLengthM: number };
 
-function productEnvelopeRaw(districtRaw: unknown, drillId: ParkDepthDrillId): RawBox[] {
-  const rects: ObstacleRect2D[] = parkDepthObstacles(districtRaw, drillId);
+function productEnvelopeRaw(districtRaw: unknown, drillId: string, rects: readonly ObstacleRect2D[]): RawBox[] {
   const occupied = scenarioBaysOf(districtRaw).filter((b) => b.occupied);
   const held: ScenarioObstacleSpec[] = heldSceneryFor(`${drillId}@L1`, districtRaw);
-  const extras = PARK_DEPTH_DRILLS[drillId].extraObstacles ?? [];
-  if (rects.length !== occupied.length + extras.length) {
-    throw new Error(`${drillId}: obstacle list is not bays + extras`);
+  // The occupied bays lead the list, in district order, as lotObstacleRects arms them.
+  for (let i = 0; i < occupied.length; i++) {
+    const r = rects[i];
+    if (!r || Math.hypot(r.x - occupied[i].x, r.y - occupied[i].y) > 1e-9) {
+      throw new Error(`${drillId}: obstacle ${i} is not occupied bay ${i}`);
+    }
   }
   const out: RawBox[] = rects.map((r, i) => {
     if (i < occupied.length) {

@@ -14,22 +14,43 @@
  *   lead car (bay-4) y ∈ [4.25, 8.75], rear car (bay-2) y ∈ [−8.75, −4.25];
  *   spawn lot-spawn-approach (4.06, −105) heading north.
  *
- * The correct maneuver is the textbook reverse S with a forward finish (the
- * ~45° entry, three reference points): pull up beside the lead car (~0.85 m
- * gap, rear bumpers level — ref 1), reverse straight until the rear axle
- * clears the lead's bumper, full right lock to ~47° (ref 2), counter-steer
- * full left when the nose clears the lead's rear bumper (ref 3), come to
- * rest DEEP in the slot near the rear car, then pull forward to center —
- * the real-world three-point finish. Ending the reverse deep is what keeps
- * the swinging nose 0.75+ m off the lead car's corner (verified by SAT scan
- * over the whole path; a symmetric S that ends ON the center clips the lead
- * by ~0.2 m). Setup rides x ≈ 3.7 — near the drawn lane center, so no lane
- * detector is ever near arming; reverse is exempt by A12 law.
+ * THE MANOEUVRE, AS THE PRODUCT CAR DRIVES IT (catalogue-demo-curvature:
+ * dae908c7, family «curvpark2», 2026-11-06). Until then the reverse S was two
+ * 4 m polyline arcs swung to 47.5° («~45°»): the ghost pivoted at every vertex
+ * (3.25 m over its tightest metre). It is now the parking kit's `kerbPark`
+ * (./parkKit) on the 4.6 m drivable circle: from ориентир 1 — beside the lead
+ * car, rear bumpers level, its flank 0.74 m away on the live collider (0.85 m
+ * on the gate's rect) — the car rolls straight back 0.6 m, swings to ≈ 38°
+ * (ориентир 2: «около 40°», the measured angle rounded to the nearest 5°,
+ * integrator ruling R6), counter-swings to parallel deep in the slot, 0.44 m
+ * off the rear car, and pulls 1.8 m forward to the middle (instruction 6,
+ * «центрирай се»). Every pose keeps ≥ 0.25 m from both cars as the product's
+ * boxes see them — pinned in traces/__tests__/park-family-drivable.test.ts.
+ * The setup rides x = 3.68, beside the drawn lane centre; reverse is exempt
+ * from the lane detectors by A12 law.
  */
 
+import { authoredDrive, DRIVABLE_MIN_CENTRE_RADIUS_M, straight, turn, withRunOut } from "./drivablePath";
+import {
+  aisleSEndY,
+  aisleTo,
+  CREEP_KMH,
+  kerbPark,
+  LOOK_BEFORE_REVERSE,
+  lotObstacleRects,
+  parkedRect,
+  REVERSE_KMH,
+  SETTLE,
+  leftSetUpMove,
+  toSetup,
+  untilContact,
+  D2R,
+  type KerbPark,
+  FEEDER_END_Y,
+  lotApproach,
+} from "./parkKit";
 import type { DriveScript, ObstacleRect2D, RecordedDrive, RecordScriptedDriveOptions } from "./recorder";
 import { recordScriptedDrive } from "./recorder";
-import { lotObstacleRects } from "./scParkPerpRev";
 
 export const SC_PARK_PARALLEL_ID = "sc-park-parallel";
 
@@ -37,48 +58,34 @@ export const SC_PARK_PARALLEL_ID = "sc-park-parallel";
 const X_LANE = 4.0625;
 /** Target bay center (lot-bay-3 of lot-par-v1). */
 const BAY_X = 6.28;
-/** Correct setup: beside the lead car, ~0.85 m lateral gap
- *  (= BAY_X − 2·R_S·(1 − cos ENTRY), rounded — the S lands on the bay line). */
+/** Correct setup (ориентир 1): beside the lead car, rear bumpers level. */
 const X_SETUP = 3.68;
-/** Arc radius of both S halves (car-center path), m — full-lock-ish, the
- *  prototype's realism envelope. */
-const R_S = 4.0;
-/** Max entry angle of the S, degrees (the „~45°" teaching reference). */
-const ENTRY_DEG = 47.5;
-/** Where the S begins (top of the straight-back phase);
- *  ≈ Y_S_END + 2·R_S·sin(ENTRY_DEG). */
-const Y_S_TOP = 4.9;
-/** The reverse ends DEEP in the slot (tangent-south at y ≈ −1, straight
- *  tail to −1.3) — the forward pull to center is the three-point finish. */
-const Y_REV_STOP = -1.3;
 /** Setup stop: rear bumper level with the lead car's rear bumper (4.25). */
 const Y_SETUP = 6.3;
 
-/**
- * The reverse S (car-center path): arc A sweeps 0→ENTRY_DEG around a center
- * east of the start (full right lock in reverse), arc B is its point-mirror
- * (full left), ending tangent-south on the bay line. Returns the polyline
- * WITHOUT the start point.
- */
-function reverseSPoints(startX: number, startY: number): Array<[number, number]> {
-  const cx = startX + R_S;
-  const cy = startY;
-  const out: Array<[number, number]> = [];
-  const steps = 8;
-  for (let k = 1; k <= steps; k++) {
-    const th = ((k / steps) * ENTRY_DEG * Math.PI) / 180;
-    out.push([cx - R_S * Math.cos(th), cy - R_S * Math.sin(th)]);
-  }
-  const [mx, my] = out[out.length - 1]; // the S midpoint
-  const first: Array<[number, number]> = [[startX, startY], ...out.slice(0, steps - 1)];
-  for (let k = steps - 1; k >= 0; k--) {
-    const [px, py] = first[k];
-    out.push([2 * mx - px, 2 * my - py]);
-  }
-  return out;
-}
+/** The kerb park: roll back 0.6 m, ramps of 1 m, at rest parallel deep in the slot, one pull to the middle. */
+const KP_OPTS = { radiusM: DRIVABLE_MIN_CENTRE_RADIUS_M, restY: 0, rampInM: 1.0, rampM: 1.0, shortDeg: 0, s0M: 0.6 };
+const KP: KerbPark = kerbPark(X_SETUP, Y_SETUP, { x: BAY_X, y: 0 }, KP_OPTS);
+/** The far mistake's setup: 2.12 m off the lead car's flank on its live collider (2.23 m on the gate's rect). */
+const X_FAR = 2.3;
 
-/** Approach: spawn → right-lane cruise up the approach road. */
+/** Geometry the drivability pin reads (traces/__tests__/park-family-drivable.test.ts). */
+export const SC_PARK_PARALLEL_GEOMETRY = {
+  radiusM: KP_OPTS.radiusM,
+  setup: { ...KP.setup },
+  swingDeg: KP.swingDeg,
+  rollBackM: KP.s0M,
+  reverseEnd: { ...KP.b.end },
+  pullM: KP.fwd.lengthM,
+  farSetupX: X_FAR,
+} as const;
+
+/**
+ * Approach: spawn → right-lane cruise up the approach road — kept for
+ * sc-park-parallel/mistake-no-observation alone, which is byte-for-byte the
+ * drive it was (never an offender); the re-authored demos use parkKit
+ * `lotApproach`, at the aisle's pace where the aisle begins.
+ */
 const APPROACH: Array<[number, number]> = [
   [X_LANE, -105],
   [X_LANE, -24],
@@ -100,71 +107,52 @@ function pullUpPoints(x: number): Array<[number, number]> {
 // ---------------------------------------------------------------------------
 
 export function scParkParallelShadowScript(): DriveScript {
-  const s = reverseSPoints(X_SETUP, Y_S_TOP);
-  const mid = s[7]; // end of arc A (the ~45° reference pose)
   return {
     steps: [
       { kind: "annotation", textBg: "Влизаме в паркинга: дръж дясната страна и карай спокойно." },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 18 },
+      ...lotApproach({ x: X_LANE, y: FEEDER_END_Y }),
       {
         kind: "annotation",
-        textBg: "Свободното място е вдясно, между двете коли. Намали, огледай се и пусни десен мигач.",
+        textBg: "Свободното място е вдясно, между двете коли. Намали и застани успоредно на предната кола.",
       },
-      { kind: "glance", mirror: "right" },
-      { kind: "indicator", setting: "right" },
-      { kind: "drive", points: pullUpPoints(X_SETUP), targetKmh: 10 },
+      // The 0.38 m onto the setup line is a correction inside the lane, not a
+      // set-up move (less than the car's half width — parkKit `leftSetUpMove`):
+      // no signal for it; the bay's right signal is given at the setup.
+      ...toSetup(aisleTo(X_SETUP, Y_SETUP, { radiusM: 30 }), 9),
       {
         kind: "annotation",
         textBg:
           "Ориентир 1: успоредно на предната кола, на половин до един метър — задна броня срещу задна броня.",
       },
-      { kind: "pause", sec: 1.0, brake: true },
+      { kind: "pause", sec: 1.2, brake: true },
       {
         kind: "annotation",
-        textBg: "Преди задната: двете огледала, после през рамо — и завърти докрай надясно.",
+        textBg: "Сега десен мигач. Преди задната: двете огледала, после през рамо — и завърти докрай надясно.",
       },
-      { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "glance", mirror: "rear" },
-      {
-        // Straight-back until the rear axle clears the lead's bumper, then
-        // the full-right half of the S.
-        kind: "drive",
-        points: [[X_SETUP, Y_SETUP], [X_SETUP, Y_S_TOP], ...s.slice(0, 8)],
-        targetKmh: 4,
-        reverse: true,
-      },
-      // Mid-maneuver observation (instruction 4) — the during-reverse moment.
-      { kind: "glance", mirror: "rear" },
+      { kind: "indicator", setting: "right" },
+      ...LOOK_BEFORE_REVERSE,
+      // The gear goes in after the looks, never on the instant of the last one
+      // (so every look is heard before R on every display — grade-grid ROUND 8).
+      { kind: "pause", sec: 0.4, brake: true },
+      // Straight back 0.6 m, then the first half of the S — wheel right.
+      { kind: "drive", points: withRunOut(KP.a.points), targetKmh: REVERSE_KMH, reverse: true },
       {
         kind: "annotation",
         textBg:
-          "Ориентир 2: под ~45° си. Щом предната броня подмине задната броня на съседа — докрай наляво (ориентир 3).",
+          "Ориентир 2: под около 40° си. Спри и погледни назад. Щом предната броня подмине задната броня на съседа — докрай наляво (ориентир 3).",
       },
-      {
-        // Counter-steer half of the S, ending DEEP in the slot near the rear
-        // car — that depth is what keeps the swinging nose off the lead car.
-        kind: "drive",
-        points: [mid, ...s.slice(8), [BAY_X, Y_REV_STOP]],
-        targetKmh: 4,
-        reverse: true,
-      },
+      { kind: "pause", sec: 1.0, brake: true },
+      // Mid-maneuver observation (instruction 4) — the during-reverse moment.
+      { kind: "glance", mirror: "rear" },
+      // The counter-swing, down to parallel deep in the slot.
+      { kind: "drive", points: withRunOut(KP.b.points), targetKmh: CREEP_KMH, reverse: true },
       { kind: "annotation", textBg: "И леко напред, докато застанеш по средата на мястото." },
-      {
-        // The three-point finish: pull forward to the slot center.
-        kind: "drive",
-        points: [
-          [BAY_X, Y_REV_STOP],
-          [BAY_X, 0],
-        ],
-        targetKmh: 3,
-      },
+      { kind: "pause", sec: 1.0, brake: true },
+      { kind: "drive", points: withRunOut(KP.fwd.points), targetKmh: CREEP_KMH },
       // The final check before the definitive stop (rubric moment 3).
-      { kind: "glance", mirror: "left" },
-      { kind: "glance", mirror: "right" },
-      { kind: "pause", sec: 2.2, brake: true },
-      { kind: "indicator", setting: "off" },
+      ...SETTLE,
       { kind: "annotation", textBg: "Готово: успоредно на линиите, центрирано, колата е в покой." },
     ],
   };
@@ -174,55 +162,59 @@ export function scParkParallelShadowScript(): DriveScript {
 // Mistake demo 1 — „Твърде далеч от предната кола" (slot geometry collapses)
 // ---------------------------------------------------------------------------
 
+/**
+ * The same S as the correct demo — the same roll back, the same 4.6 m swings
+ * to the same angle — begun 2.2 m off the lead car instead of 0.74 m. It ends
+ * parallel, but 1.4 m short of the kerb line; the driver then tries to get
+ * there backwards, wheel right again (the doomed correction), and the tail
+ * swings into the rear car — cut where that contact has happened (parkKit
+ * `untilContact`, on the smaller of the gate's rect and the live collider).
+ */
 export function scParkParallelMistakeFarScript(): DriveScript {
-  const xFar = 2.3; // ~2.2 m off the lead car — the broken setup
-  const s = reverseSPoints(xFar, Y_S_TOP);
-  const mid = s[7];
-  const sEnd = s[s.length - 1]; // ≈ (4.90, −1.0) — a car-width short of the curb
+  const k = 1 / KP_OPTS.radiusM;
+  const sameS = authoredDrive(
+    { x: X_FAR, y: Y_SETUP, headingDeg: 0 },
+    [
+      straight(KP.s0M),
+      ...turn(KP.swingDeg * D2R, k, KP_OPTS.rampInM, KP_OPTS.rampM),
+      ...turn(KP.swingDeg * D2R, -k, KP_OPTS.rampM, KP_OPTS.rampM),
+    ],
+    -1,
+  );
+  const correction = authoredDrive(sameS.end, [...turn(30 * D2R, k, 1.0, 1.0), straight(3)], -1);
+  const REAR_CAR = parkedRect(BAY_X, -6.5, 0);
   return {
     steps: [
       {
         kind: "annotation",
-        textBg: "Грешен подход: колата спира на близо два метра от предната кола.",
+        textBg: "Грешен подход: колата спира на повече от два метра от предната кола.",
       },
       { kind: "glance", mirror: "rear" },
-      { kind: "drive", points: APPROACH, targetKmh: 18 },
+      ...lotApproach({ x: X_LANE, y: FEEDER_END_Y }),
+      ...leftSetUpMove(aisleTo(X_FAR, Y_SETUP), 9, aisleSEndY(X_FAR)),
+      { kind: "pause", sec: 1.2, brake: true },
       { kind: "glance", mirror: "right" },
       { kind: "indicator", setting: "right" },
-      { kind: "drive", points: pullUpPoints(xFar), targetKmh: 10 },
-      { kind: "pause", sec: 1.0, brake: true },
       {
         kind: "annotation",
         textBg: "От толкова далеч същите завъртания не стигат до реда…",
       },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "rear" },
+      { kind: "pause", sec: 0.4, brake: true },
+      { kind: "drive", points: withRunOut(sameS.points), targetKmh: REVERSE_KMH, reverse: true },
+      { kind: "pause", sec: 1.0, brake: true },
       {
         kind: "drive",
-        points: [[xFar, Y_SETUP], [xFar, Y_S_TOP], ...s.slice(0, 8)],
-        targetKmh: 4,
-        reverse: true,
-      },
-      {
-        kind: "drive",
-        points: [mid, ...s.slice(8)],
-        targetKmh: 4,
-        reverse: true,
-      },
-      {
-        // The doomed correction: still angled, still short of the curb, the
-        // driver keeps backing toward the slot — the tail runs into the rear
-        // car at creep speed (the geometric COLLISION gate).
-        kind: "drive",
-        points: [sEnd, [5.5, -2.6], [6.1, -4.4]],
-        targetKmh: 2.5,
+        points: untilContact(correction.points, -1, REAR_CAR, "vela_h3"),
+        targetKmh: CREEP_KMH,
         reverse: true,
       },
       { kind: "pause", sec: 1.5, brake: true },
       {
         kind: "annotation",
         textBg:
-          "Задницата удари задната кола. Правилно: започни на около половин метър от съседа — геометрията на маневрата зависи от изходната позиция.",
+          "Задницата удари задната кола. Правилно: започни на половин до един метър от съседа — геометрията на маневрата зависи от изходната позиция.",
       },
     ],
   };

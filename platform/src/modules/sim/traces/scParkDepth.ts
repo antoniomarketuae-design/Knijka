@@ -75,48 +75,57 @@
  * traces/__tests__/sc-park-depth-traces.test.ts (RECORD_TRACES=1 re-records).
  */
 
-import { obbSeparationM, type Obb2D } from "../collision";
-import { CHASSIS_HALF_EXTENTS } from "../vehicle";
 import {
   authoredDrive,
-  DRIVABLE_MIN_CENTRE_RADIUS_M,
   sShift,
   straight,
   swingForShift,
   turn,
   withRunOut,
   type AuthoredPath,
-  type CurvatureStretch,
   type PathPose,
 } from "./drivablePath";
+import {
+  aisleTo,
+  bayReverse,
+  CREEP_KMH,
+  D2R,
+  echelonReverse,
+  FEEDER_END_Y,
+  firstMetres,
+  GATE_Y,
+  kerbPark,
+  LOOK_BEFORE_REVERSE,
+  lotObstacleRects,
+  parkedRect,
+  R_MIN,
+  REVERSE_KMH,
+  SETTLE,
+  SETUP_KMH,
+  SETUP_SLOW_M,
+  toSetup,
+  untilContact,
+  X_LANE,
+  type Pts,
+} from "./parkKit";
 import type {
   DriveScript,
-  DriveStep,
   ObstacleRect2D,
   RecordedDrive,
   RecordScriptedDriveOptions,
 } from "./recorder";
 import { recordScriptedDrive } from "./recorder";
-import {
-  lotObstacleRects,
-  PARKED_CAR_HALF_LENGTH_M,
-  PARKED_CAR_HALF_WIDTH_M,
-} from "./scParkPerpRev";
+
+// The parking kit moved to ./parkKit (a leaf module — see its header); the two
+// names this module exported from it are exported from here as before.
+export { PARK_DEPTH_LIVE_HALF, type ParkDepthContactModel } from "./parkKit";
 
 // ---------------------------------------------------------------------------
 // Shared geometry kit
 // ---------------------------------------------------------------------------
 
-/** Northbound drawn curb-lane centre on every lot road (2 × 3.25 m × 2.5 / 2). */
-const X_LANE = 4.0625;
-/** Where the feeder leg hands over to the aisle leg (and 18 km/h to 9). */
-const FEEDER_END_Y = -24;
-/** The gate: north of it the road is the unpainted `service` aisle. */
-const GATE_Y = -18;
-
-type Pts = Array<[number, number]>;
-const D2R = Math.PI / 180;
-const R_MIN = DRIVABLE_MIN_CENTRE_RADIUS_M;
+// The lot road, the aisle and the kit itself: ./parkKit (X_LANE, FEEDER_END_Y,
+// GATE_Y, aisleTo, bayReverse, echelonReverse, kerbPark, untilContact, toSetup, …).
 
 /** Approach polyline: the spawn pose up the feeder to the aisle mouth. */
 function approach(spawnY: number): Pts {
@@ -143,336 +152,6 @@ function easeTo(x: number, endY: number): Pts {
   ];
 }
 
-/**
- * The aisle leg: from the feeder's end, straight to the gate, ONE ramped S
- * onto the manoeuvring line `x`, then straight north to `y`. The whole lateral
- * move is north of the gate. `radiusM` is the S's tightest radius: 6 m where
- * the row stands across the drawn lane and the car has to be off it before
- * the first parked nose (≈ 9 m past the gate), gentler where it only has to
- * give the row a little more room.
- */
-function aisleTo(
-  x: number,
-  y: number,
-  o: { radiusM?: number; rampM?: number; shiftFromY?: number } = {},
-): AuthoredPath {
-  const shift = x - X_LANE;
-  const fromY = o.shiftFromY ?? GATE_Y;
-  const prog: CurvatureStretch[] = [straight(fromY - FEEDER_END_Y)];
-  let sLenM = 0;
-  if (Math.abs(shift) > 1e-9) {
-    const k = Math.sign(shift) / (o.radiusM ?? 6);
-    const rampM = o.rampM ?? 1.5;
-    const s = sShift(swingForShift(shift, k, rampM), k, rampM);
-    sLenM = authoredDrive({ x: 0, y: 0, headingDeg: 0 }, s, 1).end.y;
-    prog.push(...s);
-  }
-  const restM = y - (fromY + sLenM);
-  if (restM < 0) throw new Error(`aisleTo(${x}, ${y}): the S needs ${sLenM.toFixed(2)} m, past the stop`);
-  prog.push(straight(restM));
-  const path = authoredDrive({ x: X_LANE, y: FEEDER_END_Y, headingDeg: 0 }, prog, 1);
-  // The S returns the heading to north by symmetry; say so exactly, so the leg
-  // that starts where this one stops starts square.
-  return { ...path, end: { x, y, headingDeg: 0 } };
-}
-
-/** The first `lenM` metres of a path (a mistake demo that never finishes it). */
-function firstMetres(path: AuthoredPath, lenM: number): Pts {
-  const out: Pts = [path.points[0]];
-  let acc = 0;
-  for (let i = 1; i < path.points.length && acc < lenM; i++) {
-    acc += Math.hypot(path.points[i][0] - path.points[i - 1][0], path.points[i][1] - path.points[i - 1][1]);
-    out.push(path.points[i]);
-  }
-  return out;
-}
-
-/** The headless footprint of the car parked in a bay at (x, y) on `headingDeg`. */
-function parkedRect(x: number, y: number, headingDeg: number): Obb2D {
-  return {
-    x,
-    y,
-    headingDeg,
-    halfWidthM: PARKED_CAR_HALF_WIDTH_M,
-    halfLengthM: PARKED_CAR_HALF_LENGTH_M,
-  };
-}
-
-/**
- * What the LIVE scene stands in a bay, m (half across, half along): the
- * collider ScenarioObstacles mounts is a cuboid sized off the model's own GLB
- * (`vehicleColliderDims(rig.halfWidth, rig.halfLength, …)`), not the uniform
- * 0.9 × 2.25 m rect the recorder's gate arms. By value, for the models these
- * demos run into; traces/__tests__/sc-park-depth-drivable.test.ts pins every
- * entry against the GLB table (parkDepthProduct GLB_HALF) and every demo's
- * named model against the one the lesson world actually parks there.
- */
-export const PARK_DEPTH_LIVE_HALF = {
-  vela_h3: { across: 1.05, along: 2.16 },
-  pino: { across: 0.9901, along: 1.84 },
-  dret_90: { across: 1.01, along: 2.255 },
-  arden_x: { across: 1.0701, along: 2.24 },
-  kargo_v: { across: 1.15, along: 2.705 },
-} as const;
-export type ParkDepthContactModel = keyof typeof PARK_DEPTH_LIVE_HALF | "wall";
-
-/**
- * The body a contact demo is CUT against: the per-axis SMALLER of the gate's
- * rect and the live collider (round 2, D1). Both are centred on the bay and
- * share its heading, so that box is exactly the part of the car the two agree
- * on — a footprint inside it is a contact the live scene reports AND the
- * headless gate grades. Cutting against either one alone left three demos
- * resting a centimetre to 0.31 m short of the car the explanation says they
- * hit (a pino is 0.41 m shorter than the gate's rect; a vela_h3 0.09 m).
- */
-function contactBody(rect: Obb2D, model: ParkDepthContactModel): Obb2D {
-  if (model === "wall") return rect; // the held slab and the gate's rect are one size
-  const live = PARK_DEPTH_LIVE_HALF[model];
-  return {
-    ...rect,
-    halfWidthM: Math.min(rect.halfWidthM, live.across),
-    halfLengthM: Math.min(rect.halfLengthM, live.along),
-  };
-}
-
-/** How far into the contact body a demo comes to rest, m («a bumper's give»). */
-const CONTACT_DEPTH_M = 0.12;
-
-/**
- * A path cut where the mistake it demonstrates has HAPPENED: at the first
- * vertex where the car's footprint (headed along the path, as the recorder
- * poses it) is `CONTACT_DEPTH_M` inside `contactBody(rect, model)` — with the
- * recorder's 5 cm run-out, so the car comes to rest ON that vertex and not
- * 5 cm short of it. The recorder brakes into the end of a stopping step, so
- * the ghost comes to rest against the car it touched instead of driving on
- * through it — which is what four of the old demos did, billing a second,
- * third and fourth car nobody's explanation mentioned.
- */
-function untilContact(pts: Pts, dir: 1 | -1, rect: Obb2D, model: ParkDepthContactModel): Pts {
-  const body = contactBody(rect, model);
-  for (let i = 1; i < pts.length; i++) {
-    const [ax, ay] = pts[i - 1];
-    const [bx, by] = pts[i];
-    let headingDeg = (Math.atan2(bx - ax, by - ay) * 180) / Math.PI;
-    if (dir < 0) headingDeg += 180;
-    const sep = obbSeparationM(
-      { x: bx, y: by, headingDeg, halfWidthM: CHASSIS_HALF_EXTENTS.x, halfLengthM: CHASSIS_HALF_EXTENTS.z },
-      body,
-    );
-    if (sep <= -CONTACT_DEPTH_M) return withRunOut(pts.slice(0, i + 1));
-  }
-  throw new Error("untilContact: the path never reaches the body it is meant to touch");
-}
-
-// --- The 90° reverse into a perpendicular bay ------------------------------
-
-interface BayReverse {
-  /** Where the car stops before the manoeuvre, nose north. */
-  setup: PathPose;
-  /** Setup → the look half-way round the swing (the wheel still held). */
-  a: AuthoredPath;
-  /** The rest of the swing, the wheel coming straight, and in to the bay line. */
-  b: AuthoredPath;
-}
-
-/**
- * Reverse through 90° into the bay at (`bay.x`, `bay.y`) from the line x = `x0`:
- * straight back `s0M`, the wheel wound on over `rampInM`, held, unwound over
- * `rampOutM`, then straight in along the bay's axis. The setup's y is DERIVED —
- * it is wherever the swing has to begin for the car to arrive on the axis.
- * `side` +1 = bays on the east, −1 = on the west (the mirror).
- */
-function bayReverse(
-  side: 1 | -1,
-  x0: number,
-  bay: { x: number; y: number },
-  o: { radiusM: number; s0M: number; rampInM: number; rampOutM: number },
-): BayReverse {
-  const k = side / o.radiusM;
-  const [rampIn, hold, rampOut] = turn(Math.PI / 2, k, o.rampInM, o.rampOutM);
-  const progA: CurvatureStretch[] = [straight(o.s0M), rampIn, { ...hold, lenM: hold.lenM / 2 }];
-  const progB: CurvatureStretch[] = [{ ...hold, lenM: hold.lenM / 2 }, rampOut];
-  const d = authoredDrive({ x: 0, y: 0, headingDeg: 0 }, [...progA, ...progB], -1).end;
-  const inM = side * (bay.x - (x0 + d.x));
-  if (inM < 0.02) throw new Error(`bayReverse from x=${x0}: the swing ends ${(-inM).toFixed(2)} m past the bay`);
-  const setup: PathPose = { x: x0, y: bay.y - d.y, headingDeg: 0 };
-  const a = authoredDrive(setup, progA, -1);
-  const b = authoredDrive(a.end, [...progB, straight(inM)], -1);
-  return { setup, a, b };
-}
-
-// --- The 45° reverse into an echelon bay -----------------------------------
-
-/**
- * Reverse through 45° onto the axis of a 135° echelon bay and straight in to
- * its centre: the car ends facing back up the aisle at 315°, which is the whole
- * point of reverse-angle parking — you leave nose-first, looking where you go.
- * `a` is the swing (ending with the wheel straight, on the axis), `b` the
- * straight run in.
- */
-function echelonReverse(
-  bay: { x: number; y: number },
-  o: { radiusM: number; s0M: number; rampInM: number; rampOutM: number; inM: number },
-): BayReverse {
-  const progA: CurvatureStretch[] = [
-    straight(o.s0M),
-    ...turn(Math.PI / 4, 1 / o.radiusM, o.rampInM, o.rampOutM),
-  ];
-  const d = authoredDrive({ x: 0, y: 0, headingDeg: 0 }, [...progA, straight(o.inM)], -1).end;
-  const setup: PathPose = { x: bay.x - d.x, y: bay.y - d.y, headingDeg: 0 };
-  const a = authoredDrive(setup, progA, -1);
-  const b = authoredDrive(a.end, [straight(o.inM)], -1);
-  return { setup, a, b };
-}
-
-// --- The reverse S of a kerb-side parallel park ----------------------------
-
-interface KerbPark {
-  setup: PathPose;
-  /** Straight back, then the first swing (wheel right) — ends with the wheel
-   *  straight, the car at `swingDeg` to the kerb: reference point 2. */
-  a: AuthoredPath;
-  /** The counter-swing (wheel left) down to the bottom of the slot. */
-  b: AuthoredPath;
-  /** The pull forward — the one correction — parallel to the kerb at its end. */
-  fwd: AuthoredPath;
-  /** The angle to the kerb at reference point 2, degrees. */
-  swingDeg: number;
-  /** How far the car rolls straight back before the wheel goes over, m. */
-  s0M: number;
-}
-
-/**
- * The parallel park, solved backwards from where it has to END.
- *
- * The car must come to rest at (`bay.x`, `restY`), parallel, in TWO moves:
- * the reverse, and one forward pull. With `shortDeg` = 0 the reverse S itself
- * ends parallel and the forward pull is straight. In a slot too short for that
- * (see the file header) the S stops `shortDeg` short of parallel and the
- * forward pull is the one correction: the wheel to the right, then straight.
- *
- * HOW SHORT, AND WHY THE STRAIGHT. The ghost is headed along its path, but a
- * real car's body FOLLOWS its centre's path, about a rear-axle offset (1.28 m)
- * behind it: a pull that turns 12° in 1.4 m leaves the body 7° short of
- * parallel when the ghost is square. So the S stops only 6–7.5° short and the
- * pull carries 0.6–1.0 m of straight after its turn — enough for a car that
- * starts square and steers within its lock to rest within 4° of the ghost
- * (the drivability pin's «car that starts square» is that car). Round 1 got
- * there with a third move instead (a long pull past the middle, then a roll
- * straight back), which was a second correction.
- *
- * Two closures, both exact:
- *  - sideways: the first swing's angle is solved (bisection — the sideways
- *    travel of the S is strictly increasing in it) so that from the setup line
- *    x = `xs` the car arrives on the forward pull's start;
- *  - lengthways: the car STOPS at `setupY` — the reference point the briefing
- *    teaches — and the one free length takes up the rest: the straight roll
- *    back `s0M` when the forward pull is a turn, the forward pull itself when
- *    it is straight (`s0M` is then given).
- */
-function kerbPark(
-  xs: number,
-  setupY: number,
-  bay: { x: number; y: number },
-  o: {
-    radiusM: number;
-    restY: number;
-    /** Ramp onto the first swing / through the middle and off the second, m. */
-    rampInM: number;
-    rampM: number;
-    shortDeg: number;
-    /** Forward pull when `shortDeg` > 0: ramp of its turn, the straight after it. */
-    fwdRampM?: number;
-    fwdStraightM?: number;
-    /** Roll straight back before the swing, when `shortDeg` = 0. */
-    s0M?: number;
-  },
-): KerbPark {
-  const k = 1 / o.radiusM;
-  const short = o.shortDeg * D2R;
-  const fwdTurn: CurvatureStretch[] =
-    short > 0
-      ? [...turn(short, k, o.fwdRampM ?? 0.4, o.fwdRampM ?? 0.4), straight(o.fwdStraightM ?? 0.05)]
-      : [];
-  const dF = authoredDrive({ x: 0, y: 0, headingDeg: -o.shortDeg }, fwdTurn, 1).end;
-  const fwdStartX = bay.x - dF.x;
-  const first = (swing: number) => turn(swing, k, o.rampInM, o.rampM);
-  const second = (swing: number) => turn(swing - short, -k, o.rampM, o.rampM);
-  const sideways = (swing: number) =>
-    authoredDrive({ x: 0, y: 0, headingDeg: 0 }, [...first(swing), ...second(swing)], -1).end.x;
-  let lo = Math.max((k * (o.rampInM + o.rampM)) / 2, short + k * o.rampM) + 1e-9;
-  let hi = Math.PI / 2;
-  if (sideways(lo) > fwdStartX - xs) throw new Error("kerbPark: the ramps alone carry the car past the bay line");
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2;
-    if (sideways(mid) < fwdStartX - xs) lo = mid;
-    else hi = mid;
-  }
-  const swing = (lo + hi) / 2;
-  const dS = authoredDrive({ x: 0, y: 0, headingDeg: 0 }, [...first(swing), ...second(swing)], -1).end;
-  let s0M: number;
-  let fwdProg: CurvatureStretch[];
-  if (short > 0) {
-    // The forward pull is fixed; the roll back takes up the length.
-    s0M = setupY - (o.restY - dF.y - dS.y);
-    fwdProg = fwdTurn;
-  } else {
-    s0M = o.s0M ?? 1.5;
-    fwdProg = [straight(o.restY - (setupY - s0M + dS.y))];
-  }
-  if (s0M < 0.2) throw new Error(`kerbPark: only ${s0M.toFixed(2)} m to roll back before the swing`);
-  if (fwdProg[fwdProg.length - 1].lenM < 0.02) throw new Error("kerbPark: no forward pull left");
-  const setup: PathPose = { x: xs, y: setupY, headingDeg: 0 };
-  const a = authoredDrive(setup, [straight(s0M), ...first(swing)], -1);
-  const b = authoredDrive(a.end, second(swing), -1);
-  const fwd = authoredDrive(b.end, fwdProg, 1);
-  return { setup, a, b, fwd, swingDeg: swing / D2R, s0M };
-}
-
-/** The three glances every reverse manoeuvre owes before the gear goes in. */
-const LOOK_BEFORE_REVERSE: DriveStep[] = [
-  { kind: "glance", mirror: "left" },
-  { kind: "glance", mirror: "right" },
-  { kind: "glance", mirror: "rear" },
-];
-
-/** The settle-and-hold that completes a parkInBay contract (holdSec 1.5). */
-const SETTLE: DriveStep[] = [
-  { kind: "glance", mirror: "left" },
-  { kind: "glance", mirror: "right" },
-  { kind: "pause", sec: 2.2, brake: true },
-  { kind: "indicator", setting: "off" },
-];
-
-/** The pace the car arrives at a setup stop with, km/h. */
-const SETUP_KMH = 5.5;
-/** …and how far short of the stop it is already down to it, m. */
-const SETUP_SLOW_M = 12;
-
-/**
- * The aisle leg to a setup stop, as two drive steps: the aisle's own pace, then
- * SETUP_KMH over the last twelve metres.
- *
- * WHY. Every Задача 1 here is a halt gate capped at 6 km/h on a 5 m disc (7.5 m
- * on L1), and the lesson coaches a car that ENTERS that disc above the cap:
- * «Стигна точката, но твърде бързо … стигна дотук с 9 км/ч». The old demos all
- * drove into it at 8–9 km/h and braked on the mark, so the drive shown as
- * correct drew that card at every rung. A demo of a halt arrives slowly.
- */
-function toSetup(path: AuthoredPath, aisleKmh: number): DriveStep[] {
-  const slowFromY = path.end.y - SETUP_SLOW_M;
-  const i = path.points.findIndex(([, y]) => y >= slowFromY);
-  if (i <= 0) return [{ kind: "drive", points: withRunOut(path.points), targetKmh: SETUP_KMH }];
-  return [
-    { kind: "drive", points: path.points.slice(0, i + 1), targetKmh: aisleKmh },
-    { kind: "drive", points: withRunOut(path.points.slice(i)), targetKmh: SETUP_KMH },
-  ];
-}
-
-/** Reversing pace, km/h — пешеходна скорост. */
-const REVERSE_KMH = 3.5;
-/** The last metre in a bay, and every forward pull inside a slot. */
-const CREEP_KMH = 2.5;
 
 // ---------------------------------------------------------------------------
 // Extra obstacle bodies (the two drills whose neighbour is not a parked car)

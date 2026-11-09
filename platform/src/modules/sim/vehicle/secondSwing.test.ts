@@ -451,10 +451,26 @@ describe("routing: the line reaches the student, and the sim is what raises it",
     );
     expect(STYLES_SRC).toContain('[data-hud="wind-swing-cue"] > div {');
     // …and it stands down behind the overlay column and the touch hint, the
-    // rank the other two chips in this lane already keep.
+    // rank the other two chips in this lane already keep — EXCEPT where the
+    // column's row YIELDS to it. AMENDED 2026-11-09 (sc-ac-crosswind:a9db1738
+    // clause 4, integrator rulings W3Z-2 (3) and R-SC1 (A)): this pin used to
+    // assert the bare `[data-sim-overlay-active="on"]` hide, i.e. the exact
+    // rule that kept the cue `display: none` for its whole life on both rig-w3z
+    // phone drives behind the task standby — the defect W3Z-2 (3) ruled on this
+    // row. The stand-down intent is kept: louder rows, blocking and sheet-only
+    // items, the read sheet and the touch hint still hold it
+    // (`lesson-ui/__tests__/swingCueYield.test.tsx` evaluates every state).
     expect(STYLES_SRC).toContain(
-      '[data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="wind-swing-cue"] {',
+      '[data-sim-compact="on"][data-sim-overlay-active="on"]:not([data-sim-overlay-yields="on"]) [data-hud="wind-swing-cue"] {',
     );
+    // …and the bare head is gone as a rule of its own (the landscape car-sheet
+    // re-hide contains the same text after an `html[…]` prefix, so this reads
+    // line starts, not substrings).
+    expect(
+      /^\s*\[data-sim-compact="on"\]\[data-sim-overlay-active="on"\] \[data-hud="wind-swing-cue"\][ ,{]/m.test(
+        STYLES_SRC,
+      ),
+    ).toBe(false);
     expect(STYLES_SRC).toContain(
       '[data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="wind-swing-cue"] {',
     );

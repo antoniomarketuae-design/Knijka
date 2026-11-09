@@ -217,7 +217,7 @@ describe("FR-B5-JAM — a car pinned against what it hit is not left there", () 
 // the ОСЕВА, because `runtime/locator.ts` clamps the lateral distance before
 // computing the offset (locator.ts:278, :297) so the largest magnitude it can
 // emit is LANE_WIDTH_M / 2 = 4.0625 against a bar of 3.25. That is the straddle
-// test, not carriageway membership, and `templates-parking.ts:626-632` records
+// test, not carriageway membership, and `templates-parking.ts:641-647` records
 // that `lot-spawn-approach` reads laneOffsetM 4.06 with „Thirty-one shipped
 // scenarios" starting there. The engine.ts block carries the full derivation.
 //
@@ -237,7 +237,7 @@ describe("FR-B5-JAM — a car pinned against what it hit is not left there", () 
  * A car on the centreline of a two-way street reads exactly this — it is
  * `LANE_WIDTH_M / 2 = 3.25 × PERCEPTUAL_ROAD_SCALE / 2`, the largest magnitude
  * `runtime/locator.ts` can emit, and the pose 31 shipped scenarios spawn at
- * (`lot-spawn-approach`, templates-parking.ts:626-632). It is ALSO what a car
+ * (`lot-spawn-approach`, templates-parking.ts:641-647). It is ALSO what a car
  * shoved into a building reads, which is the whole point of the last test.
  */
 const CENTRELINE_OFFSET_M = 4.0625;
@@ -388,7 +388,7 @@ describe("the crash pin's fold — the defects its own spec had filed", () => {
     // `laneKeepMaxOffsetM` = 1.3 × 2.5 = 3.25 the truthy band is 0.8125 m wide
     // and it contains the middle of the road; `rules/engine.ts:1748` calls the
     // identical expression `offCentre` and grades POOR_LANE_KEEPING off it.
-    // `templates-parking.ts:626-632`: `lot-spawn-approach` reads 4.06 there and
+    // `templates-parking.ts:641-647`: `lot-spawn-approach` reads 4.06 there and
     // „Thirty-one shipped scenarios do that".
     // MUTATION: add `&& Math.abs(tick.laneOffsetM) <= prev.rules.config
     // .laneKeepMaxOffsetM` to the freeze — the prescription's own spelling — and
