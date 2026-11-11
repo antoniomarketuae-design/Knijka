@@ -61,6 +61,7 @@ import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
 import {
   createTurnRoadPort,
   JUNCTION_AREA_RADIUS_M,
+  TURN_REARM_DEG,
   TurnDetector,
   type TurnRoadSample,
 } from "./turns";
@@ -892,6 +893,32 @@ export const ROUNDABOUT_FORCED_SHED_MPS = 0.3;
  * BASE commits are untouched (a base commit with the same hole is recorded as
  * the candidate «guardbrakedcut», not changed here); LEFT_TURN_GAP_MEMORY_SEC,
  * YIELD_CONVICT_SUSTAIN_SEC and LEFT_TURN_MIN_CLOSING_MPS are unchanged (R7b).
+ *
+ * THE LATE READ (lane slowturn2, integrator rulings ST-LATE, ST-LATE-READ,
+ * ST-LATE-END, ST-RESPAWN-SCOPE and ST-CHAIN, 2026-11-09;
+ * sc-turn-left-oncoming:1613ef2c). (3) used to be read on the commit tick
+ * only, so the braking a car's OWN account took for him AFTER an added commit,
+ * while his body still lay on its route ahead of it, billed nothing (rig w4b
+ * S12: car 1001 shed 0.61 / 2.33 m/s for him after the commit at L1 / L3, and
+ * both drives passed with «0 наказателни точки»). Now an ADDED-path left commit
+ * that is not adjudicated on its own tick opens a window on the vehicles that
+ * meet (1), (2) and (4) ON THE COMMIT TICK with his body on their route ahead
+ * then (the commit-tick reading — the set is frozen at the act). On each later
+ * graded grid point of the visit, while the visit is not yet adjudicated, the
+ * FIRST candidate whose in-way account (this line, read with `>=`; growth
+ * before the commit included) reaches the line is billed — the same
+ * prioritySituation as at the commit, once — and every window closes. A
+ * candidate's window closes when its route no longer arrives at the node or his
+ * body leaves its route (which also covers «it passed him»: its route starts at
+ * its own position); EVERY window closes on the visit reset, a respawn
+ * (`noteRespawn`), any later turnStarted in the visit, an adjudication by any
+ * path, and when his TURN IS COMPLETE (ST-LATE-END (d)): the first grid point on
+ * which his lane fix lies on an edge at the visit's node other than the edge he
+ * approached it by, with his heading within TURN_REARM_DEG of that edge's
+ * tangent at his arclength in its sense away from the node — so a right-turner
+ * that only follows him down his exit arm after the turn is never billed. A
+ * window once closed never re-opens. No clock and no new number (ADR-014): the
+ * grid point's own lane fix, the accounts and routes as they stand at it.
  */
 export const LEFT_TURN_FORCED_SHED_MPS = ROUNDABOUT_FORCED_SHED_MPS;
 /**
@@ -1311,17 +1338,32 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    *  then carries `follower: null` and nothing can be billed from it. */
   setSameDirVehiclesQuery(fn: SameDirVehiclesQuery | null): void;
   /** Install the traffic module's every-vehicle ACCOUNT lookup
-   *  (`traffic.playerShedAccounts`) for the reverse-warning measurement,
-   *  `SimTick.reverseBrakedFor` (lane rbreverse; display-only — no rule reads
-   *  it). Default: none — the field is then ABSENT from every tick («cannot
-   *  answer»), never null. */
+   *  (`traffic.playerShedAccounts`). It feeds TWO readers: the reverse-warning
+   *  measurement `SimTick.reverseBrakedFor` (lane rbreverse; that field is
+   *  display-only — no rule reads it), and the N1 tracker's forced-braking
+   *  evidence at an ADDED-path left commit and its late read (ruling R13''',
+   *  lanes slowturn and slowturn2 — runtime/leftTurnGiveWay.ts), which IS
+   *  graded. Default: none — `reverseBrakedFor` is then ABSENT from every tick
+   *  («cannot answer»), never null, and no vehicle is R13''' evidence. */
   setPlayerShedAccountsQuery(fn: PlayerShedAccountsQuery | null): void;
   /** Install the traffic module's planned-route lookup
    *  (`traffic.plannedRouteThrough`) for the N1 tracker's forced-braking
-   *  evidence at an ADDED-path left commit (lane slowturn, ruling R13''' —
-   *  runtime/leftTurnGiveWay.ts). Default: none — no vehicle is then that
-   *  evidence (the tight-gap conviction is unchanged). */
+   *  evidence at an ADDED-path left commit and its late read (lanes slowturn
+   *  and slowturn2, ruling R13''' — runtime/leftTurnGiveWay.ts). R13''' needs
+   *  BOTH this and the account lookup (`setPlayerShedAccountsQuery`): with
+   *  either missing no vehicle is that evidence and no late window opens (the
+   *  tight-gap conviction is unchanged). */
   setPlannedRouteQuery(fn: PlannedRouteQuery | null): void;
+  /**
+   * The student RESPAWNED (LessonScene `resetCar`: key R / «Рестарт»): close
+   * the N1 tracker's late window — it can bill with no new commit, and the car
+   * was just lifted away from every vehicle it held — and clear its per-visit
+   * maps (lane slowturn2, ruling ST-RESPAWN-SCOPE: measured, a respawn within
+   * 40 m of the same node keeps the visit, and its account map survived).
+   * Nothing else of the visit is reset (ltAdjudicated and the other N1 fields
+   * stay as they were: a whole-visit reset would need its own ruling).
+   */
+  noteRespawn(): void;
   /**
    * Physics layer reports a contact; drained into the next sample().
    *
@@ -1871,7 +1913,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   // turn (the bearing-opposition filter would drop a still-arriving car).
   let ltNode: string | null = null; // junction currently visited (any control)
   let ltApproachHeading = 0; // player heading frozen at visit start
+  let ltApproachEdge = -1; // lane-fix edge at the visit start (ST-LATE-END (d))
   let ltAdjudicated = false; // one grade per visit
+  // ST-VERDICT-HOLD (`SimTick.leftTurnOncomingOpen` / `…Billed`): a left commit
+  // of this visit has been read by the adjudicator below; the student respawned
+  // during this visit; this visit's left turn was billed. Measurement only —
+  // nothing graded reads any of them.
+  let ltCommitRead = false;
+  let ltRespawned = false;
+  let ltBilled = false;
   let ltConflictSeen = false; // a REAL closing conflict (gap ≤ safe band) seen
   let ltSlowed = false; // player held yield speed while that conflict existed
   let ltCondSince: number | null = null; // current visibility episode onset
@@ -1890,6 +1940,21 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     LEFT_TURN_ONCOMING_MIN_DEG,
   );
   const ltMe = { x: 0, y: 0, headingDeg: 0, halfLengthM: PLAYER_HALF_LENGTH_M, halfWidthM: PLAYER_HALF_WIDTH_M };
+  /**
+   * ST-LATE-END (d) — HIS TURN IS COMPLETE on this grid point: his lane fix
+   * lies on an edge at the visit's node other than the edge he approached it by
+   * (the fix at the visit start), and his heading is within TURN_REARM_DEG of
+   * that edge's tangent at his arclength, taken in its sense AWAY from the node.
+   * Read only to close the late window (LEFT_TURN_FORCED_SHED_MPS).
+   */
+  const ltTurnComplete = (nodeId: string, edgeIdx: number, sM: number, headingDeg: number): boolean => {
+    if (edgeIdx < 0 || edgeIdx === ltApproachEdge) return false;
+    const e = index.edges[edgeIdx].edge;
+    const sense = e.from === nodeId ? 1 : e.to === nodeId ? -1 : 0;
+    if (sense === 0) return false;
+    const [tx, ty] = index.tangentAt(edgeIdx, sM);
+    return Math.abs(signedDeltaDeg(headingDeg, bearingDeg(tx * sense, ty * sense))) <= TURN_REARM_DEG;
+  };
 
   // OVERTAKE-CORRIDOR tracker (doc 72 OV-05/OV-08) — one adjudication per
   // opposing-bank EXCURSION (the solidCross excursion discipline), with the
@@ -2474,7 +2539,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         if (ltNode !== nearestIx.id) {
           ltNode = nearestIx.id;
           ltApproachHeading = v.headingDeg;
+          ltApproachEdge = fix.edgeIdx;
           ltAdjudicated = false;
+          ltCommitRead = false;
+          ltRespawned = false;
+          ltBilled = false;
           ltConflictSeen = false;
           ltSlowed = false;
           ltCondSince = null;
@@ -2484,12 +2553,13 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           ltTightGapSec = undefined;
           ltGiveWay.reset();
         }
-        if (shedAccountsQuery !== null && plannedRouteQuery !== null) {
+        const ltRows = shedAccountsQuery !== null && plannedRouteQuery !== null ? shedAccountsQuery() : null;
+        if (ltRows !== null && plannedRouteQuery !== null) {
           ltMe.x = v.position.x;
           ltMe.y = v.position.y;
           ltMe.headingDeg = v.headingDeg;
           ltGiveWay.track(
-            shedAccountsQuery(),
+            ltRows,
             plannedRouteQuery,
             nearestIx.id,
             nearestIx.x,
@@ -2497,6 +2567,30 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             LEFT_TURN_ONCOMING_RADIUS_M,
             ltMe,
           );
+          // THE LATE READ (LEFT_TURN_FORCED_SHED_MPS; runtime/leftTurnGiveWay.ts):
+          // windows opened at an earlier ADDED commit of this visit. Every
+          // window closes on any turnStarted of this grid point (a later turn
+          // in the visit), on an adjudication, and once his turn is complete
+          // (ST-LATE-END (d)); otherwise the first candidate whose own in-way
+          // account reached the line is billed, once.
+          if (ltGiveWay.lateOpen()) {
+            if (ltAdjudicated || events.some((e, i) => i >= beforeTurns && e.kind === "turnStarted") || ltTurnComplete(nearestIx.id, fix.edgeIdx, fix.sM, v.headingDeg)) {
+              ltGiveWay.closeLate();
+            } else {
+              const lateId = ltGiveWay.lateRead(ltRows);
+              if (lateId !== null) {
+                events.push({
+                  kind: "prioritySituation",
+                  situation: "left-turn-oncoming",
+                  violated: true,
+                  addedPath: true,
+                  forcedById: lateId,
+                });
+                ltAdjudicated = true;
+                ltGiveWay.closeLate();
+              }
+            }
+          }
         }
         const probe = oncomingQuery(
           nearestIx.x,
@@ -2555,6 +2649,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           ltCondSince = null;
         }
         if (leftTurnCommitted && !ltAdjudicated) {
+          ltCommitRead = true;
           const commitGap = gapSec ?? ltTightGapSec;
           const tightRecent = tSec - ltLastTightT <= LEFT_TURN_GAP_MEMORY_SEC;
           const visibleLongEnough = tSec - ltSustainedRecentT <= LEFT_TURN_GAP_MEMORY_SEC;
@@ -2564,9 +2659,9 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           // R13''' is read only where the tight evidence did not convict, and
           // only at an ADDED-path commit (base commits are untouched).
           const forcedById =
-            !tightConvicts && leftTurnCommitAdded && shedAccountsQuery !== null && plannedRouteQuery !== null
+            !tightConvicts && leftTurnCommitAdded && ltRows !== null && plannedRouteQuery !== null
               ? ltGiveWay.evidence(
-                  shedAccountsQuery(),
+                  ltRows,
                   plannedRouteQuery,
                   nearestIx.id,
                   nearestIx.x,
@@ -2589,6 +2684,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             else if (commitGap !== undefined) ev.gapSec = commitGap;
             events.push(ev);
             ltAdjudicated = true;
+            ltGiveWay.closeLate();
           } else if (forcedById !== null) {
             // Ruling R13''' (LEFT_TURN_FORCED_SHED_MPS; runtime/leftTurnGiveWay.ts):
             // an ADDED-path commit across the route of a vehicle he had to give
@@ -2604,6 +2700,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
               forcedById,
             });
             ltAdjudicated = true;
+            ltGiveWay.closeLate();
+          } else if (leftTurnCommitAdded && ltRows !== null && plannedRouteQuery !== null) {
+            // ST-LATE: an ADDED commit this tick did not adjudicate opens the
+            // late window on the vehicles that meet (1), (2) and (4) now, his
+            // body on their route ahead — and closes it at once if his turn is
+            // already complete on this grid point.
+            if (
+              ltGiveWay.openLate(ltRows, plannedRouteQuery, nearestIx.id, nearestIx.x, nearestIx.y, LEFT_TURN_ONCOMING_RADIUS_M, ltApproachHeading) > 0 &&
+              ltTurnComplete(nearestIx.id, fix.edgeIdx, fix.sM, v.headingDeg)
+            ) {
+              ltGiveWay.closeLate();
+            }
           } else if (!leftTurnCommitAdded && ltConflictSeen && ltSlowed) {
             // (Never at an ADDED-path commit — ruling R11: the added path
             // convicts, it does not credit. A slow careful turn earns no praise
@@ -2618,11 +2726,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             if (gapSec !== undefined) ev.gapSec = gapSec;
             events.push(ev);
             ltAdjudicated = true;
+            ltGiveWay.closeLate();
           }
         }
       } else if (ltNode !== null) {
         ltNode = null;
         ltAdjudicated = false;
+        ltCommitRead = false;
+        ltRespawned = false;
+        ltBilled = false;
         ltConflictSeen = false;
         ltSlowed = false;
         ltCondSince = null;
@@ -2631,6 +2743,28 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ltLastTightT = -Infinity;
         ltTightGapSec = undefined;
         ltGiveWay.reset();
+      }
+      // ST-VERDICT-HOLD — CAN THIS VISIT'S LEFT-TURN ADJUDICATION STILL BILL?
+      // (`SimTick.leftTurnOncomingOpen`.) Yes while he is in a junction visit
+      // whose left turn has not been adjudicated and EITHER no left commit of
+      // the visit has been read yet (the commit-tick reading — tight or R13''' —
+      // is still ahead of him) OR an ST-LATE window is open (the late read can
+      // still bill). The visit reset and a respawn in the visit release it.
+      // Read once per grid point AFTER the tracker, so the point that bills, or
+      // closes the last window, already publishes it absent.
+      const ltOpenNow =
+        nearestIx !== null && !ltAdjudicated && !ltRespawned && (!ltCommitRead || ltGiveWay.lateOpen());
+      // …and WAS IT BILLED on this visit (`SimTick.leftTurnOncomingBilled`): any
+      // left-turn-oncoming bill of this grid point — tight, R13''' at the
+      // commit, or the late read — latches for the rest of the visit.
+      if (
+        nearestIx !== null &&
+        !ltBilled &&
+        events.some(
+          (e, i) => i >= beforeTurns && e.kind === "prioritySituation" && e.situation === "left-turn-oncoming" && e.violated,
+        )
+      ) {
+        ltBilled = true;
       }
 
       // 4b. Right-hand rule: entering an uncontrolled junction's core while a
@@ -3459,6 +3593,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // same additive seam: absent on every frame with no entry waiting on a
       // car, which is every frame away from a ring with traffic on it.
       if (rbEntryOpenNow) tick.roundaboutEntryOpen = true;
+      // The N1 tracker's «this left turn can still be billed» (ST-VERDICT-HOLD)
+      // — the same additive seam: absent on every frame away from a junction and
+      // on every frame after the visit's left turn is adjudicated or released.
+      if (ltOpenNow) tick.leftTurnOncomingOpen = true;
+      if (nearestIx !== null && ltBilled) tick.leftTurnOncomingBilled = true;
       // …and its «somebody has paid for this entry» — the same seam again.
       if (rbEntryPaidNow) tick.roundaboutEntryPaidFor = true;
       // THE PERSON IN THE PATH (`SimTick.vruAheadM`) — additive, and published
@@ -4426,6 +4565,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     setPlannedRouteQuery(fn: PlannedRouteQuery | null): void {
       plannedRouteQuery = fn;
+    },
+
+    noteRespawn(): void {
+      // ST-RESPAWN-SCOPE: the late window closes and the per-visit maps clear;
+      // ltNode, ltAdjudicated and the other N1 fields are left as they were.
+      ltGiveWay.reset();
+      // ST-VERDICT-HOLD: the respawn releases the oncoming-wait verdict's hold
+      // for the rest of this visit (`SimTick.leftTurnOncomingOpen`).
+      ltRespawned = true;
     },
 
     debugUncontrolledJunctions() {

@@ -71,6 +71,7 @@
 
 import {
   CONTROLLER_ACT_LAMPS_DARK,
+  FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED,
   HANDBRAKE_ACT_MOVE_OFF_ATTEMPT,
   HEADLIGHTS_CONDITION_SNOW,
   JUNCTION_SCAN_CONTROL_GIVE_WAY,
@@ -10296,7 +10297,17 @@ function handleTickEvent(
                       ? "POLICE_STOP_SIGNAL_IGNORED"
                       : "FAILED_TO_YIELD",
           t,
-          { detail: e.situation },
+          // The N1 tracker's forced-braking left-turn bill (ruling R13''',
+          // commit-tick or late) names its evidence vehicle; its card is its
+          // own act (catalog.ts FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED, lane
+          // slowturn2, ruling ST-CARD). Only the act key moves: the code, the
+          // points and the place latch (keyed by the situation) are unchanged.
+          {
+            detail:
+              e.situation === "left-turn-oncoming" && e.forcedById !== undefined
+                ? FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED
+                : e.situation,
+          },
         );
         if (placeAct === null) out.push(bill);
         else billAct(s, tick, out, placeAct, bill);

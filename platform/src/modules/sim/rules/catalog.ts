@@ -3094,6 +3094,13 @@ export const WRONG_WAY_ROAD_COPY: Record<
 export const FAILED_TO_YIELD_SITUATION_ROUNDABOUT = "roundabout";
 /** The CyclistRightHookRunner's situation (orchestrator/runners.ts). */
 export const FAILED_TO_YIELD_SITUATION_CYCLIST_RIGHT_HOOK = "cyclist-right-hook";
+/**
+ * The N1 tracker's FORCED-BRAKING left-turn bill (ruling R13''': a
+ * `prioritySituation` «left-turn-oncoming» that names its evidence vehicle,
+ * `forcedById`) — the act key the reducer stamps for it (rules/engine.ts),
+ * so the card says what happened (lane slowturn2, integrator ruling ST-CARD).
+ */
+export const FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED = "left-turn-oncoming-forced";
 
 export const FAILED_TO_YIELD_SITUATION_COPY: Record<
   string,
@@ -3165,6 +3172,54 @@ export const FAILED_TO_YIELD_SITUATION_COPY: Record<
     peekBg: "Пусни велосипедиста пръв.",
     correctiveBg:
       "Преди десен завой провери дясното огледало и погледни през дясното рамо за велосипедист, който идва отзад, а ако велоалеята е двупосочна — и напред-надясно за този, който идва срещу теб. Пропусни го да премине и завий едва след това.",
+  },
+  // THE TURN THAT MADE AN ONCOMING CAR BRAKE, named as itself —
+  // sc-turn-left-oncoming:1613ef2c (lane slowturn2, integrator rulings ST-CARD,
+  // 2026-11-09, and ST-CARD-2, 2026-11-10; the integrator approves the wording
+  // at landing, the founder may veto it after). Until this row a ruling-R13'''
+  // bill — a slow (ADDED-path) turn across the planned route of an oncoming car
+  // that goes straight on or turns right, whose OWN `playerShedMps` account grew
+  // ≥ 0.3 m/s while his body lay on that route ahead of it
+  // (runtime/leftTurnGiveWay.ts) — printed the POOLED card: «На кръстовище без
+  // светофар пропускаш идващите отдясно; при знак „Пропусни движението“ — всички
+  // по главния път», the right-hand rule and the give-way sign, and «ЗДвП чл. 47;
+  // чл. 48; чл. 50, ал. 1» — none of which is the duty a turner owes the
+  // oncoming traffic, and nothing on it said why he was billed (STEP 0(d),
+  // measured on rig w4b's S12 at L1/L3 and on the exam drill; identical for a
+  // commit-tick and a late bill).
+  //
+  // A LEFT TURN OR A TURN-ROUND — THE BILL CANNOT TELL WHICH (ruling ST-CARD-2).
+  // The added-path commit is emitted at the 55° point (runtime/turns.ts), where a
+  // junction U-turn is still classed as a left turn (R2 (a)), so the bill —
+  // commit-tick or late — cannot know whether the turn will end as a left turn
+  // (ЗДвП чл. 37, ал. 1) or a turn-round (чл. 38, ал. 2). It bills both: S12's
+  // left turns, and sc-mv-uturn-ban's 180° turn-rounds (creep258@5 L1–L5 on car
+  // 1002, creep264@5 L5 on car 1005 — round-1 verifier, F1). So the text claims
+  // only «зави», never «наляво», and quotes BOTH articles, each marked with the
+  // turn it governs; the corrective names both turns.
+  //
+  // EVERY SENTENCE IS TRUE OF EVERY BILL THAT CARRIES THIS KEY. The reducer
+  // stamps it only on a «left-turn-oncoming» conviction that names
+  // `forcedById`, i.e. only on an R13''' bill (commit-tick or late): its car
+  // approaches from the opposite direction (clause (2), «насрещно») and goes
+  // straight on or turns right (clause (1), its own planned route), his body
+  // lay on its route AHEAD of it (so he turned «пред» it, «в пътя му»), and its
+  // account — the model's own guard braking BECAUSE OF HIM (attributed:
+  // playerBinding / playerClamped) — grew by ≥ 0.3 m/s («трябваше да намали»).
+  // Nothing about a gap figure is claimed: an R13''' bill exists for the case
+  // the measured gap did NOT convict.
+  //
+  // RETRIEVED LAW ONLY (ADR-002): ЗДвП чл. 37, ал. 1 and чл. 38, ал. 2, each
+  // verbatim from content/law/acts/zdvp.json (units «Чл. 37.» and «Чл. 38.»),
+  // pinned against that file in rules/__tests__/failed-to-yield-situation-copy.test.ts.
+  [FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED]: {
+    titleBg: "Непропускане на насрещния",
+    explanationBg:
+      "Зави пред насрещно превозно средство, което продължаваше направо или завиваше надясно, и то трябваше да намали, защото завоят ти навлезе в пътя му. При ляв завой важи ЗДвП чл. 37, ал. 1: „При завиване наляво за навлизане в друг път водачът на завиващото нерелсово пътно превозно средство е длъжен да пропусне насрещно движещите се пътни превозни средства.“ При обратен завой важи ЗДвП чл. 38, ал. 2: „При завиване в обратна посока водачът пропуска насрещно движещите се пътни превозни средства.“ Да изглежда, че ще успееш, не е достатъчно: щом насрещният трябва да намали заради теб, предимството му е отнето.",
+    lawRef: "ЗДвП чл. 37, ал. 1; чл. 38, ал. 2",
+    peekBg: "Насрещният намали заради теб.",
+    correctiveBg:
+      "При ляв или обратен завой пропусни насрещните, които продължават направо или завиват надясно, и тръгни едва когато завоят ти няма да накара никого от тях да намали. Колкото по-бавно завиваш, толкова по-голям интервал ти трябва.",
   },
 };
 

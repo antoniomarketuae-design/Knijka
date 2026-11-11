@@ -23,10 +23,15 @@
  * an ordinary crossroads to look left, which is the same defect mirrored.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
   FAILED_TO_YIELD_SITUATION_COPY,
+  FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED,
   FAILED_TO_YIELD_SITUATION_ROUNDABOUT,
   VIOLATIONS,
   actCopy,
@@ -181,5 +186,95 @@ describe("FAILED_TO_YIELD explains the junction the student was actually at", ()
     expect(row.explanationBg).toMatch(/Наредба № РД-02-21-1\/23\.11\.2023/);
     expect(row.explanationBg).not.toMatch(/Наредба № РД-02-21-1[^)]*чл\./);
     expect(row.lawRef).toMatch(/^ЗДвП /);
+  });
+});
+
+// ───────────── the forced-braking card: a left turn OR a turn-round ─────────────
+//
+// sc-turn-left-oncoming:1613ef2c, lane slowturn2, integrator rulings ST-CARD
+// (2026-11-09) and ST-CARD-2 (2026-11-10). The R13''' bill (a `prioritySituation`
+// «left-turn-oncoming» that names `forcedById`) is emitted at the 55° point of an
+// ADDED-path turn, where a junction U-turn is still classed as a left turn
+// (runtime/turns.ts R2 (a)); on sc-mv-uturn-ban it bills 180° turn-rounds
+// (creep258@5 L1–L5 car 1002, creep264@5 L5 car 1005 — round-1 verifier F1). So
+// its card may not say «наляво» of what he did, and must cite the article for
+// each turn, retrieved from content/law (ADR-002).
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, "../../../../../..");
+const ZDVP = JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "law", "acts", "zdvp.json"), "utf-8")) as {
+  units: { ref: string; textBg: string }[];
+};
+/** ал. n of чл. art, retrieved: from «(n) » to the next «(n+1) » or the unit's end. */
+function alinea(art: number, n: number): string {
+  const unit = ZDVP.units.find((u) => u.ref === `чл. ${art}`)!.textBg;
+  const from = unit.indexOf(`(${n}) `) + `(${n}) `.length;
+  const next = unit.indexOf(`(${n + 1}) `, from);
+  return unit.slice(from, next < 0 ? undefined : next).trim();
+}
+/** The first sentence of чл. 37, ал. 1 (its second governs tram drivers among themselves). */
+const ART_37_1 = alinea(37, 1).split(/(?<=\.) /)[0];
+const ART_38_2 = alinea(38, 2);
+const FORCED = FAILED_TO_YIELD_SITUATION_COPY[FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED];
+
+function convictForced(): ViolationEvent[] {
+  return yields(
+    drive([
+      tick(0, {
+        speedKmh: 6,
+        events: [
+          { kind: "prioritySituation", situation: "left-turn-oncoming", violated: true, addedPath: true, forcedById: 1001 },
+        ],
+      }),
+      tick(1, { speedKmh: 6 }),
+    ]).events,
+  );
+}
+
+describe("ST-CARD-2 — the forced-braking card is true of a left turn and of a turn-round", () => {
+  it("the retrieval itself is the two duties to the ONCOMING traffic (a broken lookup cannot pass)", () => {
+    expect(ART_37_1).toMatch(/^При завиване наляво за навлизане в друг път .* насрещно движещите се пътни превозни средства\.$/);
+    expect(ART_38_2).toMatch(/^При завиване в обратна посока .* насрещно движещите се пътни превозни средства\.$/);
+  });
+
+  it("an R13''' bill (forcedById present) prints this act, and only it", () => {
+    const [card] = convictForced();
+    expect(card.detail).toBe(FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED);
+    expect(card.titleBg).toBe(FORCED.titleBg);
+    expect(card.explanationBg).toBe(FORCED.explanationBg);
+    expect(card.lawRef).toBe("ЗДвП чл. 37, ал. 1; чл. 38, ал. 2");
+    expect(card.explanationBg).not.toMatch(RIGHT_HAND_RULE);
+    // the charge is the code's own: class, points
+    expect(card.severityClass).toBe("opasna");
+    expect(card.points).toBe(10);
+  });
+
+  it("BOTH articles are quoted VERBATIM from content/law/acts/zdvp.json, each marked with the turn it governs", () => {
+    expect(FORCED.explanationBg).toContain(`При ляв завой важи ЗДвП чл. 37, ал. 1: „${ART_37_1}“`);
+    expect(FORCED.explanationBg).toContain(`При обратен завой важи ЗДвП чл. 38, ал. 2: „${ART_38_2}“`);
+  });
+
+  it("outside the quoted law it never says he turned «наляво» — the bill cannot know which turn it was", () => {
+    const own = FORCED.explanationBg.replace(/„[^“]*“/g, "");
+    expect(own).not.toMatch(/наляво|отляво/i);
+    expect(own.startsWith("Зави пред насрещно превозно средство, което продължаваше направо или завиваше надясно")).toBe(true);
+    // WHY he was billed (THEO-4): the other car had to slow because his turn entered its path
+    expect(own).toMatch(/трябваше да намали, защото завоят ти навлезе в пътя му/);
+    // no gap figure: an R13''' bill exists where the measured gap did NOT convict
+    expect(FORCED.explanationBg).not.toMatch(/секунд|под 2/);
+    for (const s of [FORCED.titleBg, FORCED.peekBg]) expect(s).not.toMatch(/ляв|наляво|обратн/i);
+  });
+
+  it("the corrective names a left turn AND a turn-round", () => {
+    expect(FORCED.correctiveBg).toMatch(/^При ляв или обратен завой пропусни насрещните/);
+  });
+
+  it("the server rebuilds the same card from the wire key", () => {
+    const [client] = convictForced();
+    const wire = serializeRuleEvents([client], []);
+    expect(wire[0].detail).toBe(FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED);
+    const rebuilt = rebuildRuleEvents(wire)!.find((e) => e.kind === "violation") as ViolationEvent;
+    expect(rebuilt.explanationBg).toBe(client.explanationBg);
+    expect(rebuilt.lawRef).toBe(client.lawRef);
   });
 });

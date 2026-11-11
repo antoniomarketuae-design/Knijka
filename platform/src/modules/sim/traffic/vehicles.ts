@@ -69,9 +69,11 @@ export interface VehicleAgent {
    * braking» at a roundabout entry — see `playerShedThisStep` below and
    * `traffic/system.ts circulatingReportFor`). Nothing in this file reads it:
    * it is the agent's own account of what the student cost it, published
-   * through the traffic system's circulating report — and, display-only, through
+   * through the traffic system's circulating report — and through
    * `playerShedAccounts` to the reverse warning's measurement (lane rbreverse,
-   * `SimTick.reverseBrakedFor`; no rule reads it).
+   * `SimTick.reverseBrakedFor`; display-only, no rule reads that field) and to
+   * the N1 tracker's GRADED forced-braking evidence and late read (ruling
+   * R13''', lanes slowturn / slowturn2).
    */
   playerShedMps: number;
   /**

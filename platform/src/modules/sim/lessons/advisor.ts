@@ -1986,6 +1986,50 @@ export const YIELD_VOICE_VERDICT_S = 4;
 export const YIELD_VOICE_RING_ENTRY_ARC_DEG = ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG;
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ONCOMING-WAIT VERDICT WAITS FOR THE LEFT TURN'S ADJUDICATION — integrator
+ * ruling ST-VERDICT-HOLD (2026-11-10, lane slowturn2; sc-turn-left-oncoming:
+ * 1613ef2c round 3), the ring's «AND THE ENTRY MUST BE CLOSED» applied to the
+ * one other duty whose adjudicator can bill long after the wheels turn.
+ *
+ * MEASURED before this hold (rig-w4b S12, PC and phone, L1 and L3, at 60 Hz,
+ * 30 Hz and phone cadence — 12 of 12 replays): «Пропусна насрещните — Изчака
+ * 5 с и зави чак когато интервалът стигна — без отчетено нарушение на
+ * предимството. Точно това мери този урок…» at k2330, YIELD_VOICE_VERDICT_S
+ * after he moved off, while he was still 22 m before the node at heading 270;
+ * then, for the same turn, «Непропускане на насрещния» (FAILED_TO_YIELD, the
+ * R13''' late read: car 1001 braked 0.312 / 0.336 m/s for him) at k2824 (L1)
+ * and k2805 (L3). A praise and a bill on one visit, the praise first.
+ *
+ * WHY TIME CANNOT FIX IT, as at the ring: a slow left turn is committed at the
+ * 55° point (turns.ts, the added path) whenever he gets there, and the ST-LATE
+ * window then stays open until the oncoming car leaves his body behind or his
+ * turn is complete (ST-LATE-END (d)). No number of seconds after departure is
+ * after both.
+ *
+ * SO: a pending `oncomingVehicle` verdict is HELD while the runtime says this
+ * visit's left turn can still be billed (`SimTick.leftTurnOncomingOpen`,
+ * handed in as `oncomingTurnOpen`) and is said on the first frame after —
+ * his turn committed and read, no bill, no window open (or the visit reset, or
+ * a respawn) — and if a left-turn-oncoming bill lands (`oncomingTurnBilled`,
+ * latched for the visit) it is DROPPED for that visit. The time window stays
+ * as the floor. The copy is unchanged: shown after the turn, «и зави» is a fact.
+ *
+ * IT ONLY DELAYS. A verdict held past its time is marked `turnHeld`, and a
+ * stop made inside the junction before the turn is read (a careful turner who
+ * waits again clear of the oncoming lane) no longer drops it as „he did not
+ * actually go": without the hold it had been said already. MEASURED without
+ * the mark: 96 of the 417 unbilled census cells that showed the verdict on
+ * base lost it (the slowturn-ltap stop-20 / ow cells). Every verdict the hold
+ * never touched folds exactly as before.
+ *
+ * ONLY `oncomingVehicle`. The rail duty and the other five keep the time
+ * window (the residual named under «ONLY THE RING» above).
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const YIELD_VOICE_ONCOMING_TURN_HOLD = "oncomingVehicle" as const;
+
+/**
  * How long a finished wait keeps waiting for the wheels to turn, seconds. A
  * red goes green while the car is still standing — the wait has ended but the
  * departure has not happened, and the verdict is about the departure. Past
@@ -3252,6 +3296,29 @@ export interface YieldVoiceInput {
    * explanation and its card are untouched.
    */
   ringEntryPaidFor?: boolean;
+  /**
+   * The N1 left-turn adjudicator can STILL BILL this junction visit's left
+   * turn (`SimTick.leftTurnOncomingOpen`: no left commit of the visit has
+   * been read yet, or an ST-LATE window is open). While it is `true` a
+   * pending `oncomingVehicle` verdict is HELD — «Изчака … и зави чак когато
+   * интервалът стигна — без отчетено нарушение на предимството» is not yet a
+   * fact (integrator ruling ST-VERDICT-HOLD, 2026-11-10; see
+   * YIELD_VOICE_ONCOMING_TURN_HOLD). Optional, and absent or `false` means
+   * „nothing is waiting": the time window alone, exactly the fold before this
+   * field existed. It only ever DELAYS a line; it speaks none.
+   */
+  oncomingTurnOpen?: boolean;
+  /**
+   * The N1 adjudicator BILLED this junction visit's left turn across the
+   * oncoming (`SimTick.leftTurnOncomingBilled`: a «left-turn-oncoming»
+   * `prioritySituation`, violated — commit-tick or the ST-LATE late read —
+   * latched until the visit resets). A pending `oncomingVehicle` verdict is
+   * DROPPED while it is set, never shown and never voiced: nothing later can
+   * make «без отчетено нарушение на предимството» true of that turn. Read off
+   * the tracker, not the scored codes, so a charge the scorer withholds still
+   * drops it. Optional, absent means „no such bill on this visit".
+   */
+  oncomingTurnBilled?: boolean;
 }
 
 /**
@@ -3473,10 +3540,13 @@ export function stepYieldVoice(
       // The graded channel owns this departure. Drop it silently — this is the
       // one branch that must never speak, and it is why the verdict waits.
       pending = null;
-    } else if (wait.holding) {
+    } else if (wait.holding && pending.turnHeld !== true) {
       // He did not actually go: a creep of one car length in a queue, and he is
       // standing at the same line again. Nothing has been judged, so nothing
       // is said; the episode below simply resumes.
+      // (Not a verdict ST-VERDICT-HOLD is holding past its time: without the
+      // hold it was said already, and the hold only DELAYS it — a stop made
+      // inside the junction, before the turn is read, does not unsay it.)
       pending = null;
     } else if (ringEntryAbandoned(pending.ring, site)) {
       // He left the ring he was waiting to enter — turned off, or backed out
@@ -3494,9 +3564,23 @@ export function stepYieldVoice(
       // 7,862 live-chain drives heard it after such an easing. Dropped, not
       // held: nothing that happens later can make it true of this entry.
       pending = null;
+    } else if (pending.reason === YIELD_VOICE_ONCOMING_TURN_HOLD && input.oncomingTurnBilled === true) {
+      // THE LEFT TURN WAS BILLED (ST-VERDICT-HOLD) — commit-tick or late. The
+      // verdict says he turned only when the interval allowed and no priority
+      // breach was recorded; that is now false of this visit's turn. Dropped,
+      // not held: nothing later can make it true.
+      pending = null;
     } else if (pending.wentAtSec === null) {
       if (moving) pending = { ...pending, wentAtSec: t };
       else if (t - (endedAtSec ?? t) > YIELD_VOICE_DEPART_GRACE_S) pending = null;
+    } else if (
+      pending.reason === YIELD_VOICE_ONCOMING_TURN_HOLD &&
+      input.oncomingTurnOpen === true &&
+      t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S
+    ) {
+      // ST-VERDICT-HOLD — due, but his left turn can still be billed. Held,
+      // and marked as held (`turnHeld`), so the re-stop above cannot drop it.
+      if (pending.turnHeld !== true) pending = { ...pending, turnHeld: true };
     } else if (
       t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S &&
       // sc-roundabout-entry:8be266cf — AND the entry it describes has happened,

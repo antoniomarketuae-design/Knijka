@@ -1765,8 +1765,10 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //     anyway. Nothing here reads it — `system.ts circulatingReportFor`
   //     publishes it (and, since lane rbreverse, `system.ts
   //     playerShedAccounts` for the DISPLAY-ONLY reverse warning,
-  //     `SimTick.reverseBrakedFor` — no rule reads that). A frame no player
-  //     guard bound accounts exactly nothing.
+  //     `SimTick.reverseBrakedFor` — no rule reads that — and for the N1
+  //     tracker's GRADED forced-braking evidence and late read, ruling R13''',
+  //     lanes slowturn / slowturn2). A frame no player guard bound accounts
+  //     exactly nothing.
   if (playerBound || playerClamped) {
     agent.playerShedMps += playerShedThisStep(speedBefore, agent.speed, speedNoPlayer);
   }

@@ -2172,7 +2172,7 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     expect(corrective!("CROSSED_SOLID_LINE", "no-such-act")).toBe(pooled);
   });
 
-  it("CENSUS: four acts in the catalogue have their own corrective — the right hook on a cyclist (since lane vbltiming), the U-turn, (since 2026-10-08) the return in front of an overtaken vehicle, and (since lane waitcard) the officer's halt at a junction whose lamps are out — and no other card moved", () => {
+  it("CENSUS: five acts in the catalogue have their own corrective — the right hook on a cyclist (since lane vbltiming), the slow left turn that made an oncoming car brake (since lane slowturn2), the U-turn, (since 2026-10-08) the return in front of an overtaken vehicle, and (since lane waitcard) the officer's halt at a junction whose lamps are out — and no other card moved", () => {
     const withOwn: string[] = [];
     for (const [code, acts] of Object.entries(rules.PER_ACT_COPY)) {
       for (const [detail, copy] of Object.entries(acts ?? {})) {
@@ -2197,8 +2197,14 @@ describe("§3 violationCorrectiveBg — act first, pooled second, like every oth
     // светофара…») names a lamp at the one officer's junction whose lamps are
     // out; the dark-lamp officer's corrective teaches his posture instead.
     // PER_ACT_COPY registers it last, so it is last here (insertion order).
+    // The second row is sc-turn-left-oncoming:1613ef2c (lane slowturn2, ruling
+    // ST-CARD): the forced-braking left-turn bill's corrective tells a
+    // left-turner to let the oncoming straight and right traffic through, where
+    // the pooled one teaches the right-hand rule and the roundabout
+    // (`slowturn2-late-bill.live.test.ts` pins the card on the drive).
     expect(withOwn).toEqual([
       "FAILED_TO_YIELD|cyclist-right-hook",
+      "FAILED_TO_YIELD|left-turn-oncoming-forced",
       `CROSSED_SOLID_LINE|${UTURN}`,
       "LANE_ENTRY_FORCED_BRAKING|overtakeReturn",
       "CONTROLLER_SIGNAL_VIOLATED|lampsDark",

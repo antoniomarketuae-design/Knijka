@@ -181,7 +181,6 @@ export function HeroCarBody({
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
   // Cockpit view (context.enabled) → hide the shell; see the header comment.
   const { enabled: cockpitView } = useContext(CockpitInteractionContext);
-  const wheels = useRef<Wheel[]>([]);
   const roll = useRef(0);
   // Lamp state cache — emissive uniforms rewritten only when the key changes.
   const lampState = useRef({ head: -1, tail: -1 });
@@ -205,7 +204,14 @@ export function HeroCarBody({
     return QUALITY_PRESETS[level].clearcoat;
   }, []);
 
-  const { model, scale, offsetY, paintMaterial, drlMaterial, tailMaterial, lamp } = useMemo(() => {
+  // The road-wheel list is RETURNED with the model it was found in, never
+  // written into a ref from inside this memo: under React StrictMode (bridged
+  // into the Canvas on `next dev`) a mount memo runs twice and the FIRST
+  // result is kept, so a ref written here held the second clone's wheels
+  // while the first clone was drawn — the student car's wheels never steered
+  // or rolled on the dev build (diagnose-w4c-a9db1738; same defect as
+  // ShadowCar). Returned together, useFrame poses the drawn model's wheels.
+  const { model, scale, offsetY, paintMaterial, drlMaterial, tailMaterial, lamp, wheels } = useMemo(() => {
     const root = scene.clone(true);
     // One shared paint material for every panel (single shader program), built
     // lazily from the model's authored pigment colour — clearcoat or glossy
@@ -272,7 +278,6 @@ export function HeroCarBody({
         found.push({ node, front: name.startsWith("wheel_F") });
       }
     }
-    wheels.current = found;
 
     // Auto-fit to the collider: scale model width → collider width, then drop it
     // so its lowest point (tyre contact) sits at the collider bottom (-h.y).
@@ -306,6 +311,7 @@ export function HeroCarBody({
       drlMaterial: drlMaterial as MeshStandardMaterial | null,
       tailMaterial: tailMaterial as MeshStandardMaterial | null,
       lamp,
+      wheels: found as readonly Wheel[],
     };
   }, [scene, useClearcoat]);
 
@@ -356,11 +362,11 @@ export function HeroCarBody({
 
   useFrame((_, delta) => {
     const sim = simRef?.current;
-    if (sim && wheels.current.length > 0) {
+    if (sim && wheels.length > 0) {
       const speedMps = sim.speedKmh / 3.6;
       roll.current += (speedMps / WHEEL_RADIUS_M) * delta;
       const steer = (sim.steerRad ?? 0) * STEER_VISUAL;
-      for (const w of wheels.current) {
+      for (const w of wheels) {
         w.node.rotation.x = roll.current;
         w.node.rotation.y = w.front ? steer : 0;
       }

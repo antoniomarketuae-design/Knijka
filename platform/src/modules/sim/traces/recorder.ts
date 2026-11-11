@@ -716,8 +716,10 @@ export function recordScriptedDrive(
   // same hookup scene/lessonWorldRecipe.ts wireTrafficQueries gives the live
   // lesson, so a recorded demo is graded on the same world the student is.
   runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
-  // …and the reverse-warning measurement's account query (lane rbreverse), as
-  // wireTrafficQueries gives the live lesson. Display-only: it grades nothing.
+  // …and the account query (lane rbreverse), as wireTrafficQueries gives the
+  // live lesson: the reverse-warning measurement reads it (display-only), and
+  // so does the N1 tracker's GRADED forced-braking evidence and its late read
+  // (ruling R13''', lanes slowturn / slowturn2) together with the next query.
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
   // Lane slowturn (ruling R13'''): each vehicle's planned route through a junction node, for the N1
   // tracker's forced-braking evidence at an ADDED-path left commit (runtime/leftTurnGiveWay.ts).

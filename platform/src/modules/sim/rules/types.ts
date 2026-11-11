@@ -392,9 +392,12 @@ export type SimTickEvent =
        * Present only on a ruling-R13''' conviction at an ADDED-path left commit
        * (runtime/worldRuntime.ts LEFT_TURN_FORCED_SHED_MPS, runtime/leftTurnGiveWay.ts):
        * the traffic id of the vehicle he had to give way to whose forced braking
-       * for him is the evidence. An
-       * internal diagnostic channel, like `addedPath` — never shown, read by no
-       * rule; it lets an instrument check the bill against THAT car's raw rows.
+       * for him is the evidence — at the commit, or later through the late read
+       * (lane slowturn2, ruling ST-LATE). An internal diagnostic channel, like
+       * `addedPath` — never shown, and it grades nothing; the reducer reads only
+       * its PRESENCE, to stamp the act key of the card
+       * (`FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED`, ruling ST-CARD). It lets an
+       * instrument check the bill against THAT car's raw rows.
        */
       forcedById?: number;
     };
@@ -1140,6 +1143,44 @@ export interface SimTick {
    * touching a circulating car at walking pace. It can only silence a line.
    */
   roundaboutEntryPaidFor?: boolean;
+  /**
+   * THIS JUNCTION VISIT'S LEFT TURN CAN STILL BE BILLED — integrator ruling
+   * ST-VERDICT-HOLD (2026-11-10, lane slowturn2; sc-turn-left-oncoming:1613ef2c).
+   *
+   * Set while he is in a junction visit (`JUNCTION_AREA_RADIUS_M` of a node)
+   * whose left turn the N1 tracker has NOT adjudicated, and either no left
+   * commit of the visit has been read yet — the commit-tick reading (the tight
+   * gap, or R13''' forced braking at an added commit) is still ahead — or an
+   * ST-LATE window is open, so the late read can still bill FAILED_TO_YIELD on
+   * a car that keeps braking for him after the commit. Absent once the turn is
+   * adjudicated (billed or praised), once a commit has been read and no window
+   * is left open, on the visit reset, and after a respawn in the visit.
+   *
+   * Published `true` on those frames and ABSENT on every other — additive,
+   * like `roundaboutEntryOpen` above. Absent does NOT mean «he gave way»: it
+   * means no left turn of his is waiting on anything.
+   *
+   * MEASUREMENT ONLY — nothing graded reads it and none may. Its one reader is
+   * the instructor's voice (`lessons/advisor.ts stepYieldVoice`, handed in as
+   * `oncomingTurnOpen`): «Пропусна насрещните — Изчака … и зави чак когато
+   * интервалът стигна — без отчетено нарушение на предимството» is a sentence
+   * about a left turn whose adjudication is OVER, so it is held while this is
+   * set. MEASURED before it existed (rig-w4b S12, 12 of 12 replays): the
+   * verdict at k2330, 22 m before the node, then FAILED_TO_YIELD for the same
+   * turn at k2824 (L1) / k2805 (L3). It can only delay or drop a line.
+   */
+  leftTurnOncomingOpen?: boolean;
+  /**
+   * THIS JUNCTION VISIT'S LEFT TURN WAS BILLED — the same ruling. Set from the
+   * grid point the N1 tracker emits a violated «left-turn-oncoming»
+   * `prioritySituation` (the tight gap, R13''' at an added commit, or the
+   * ST-LATE late read) until the visit resets; ABSENT on every other frame.
+   * MEASUREMENT ONLY: its one reader, the instructor's voice (handed in as
+   * `oncomingTurnBilled`), DROPS a pending «Пропусна насрещните» for the rest
+   * of the visit — never shown, never voiced. Read off the tracker, not the
+   * scored codes, so a charge the scorer withholds still drops it.
+   */
+  leftTurnOncomingBilled?: boolean;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
   /**

@@ -58,7 +58,8 @@ export {
 } from "./worldRuntime";
 // …and the one query it is read with (what is under a district point).
 export { makeSurfaceFix, surfaceAt, type DrivableSurface, type SurfaceFix } from "./surface";
-// Lane rbreverse: the reverse-warning measurement (display-only; no rule reads it).
+// Lane rbreverse: the reverse-warning measurement — `SimTick.reverseBrakedFor` is display-only; no rule reads it.
+// (The account query it reads also feeds the graded R13''' evidence: worldRuntime.ts setPlayerShedAccountsQuery.)
 export {
   REVERSE_BRAKED_FOR_VEHICLE_STOPPED_MPS,
   REVERSE_BRAKED_FOR_REVERSING_KMH,

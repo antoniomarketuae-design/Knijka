@@ -1166,6 +1166,14 @@ export interface YieldVoiceState {
      * caller could not say, and the verdict keeps the time window alone.
      */
     ring?: { x: number; y: number; azDeg: number };
+    /**
+     * An `oncomingVehicle` verdict that was DUE (its time window passed) and is
+     * being held only because his left turn can still be billed (advisor.ts
+     * `YIELD_VOICE_ONCOMING_TURN_HOLD`, ruling ST-VERDICT-HOLD). Such a verdict
+     * is not dropped by a later stop: the hold only delays it. Absent on every
+     * verdict the hold never touched — the state of every drive before it.
+     */
+    turnHeld?: true;
   } | null;
   /**
    * The live episode carries a graded mute-code conviction

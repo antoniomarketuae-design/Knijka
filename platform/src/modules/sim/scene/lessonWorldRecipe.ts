@@ -367,7 +367,10 @@ export function wireTrafficQueries(
   runtime.setSameDirVehiclesQuery((px, py, h, r) => traffic.sameDirVehiclesNear(px, py, h, r));
   // Lane rbreverse (sc-roundabout-entry:9e85f27e; founder ruling Q2 «warn
   // only»): every vehicle's own account, for the reverse-warning measurement
-  // `SimTick.reverseBrakedFor` — DISPLAY-ONLY, no rule reads it.
+  // `SimTick.reverseBrakedFor` (that field is display-only: no rule reads it)
+  // — and, since lanes slowturn / slowturn2 (ruling R13'''), for the N1
+  // tracker's GRADED forced-braking evidence and its late read, which need
+  // this query AND the planned-route query below.
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
   // Lane slowturn (ruling R13'''): each vehicle's planned route through a junction node, for the N1
   // tracker's forced-braking evidence at an ADDED-path left commit (runtime/leftTurnGiveWay.ts).

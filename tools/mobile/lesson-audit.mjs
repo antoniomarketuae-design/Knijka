@@ -4708,7 +4708,7 @@ async function runDemo() {
    * 2026-08-28): `03d-demo-end.png` showed «0:00 / 0:45» — the transport back
    * at the start, the ghost back on the spawn mark, and the FIRST annotation
    * on the glass again. The replay does not stop at the end, it LOOPS
-   * (`ShadowCar.tsx:571`), so a frame taken after the loop's exit condition is
+   * (`ShadowCar.tsx:578`), so a frame taken after the loop's exit condition is
    * a frame of the beginning wearing the name of the end. The picture was
    * wrong in the reassuring direction — it looked like a finished replay.
    * So the frame is taken from INSIDE the loop, at 85% of the authored
@@ -4728,7 +4728,7 @@ async function runDemo() {
     samples += 1;
     const t = r.tSec ?? last;
     if (t > last + 0.05) { advancing += 1; lastMoveAt = Date.now(); }
-    // THE REPLAY LOOPS, IT DOES NOT STOP. `ShadowCar.tsx:571` — `if
+    // THE REPLAY LOOPS, IT DOES NOT STOP. `ShadowCar.tsx:578` — `if
     // (clock.tSec > end) clock.tSec = loop ? loop.startSec : 0` — so the
     // playhead WRAPS and `playing` stays true for ever. „It finished" is
     // therefore a wrap after the playhead had got most of the way along, and

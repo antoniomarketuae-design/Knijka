@@ -966,8 +966,12 @@ function sceneResetCar(): { text: string; run: (...args: unknown[]) => () => voi
   }).outputText;
   return { text, run: new Function(...RESET_NAMES, `"use strict";\n${js}`) as (...args: unknown[]) => () => void };
 }
-/** Every name the scene's `resetCar` reads from outside itself. */
-const RESET_NAMES = ["simRef", "directorRef", "cabinRef", "gradeGrid"] as const;
+/** Every name the scene's `resetCar` reads from outside itself — since lane
+ *  slowturn2 also the world runtime (`runtime.noteRespawn()`, ruling
+ *  ST-RESPAWN-SCOPE: the N1 tracker's late window closes on a respawn). */
+const RESET_NAMES = ["simRef", "directorRef", "cabinRef", "gradeGrid", "runtime"] as const;
+/** A runtime stand-in for the cells that execute `resetCar` with no world. */
+const NO_WORLD_RUNTIME = { noteRespawn() {} };
 
 /** A real CabinControls needs a window to bind its key listeners to. */
 function withWindow<T>(fn: () => T): T {
@@ -1103,7 +1107,7 @@ function driveLooks(
       out.gear = p.gear;
     };
     const scene = run(ordered, cabinNow);
-    const resetCar = opts.resetCar ? opts.resetCar(args.simRef, directorRef, args.cabinRef, gradeGrid) : null;
+    const resetCar = opts.resetCar ? opts.resetCar(args.simRef, directorRef, args.cabinRef, gradeGrid, runtime) : null;
     let respawn: LookRun["respawn"] = null;
     const dur = Math.min(c.trace.meta.durationSec, opts.seconds ?? Infinity);
     let accumulator = 0;
@@ -1367,15 +1371,15 @@ describe("§5 ROUND 8 — a respawn: the scene's own `resetCar`, EXECUTED — no
   const reset = sceneResetCar();
   const c = cell("sc-jx-giveway-b1", "shadow-correct.trace.json", 1);
 
-  it("`resetCar` was found, and reads only the four things this file hands it", () => {
+  it("`resetCar` was found, and reads only the five things this file hands it", () => {
     expect(reset.text.startsWith("() => {")).toBe(true);
     expect(reset.text).toContain("gradeGrid.reset()");
     let thrown: unknown = null;
     try {
       withWindow(() => {
         const cabin = new CabinControls({}, "ready", "off");
-        reset.run({ current: { reset() {} } }, { current: { reset() {} } }, { current: cabin }, new GradeGrid())();
-        reset.run({ current: null }, { current: null }, { current: null }, new GradeGrid())();
+        reset.run({ current: { reset() {} } }, { current: { reset() {} } }, { current: cabin }, new GradeGrid(), NO_WORLD_RUNTIME)();
+        reset.run({ current: null }, { current: null }, { current: null }, new GradeGrid(), NO_WORLD_RUNTIME)();
       });
     } catch (e) {
       thrown = e;
@@ -1442,7 +1446,7 @@ describe("§5 ROUND 8 — a respawn: the scene's own `resetCar`, EXECUTED — no
         director: null,
       } as unknown as GradeGridWorld;
       const grid = new GradeGrid();
-      const resetCar = reset.run({ current: { reset() {} } }, { current: null }, { current: null }, grid);
+      const resetCar = reset.run({ current: { reset() {} } }, { current: null }, { current: null }, grid, NO_WORLD_RUNTIME);
       const events: number[] = [];
       const RESPAWN = 90;
       const hooks: GradeGridHooks = {

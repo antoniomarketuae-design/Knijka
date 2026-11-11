@@ -2545,7 +2545,12 @@ export function ReadyScene({
     // by lessons/scenario/__tests__/live-grade-call.execution.test.ts.
     cabinRef.current?.forgetPendingGlances();
     gradeGrid.reset();
-  }, [gradeGrid]);
+    // Lane slowturn2 (ruling ST-RESPAWN-SCOPE): the N1 tracker's late window
+    // can bill with no new commit, so it closes here, and its per-visit maps
+    // clear (runtime noteRespawn). Executed by
+    // runtime/__tests__/left-turn-late-read.test.ts (T-RESPAWN).
+    runtime.noteRespawn();
+  }, [gradeGrid, runtime]);
 
   // A2 performed pre-drive: raw transition queues, drained by RuntimeDriver's
   // frame loop and resolved to procedure steps (performedSteps.ts). Driveline

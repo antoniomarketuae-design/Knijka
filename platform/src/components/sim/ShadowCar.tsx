@@ -365,8 +365,16 @@ export function ShadowCar({
   const reducedMotion = useMemo(() => prefersReducedMotion(), []);
 
   // --- ghost model: clone + translucent tinted materials + wheel rig -------
-  const wheels = useRef<GhostWheel[]>([]);
-  const { model, scale, offsetY, ghostMaterials } = useMemo(() => {
+  // The wheel list is RETURNED with the model it was found in, never written
+  // into a ref from inside this memo (sc-ac-crosswind:a9db1738, rig w4c XC2):
+  // under React StrictMode — which R3F bridges into the Canvas on `next dev`
+  // — the reconciler runs a mount memo twice and keeps the FIRST result, so a
+  // ref written here ended up holding the SECOND clone's wheels while
+  // `<primitive object={model}/>` drew the first, and useFrame steered and
+  // rolled four wheels nobody draws (drawn wheel_FL rotation.y = 0 on every
+  // frame of the correct crosswind demo). Returned together, the wheels
+  // useFrame poses are by construction the ones inside the drawn model.
+  const { model, scale, offsetY, ghostMaterials, wheels } = useMemo(() => {
     const root = scene.clone(true);
     const ghostMaterials: THREE.Material[] = [];
     root.traverse((o) => {
@@ -416,7 +424,6 @@ export function ShadowCar({
         found.push({ node, front: name.startsWith("wheel_F") });
       }
     }
-    wheels.current = found;
 
     // Auto-fit exactly like HeroCarBody: width → collider width, tyres → 0.
     const bbox = new THREE.Box3().setFromObject(root);
@@ -425,7 +432,7 @@ export function ShadowCar({
     const targetWidth = CHASSIS_HALF_EXTENTS.x * 2; // the hero collider width
     const fitScale = size.x > 1e-3 ? targetWidth / size.x : 1;
     const fitOffsetY = -bbox.min.y * fitScale;
-    return { model: root, scale: fitScale, offsetY: fitOffsetY, ghostMaterials };
+    return { model: root, scale: fitScale, offsetY: fitOffsetY, ghostMaterials, wheels: found as readonly GhostWheel[] };
   }, [scene, tint]);
 
   useEffect(
@@ -583,7 +590,7 @@ export function ShadowCar({
 
     // Wheels: roll with the trace speed at the playback rate, steer per trace.
     rollRef.current += ((pt.speedKmh / 3.6) / WHEEL_RADIUS_M) * dtPlayback;
-    for (const w of wheels.current) {
+    for (const w of wheels) {
       w.node.rotation.x = rollRef.current;
       w.node.rotation.y = w.front ? pt.steerRad : 0;
     }

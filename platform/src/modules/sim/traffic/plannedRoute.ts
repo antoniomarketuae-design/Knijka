@@ -27,34 +27,84 @@
  *    it — staged.ts resolveStagedVehiclePath) at arc `s`. An authored rail
  *    line (`spec.railPath`) has no lanes and no movement at a node: null.
  *
- * THE MOVEMENT is `turnSpeedCap`'s own bands (vehicles.ts), read on the lane it
- * arrives by and the lane it leaves by: their cosine below −0.17 a U-turn,
- * below 0.57 a proper turn (left when the exit lies to the left of travel),
- * otherwise straight through (a bend of less than ~55° is not a turn there).
+ * THE MOVEMENT (lane slowturn2, integrator rulings ST-CLASS and ST-UTURN-X (a),
+ * 2026-11-09; sc-turn-left-oncoming:1613ef2c). It is read on WHAT THE VEHICLE
+ * DRIVES, and the side it turns to is decided BEFORE how sharply:
+ *  · THE DIRECTIONS. An ambient pair with a connector (graph.ts laneConnector,
+ *    length > 0) is driven as one cubic tangent to the `from` lane at
+ *    `exitS` and to the `to` lane at `entryS` (graph.ts buildLaneConnector
+ *    d0 / d3), so its movement is read on those two lane directions
+ *    (`sampleLane` at exitS / entryS) — never on the connector polyline's
+ *    first and last segments (on 7 catalogue pairs those fall on the other
+ *    side of 55°), and never on the lanes' end segments at the node centre,
+ *    which the car does not drive (42 of 812 connector pairs at degree ≥ 3
+ *    disagree). With no connector (the lanes already meet: graph.ts
+ *    CONNECTOR_MEET_M) the end segments ARE what it drives. A STAGED vehicle
+ *    never drives a connector (staged.ts resolveStagedVehiclePath joins its
+ *    lanes by a straight chord), so a staged pair is read on the lanes' end
+ *    segments.
+ *  · THE ORDER, exactly: (1) the reverse lane (`to.index === from.reverse`,
+ *    graph.ts — the traffic model's only U-turn notion) is «uturn»; (2) a
+ *    cosine at or above TURN_COS (turnSpeedCap's ~55° band, = runtime/turns.ts
+ *    TURN_THRESHOLD_DEG) is «straight»; (3) an exit to the RIGHT of travel is
+ *    «right», however sharp; (4) otherwise «left». There is no sharp-left
+ *    U-turn band (ruling ST-UTURN-X (a)): runtime/turns.ts has no junction
+ *    U-turn class — a U-turn at a junction is a left turn there (ruling R2
+ *    (a)) — and the reverse lane is the only U-turn the traffic model plans.
+ *    The reverse test comes FIRST because a reverse pair's two tangents are
+ *    anti-parallel and 273 of the 856 give a cross product below zero by float
+ *    noise. WHY THE SIDE FIRST: the old order tested a sign-blind U band
+ *    (cosine below −0.17) before the side, and 21 sharp RIGHT turns (lane
+ *    angles 101.9–143.1° on d2-v1 and district-v1) read as «uturn» — among
+ *    them the exam drill's graded node, d2-v1 n4547529959, e856821051.0 →
+ *    e23040421.0, which the car drives as an 86.5° right turn into the arm a
+ *    left-turner takes. A right-turner there is one he must give way to (ЗДвП
+ *    чл. 37, ал. 1), and runtime/leftTurnGiveWay.ts (1) refused it.
+ *  · NOT CHANGED, recorded: `approachDirX/Y` stays the arrival lane's end
+ *    segment (ruling ST-APPROACHDIR: no lesson-driven approach falls on
+ *    different sides of 130° under the two readings), and traffic/vehicles.ts
+ *    `turnSpeedCap` and `studentComing` keep their own bands — they move
+ *    ambient traffic on every trace (ruling ST-COMING records studentComing's
+ *    side-blind band as a known limit).
  *
  * PURE: reads the agent and the graph, writes only the caller's row.
  */
-import { laneConnector, type DirectedLane, type LaneGraph } from "./graph";
+import { laneConnector, sampleLane, type DirectedLane, type LaneConnector, type LaneGraph } from "./graph";
 import type { StagedVehicleAgent } from "./staged";
 import type { PlannedMovement, PlannedRouteThroughNode } from "./types";
 import type { VehicleAgent } from "./vehicles";
 
-/** turnSpeedCap's U-turn band (vehicles.ts: «cos < −0.17 … > ~100°: near U-turn»). */
-const UTURN_COS = -0.17;
-/** turnSpeedCap's proper-turn band (vehicles.ts: «cos < 0.57 … > ~55°: proper turn»). */
+/** turnSpeedCap's proper-turn band (vehicles.ts: «cos < 0.57 … > ~55°: proper turn»; = runtime/turns.ts TURN_THRESHOLD_DEG). */
 const TURN_COS = 0.57;
 
-/** The movement from lane `cur` onto lane `next`, by `turnSpeedCap`'s bands. */
-export function plannedMovement(cur: DirectedLane, next: DirectedLane): PlannedMovement {
-  const cos = cur.endDirX * next.startDirX + cur.endDirY * next.startDirY;
-  if (cos < UTURN_COS) return "uturn";
-  if (cos < TURN_COS) {
-    // 0° = north = +y, x east: a positive cross product turns the travel to the LEFT
-    // (vehicles.ts studentComing: «cross > 0 … to the left»).
-    const cross = cur.endDirX * next.startDirY - cur.endDirY * next.startDirX;
-    return cross > 0 ? "left" : "right";
+const MOVE_SAMPLE = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
+
+/**
+ * The movement from lane `cur` onto lane `next` (see the header): read on the
+ * connector's end tangents when `conn` is a driven connector (length > 0),
+ * else on the lanes' end segments; reverse lane first, then straight, then
+ * the side.
+ */
+export function plannedMovement(cur: DirectedLane, next: DirectedLane, conn?: LaneConnector): PlannedMovement {
+  if (next.index === cur.reverse) return "uturn"; // (1)
+  let ax = cur.endDirX;
+  let ay = cur.endDirY;
+  let bx = next.startDirX;
+  let by = next.startDirY;
+  if (conn !== undefined && conn.length > 0) {
+    // graph.ts buildLaneConnector's own d0 / d3.
+    sampleLane(cur, conn.exitS, cur.px.length - 2, MOVE_SAMPLE);
+    ax = MOVE_SAMPLE.dirX;
+    ay = MOVE_SAMPLE.dirY;
+    sampleLane(next, conn.entryS, 0, MOVE_SAMPLE);
+    bx = MOVE_SAMPLE.dirX;
+    by = MOVE_SAMPLE.dirY;
   }
-  return "straight";
+  if (ax * bx + ay * by >= TURN_COS) return "straight"; // (2)
+  // 0° = north = +y, x east: a positive cross product turns the travel to the LEFT
+  // (vehicles.ts studentComing: «cross > 0 … to the left»).
+  if (ax * by - ay * bx < 0) return "right"; // (3), however sharp
+  return "left"; // (4) — no sharp-left U-turn band (ruling ST-UTURN-X (a))
 }
 
 /** A fresh row (the system keeps one and overwrites it per call). */
@@ -157,7 +207,7 @@ export function ambientRouteThrough(
     const conn = laneConnector(graph, lk, nk);
     if (startS < conn.exitS) pushRange(row, lk.px, lk.py, lk.cum, startS, conn.exitS);
     if (k === found) {
-      row.movement = plannedMovement(lk, nk);
+      row.movement = plannedMovement(lk, nk, conn);
       row.approachDirX = lk.endDirX;
       row.approachDirY = lk.endDirY;
     }

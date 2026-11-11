@@ -1335,6 +1335,10 @@ describe("§3 the scene's own lines — what the model assumes, pinned at its ad
         "directorRef.current?.reset();",
         "cabinRef.current?.forgetPendingGlances();",
         "gradeGrid.reset();",
+        // lane slowturn2 (ruling ST-RESPAWN-SCOPE): the N1 tracker's late window
+        // closes and its per-visit maps clear on a respawn (runtime noteRespawn;
+        // runtime/__tests__/left-turn-late-read.test.ts T-RESPAWN).
+        "runtime.noteRespawn();",
       ]);
       // Both callers of a respawn go through it: key R and the touch sheet.
       expect(scene.split("onReset: resetCar").length - 1).toBe(1);

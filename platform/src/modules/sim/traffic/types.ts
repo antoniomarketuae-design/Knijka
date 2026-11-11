@@ -1042,7 +1042,10 @@ export interface StagedActorView {
    * founder ruling Q2 2026-10-19 «warn only»): `TrafficSystem.playerShedAccounts`
    * hands every agent's account to the runtime's reverse-warning measurement
    * (`runtime/reverseBrakedFor.ts` → `SimTick.reverseBrakedFor`), which only
-   * the coach's advisor card reads. It bills nothing.
+   * the coach's advisor card reads; that reader bills nothing. A FOURTH READER
+   * IS GRADED: the N1 tracker's forced-braking evidence at an ADDED-path left
+   * commit, and its late read (ruling R13''', lanes slowturn / slowturn2 —
+   * runtime/leftTurnGiveWay.ts), reads the same rows.
    */
   readonly playerShedMps?: number;
   /**
@@ -1269,7 +1272,9 @@ export interface TrafficSystem {
    * the rows are a reused pool. Lane rbreverse (sc-roundabout-entry:9e85f27e):
    * the runtime's reverse-warning measurement (`SimTick.reverseBrakedFor`)
    * reads it — a DISPLAY-ONLY reader: no rule reads that field (founder ruling
-   * Q2 2026-10-19, «warn only»). Pedestrians have no account and are not here.
+   * Q2 2026-10-19, «warn only»). The N1 tracker's forced-braking evidence and
+   * its late read (ruling R13''', lanes slowturn / slowturn2) ALSO read it, and
+   * that reader IS graded. Pedestrians have no account and are not here.
    */
   playerShedAccounts(): readonly PlayerShedAccount[];
   /**

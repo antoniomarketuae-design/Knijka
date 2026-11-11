@@ -19483,3 +19483,495 @@ PINNED AT INTEGRATION: pinned in process (the integrator, 2026-11-09; log `D:/kn
 - **Instrument (Z2-OCC).** An occlusion read built on elementFromPoint cannot see a pointer-events-none node such as the swing cue. The w3z2 occlusion measure needs a calibrated read. Evidence: `swingcue-r1.json` (build owed items 2(ii) and 7).
 - **C6 reachability.** C6 (the predrive row up while the cue fires) is unreachable only on a drive that starts at rest: preDrive locks the drive (engine.ts:2417) and the detector needs ≥ 20 km/h. Unproven for a rung that spawns moving. Evidence: `swingcue-r1.json` (census «Reachability»; build owed item 7).
 - **Test infrastructure.** lesson-ui shellClipAffordances «THE GENERAL FORM» hits its 60 s timeout under machine load. It did so in both the builder's and the verifier's directory runs, and in the curvpark2 integrator's components/sim run; it is green standalone and in the targeted runs. Evidence: `swingcue-r1.json` (build regression; verify F5); `D:/knijka-lanes/scratch/swingcue-verify/gate-lesson-ui.txt`; `land-cp2-results.json` integ tests (components/sim).
+
+## Landed: a slow (added-path) left turn is now also billed when the oncoming car has to brake for him only after his turn has begun. An oncoming car's movement is now read on the path it actually drives, so a sharp right turn into his exit arm counts as a car turning right that he must let through. The forced-braking bill has its own card, «Непропускане на насрещния». It quotes ЗДвП чл. 37, ал. 1 for a left turn and чл. 38, ал. 2 for a turn-round, because the bill cannot tell which of the two the turn will become. The instructor's «Пропусна насрещните» is now held until his left turn has been committed and read with no late window left open, and it is dropped on a visit that is billed. One reviewed card is added (15 strings). No other string is added or changed: the verdict keeps its words, and only its time moves. Measured in process only. `sc-turn-left-oncoming:1613ef2c` (major), the bill side (2026-11-10)
+
+Lane `slowturn2` ran three rounds. Round 1 was built on `ab78b58`. Round 2 was rebuilt on `c847a5d`, and round 3 continued that lane (HEAD had not moved). The builder worked in `D:/knijka-lanes/slowturn2-impl` and the verifier in `D:/knijka-lanes/slowturn2-verify`.
+- **The verdict.**
+  - Round 1. The builder returned BLOCKED on one point only, UC-1-SUBST (iii). The integrator moved that point to lane `uturnyield` (ruling ST2-DECOUPLE) and ran a verify-only pass. That pass REFUTED the lane on the new card's text. The card said «Зави наляво» and quoted only чл. 37, ал. 1, but the tree also bills it on 180° turn-rounds in sc-mv-uturn-ban: creep258@5 at L1–L5 on car 1002 at k2054, and creep264@5 at L5 on car 1005 at k2159. For a turn-round, content/law gives чл. 38, ал. 2. The pass also left two conditions. Mutants V1 and V9 of the frozen candidate set survived (F4). And HEAD had moved to `c847a5d`, where the patch conflicted on the reviewed-text manifest (F5).
+  - Round 2 was built under ruling ST-CARD-2, with the V1 / V9 pins, rebased on `c847a5d`. It was REFUTED on one finding the builder had not reported. On every S12 replay (12 of 12), the wait advisor said «Пропусна насрещните» at k2330, while he was still 22 m before the node at heading 270. The new late bill then billed the same turn at k2824 (L1) / k2805 (L3). That is a praise and a bill for one visit.
+  - Round 3 was built under ruling ST-VERDICT-HOLD. It was SIGNED OFF WITH CONDITIONS on 2026-11-10 by a fresh verifier pass, and no stop rule triggered.
+  - The verifier's log is `D:/knijka-lanes/scratch/slowturn2-verify/PROGRESS.md`, entries 2026-11-09 23:51 to 2026-11-10 09:08. The builder's log is `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md`.
+  - The reports are in `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/`: `slowturn2-r1.json` (builder), `slowturn2-r1-verify.json`, `slowturn2-r2.json` and `slowturn2-r3.json`.
+- **The patch.** `D:/knijka-lanes/slowturn2-result-r3.patch`.
+  - sha256 5f164c3301123bf31385470042666bb263393c78369702538c07bbba79b048ec; 37 files (29 modified, 8 new); +2063/−65; 0 CR bytes; no touched file is CRLF in base (the builder).
+  - It is cumulative against `c847a5d`, which is HEAD.
+  - The verifier reset its lane to `c847a5d` and applied the patch fresh. `git diff base` reproduced the sha256, and the round-2→3 delta (ca293b75…b561, 9 files) matched the builder's.
+- **What this landing stages.** The 37 files of the patch, with the integration pin of condition (1) inside one of them (below), plus `docs/simulation/88_LESSON_AUDIT.md` (this section) and `docs/architecture/07_ARCHITECTURE_DECISION_RECORDS.md` (the ADR text). No other docs file is committed. The same commit carries the wheelpose landing (gate-wp2, 4 files, none shared with this landing; its own section follows).
+  - The pin adds no file. It is a 13-line cell in `runtime/__tests__/left-turn-late-read.test.ts`. So the staged diff (37 files, +2076/−65) no longer equals the patch's sha256. It is `D:/knijka-lanes/gate-st2.patch`, sha256 1eef759375110d3d37a12db94a17673a930cc5d92bb2a38f0f16440d79891920.
+  - The code and test paths below are under `platform/src/` (`modules/sim/` where no other root is named).
+  - **Product:**
+    - `modules/sim/traffic/plannedRoute.ts`;
+    - `modules/sim/runtime/leftTurnGiveWay.ts`, `runtime/worldRuntime.ts` and `runtime/index.ts`;
+    - `modules/sim/rules/catalog.ts`, `rules/engine.ts`, `rules/index.ts` and `rules/types.ts`;
+    - `modules/sim/lessons/advisor.ts`, `lessons/engine.ts` and `lessons/types.ts`;
+    - `components/sim/LessonScene.tsx` (resetCar → noteRespawn);
+    - `modules/sim/scene/lessonWorldRecipe.ts` and `traces/recorder.ts`;
+    - `traffic/staged.ts`, `traffic/types.ts` and `traffic/vehicles.ts` (comments only, round-1 verifier F8).
+  - **Tests, new:**
+    - `runtime/__tests__/left-turn-late-read.test.ts` (with the integration pin);
+    - `lessons/__tests__/yield-voice-oncoming-turn-hold.test.ts`;
+    - `lessons/scenario/__tests__/slowturn2-late-bill.live.test.ts`, with `slowturn2-s12-rig-w4b.fixture.json`;
+    - `lessons/scenario/__tests__/slowturn2-verdict-hold.live.test.ts`;
+    - `lessons/scenario/__tests__/slowturn2-exam-node.live.test.ts`, with the `examDriveD2.ts` harness;
+    - `traffic/__tests__/planned-movement-census.fixture.json`.
+  - **Tests, changed:**
+    - `traffic/__tests__/planned-route.test.ts`;
+    - `rules/__tests__/failed-to-yield-situation-copy.test.ts`;
+    - `rules/__tests__/solid-cross-uturn-act.test.ts` (the act-corrective census);
+    - `scene/__tests__/live-grid-wiring.test.ts` (the resetCar body);
+    - `lessons/scenario/__tests__/live-grade-call.execution.test.ts` (the executed-resetCar harness);
+    - `modules/clips/capture/captureFeedParity.test.ts` (a comment).
+  - **Reviewed-text manifest** (`lessons/scenario/__tests__/reviewed-text-manifest/`): manifest.json, strings.3.txt, strings.4.txt, strings.b.txt, units.catalog.txt and units.source.txt.
+- **The rulings it was built under** (integrator, each the founder's to veto):
+  - ST-CLASS, ST-LATE, ST-CHAIN and W4B-ART, given before the lane;
+  - ST-UTURN-X (a), ST-LATE-END (d), ST-LATE-READ, ST-CARD, ST-APPROACHDIR, ST-RESPAWN-SCOPE, ST-COMING, ST-RUNNER-ALL and ST2-DECOUPLE (2026-11-09), with ST-BRISK deferred that day to a later ruling (made 2026-11-10; condition (4));
+  - ST-CARD-2 and ST-VERDICT-HOLD (2026-11-10).
+  They were made under the founder's delegations of 2026-10-08 and 2026-10-19, and the founder's forced-braking rulings of 2026-09-30 and 2026-10-05.
+
+**The row is NOT closed by this landing.** `sc-turn-left-oncoming:1613ef2c` stays OPEN (PARTIAL, rig-w4b).
+- Every number below was measured in process. Recorded and scripted drives were folded through the live chain, and the rig-w4b raws were replayed. No builder, verifier or integrator drove a slow left turn in a browser or saw the new card on a device.
+- This landing is the bill side only. The row's «gets no credit» half is lane `ltap2` (ruling ST-CREDIT-ROUTE), together with `52a3516f` and `bc162f55`.
+- The row closes only through that lane AND a rig re-drive judged after both landings (Owed, below).
+- The landing does not change the open-row count. The docs agent's list-open.mjs run on 2026-11-10 shows 10 open (1 critical, 9 major, 0 minor).
+
+**What was wrong.**
+- **The planned-route class (ST-CLASS).**
+  - On base, `traffic/plannedRoute.ts plannedMovement` read a vehicle's movement on the lanes' end segments at the node centre, by `turnSpeedCap`'s bands. It tested a sign-blind U band (cosine below −0.17) BEFORE the side.
+  - So 21 sharp right turns (lane angles 101.9–143.1°, the builder) read «uturn», and R13''' clause (1) refused them as vehicles he must give way to.
+  - One of them is the exam drill's graded node, d2-v1 n4547529959, e856821051.0 → e23040421.0. The car drives it as an 86.5° right turn into the arm a left-turner takes. The round-1 verifier reproduced it: «uturn» on base, «right» on the tree.
+- **Forced braking after the commit (ST-LATE).**
+  - R13''' clause (3) was read only on the added commit's own grid point.
+  - On rig w4b's S12 (sx-n-c, oncoming car 1001, the commit at k2802), the car's own attributed account reached the 0.3 m/s line only after the commit, while his body still lay on its route.
+  - The round-1 verifier, 12 of 12 replays: on L1 the account stays 0 until k2821, then reads 0.106 → 0.210 → 0.312 at k2824. On L3 it is 0.0072 at the commit and 0.336 at k2805.
+  - Base billed nothing: the drive passed with 0 points and the turn credited.
+- **The card.** Before ST-CARD, where a slow-turn forced-braking bill was shown it printed the pooled FAILED_TO_YIELD card.
+  - Its text was the right-hand rule and the give-way sign, citing «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1», and nothing said why he was billed.
+  - This is the builder's STEP 0(d), measured on S12 L1 / L3, where a late bill and a commit-tick bill showed the same strings.
+  - On the exam drill and on sc-mv-uturn-ban the praise latches the place, so a forced bill showed nothing there.
+- **The verdict (found in round 2).**
+  - On base, `lessons/advisor.ts stepYieldVoice` said the `oncomingVehicle` verdict YIELD_VOICE_VERDICT_S (4 s) after he moved off. Its only holds were for a ring.
+  - On S12 that was k2330: 22 m before the node, at x 21.7 and heading 270, before any turn.
+  - Base already carried the same conflict on commit-tick R13''' bills of slow turns. The round-3 verifier's census found the verdict beside a bill in 18 of 165 base cells, all of them commit-tick R13''' bills: v6 at L3/L5 on car 1001, and w12-v7 at L1–L3/L5 on car 1000. The builder's example is shadow-6-stop20 L1, with the verdict at k1582 and the bill at k4143.
+  - A separate base defect is cured with it: base's «зави» was premature, said before any turn (round-2 verifier). The tree never shows the verdict before his left commit (round-3 verifier).
+
+**What landed.** This is the builder's description, checked by the verifiers against the patch.
+- **ST-CLASS, `traffic/plannedRoute.ts plannedMovement(cur, next, conn?)`.** The tests run in this order:
+  - (1) the reverse lane gives «uturn»;
+  - (2) a cosine ≥ TURN_COS 0.57 gives «straight»;
+  - (3) an exit to the right gives «right», however sharp;
+  - (4) anything else gives «left».
+  - An ambient pair with a driven connector is read on the two lane directions the connector is tangent to (`sampleLane` at `exitS` / `entryS`, the connector's d0 / d3). A staged pair, or a pair with no connector, is read on the lanes' end segments.
+  - UTURN_COS is removed (ST-UTURN-X (a)). The reverse lane is the traffic model's only U-turn, and runtime/turns.ts has no junction U-turn class (R2 (a)).
+  - `approachDirX/Y`, `turnSpeedCap` and `studentComing` are unchanged (ST-APPROACHDIR, ST-COMING).
+- **ST-LATE: the window.** It lives in `runtime/leftTurnGiveWay.ts` (`openLate` / `lateRead` / `closeLate` / `lateOpen` / `lateOpenIds`) and the `runtime/worldRuntime.ts` N1 block.
+  - At an added-path left commit that is not adjudicated on its own grid point, a window opens. It holds the vehicles that meet clauses (1), (2) and (4) ON THAT POINT with his body on their route ahead of them. This set is frozen at the commit (ST-LATE-READ).
+- **ST-LATE: the read.** On each later grid point of the visit, after `track`:
+  - a candidate closes when its route no longer arrives at the node or his body has left it;
+  - the first open candidate whose own in-way account reaches ≥ LEFT_TURN_FORCED_SHED_MPS (0.3 m/s) is billed with the same `prioritySituation {left-turn-oncoming, violated, addedPath, forcedById}`, once, and every window then closes.
+- **ST-LATE: the closes.** Every window also closes:
+  - on the visit reset;
+  - on any later `turnStarted` in the visit;
+  - on any adjudication;
+  - on a respawn;
+  - when his turn is complete (ST-LATE-END (d)). «Complete» means his lane fix lies on an edge at the visit's node other than the edge he approached by, with his heading within TURN_REARM_DEG 15° of that edge's tangent taken away from the node.
+  - Only the car's own attributed account counts (ST-CHAIN). The window adds no constant.
+- **ST-RESPAWN-SCOPE.** `WorldRuntime.noteRespawn()`, called by `LessonScene resetCar`, closes the window and clears the tracker's per-visit maps. The builder measured why at base: on the exam drill, a respawn 15 m from the node keeps the visit and its 10-row account map.
+- **ST-CARD / ST-CARD-2.**
+  - `rules/catalog.ts FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED = "left-turn-oncoming-forced"`. `rules/engine.ts` stamps this act key only on a «left-turn-oncoming» conviction that names `forcedById`. The code, the points and the `priority|left-turn-oncoming` place latch are unchanged.
+  - The card:
+    - title «Непропускане на насрещния»;
+    - explanation «Зави пред насрещно превозно средство, което продължаваше направо или завиваше надясно, и то трябваше да намали, защото завоят ти навлезе в пътя му. При ляв завой важи ЗДвП чл. 37, ал. 1: „…“ При обратен завой важи ЗДвП чл. 38, ал. 2: „…“ Да изглежда, че ще успееш, не е достатъчно: щом насрещният трябва да намали заради теб, предимството му е отнето.»;
+    - peek «Насрещният намали заради теб.»;
+    - lawRef «ЗДвП чл. 37, ал. 1; чл. 38, ал. 2»;
+    - corrective «При ляв или обратен завой пропусни насрещните, които продължават направо или завиват надясно, и тръгни едва когато завоят ти няма да накара никого от тях да намали. Колкото по-бавно завиваш, толкова по-голям интервал ти трябва.»
+  - Both quotes were retrieved verbatim from content/law/acts/zdvp.json.
+- **ST-VERDICT-HOLD (round 3).**
+  - `runtime/worldRuntime.ts` keeps three per-visit flags, `ltCommitRead`, `ltRespawned` and `ltBilled`. From them it publishes two SimTick fields, MEASUREMENT ONLY and read by nothing graded:
+    - `SimTick.leftTurnOncomingOpen`: the visit is active, not adjudicated and not respawned, and either no left commit has been read yet or a late window is open;
+    - `SimTick.leftTurnOncomingBilled`: latched from any violated «left-turn-oncoming» prioritySituation of the visit.
+  - `lessons/engine.ts` hands them to `lessons/advisor.ts stepYieldVoice` as `oncomingTurnOpen` / `oncomingTurnBilled`.
+  - A due `oncomingVehicle` verdict is HELD while the first is set, and marked `turnHeld` so that a stop inside the junction does not drop it. It is said on the first grid point after the field clears. It is DROPPED for the visit once the second is set.
+  - The time window stays the floor. Only `oncomingVehicle` is held.
+- **Comments.** The stale «display-only» comments on the shed-account query (F11) are corrected.
+  - The round-1 verifier (F8) confirmed that the diffs in vehicles.ts, staged.ts, traffic/types.ts, lessonWorldRecipe.ts and recorder.ts are comment-only.
+  - On the staged diff, runtime/index.ts and captureFeedParity.test.ts also change only comments.
+  - worldRuntime.ts has its comment corrections beside its logic changes.
+- **What did not move.**
+  - No F15 constant moved (round-1 verifier F8).
+  - The constant changes are UTURN_COS removed, MOVE_SAMPLE added, the new act key FAILED_TO_YIELD_SITUATION_LEFT_TURN_FORCED, and (round 3) YIELD_VOICE_ONCOMING_TURN_HOLD = "oncomingVehicle" in lessons/advisor.ts.
+  - No committed trace was re-recorded.
+  - The clip plan was not regenerated: clipPlan 27/27, and no fault time moved.
+  - Round 3 changed no string, and the verdict's copy is byte-identical.
+
+**What the student sees.** One card is added. No other string is added or changed. The verdict «Пропусна насрещните» keeps its words: it only moves later, or is dropped on a billed visit.
+- **S12, PC and phone, L1 and L3, at 60 Hz, 30 Hz and the phone cadence.**
+  - FAILED_TO_YIELD on car 1001, once: at k2824 on L1 and k2805 on L3, that is 0.37 s / 0.05 s after the commit at k2802. The card is «Непропускане на насрещния», with 10 points.
+  - The turn task is refused and the follow runner resolves «violation».
+  - «Пропусна насрещните» is never shown, on the glass or in the debrief.
+  - Base passed the same drives with 0 points and the turn credited, after the verdict at k2330.
+- **Turn-rounds.** The same card bills the 180° turn-rounds in sc-mv-uturn-ban: creep258@5 at L1–L5 on car 1002 at k2054 (commit k2046), and creep264@5 at L5 on car 1005 at k2159 (commit k2152).
+  - These are scripted cells: the UC C5 / C cells, run by the slowturn2 builder's tmp-s2uc probe and the round-1 verifier's zzv-uc probe. They are not committed tapes, so they are uncommitted inputs.
+  - The card is worded to be true of a left turn and of a turn-round alike (ST-CARD-2).
+- **«Пропусна насрещните» on a drive that is not billed.** The verdict keeps its words, «Изчака N с и зави чак когато интервалът стигна — без отчетено нарушение на предимството. Точно това мери този урок: не „ще успея“, а колко секунди има до насрещния, преброени преди волана. Запази го и когато отзад те чакат.» It is now said on the commit, or when the late window closes. The round-3 verifier's examples:
+  - the correct demo: k1582 → k1787, the commit, on the same tick as the yield praise;
+  - B: k2330 → k2590;
+  - S5: k2330 → k3349;
+  - v9 L3: k1582 → k2343, when the late window closes;
+  - arc11-s25: k1582 → k3867;
+  - STOP5: k2330 and k3310 → k3307. Base said it twice for that one turn; the tree says it once.
+- **The exam drill's graded node.** On the real TrafficSystem it bills nothing on base or on the tree (the builder). The ambient right-turners yield to the student and queue at the mouth with their accounts at 0 (ST-COMING).
+
+**What the verifier reproduced.** These are its own measurements, on `c847a5d` + the patch: round 3 unless a round is named. Outputs are under `D:/knijka-lanes/scratch/slowturn2-verify/`.
+- **S12** (`s12-tree3.json`).
+  - 12 of 12 replays (PC and phone, L1 and L3, three cadences). The only violation is «Непропускане на насрещния» on car 1001, at k2824 (L1) / k2805 (L3), once each.
+  - Score 10, passed false, the turn task not done, the follow runner «violation», and no «Пропусна насрещните» anywhere.
+  - Every other field is byte-identical to round 2.
+- **Its own verdict census, 270 cells, base against the tree** (probe zzv-vh; `vh-base.jsonl`, `vh-tree3.jsonl`, `vh-table.tsv`).
+  - The cells: the 3 committed tapes at L1–L5, the 15 rig-w4b raws at their own level, and 12 scripted drives the verifier wrote itself at L1–L5 (slow 6 / 9 / 13 km/h, brisk 17 / 21, short waits, a stop at the mouth, stops inside the arc). Each runs at three cadences.
+  - Base: 165 cells show the verdict, all of them before the commit. 18 of them also carry a bill, all commit-tick R13''' bills.
+  - Tree: 129 cells show the verdict. None of them is billed, none shows it before his left commit, none shows it inside the `leftTurnOncomingOpen` interval, and none depends on cadence.
+  - Of the 135 base-shown cells the tree leaves unbilled, 129 still show the verdict, later. The other 6 (arc7-s10 at L3/L5) lose it to the existing COLLISION mute before the commit.
+  - No cell gains the verdict.
+- **The class census** (rounds 1 and 2; `census-mine.json`). The verifier computed the tangents itself, not through plannedMovement.
+  - 2,154 pairs, with 0 mismatches against the tree.
+  - 84 pairs change. That equals the committed fixture and the drafter's list: uturn→right 21, uturn→left 33, left→straight 1, straight→right 1, straight→left 4, right→straight 24.
+  - All 856 reverse pairs are «uturn». The exam pair is «right» at 86.5°.
+  - The verifier counts 272 reverse pairs with a cross product below zero, against the builder's 273. That is float noise at a segment boundary, and it does not matter because the reverse test comes first.
+  - On base, planned-route fails 5 tests on assertion text.
+- **The card** (round 2).
+  - Both quotes equal content/law/acts/zdvp.json: the first sentence of чл. 37 (1) and all of чл. 38 (2). Each is marked with its turn, and no «наляво» stands outside the quotes.
+  - Every sentence is true on every billed cell. On S12 he turns 270 → 180, a left turn under чл. 37, ал. 1, and car 1001 goes straight. On the turn-round cells he turns 0 → 180, under чл. 38, ал. 2, and the stream car drives south at x −4.06, slowing from 8 to about 1.2 m/s.
+  - Only the 15 strings of the new card were added to the manifest.
+- **Mutants.** Each was restored and checked by sha256.
+  - Round 1:
+    - killed on assertion text: V2 (>= read as >), V3 (the turn-complete heading test dropped), V6 (the act key stamped without forcedById), V7 (the connector tangents dropped), V8 (no close on a later turnStarted) and V10 (the noteRespawn call removed from LessonScene);
+    - V1 and V9 survived (condition F4, below).
+  - Round 2: V1 and V9 killed on «AssertionError: expected [ { k: 138, …(5) } ] to deeply equal []». Also killed: E2 (the met check in evidence()), C1 (the two article markers swapped) and C2 (the explanation saying «Зави наляво»).
+  - Round 3, 9 mutants:
+    - VH8 (hold removed) killed: T-LIVE «expected [{k:2330, kind:'lesson'…}] to deeply equal []»;
+    - VH1 (open only while a late window is open) killed: verdict-hold.live, 4 tests;
+    - VH9 (drop removed) killed by 4 unit tests. It is equivalent in the live chain, where the existing gradedMute drops the verdict on the bill frame;
+    - VH2, VH4, VH5 and VH6 killed;
+    - VH3 survives the lane's tests (condition (1); pinned at integration, below);
+    - VH7 is provably equivalent: `ltBilled` is published only while nearestIx is not null, and every re-entry passes the visit-start reset.
+- **Regression, one file at a time with one worker.**
+  - 20 targeted files green: yield-voice-oncoming-turn-hold 12, slowturn2-verdict-hold.live 4, left-turn-late-read 35, planned-route 15, left-turn-forced-braking 27, failed-to-yield-situation-copy 16, slowturn2-late-bill.live 2, slowturn2-exam-node.live 3, reviewed-text-manifest 49, caption-truth 58, keep-right-claim-census 24, clipPlan 27, live-grid-wiring 41, live-grade-call.execution 47, captureFeedParity 15, slowturn-ltap.live 380, advisorFace 15, advisorPeekSummary 13, personStrikeHold 28 and controller-dark-lamp-head-and-voice 13.
+  - The lessons/__tests__ directory: 130 files, 2,484 passed, 165 skipped.
+  - Round 1 also ran the runtime directory (52 files, 972) and traffic (45, 575) green.
+  - tsc: 22 errors, the environment baseline, none in a touched file.
+- **Restored clean.** The lane equals base plus the patch, `git diff base --binary` gives the patch sha, the probes were moved to attempts/ and nothing was deleted.
+
+**The builder's numbers, not re-measured by a verifier.**
+- **The 795-cell verdict census** (sc-turn-left-oncoming only, the one lesson that authors `reportOncomingGapSec`). The cells: 3 tapes, 4 rig-w2 legs, 15 rig-w4b raws and 39 scripted drives, at L1–L5 and three cadences.
+  - Base showed the verdict in 477 cells. ROUND 2 showed it in 477 cells, 60 of them also billed (S12 12 of 12 among them).
+  - The tree shows it in 405 cells: none billed, none before his left commit, none while open, none cadence-dependent.
+  - In 417 cells base showed the verdict and the tree bills nothing. 405 of them still show it, later. The other 12 (shadow-7/8-stop5 at L3/L5) lose it to the existing COLLISION mute before the commit.
+  - Without the `turnHeld` mark, 96 of those 417 cells would lose the verdict.
+  - (Round 2's 60 billed cells are not a base figure. Base S12 is unbilled; condition (2).)
+- **Cells re-run identical.** The watch list, 90/90 cells (every ADDED-left committed cell × rungs × three cadences, none with a candidate), and the base-commit tapes, 120/120, are identical on every round. The round-1 verifier compared the builder's own watch files and found them identical; it did not re-run them. UC C5 + C, 31/31 identical from round 2 to round 3.
+- **The close options** (STEP 0(b2)). On S12 the candidate's own off-route close comes at k2830. (d) fires at k2848, (c) at k3145 and the visit reset at k3353, and every option bills the same car.
+  - The margin to the close: L1 6 grid points (0.10 s), L3 25.
+  - On the exam node's real-model follower cell (go120), car 8 is not a candidate: the set is frozen at the commit. Its account reaches 0.3 in his path at k9296, after (d) has closed at k8980, and (c) never fires before the visit reset at k9750. So had car 8 been a candidate, (d) would not have billed it and (c) would have.
+- **The brisk table** (STEP 0(c)). 24 base-left tapes × L1–L5 give 120 cells. 12 of them carry a post-commit crossing, and every one was already convicted by the tight rule at the commit.
+- **The class census beyond the 84 pairs.** 1,214 pairs keep their base class. 7 chord-vs-tangent pairs fall on the other side of 55° if the connector polyline's end segments are used.
+- **Mutants.** MH1–MH8 (round 3) and M1–M16, X1, X8 and X10 (round 1), all killed on assertion text.
+- **Directory runs.**
+  - Round 3: runtime 52 files, 981; rules 110, 1,935; lessons/scenario/__tests__ 221 files, 5,663 passed, 2 skipped; lesson-ui 60 files, 1,120/1,122. The 2 lesson-ui reds: touchHintLifetime ENOENT tools/ (environment), and shellClipAffordances timed out under load (40/40 alone).
+  - Round 2: traffic 54, 690; scene 798/799 (ENOENT tools/); components/sim 2,072/2,073 (ENOENT tools/); clips 291 (whyPanel ENOENT docs/); traces 174, 2,536.
+
+**The conditions, and how each stands** (integrator rulings, 2026-11-10, each the founder's to veto).
+
+**(1) r3 C1: mutant VH3 survives the lane's tests. PINNED AT INTEGRATION.**
+- VH3 removes the `ltRespawned` reset at a node-change visit start. It survives left-turn-late-read (35/35), because every test path passes through the visit-end reset.
+- It is reachable only when the nearest node changes directly from A to B after a respawn. sx-v1, the district of the only lesson that can show the verdict, has one node (sx-n-c), so no shipped cell reaches it: a survivor on an uncommitted input.
+- The ruling: add a cell to the existing left-turn-late-read harness that switches nodes after a respawn, so that VH3 dies on assertion text; otherwise record it here.
+PINNED AT INTEGRATION: the integrator added one cell to the ST-VERDICT-HOLD describe of `runtime/__tests__/left-turn-late-read.test.ts`, in the existing harness: «…but only for the visit: a respawn at J (60), then a DIRECT node change onto the next node n348207502 (61 on) — open again from the new visit's first point».
+  - noteRespawn fires at frame 60 at J. poseAt then lifts the car straight onto the centre of n348207502, the district's next node, 63.5 m away (JUNCTION_AREA_RADIUS_M is 40).
+  - The cell asserts that `leftTurnOncomingOpen` is true at 59 and absent at 60, that nothing is billed, and that the open frames are [0..59] plus [61..end]. The file was green 36/36 before the mutant.
+  - VH3 (the exact edit of the verifier's mut3/mut.cjs: the `ltRespawned = false;` reset at the start of a node-change visit removed) dies 1 failed | 35 passed, on the new cell only: «AssertionError: expected [ Array(60) ] to deeply equal [ +0, 1, 2, 3, 4, 5, 6, 7, 8, …(254) ]». worldRuntime.ts was restored by copy, sha256 b43d3dc63dacd01ca364b307f75455db2e366ff37b1e70ac8e2520a25e178030 checked, and the file was green 36/36 again.
+  - The merge verifier applied VH3 itself (the `ltRespawned = false;` at worldRuntime.ts:2545 removed) and got the same result on the same text, on the new cell only. The cell runs the real `createWorldRuntime(loadDistrict())` with `rt.noteRespawn` and `rt.sample`; the prototype hook on `LeftTurnGiveWayEvidence.track` is diagnostic only. It restored the file with the sha256 matching.
+  - VH7 (`ltBilled = false` removed at visit end) is not pinned. It is equivalent: the only path back into a visit is the node-change visit start, which resets `ltBilled` before anything reads it (the integrator). The merge verifier accepted it on reading (worldRuntime.ts:2546 resets it at the visit start; :3600 publishes it only while nearestIx is not null).
+
+**(2) r3 C2: the docs figure. FIXED in this section and in the ADR-014 amendment.**
+- The lane's drafts said «base showed the verdict in 477 cells, 60 of them also billed (S12 12/12 among them)». The 60 billed cells are ROUND-2 figures. (The builder's base count of cells showing the verdict is also 477.)
+- Base S12 is not billed: 12 of 12 pass with 0 points.
+- This section and ADR-014 «Amendment 2026-11-09» label the builder's billed figure «round 2». They give the base figure from the round-3 verifier's census: 165 cells with the verdict, 18 of them also billed, all commit-tick R13''' bills.
+
+**(3) The builder's known limit. RECORDED.**
+- A respawn releases the hold, as ruled, but the lesson engine receives no respawn signal. So a verdict still pending when the student presses «Рестарт» between moving off and the commit, without crashing, is said after the respawn. (A crash's COLLISION already drops it.)
+- Base said the same sentence 4 s after he moved off, so this does not newly falsify a sentence (round-3 verifier N1).
+- sc-turn-left-oncoming spawns 105 m from its only node, so a respawn always ends the visit there.
+- No census cell exercises it. Dropping the verdict on a respawn needs a respawn signal on the lesson engine.
+- Not pinned at integration: no respawn signal reaches the lesson engine on a manual restart, so there is no code path for a test to pin, and a test asserting the current behaviour would freeze the limit in place instead of guarding a ruling (the integrator).
+
+**(4) Carried, not settled by this landing.**
+- ST-COMING: `studentComing` keeps its side-blind band. So an ambient oncoming right-turner yields to the student, and the exam node cannot produce an ambient R13''' bill. No row is filed.
+- ST-RUNNER-ALL: a bill resolves every still-live oncoming runner as «violation», because runners.ts does not read `forcedById`. The commit-tick bill always did the same.
+- ST-BRISK: base commits have no late read in this landing. The brisk table went to a later ruling, which the integrator has since made (ST-BRISK, 2026-11-10, in the ltap2 brief; the founder's to veto): forced braking after a BASE commit under ST-LATE's clauses is a failure to give way. Lane «brisklate», owed after ltap2, is to build it.
+- The positive T-EXAM (a bill at the exam node from ambient traffic) could not be produced on the real TrafficSystem. It is owed to a rig drive.
+- UC-1-SUBST (iii) moved to lane `uturnyield` (ST2-DECOUPLE).
+
+**Round-1 conditions, settled in round 2.**
+- F4 (V1, V9): the builder added two cells to left-turn-late-read, «his body on its route at the commit» and «(2) met at the commit». The round-2 verifier killed both mutants on assertion text (above).
+- F5 (HEAD moved): the lane was rebuilt on `c847a5d`, and the manifest was re-recorded once there, 15 strings ADDED, all of the card. The round-3 verifier found the manifest green and untouched in round 3.
+
+**N2 (round-3 verifier). RECORDED for the seam review.**
+- The hold is built as «committed and read», not «adjudicated». After an ADDED commit with no candidate, `ltAdjudicated` stays false and no window opens, so the verdict is released on the commit tick.
+- Only a second left `turnStarted` in the same visit could still adjudicate. That needs the window to re-arm below 15°, which takes an S-move or a turn-round, and it occurs in no census cell.
+
+**The card's wording.** Approved by the integrator at this landing; the founder may veto it (O7).
+
+**Stated limits.**
+- The thin margin on S12 PC L1: the line is crossed 6 grid points (0.10 s) before his body leaves the car's route (the builder). The bill is the same at every cadence.
+- The frozen candidate set never admits a car that stood at the mouth at the commit and moved into his path later. The builder measured one on the exam node: car 8, whose account reached 0.3 in his path only after his turn was complete (k9296, against (d) at k8980).
+- When he waits again inside the junction, the single verdict's «Изчака N с» counts the wait at the line only. That is true, but not the whole wait.
+- Split nodes (R10, d2-v1) are as in the slowturn landing.
+- Only `oncomingVehicle` is held. The rail duty and the other duties keep the 4 s window (the advisor's «ONLY THE RING» residual).
+
+**LANDING ORDER.** The held landing `uc` (gate-uc.patch) and lane `uturnyield` land after this one, on top of it.
+
+**What this landing supersedes in doc 88.** In the slowturn landing (`1613ef2c`, 2026-11-08):
+- Clause (1) said «Its movement there is STRAIGHT or RIGHT, by `turnSpeedCap`'s bands» (main tree :18745). The movement is now `plannedMovement`, read on what the car drives (the connector's end tangents where it drives one), with the side decided first.
+- «The fault card is the pooled FAILED_TO_YIELD copy … this landing does not change it» (:18770) is no longer true of an R13''' (forced-braking) bill. It stays true of a tight-gap conviction.
+- The recorded candidate «The left-turn FAILED_TO_YIELD card cites the wrong duty» (:18921) is narrowed. It now holds only for tight-gap convictions, which name no `forcedById`.
+
+**ADR.**
+- ADR-014 gains «Amendment 2026-11-09».
+- In ADR-014's «Amendment 2026-11-08», two sentences are corrected in place:
+  - clause (1)'s movement sentence;
+  - the New-vocabulary sentence saying `prioritySituation.forcedById` «is read by no rule». The reducer now reads its presence to stamp the card's act key.
+- ADR-011's «Update 2026-11-08» becomes «Update 2026-11-08 / 2026-11-09».
+- ADR-015's «New vocabulary» pointer names the 2026-11-09 amendment too.
+
+**PROVEN ON c847a5d** (the integrator's run on 2026-11-10 in the worktree `D:/knijka-lanes/integ-st2`, log `D:/knijka-lanes/scratch/st2-land/PROGRESS.md`, run logs `r-*.log` in the same folder; report `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/land-st2-results.json`; the config with its conditions `D:/knijka-lanes/scratch/land-st2.config.json`. The merge verifier ran the pin, one lane mutant and the lane's key tests itself.)
+- **The apply.** The worktree was clean at c847a5d5e4e4771550c92f1f978f77a203f461a6, and the patch sha256 matched (5f164c33…b048ec). `git apply --3way --index --binary` exited 0 and staged 37 files. Every file applied cleanly, no file needed a 3-way merge, and nothing conflicted. The «Falling back to direct application» lines were for new files (the integrator's log says «the 7 new files»; the patch adds 8 new files, and all 8 are staged).
+- **The conditions:** (1) is pinned (above); (2) is fixed in this section and the ADR-014 amendment; (3) and (4) are recorded. No product code changed beyond the lane patch.
+- **The directories**, all green, rc=0 unless stated:
+  - lessons/__tests__ 130 files, 2,484 passed, 165 skipped;
+  - lessons/scenario/__tests__ 221 files, 5,664 passed, 1 skipped;
+  - components/sim: 113 of 114 files, 2,072 passed, 1 failed (2,073). The one red was a TIMEOUT with no assertion: shellClipAffordances.test.ts «THE GENERAL FORM: no sub-1 shrink weight anywhere under the sim trees», «Test timed out in 60000ms», a tree-scanner test, while two other lanes' full vitest runs (wheelpose-verify, uturnyield-verify) were on the machine. Re-run alone: 40/40;
+  - orchestrator 42, 536; rules 110, 1,935; traffic 54, 690; runtime 52, 982 (the VH3 cell included);
+  - scene 48, 799; vehicle 22, 299; world 135, 2,409; hud 75, 1,549; traces 174, 2,536;
+  - src/modules/clips/ 20, 306: the clip-plan freshness gate passed, so nothing was regenerated or staged.
+- **Reviewed-text manifest:** reviewed-text-manifest.test.ts 49/49 with the patch's manifest as shipped (its 15 added card strings). No shown text moved against the patch, so it was not re-recorded and no entry moved.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, inside the 21–22 baseline, all environment (api/health/route.ts 4, lib/db.ts 1, the admin, learning, auth, payments, privacy and outcomes stores, lesson/progress.ts, sim/lessons/store.ts 2, sim/traces/attemptStore.ts 1), none in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what gate 4/4 of wave-cycle.sh runs): run 1 read 1,918 tests, 1,897 pass, 10 fail, 11 skipped.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured», frozen 1,811 captions against 1,826 in the tree).
+  - 9 are environment reds (the integrator): build-redrive §9(a), §9(b), §9(d), §9(e), count-agreement.test.mjs and finding-reader.test.mjs fail on «could not find .audit-frames/findings» (that corpus exists only in the main tree, untracked); lane-evidence.test.mjs fails on «could not resolve the playwright package» (the main tree resolves it from the untracked tools/clips/headless/node_modules); and path-disarm and path-follow died at about 570 s with no failing subtest, killed by the integrator's own outer `timeout 590`.
+  - Re-run with the environment supplied: lane-evidence, path-disarm and path-follow with `KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/` and no outer timeout, 126 tests, 122 pass, 0 fail, rc=0 (2,270 s); count-agreement, finding-reader and build-redrive from cwd `E:/AI driver`, read only (the main tree's `git status` the same before and after), 90 tests, 89 pass, 1 fail. finding-reader and all of build-redrive §9 pass. The one red is count-agreement's «apply-reroute.mjs printed no WORKED line»: apply-reroute.mjs takes REPO from its own location (the worktree, which has no .audit-frames) and exits 2 with «no reroute.jsonl». `E:/AI driver/.audit-frames/reroute.jsonl` exists, so the main-tree gate will read it.
+  - The landing touches no tools/ and no content/ file. No tools test was taught. The main-tree gate decides.
+- **The gate patch.** `D:/knijka-lanes/gate-st2.patch`, sha256 1eef759375110d3d37a12db94a17673a930cc5d92bb2a38f0f16440d79891920, 37 files, +2,076/−65, 0 CR bytes (no staged file is CRLF in the repo). The worktree was left staged, with no stray file and no process running. One integrator slip: the mutant was once run from the worktree root instead of platform/, which left a gitignored vitest cache there; it was moved to `D:/knijka-lanes/scratch/st2-land/stray-root-node_modules`.
+- **The merge verifier: ACCEPT_WITH_FIXES** (the fixes are to the docs only, and are applied here).
+  - `git diff --cached --binary c847a5d` (sha256 1eef7593…891920) is byte-identical to gate-st2.patch; HEAD c847a5d5e4, 37 files staged.
+  - The lane patch applied with --cached to a temporary index on c847a5d gives tree 85681568…. It differs from the staged tree (df826d03…) in one file only, `runtime/__tests__/left-turn-late-read.test.ts`, +13 lines (one it() cell). No product file differs.
+  - VH3: killed again (PINNED AT INTEGRATION, under condition (1)).
+  - The lane's 8 key files in one run with --maxWorkers=1 (yield-voice-oncoming-turn-hold, slowturn2-verdict-hold.live, left-turn-late-read, planned-route, left-turn-forced-braking, failed-to-yield-situation-copy, slowturn2-late-bill.live, slowturn2-exam-node.live): 115/115 (12 + 4 + 36 + 15 + 27 + 16 + 2 + 3), rc=0. The lane verifier's VH6 (the advisor drops a verdict of any reason on a left bill) still dies, 1 failed | 11 passed, on «AssertionError: expected [ 'Защо чакаш: червен сигнал' ] to deeply equal [ 'Защо чакаш: червен сигнал', …(1) ]»; advisor.ts restored, sha256 2c465035…fcd269 matching.
+  - Both law quotes of the card (чл. 37, ал. 1 and чл. 38, ал. 2) appear verbatim in content/law/acts/zdvp.json.
+  - Its own full runs did NOT finish: its src/modules/sim/lessons/ run was still running when it returned, with two other lanes' vitest runs on the machine, and it did not run the other module directories or the tools suite. By the brief that is not a reason to reject; the integrator's counts agree with the round-3 verifier's (lessons/__tests__ 130 files, 2,484 passed, 165 skipped in both). The main-tree gate must run the full set (Owed).
+  - It left the worktree staged with the same 37 files and the diff matching the gate patch; its mutants were restored by copy with both files' sha256 checked.
+- **The docs verifier: ACCEPT_WITH_FIXES** (D1–D12 for this section, A1–A6 for the ADR texts, all applied). It re-counted the open list read only: 10 open (1 critical, 9 major), and 1613ef2c's effective verdict is PARTIAL (rig-w4b).
+- **The main apply** (the integrator, 2026-11-10, in E:/AI driver on c847a5d). gate-st2 went in 3-way: the main tree, df826d03c14453584a0189f7adeaccf1a20fe32a, equals integ-st2's index tree byte for byte. gate-wp2 (the wheelpose landing, below) was then applied 3-way on top with no conflict, because no file overlaps. The combined staged tree is 0603a9d5f2d601e62ac8b4aa920b292a6028be30, 41 files (+2,530/−77). The reviewed-text manifest was not re-recorded: wheelpose moves no shown text. The main-tree gate decides.
+- **Not re-measured on c847a5d at integration:** the round-3 verifier's S12 replays, its 270-cell verdict census, the class census, and its mutants beyond VH3 and VH6; the builder's 795-cell census, watch list, base-commit tapes, close options, brisk table and mutants. Those numbers are the lane's, measured on the lane's trees: `ab78b58` + the patch for round 1, `c847a5d` + the patch for rounds 2 and 3.
+
+**Owed.**
+- **O1, the rig re-drive under W4B-ART,** through `/dev/drive-rig` (ADR-017), after the gate. The rig's truth read must count the attributed account through the window.
+  - S12, PC and phone, L1 and L3. Expected: FAILED_TO_YIELD on car 1001 at about k2824 (L1) / k2805 (L3), and «Пропусна насрещните» NOT shown.
+  - STOP5, C11 and B.
+  - The d2-v1 exam node in both directions, which is also the positive T-EXAM.
+  - Device frames of the forced card, and of the verdict at its new, later time, on PC and phone.
+- **O2, lane `ltap2`:** the «gets no credit» half, with `52a3516f` and `bc162f55`. The row closes only through it.
+- **O3:** lane «brisklate», after ltap2: the late read after a base commit, under ST-BRISK as ruled on 2026-11-10.
+- **O4:** ST-COMING, recorded as a known limit.
+- **O5, the seam review:** plannedMovement, the late window and its closes, and the ST-VERDICT-HOLD runtime fields with the advisor hold (N2 included).
+- **O6:** a manual or device drive of a slow left turn.
+- **O7:** the founder's sign-off on the card text.
+- **The main-tree gate on the combined tree** (with land-wp2, lane wheelpose). At the main apply gate-wp2 went in 3-way on top of gate-st2 with no conflict; the combined staged tree is 0603a9d5…, 41 files (PROVEN ON c847a5d). The sources record no suite run on that tree. The gate must run the full vitest folders and `node platform/scripts/tools-tests.mjs` (the merge verifier's V6, whose own full runs did not finish).
+- **Lane `uturnyield`:** UC-1-SUBST (iii), and a turn-round card of its own for the turn-rounds the ADR-013 tracker confirms.
+- **A respawn signal on the lesson engine,** if the founder wants the verdict dropped on a voluntary «Рестарт» (condition (3)).
+- **The founder is told:**
+  - a sharp right-turner into the student's exit arm now counts as a car the student must let through;
+  - a slow left turn is billed when the oncoming car has to brake for the student after the turn began;
+  - the new card (the integrator's wording, the founder's to veto);
+  - «Пропусна насрещните» is now said after the turn, not on the approach;
+  - the respawn limit.
+
+**Recorded, not filed** (the docs agent's new findings, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-10). Several restate items above; each is listed with the docs agent's evidence.
+- **The tight-gap left-turn card still cites the wrong duty.** A tight-gap left-turn FAILED_TO_YIELD (a «left-turn-oncoming» conviction with no forcedById, brisk or slow) still prints the pooled right-hand-rule card citing «ЗДвП чл. 47; чл. 48; чл. 50, ал. 1». The new act key is stamped only when forcedById is present, and FAILED_TO_YIELD_SITUATION_COPY has no «left-turn-oncoming» row. This narrows doc 88's recorded candidate «The left-turn FAILED_TO_YIELD card cites the wrong duty» (main tree :18921). Evidence: `D:/knijka-lanes/slowturn2-result-r3.patch`, the rules/engine.ts hunk @@ -10296 and the rules/catalog.ts hunk @@ -3094; `E:/AI driver/platform/src/modules/sim/rules/catalog.ts:3098-3175`, whose table has only the roundabout and cyclist-right-hook rows; `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` STEP 0(d).
+- **UC-1-SUBST (iii),** assigned to lane `uturnyield` (ST2-DECOUPLE), not a row. On the combined tree c847a5d + slowturn2 + gate-uc, sc-mv-uturn-ban creep243@5 / creep250@5 at L1–L4 (and their C-group L3 twins) are credited UTURN_PAST_SOLID_AXIS with «Точно това иска да види изпитващият.» and no bill. Yet the stream car (1001 / 1002) took 7.38 m/s of attributed braking for him from k1866 / k2112, after the commit at k1858 / k2107. R13''' cannot reach a car that has already passed mvu-n-gap, and LANE_ENTRY_FORCED_BRAKING did not fire. Evidence: `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/slowturn2-r1.json` (build report STATUS); `D:/knijka-lanes/scratch/slowturn2-impl/uc/combined.jsonl` and `r2/uc-combined.jsonl`.
+- **A praise beside forced braking, on base too** (sc-mv-uturn-ban @8 cells). A base (brisk) commit earns YIELDED_TO_PRIORITY while the stream car sheds 6.9 m/s, so a praise is paid on a turn-round that forced the stream car to brake. This is ST-BRISK and praise territory, unchanged by slowturn2 and unmeasured beyond the builder's note. Evidence: `slowturn2-r1.json` (build report, UC-1-SUBST paragraph); `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` entry 2026-11-09 15:43; `uc/base.jsonl`.
+- **The respawn limit** (condition (3)). After a voluntary «Рестарт» between moving off and the left commit (no crash), a pending «Пропусна насрещните» is said after the respawn, because the lesson engine receives no respawn signal. Base said the same sentence 4 s after moving off. No census cell exercises it. Evidence: `slowturn2-r3.json` (build report «KNOWN LIMIT»; verify N1, worldRuntime.ts noteRespawn :4570-4577, LessonScene.tsx resetCar :2537-2553).
+- **The other duties' verdicts keep the 4 s window, and a stale count in comments.** The yield-voice verdicts of the other duties (giveWayLine, stopSign, redLight, pedestrian, railVehicle) still fire on the 4 s time window. Each can in principle precede a FAILED_TO_YIELD its adjudicator bills later: the advisor's own «ONLY THE RING» residual, now with oncomingVehicle held as well. It is unmeasured. The count in the comments is the docs agent's own reading and was not checked by a verifier: the «ONLY THE RING» header still says «The other six duties keep the time window», and the patch's new block says «The rail duty and the other five keep the time window». YieldReason has seven members and two of them (roundaboutEntry, oncomingVehicle) are now held, so five keep the window: rail plus four. Evidence: `E:/AI driver/platform/src/modules/sim/lessons/advisor.ts:1976-1983`; `lessons/types.ts:1068` (YieldReason); `D:/knijka-lanes/slowturn2-result-r3.patch` lines 276-277.
+- **N2: the hold is «committed and read», not «adjudicated».** After an ADDED commit with no candidate, the verdict is released on the commit tick. A second left turnStarted in the same visit (after the window re-arms below 15°, for example an S-move or a turn-round) could still adjudicate and bill after the verdict was said. No census cell has it; it is recorded for the seam review. Evidence: `slowturn2-r3.json` verify N2; worldRuntime.ts :2651-2730 and :2755 in the r3 patch.
+- **The wait count.** When the student waits again inside the junction, the single «Пропусна насрещните» verdict's «Изчака N с» counts only the wait at the line. That is true, but not the whole wait. Base said the verdict twice for such a turn. Evidence: `slowturn2-r3.json` (build owed, «NEW (round 3), note»); `D:/knijka-lanes/scratch/slowturn2-impl/r3/verdict-summary.txt`.
+- **ST-COMING.** vehicles.ts `studentComing` keeps the side-blind U band that plannedMovement dropped. So an ambient oncoming sharp right-turner (now classed «right») yields to the student and queues at the mouth with its account at 0. No ambient R13''' bill can arise at the exam node, and no positive exam-node bill could be produced on the real TrafficSystem. Evidence: `slowturn2-r1.json` (build report T-EXAM); `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` entry 2026-11-09 14:43; `platform/src/modules/sim/lessons/scenario/__tests__/slowturn2-exam-node.live.test.ts` in the patch.
+- **ST-RUNNER-ALL.** A left-turn-oncoming bill resolves every still-live oncoming runner as «violation», because orchestrator/runners.ts does not read forcedById. So a runner for a car the student did not force is also marked violated. Evidence: `D:/knijka-lanes/scratch/slowturn2-impl/docs-draft-r3/ADR-014-amendment-2026-11-09.md` («Stated limits»); `slowturn2-r3.json` build owed.
+- **ST-BRISK.** There is no late read after a base (brisk) left commit, so forced braking that starts after a brisk commit is billed only if the tight rule convicted at the commit. On committed tapes all 12 such cells were already convicted; uncommitted inputs are unmeasured. (Since ruled: ST-BRISK, 2026-11-10, the founder's to veto; lane «brisklate», after ltap2, is owed.) Evidence: `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` STEP 0(c); `s0/brisk-base.jsonl`.
+- **The frozen candidate set** (ST-LATE-READ) never admits a car that stood at the mouth at the commit and moved into his path later. The builder measured one on the exam node (go120): car 8, whose account reached 0.3 in his path only after his turn was complete (k9296, against (d) at k8980). Evidence: `D:/knijka-lanes/scratch/slowturn2-impl/docs-draft-r3/doc88-landing-section.md` («Known limits»); `PROGRESS.md` entry 2026-11-09 14:43.
+- **Instrument risk for the O1 rig re-drive.** On S12 PC L1 the late bill lands only 6 grid points (0.10 s) before his body leaves car 1001's route (L3: 25). A small pose difference on the device could move the close ahead of the line, and the bill would then not appear. Evidence: `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` STEP 0(b); `slowturn2-r1.json` build («Margin 6»).
+- **Test infrastructure.** reviewed-text-manifest §3 / §3b hit «Test timed out in 60000ms» under the full lessons/scenario directory load; the file is 49/49 alone. It is the same class as the recorded shellClipAffordances timeout. Evidence: `D:/knijka-lanes/scratch/slowturn2-impl/PROGRESS.md` entry 2026-11-10 04:26 (r2 HAND-OFF); `logs2/`.
+
+## Landed: in process, under React StrictMode (the `next dev` build that every rig and audit drive runs on), the demo ghost and the student car now pose the wheels of the model they draw. ShadowCar.tsx and HeroCarBody.tsx return the wheel list from the same memo that builds the drawn model, and the frame loop poses that list. The ref that was written inside the memo is gone. On the crosswind correct demo the drawn ghost's front-left wheel now reaches the committed steer, −0.025224 rad, where on base it stayed at 0 on every frame, and the drawn wheels now roll. What is posed is unchanged: steer, roll, signs, axes and the YXZ order. No sentence, bill, point, threshold, timing, trace or camera moves. Measured in process only; the device check after the fix is owed. `sc-ac-crosswind:a9db1738` (major), clause 2, item XC2 (P-A9-W) (2026-11-10)
+
+Lane `wheelpose` ran one round on its base `c847a5d`. The builder worked in `D:/knijka-lanes/wheelpose-impl` (the lane's own base commit c79bd50, tagged base) and the verifier in `D:/knijka-lanes/wheelpose-verify` (base `c847a5d` plus the patch).
+- **The verdict.** SIGNED OFF WITH CONDITIONS on 2026-11-10 by a fresh adversarial verifier, which refuted nothing. Its log is `D:/knijka-lanes/scratch/wheelpose-verify/PROGRESS.md`, entries 07:48 to 11:35. The builder's log is `D:/knijka-lanes/scratch/wheelpose-impl/PROGRESS.md`. The report is `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/wheelpose-r1.json`. The diagnosis it was built on is `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/diagnose-w4c-a9db1738.json`; a second agent checked that diagnosis and agreed with it.
+- **The patch.** `D:/knijka-lanes/wheelpose-result-r1.patch`: sha256 6b23794e…ca3b6, 3 files, +439/−10, LF only. It is cumulative against `c847a5d`, which is HEAD, so it applies directly. The product change is +23/−10 across the two components; the rest is the new test. The verifier restored its lane and re-diffed it against base: the result was byte-identical to the patch, same sha256. `git apply --check` on the main tree was clean.
+- **What this landing stages:** 4 files.
+  - From the patch: `platform/src/components/sim/ShadowCar.tsx`, `platform/src/components/sim/HeroCarBody.tsx`, and the new `platform/src/components/sim/__tests__/wheelPoseStrictMode.test.tsx`, which also carries the integrator's C1 pin (below).
+  - `tools/mobile/lesson-audit.mjs`: comment only. Two code comments (:4711 and :4731) cited «ShadowCar.tsx:571» and now cite «ShadowCar.tsx:578». On the landed tree :578 is the loop-wrap line `if (clock.tSec > end) clock.tSec = loop ? loop.startSec : 0;` that those comments describe (condition 4).
+  - None of these overlaps the slowturn2 landing in `D:/knijka-lanes/integ-st2` (37 files). That landing stages `traces/recorder.ts` and the reviewed-text manifest, which this one does not touch.
+- **The ruling it was built under.** None of its own. The repair follows the diagnosis's product finding. The conditions were ruled by the integrator on 2026-11-10 and are the founder's to veto.
+
+**The row is NOT closed by this landing.** `sc-ac-crosswind:a9db1738` stays OPEN (PARTIAL, w4c).
+- Every repair measurement below was made in process, through the project's own R3F path with a stub renderer. No builder, verifier or integrator saw a wheel turn on a device after the change, and no one looked at pixels or WebGL.
+- The row moves only on a rig re-drive judged after this landing: rig w4d, item XC2 (Owed, below).
+- The landing does not change the open-row count: 10 open (1 critical, 9 major, 0 minor), from the docs agent's list-open.mjs run on 2026-11-10.
+
+**What was wrong.**
+- **The row's own measurement (rig w4c, XC2, P-A9-W).** Clause (2) of the row says the wheel shows no counter-steer at any point. On the audited `next dev` device, the drawn ghost's front wheel never steered during the crosswind correct demo.
+- **The instrument was checked first** (the diagnoser, confirmed by the checker). The page (w3z2-page.mjs:263, :290) read `rotation.y` of the drawn `wheel_FL` under the identified ghost group. hero_car.glb's only wheel nodes are wheel_FL/FR/RL/RR, all four children of hero_car_body (the file's fifth and last node), and none of them has a child node, so the rig read the correct node and the correct property. The probe also shows that no drawn wheel was posed at all, so the choice of node could not change the verdict.
+- **The cause** (the diagnoser, re-verified by the builder at `c847a5d`):
+  - ShadowCar.tsx:369–429 cloned the GLB inside a useMemo and wrote `wheels.current = found` (:419) as a side effect. useFrame (:586–589) posed `wheels.current`, and :643 drew the memo's `model`.
+  - HeroCarBody.tsx did the same: the useMemo at :208–310 wrote `wheels.current = found` at :275, and useFrame posed the ref.
+  - R3F 9.6.1 bridges StrictMode from the DOM tree into the Canvas (events-f19bcc32.cjs.dev.js:74–83). Under StrictMode its dev reconciler runs a mount memo twice and keeps the FIRST result (:9906–9918).
+  - So the drawn model was clone #1, while the ref held the wheels of clone #2, which is never added to the scene. useFrame steered and rolled four wheels nobody draws.
+- **On the device, before the fix** (the diagnoser's headless load of `/dev/drive-rig?scenario=sc-ac-crosswind&level=1`):
+  - The ShadowCar fiber has mode 27, so the StrictMode bit is set. All 4 posed wheels lie outside the drawn model, in a detached GLTF «Scene».
+  - Over 2,254 rAFs the posed wheel_FL reached rotation.y −0.025224 (147 rows ≤ −0.0245), equal to the committed steerRad minimum. The drawn wheel_FL stayed at exactly 0 on every row.
+  - Roll was dead too: the drawn rotation.x stayed 0, while the posed rotation.x reached 1025.6.
+  - HeroCarBody showed the same: mode 27, posed wheels outside the drawn model, drawn wheel_FL rotY 0.
+  - The builder's own BEFORE probe (`probe-before.json`) gives the same picture: 2,255 rAFs, drawn rotY min = max = 0, orphan −0.025224 (153 rows ≤ −0.0245), orphan rotX 1028.1. The verifier did not re-run the device load.
+- **Scope** (the diagnoser's reading, from the code). The demo ghost's wheels never steered (the front pair) or rolled (all four) in any lesson on the dev build, and the student car's road wheels never steered or rolled in the chase and top-down views. Only the crosswind drill was loaded on the device. The diagnoser reads the production build as unaffected, because production has no StrictMode double-invoke. No one measured a production build.
+
+**What landed.** This is the builder's description, checked by the verifier.
+- **ShadowCar.tsx.** The memo now returns `wheels: found as readonly GhostWheel[]` alongside `model`, `scale`, `offsetY` and `ghostMaterials`. useFrame iterates that list. `useRef<GhostWheel[]>` and the write at :419 are removed, and a comment at the memo says why.
+- **HeroCarBody.tsx.** The memo now returns `wheels: found as readonly Wheel[]`, and useFrame iterates it. `useRef<Wheel[]>` and the write at :275 are removed, with a comment at the memo.
+- **What did not move.** The ghost's front pair still steers by pt.steerRad directly, and the student car's by sim.steerRad × STEER_VISUAL (1.0); the rear pair stays at 0. Roll uses the same accumulator on rotation.x, with the same signs, axes and YXZ order. No trace, bill, score, timing, shown string or camera changed. The reviewed-text manifest was not re-recorded, and it is green.
+- **New test** `components/sim/__tests__/wheelPoseStrictMode.test.tsx`, 5 tests (the builder):
+  - It uses the project's own R3F path, as in cockpitLiveReanchor and routeGuidanceStandsDown: a real createRoot, a stub renderer that is never asked to draw, frameloop «never», and frames stepped with advance().
+  - The model is the shipped hero_car.glb, decoded into GLTFLoader's layout. Every `scene.clone(true)` is recorded, so the drawn clone can be told apart from the orphans.
+  - Each component is mounted inside `<StrictMode>` and also without it, as a control.
+  - It asserts exactly one of each wheel in the drawn graph; that every wheel useFrame moved lies inside the drawn model; that the drawn wheel_FL rotation.y equals the committed crosswind shadow-correct steerRad at its minimum (−0.025224, ≤ −0.0245) for the ghost, and sim.steerRad −0.21 for the student car; that the rear wheels show 0; and that roll has advanced and is equal across wheels.
+  - It does not cover pixels or WebGL.
+
+**What the student sees.** No sentence was added, removed or changed. On the dev build the demo ghost's front wheels now turn with the demo's own steer, which on the crosswind correct demo is the held counter-steer, and its wheels roll. The student car's road wheels now steer and roll in the exterior views. This is shown in process only; no device frame shows it yet. The steer the ghost shows is about 1.4° at its largest (−0.025224 rad), and nobody has judged whether that is visible on the lens. The production build is unchanged, by the diagnoser's reading.
+
+**What the verifier reproduced** (on its own lane; outputs under `D:/knijka-lanes/scratch/wheelpose-verify/`):
+- **Red on base.** The new test, run against the base product files: 2 failed, 3 passed, with the builder's exact text. ShadowCar under StrictMode: «useFrame posed wheels of a clone that is never drawn: expected [ 'wheel_FL rotY -0.0252', …(3) ] to deeply equal []». HeroCarBody: the same with 'wheel_FL rotY -0.2100'. Both controls without StrictMode were green on base, so StrictMode is the trigger. On the patch the test passes 5/5.
+- **Frame by frame** (its own probe; data in `seq/`, compared by `cmp.cjs`):
+  - It deep-compared x, y, z and order for all 4 wheels across base without StrictMode, patch without StrictMode, the patch's drawn wheels under StrictMode, and base's orphan wheels under StrictMode. All four matched with zero mismatches.
+  - The ghost run covered 2,213 frames of the full committed crosswind correct demo. The student-car run covered 600 frames, with steer 0.4·sin(i/17)−0.05 and speed 30±20 including reverse spans.
+  - The order is YXZ on all 4 wheels.
+  - With the patch under StrictMode, the posed wheels were inside the drawn model on 2,213/2,213 ghost frames and 600/600 student-car frames. The drawn wheel_FL rotY was non-zero on 2,138 ghost frames, with minimum −0.02522431561515249, equal to the committed steerRad minimum. On base under StrictMode the drawn wheels stayed at rest on every frame.
+- **Census.** Its own scanner (`memo-scan.cjs`) reports 2 ref writes inside a memo on base (HeroCarBody.tsx:275, ShadowCar.tsx:419) and 0 on the patch.
+  - `memo-scan2.cjs` read the factory body of every one of the 329 useMemo/useState/useReducer calls in 528 files under src/components/sim and src/modules/sim. The only other lines touching a ref are LessonPlayShell's scenarioRef and mistakeRef, which are data objects, not React refs.
+  - `memo-scan3` found no external cache, registry or global writes.
+  - VitokCockpit.tsx:1546 already returns wheelNode from its memo. The fleet builds its InstancedMeshes in a memo and returns them. The memo-local group.add calls (LaneSignalGantry, WorldProps:1913) add to objects created inside the same memo. None of these is the defect.
+- **Mutants:** 9, run one at a time, each restored and checked by sha256. 7 were killed on assertion text:
+  - M1, the ShadowCar ref write restored: «useFrame posed wheels of a clone that is never drawn … 'wheel_FL rotY -0.0252'»;
+  - M2, the HeroCarBody ref write restored: the same with −0.2100;
+  - M3, ghost wheels taken from the cached scene: «drawn wheel_FL rotation.y ≠ the committed steerRad: expected +0 to be close to -0.0252…»;
+  - M4, the ghost steers its rear wheels: «expected -0.0252… to be +0»;
+  - M5, the student car's steer sign flipped: «expected 0.21 to be close to -0.21»;
+  - M6, the student car rolls on the z axis: «drawn wheel_FL never rolled»;
+  - M8, the student car's wheels taken from a second clone inside one memo: «useFrame posed wheels of a clone that is never drawn … -0.2100».
+  - M7 and M9 survived: each drops `rotation.order = "YXZ"`, M7 in ShadowCar and M9 in HeroCarBody. The patch does not touch those lines, so this is a gap in the new test, not a defect in the patch (C1).
+- **Its test runs**, one at a time with --maxWorkers=1:
+  - src/components/sim, including lesson-ui/__tests__ and the new test: 114/115 files, 2,077/2,078. The one red is touchHintLifetime, ENOENT on tools/mobile/lesson-audit.mjs, because the lane has no tools/ (C3).
+  - lessons/__tests__: 129/129 files, 2,472 passed, 165 skipped.
+  - lessons/scenario/__tests__: 218/218 files, 5,654 passed, 2 skipped, with reviewed-text-manifest, caption-truth and keep-right-claim-census green. Its first run hit its own 3,500 s timeout; this is the rerun.
+  - A targeted run (the manifest tests, src/modules/clips including capture parity, bodyViewCut, guidance-crossing-mute, park-family-drivable, the bridge-ice ghost, frameCost and the rig-step-keyed census): 29/30 files, 654/654. The failing file is whyPanel, ENOENT on docs/ (C3). clipPlan is green and was not regenerated, because no grading changed.
+  - tsc --noEmit: 22 errors on both base and patch, with identical error lists.
+- **Restored clean:** the lane, re-diffed against base, reproduced the patch sha256. Its probe test was moved out to `attempts/`.
+
+**The builder's numbers, not re-measured by the verifier.**
+- Its own census (`memo-census.cjs`) found the same 2 sites. It also found that the other clone and useGLTF memos (VitokCockpit.tsx:1545, TrafficLayer.tsx:1914, ScenarioObstacles.tsx:392 and :593, marketing HeroScene3D.tsx:400/435) already return what they draw. It classified the render-body ref writes (TouchControls.tsx:2715 and :4133, CameraAidHint.tsx:89) as latest-value refs, not drawn THREE objects.
+- Its 6 mutants (M1–M6, `scratch/wheelpose-impl/mut/`) were all killed on assertion text.
+- Its consumer run: 27/28 files, 537/537, with whyPanel the one suite error (ENOENT on docs/).
+
+**The conditions, and how each stands** (integrator ruling, 2026-11-10, the founder's to veto).
+
+**C1. Pin the Euler order. PINNED AT INTEGRATION.**
+- The committed test pinned the posed axes and values but not the order. M7 and M9 passed 5/5.
+- The ruling adds an assertion to wheelPoseStrictMode.test.tsx that each posed wheel's rotation.order is «YXZ» on both cars. The pin reads the order on the drawn wheels. The same test asserts that every posed wheel lies inside the drawn model, so on a green run they are the same four wheels. M7 and M9 must then die on that assertion's text.
+PINNED AT INTEGRATION: the integrator added an `eulerOrders()` helper and an `ALL_YXZ` constant to wheelPoseStrictMode.test.tsx, an `orders` field read from each DRAWN wheel on each car, and two assertions: `expect(r.orders, "a drawn ghost wheel is not in YXZ Euler order (steer before roll)").toEqual(ALL_YXZ)` in the ShadowCar StrictMode and control cases, and the same with «a drawn student-car wheel» in the HeroCarBody cases. The file grows from 416 to 429 lines and is green 5/5.
+  - M7 (ShadowCar.tsx without `node.rotation.order = "YXZ";`, the verifier's survivor): 2 failed | 3 passed, «AssertionError: a drawn ghost wheel is not in YXZ Euler order (steer before roll)», received 'wheel_FL XYZ'… against 'wheel_FL YXZ'…. Restored byte for byte, sha256 06cba397b0ed1ef18b7712b2612b126203256fad0c4b7b3e6be57db069e2e804 OK; green 5/5 after.
+  - M9 (HeroCarBody.tsx without the same line, the verifier's survivor): 2 failed | 3 passed, «AssertionError: a drawn student-car wheel is not in YXZ Euler order (steer before roll)», received 'wheel_FL XYZ'…. Restored byte for byte, sha256 40ad1f01c0ffeb2e57116d3310447cb74c6c15fbb5f3a585da5657e382ee17b0 OK; green 5/5 after.
+  - The merge verifier applied M7 and M9 itself, one at a time, with the same results, and added M7b (ShadowCar's order set to «XYZ» instead of removed), which died on the ghost assertion too. The orders are read from rotation.order on the wheel nodes of the clone the real R3F scene draws: the test mounts the real ShadowCar and HeroCarBody through createRoot / advance with the shipped hero_car.glb, and only useGLTF is mocked. Each file was restored byte for byte with its sha256 checked.
+
+**C2. The device check after the fix. OWED to rig w4d.**
+- The dev server on :3000 serves the main tree at `c847a5d`, the base, so neither the builder nor the verifier could measure the patch. Neither started a server.
+- The check: re-run the diagnoser's probe `D:/knijka-lanes/scratch/wheelpose-impl/probe-ghost-wheel.mjs` against a dev server serving the landed tree. Expected: posedListFromMemo true; insideDrawnModel true for all 4 wheels on both ShadowCar and HeroCarBody; drawn wheel_FL rotY minimum ≤ −0.0245.
+- A result short of that is a STOP for a follow-up, never a pass.
+
+**C3. The two tests that need tools/ and docs/. GREEN at integration; the main gate must show them green too.**
+- touchHintLifetime («the instrument still asks it the same way») reads tools/mobile/lesson-audit.mjs. whyPanel.test.ts (src/modules/clips) reads docs/simulation/scenario-engine/scenario-map.json.
+- Both failed with ENOENT in the builder's lane and in the verifier's, because neither lane has tools/ or docs/.
+- touchHintLifetime must run green on the edited lesson-audit.mjs, since this landing changes two comments in that file.
+- No tools/ string was added. tools/ mentions ShadowCar and HeroCarBody only in comments and audit prose.
+- At integration both are GREEN in `D:/knijka-lanes/integ-wp`: touchHintLifetime inside components/sim (115 files, 2,078/2,078), on the edited lesson-audit.mjs, and whyPanel inside src/modules/clips (20 files, 306). The merge verifier ran components/sim (115 files, 2,078/2,078) and whyPanel (15/15) itself. The main gate must still show both green.
+
+**C4. Recorded, not changed.**
+- Under StrictMode the materials of clone #2 (ghost and paint) leak in dev. This was already true on base.
+- HeroCarBody's memo sets envMapIntensity = 1.3 on the drei-cached shared materials. It is idempotent and causes no divergence between clones.
+- The two lesson-audit.mjs comment cites are updated from «ShadowCar.tsx:571» to «ShadowCar.tsx:578», comment only (staged above).
+
+**ADR.** No ADR text is owed. No sentence in 07_ARCHITECTURE_DECISION_RECORDS.md says that the ghost car's or the student car's drawn wheels steer or roll.
+- ADR-012's «A second wind channel steers the front wheels» and «the steered pair gets steer + pull» describe the physics car's steered pair, which was true before this landing.
+- Its «the recorder writes the held correction into the correct demos' wheel channel (`heldWheel`)» describes the trace data, also true before.
+- ADR-012's «Amendment 2026-11-05» does not promise a visible ghost wheel.
+
+**PROVEN ON c847a5d** (the integrator's run on 2026-11-10 in the worktree `D:/knijka-lanes/integ-wp`, log `D:/knijka-lanes/scratch/wp2-land/PROGRESS.md`, mutant logs `mut/M7.log` and `mut/M9.log`, suite logs `s1`…`s13-*.log`, `tsc.log`, `tools-tests.log`, `tt-pw.log` and `tt-corpus.log` in the same folder; report `C:/Users/Ljh/.claude/projects/E--AI-driver/handoff-2026-10-08/reports/land-wp2-results.json`; the config with its conditions `D:/knijka-lanes/scratch/land-wp2.config.json`. The merge verifier ran the pins, one extra mutant of its own, one lane mutant, two directory runs, whyPanel and the tools tests itself.)
+- **The apply.** The worktree was clean at c847a5d5e4e4771550c92f1f978f77a203f461a6, and the patch sha256 matched (6b23794e3e8106724607ac22e43821df77b8d13974098c4ae69ed232e15ca3b6). It went in with `git -c core.autocrlf=false apply --3way --index --binary`, exit 0: HeroCarBody.tsx and ShadowCar.tsx applied cleanly and the new wheelPoseStrictMode.test.tsx was added. No file needed a 3-way merge and nothing conflicted.
+- **The conditions:** C1 is pinned (above). C2 is owed to rig w4d: it needs a dev server serving the landed tree and a headless load, and this landing may not start a server. C3 is green here (above). C4's two comment cites are updated; the material leak and the envMapIntensity write are recorded and unchanged, because pinning them would change product behaviour, which a tests-only integration may not do. No product code changed beyond the lane patch.
+- **The directories**, all green, exit 0:
+  - lessons/__tests__ 129 files, 2,472 passed, 165 skipped;
+  - lessons/scenario/__tests__ 218 files, 5,655 passed, 1 skipped, with reviewed-text-manifest, caption-truth and the keep-right census inside. The verifier counted 5,654 / 2 because its lane had no docs/, so one test it skipped runs here;
+  - components/sim (lesson-ui included) 115 files, 2,078/2,078: touchHintLifetime (C3) and wheelPoseStrictMode (5/5 with the C1 pins) are green;
+  - orchestrator 42, 536; rules 110, 1,929; traffic 54, 682; runtime 51, 946; scene 48, 799;
+  - vehicle 22, 299; world 135, 2,409; hud 75, 1,549; traces 174, 2,536;
+  - src/modules/clips/ 20, 306: whyPanel.test.ts (C3) is green, and the clip-plan freshness gate is green (no grading moved), so nothing was regenerated.
+- **Reviewed-text manifest:** green inside the scenario run. No shown text moved (the patch changes only code and comments), so it was not re-recorded.
+- **tsc** (`npx tsc --noEmit --incremental false`): 21 errors, all environment errors in the baseline set (api/health/route.ts 4, lib/db.ts 1, the admin, learning, auth, payments, privacy and outcomes stores, lesson/progress.ts, sim/lessons/store.ts 2, sim/traces/attemptStore.ts 1), none in a touched file.
+- **tools-tests** (`node platform/scripts/tools-tests.mjs` from the worktree root, exactly what gate 4/4 of wave-cycle.sh runs): 2,030 tests, 2,007 pass, 8 fail, 11 skipped, 4 todo.
+  - 1 is the standing deck-captions freeze («the corpus has not changed since it was measured»).
+  - 7 are environment: build-redrive.test.mjs §9(a), §9(b), §9(d), §9(e), count-agreement.test.mjs and finding-reader.test.mjs fail on «could not find .audit-frames/findings by walking up from this file or the cwd» (the corpus is untracked and exists only in the main tree); lane-evidence.test.mjs fails on «[mobile-harness] could not resolve the playwright package» (the main tree resolves it from the untracked tools/clips/headless/node_modules).
+  - Re-run with the environment supplied: lane-evidence with `KNIJKA_PLAYWRIGHT_ROOT=E:/AI driver/tools/clips/headless/` 10/10; the corpus trio from cwd `E:/AI driver`, read only (the main tree's `git status --porcelain` sha256 identical before and after), 90 tests, 89 pass, 1 fail. build-redrive §9 and finding-reader are green. The one red is count-agreement's «counters disagree about the open list — apply-reroute.mjs printed no WORKED line»: apply-reroute.mjs finds the repo from its own location, the worktree with no .audit-frames, while finding-reader found the corpus through the cwd. It is the same mixed-resolution artefact the st2 landing recorded; in the main-tree gate both resolve to E:/AI driver.
+  - None of these tests reads a file this landing touches. The only tools/ change is the two comment cites in lesson-audit.mjs, and touchHintLifetime, which reads that file, is green. No tools test was taught. The main-tree gate decides.
+- **The gate patch.** `D:/knijka-lanes/gate-wp2.patch`, sha256 8aca635ae6136f7367153957d0ac5e284e6ecc3097471dc7d748fc55665affaf, 4 files, +454/−12, 0 CR bytes (all four files are LF in the repo). The worktree was left staged, with no untracked or temporary file in it and no process running.
+- **The merge verifier: ACCEPT.**
+  - `git diff --cached --binary c847a5d` (sha256 8aca635a…affaf) is byte-identical to gate-wp2.patch; HEAD c847a5d5e4e4, 4 files staged, no unstaged or untracked file.
+  - The lane patch applied 3-way to a temporary index on c847a5d: the HeroCarBody.tsx (681cd715) and ShadowCar.tsx (fd94187a) blobs equal the staged ones. The two staged files that differ are non-product: the test (lane blob 56b22fb0, staged 73fc7d92) only adds eulerOrders() / ALL_YXZ, an `orders` field on each car and the two YXZ assertions; lesson-audit.mjs changes 2 comment lines, and its new cite :578 is `if (clock.tSec > end) clock.tSec = loop ? loop.startSec : 0;`. No product change goes beyond the lane.
+  - M7, M9 and its own M7b: killed (PINNED AT INTEGRATION, under C1).
+  - The lane verifier's M3 (ShadowCar finds the wheels on the cached `scene` instead of the drawn `root`) still dies, 2 failed, on «useFrame posed wheels of a clone that is never drawn» and «drawn wheel_FL rotation.y ≠ the committed steerRad … expected +0 to be close to -0.0252…». With the base c847a5d ShadowCar.tsx the test fails 1 failed | 4 passed (the StrictMode case) on «useFrame posed wheels of a clone that is never drawn», as the lane claimed. Restored, sha256 OK.
+  - Its runs, one vitest at a time with --maxWorkers=1, all to completion: lessons/scenario/__tests__ 218 files, 5,655 passed, 1 skipped (5,779 s); src/components/sim/ (lesson-ui and touchHintLifetime included) 115 files, 2,078/2,078; src/modules/clips/whyPanel.test.ts 15/15; the tools suite as gate 4 runs it, 2,030 tests, 2,007 pass, 8 fail, exactly the integrator's breakdown, and lane-evidence 10/10 with the playwright location supplied. It did not re-run the corpus trio from the main tree.
+  - No sentence in docs/architecture says that the ghost's or the student car's wheels steer or roll, so this landing makes no ADR text true.
+  - It left the worktree exactly as found: the same 4 files staged, the staged diff sha unchanged, no unstaged or untracked file, no process running.
+- **The docs verifier: ACCEPT_WITH_FIXES** (F1–F7, all applied in this section). It re-counted the open list read only: 10 open (1 critical, 9 major), with a9db1738 PARTIAL (w4c).
+- **The main apply** (the integrator, 2026-11-10, in E:/AI driver on c847a5d). gate-st2 went in first: the main tree, df826d03c14453584a0189f7adeaccf1a20fe32a, equals integ-st2's index tree byte for byte (the slowturn2 section). gate-wp2 was then applied 3-way on top with no conflict, because no file overlaps. The combined staged tree is 0603a9d5f2d601e62ac8b4aa920b292a6028be30, 41 files (+2,530/−77). The reviewed-text manifest was not re-recorded: this landing moves no shown text. The main-tree gate decides.
+- **Not re-measured on c847a5d at integration:** the lane verifier's frame-by-frame probe (2,213 ghost and 600 student-car frames), its memo scans and its mutants beyond M3, M7 and M9; the builder's census, mutants, consumer run and BEFORE probe; and the diagnoser's device load. Those numbers are the lane's (`c847a5d` + the patch) or the diagnosis's.
+
+**Owed.**
+- **The device check after the fix (C2), then the XC2 re-drive on rig w4d,** through `/dev/drive-rig` (ADR-017), after the gate.
+  - Keep the read on the DRAWN ghost wheel (w3z2-page.mjs:263/:290). Never switch to ShadowCar's posed list: that list is now the drawn wheels by construction, but a read of it could not catch a regression to an orphan clone.
+  - Add the diagnoser's fiber-identity guard to ghostInstall: a `__REACT_DEVTOOLS_GLOBAL_HOOK__` init script that asserts every posed wheel lies inside the drawn model, and reports PRODUCT rather than a rig fault if one does not (diagnose-w4c-a9db1738 w4dChanges (a)).
+  - Record the student car's drawn wheels on the same drive.
+  - The row's other clause (2) items, and its other clauses, stay as they stand.
+- **The two-landings-one-gate proof with land-st2** (lane slowturn2). No staged file overlaps. At the main apply gate-wp2 went in 3-way on top of gate-st2 with no conflict; the combined staged tree is 0603a9d5…, 41 files (PROVEN ON c847a5d). But slowturn2 stages traces/recorder.ts and the reviewed-text manifest, and the new test reads the committed crosswind shadow-correct trace. So wheelPoseStrictMode.test.tsx and reviewed-text-manifest.test.ts must run green on the combined tree; the sources record no suite run on it yet. The main-tree gate on that tree is the proof, with touchHintLifetime and whyPanel green there (C3).
+- **The founder is told.**
+  - On the dev build, the build every audit and rig drive uses, the demo car's wheels and the student car's road wheels never turned or rolled. They now do, in process.
+  - C1–C4 are the integrator's rulings and the founder's to veto.
+  - The production build was never measured.
+- **Recorded, not filed:** the docs agent's candidates (below).
+
+**Recorded, not filed** (the docs agent's new findings, and one from the docs verifier, recorded as candidates and not filed as open rows, under the founder's order of 2026-10-19 of no new triage rounds; this landing's integrator decision D4, 2026-11-10). Each is listed with its evidence.
+- **The StrictMode orphan in the student car** (repaired in process by this landing, with the device check owed under C2; it was never a row of its own). HeroCarBody's road wheels never steered or rolled on the dev build. Evidence: `diagnose-w4c-a9db1738.json` (productDefects[1]); `wheelpose-r1.json` (verify V1).
+- **Dev-only material leaks under StrictMode.** The second clone's ghost and paint materials in ShadowCar and HeroCarBody are leaked, not disposed. So is the second fleet build in TrafficLayer.tsx:1914 and ScenarioObstacles.tsx:392. These are pre-existing, and there is no divergence between what is drawn and what is posed. Evidence: `wheelpose-r1.json` (build report, grep census item 2 and item 4).
+- **A memo mutating a shared cache.** HeroCarBody's memo sets envMapIntensity 1.3 on drei-cached shared GLTF materials. It is idempotent today, but it is a side effect in a memo on objects other consumers share. Evidence: `wheelpose-r1.json` (build report, census item 4).
+- **The XC2 student car crept with no input.** Standing in D with no input, it drifted 1.12 m and yawed to 356°. The diagnosis recorded this and did not diagnose it. Evidence: `diagnose-w4c-a9db1738.json` (productDefects[3]).
+- **The chip's tail painted over on the phone.** The push chip's tail is painted over by the task card (PF2, PE2) and by the end pause card (PA2). This may fall under a9db1738's clause 4. Evidence: `diagnose-w4c-a9db1738.json` (productDefects[3]).
+- **Every audit device is `next dev`.** No rig or audit measurement covers the production build, where StrictMode double-invoke, and so this class of defect, behaves differently. Evidence: `diagnose-w4c-a9db1738.json` (productDefects[2]).
+- **Instrument (rig w4c, cond stills).** The recorded cause «hotspot_horn» is wrong. The steering_wheel_mesh int_alu primitive (z −0.185) sets the box's lo z, and the rim-only int_leather box passes discGuard. The stripe reader also locked onto the red «50» limit ring on the rest rim: −72° on PC, −12…−16° on the iPhone. Evidence: `diagnose-w4c-a9db1738.json` (condStill; w4dChanges (b)); `D:/knijka-lanes/scratch/w4c-diag/b-stripe.json`.
+- **Instrument (rig w4c, R6 span).** The filed phone spans include the kit's own synchronous DOM reads, which took up to 5,386 ms with 1 rAF drawn. The calibration frames skip those reads. PE2 swing-praise's shutter alone took 464 ms over 4 rAFs, above 400 ms even under the proposed bracket. Evidence: `diagnose-w4c-a9db1738.json` (shutter; the checker's correction 2); `D:/knijka-lanes/scratch/w4c-diag/`.
+- **Instrument log wording.** «childCount 9» in the XC2 log is the ghost pose group's child count (w3z2-page.mjs:266), not wheel_FL's. Evidence: `diagnose-w4c-a9db1738.json` (the checker's report, (a)).
+- **A loose comment cite (the docs verifier, outside the drafts).** `platform/src/modules/sim/environment/weather.ts:359` has a comment that cites «HeroCarBody.tsx:361» and calls it the cockpit wheel. The cite was already loose on base and now sits about 6 lines further off. It is comment only and outside the C4 ruling. Evidence: the docs verifier's report in `land-wp2-results.json` (docCheck).

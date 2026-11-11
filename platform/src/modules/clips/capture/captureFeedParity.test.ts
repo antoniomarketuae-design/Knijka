@@ -142,8 +142,9 @@ function buildCaptureStack(clipId: string): CaptureStack {
   );
   runtime.setCyclistQuery((px, py, h, r) => traffic.cyclistNear(px, py, h, r));
   runtime.setOvertakenQuery((px, py, h, r) => traffic.overtakenNear(px, py, h, r));
-  // Lane rbreverse: the reverse-warning account query, as wireTrafficQueries
-  // and traces/recorder.ts wire it (display-only; grades nothing).
+  // Lane rbreverse: the account query, as wireTrafficQueries and
+  // traces/recorder.ts wire it (the reverse warning reads it display-only; the
+  // N1 tracker's R13''' evidence and late read grade on it with the next one).
   runtime.setPlayerShedAccountsQuery(() => traffic.playerShedAccounts());
   // Lane slowturn (ruling R13'''): the planned-route query, as both wire it.
   runtime.setPlannedRouteQuery((id, nodeId, reachM) => traffic.plannedRouteThrough(id, nodeId, reachM));

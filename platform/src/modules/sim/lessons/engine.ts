@@ -3859,6 +3859,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // easing too small to bill is not praised either). Same seam, same rule:
       // absent on almost every frame, and nothing graded reads it.
       ringEntryPaidFor: tick.roundaboutEntryPaidFor,
+      // ST-VERDICT-HOLD (lane slowturn2) — whether the N1 tracker can still
+      // bill this junction visit's left turn, so «Пропусна насрещните … и зави
+      // чак когато интервалът стигна» is not said over a turn that has yet to
+      // be committed or whose late window is open; and whether it billed this
+      // visit's turn, which drops that verdict. Nothing graded reads either.
+      oncomingTurnOpen: tick.leftTurnOncomingOpen,
+      oncomingTurnBilled: tick.leftTurnOncomingBilled,
     });
     yieldVoice = voice.state;
     // N11: the voice keeps folding (its state is unchanged), but after a person

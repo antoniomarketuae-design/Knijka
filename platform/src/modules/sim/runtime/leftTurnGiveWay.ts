@@ -23,7 +23,10 @@
  *      the OPPOSITE approach — the lane it arrives by ends heading more than
  *      LEFT_TURN_ONCOMING_MIN_DEG (= traffic ONCOMING_MIN_DEG, 130°) off his
  *      approach heading frozen at the visit start — and its movement there is
- *      STRAIGHT or RIGHT (`turnSpeedCap`'s bands on its two lanes). ЗДвП чл. 37,
+ *      STRAIGHT or RIGHT (traffic/plannedRoute.ts `plannedMovement`: read on the
+ *      connector it drives, the side decided before the angle, so a sharp right
+ *      turn into his exit arm is «right», never «uturn» — lane slowturn2, rulings
+ *      ST-CLASS and ST-UTURN-X (a); a U-turn is the reverse lane only). ЗДвП чл. 37,
  *      ал. 1: «При завиване наляво за навлизане в друг път водачът на
  *      завиващото нерелсово пътно превозно средство е длъжен да пропусне
  *      насрещно движещите се пътни превозни средства» (content/law/acts/
@@ -63,6 +66,30 @@
  *      while he stood clear, and which then stopped at its own line, is not).
  *  (4) within LEFT_TURN_ONCOMING_RADIUS_M of the node (and its route arrives
  *      there within that reach).
+ *
+ * THE LATE READ (lane slowturn2, integrator rulings ST-LATE, ST-LATE-READ,
+ * ST-LATE-END, ST-RESPAWN-SCOPE, 2026-11-09; sc-turn-left-oncoming:1613ef2c).
+ * At base (lane slowturn) (3) was read on the commit tick only, so braking the
+ * car's OWN account took for him AFTER an added commit, while his body still
+ * lay on its route ahead of it, billed nothing — rig w4b's S12: car 1001 shed
+ * 0.61 m/s (L1) / 2.33 m/s (L3) for him after the commit and both drives passed
+ * with «0 наказателни точки». Now, at an ADDED-path left commit that was not
+ * adjudicated on its own tick, `openLate` opens a window on the vehicles that
+ * meet (1), (2) and (4) ON THE COMMIT TICK with his body on their route ahead
+ * of them then (the commit-tick reading: the set is frozen at the act, so a car
+ * that comes into reach later is never one of them). On each later graded grid
+ * point of the visit, after `track`, `lateRead` closes the window of a
+ * candidate whose route no longer arrives here or whose route his body has left
+ * (the same `onRoute` test as (3): once the car is past his body he is never
+ * on its route ahead, so that close subsumes «it passed him»), and returns the
+ * FIRST open candidate, in row order, whose in-way account — (3)'s own sum,
+ * growth before the commit included — is at or above the line. A window once
+ * closed never re-opens. The runtime closes every window when the visit
+ * resets, when any later turnStarted fires in the visit, when the visit is
+ * adjudicated by any path, when his turn is complete (ST-LATE-END (d), read in
+ * worldRuntime.ts with the lane fix and TURN_REARM_DEG), and on a respawn
+ * (`reset` — which also clears the maps, ST-RESPAWN-SCOPE). A raw speed fall
+ * with no growth of the car's attributed account bills nothing (ST-CHAIN).
  *
  * ON HIS ROUTE = his chassis box (collision/bodies.ts PLAYER_HALF_LENGTH_M ×
  * PLAYER_HALF_WIDTH_M, on his grid pose) within the vehicle's half body width
@@ -249,6 +276,10 @@ export class LeftTurnGiveWayEvidence {
   private readonly held = new Set<number>();
   /** (2): its route ACROSS the junction met his body on some grid point of this visit. */
   private readonly met = new Set<number>();
+  /** On the last `track`: its route arrives here and his body lay on it ahead of it (the late read's close). */
+  private readonly onRouteNow = new Map<number, boolean>();
+  /** THE LATE READ: the candidates whose window is open (frozen at the added commit; only ever shrinks). */
+  private readonly late = new Set<number>();
 
   constructor(
     private readonly shedLineMps: number,
@@ -261,6 +292,8 @@ export class LeftTurnGiveWayEvidence {
     this.inWay.clear();
     this.held.clear();
     this.met.clear();
+    this.onRouteNow.clear();
+    this.late.clear();
   }
 
   /** Once per graded grid point of a junction visit. */
@@ -274,6 +307,7 @@ export class LeftTurnGiveWayEvidence {
     me: GiveWayStudent,
   ): void {
     const r2 = reachM * reachM;
+    this.onRouteNow.clear();
     for (const row of rows) {
       const prev = this.lastShed.get(row.id);
       this.lastShed.set(row.id, row.playerShedMps);
@@ -286,10 +320,12 @@ export class LeftTurnGiveWayEvidence {
         this.inWay.delete(row.id);
         this.held.delete(row.id);
         this.met.delete(row.id);
+        this.onRouteNow.set(row.id, false);
         continue;
       }
       const clearAhead = boxPolylineClearanceM(me.x, me.y, me.headingDeg, me.halfLengthM, me.halfWidthM, plan.px, plan.py, 0, plan.n);
       const onRoute = clearAhead <= plan.halfWidthM;
+      this.onRouteNow.set(row.id, onRoute);
       if (onRoute && !this.met.has(row.id)) {
         const m = routeAcross(plan.px, plan.py, plan.n, nx, ny, plan.junctionRadiusM);
         const clearAcross = boxPolylineClearanceM(me.x, me.y, me.headingDeg, me.halfLengthM, me.halfWidthM, ACROSS_X, ACROSS_Y, 0, m);
@@ -345,6 +381,80 @@ export class LeftTurnGiveWayEvidence {
     return null;
   }
 
+  /**
+   * THE LATE READ, opened at an ADDED-path left commit the commit tick did not
+   * adjudicate (call after `track` on that grid point): every vehicle that
+   * meets (1), (2) and (4) NOW — the checks `evidence` makes, less (3)'s line —
+   * with his body on its route ahead of it now. Returns how many windows opened.
+   */
+  openLate(
+    rows: readonly GiveWayAccountRow[],
+    route: PlannedRouteQuery,
+    nodeId: string,
+    nx: number,
+    ny: number,
+    reachM: number,
+    approachDeg: number,
+  ): number {
+    this.late.clear();
+    const rad = (approachDeg * Math.PI) / 180;
+    const fx = Math.sin(rad);
+    const fy = Math.cos(rad);
+    const r2 = reachM * reachM;
+    for (const row of rows) {
+      if (this.onRouteNow.get(row.id) !== true) continue; // his body on its route ahead of it, now
+      if (!this.met.has(row.id)) continue; // (2)
+      const tx = nx - row.x;
+      const ty = ny - row.y;
+      const d2 = tx * tx + ty * ty;
+      if (d2 > r2) continue; // (4)
+      const plan = route(row.id, nodeId, reachM);
+      if (plan === null) continue; // (4) / has not passed the node
+      if (plan.movement !== "straight" && plan.movement !== "right") continue; // (1)
+      const aBearing = (Math.atan2(plan.approachDirX, plan.approachDirY) * 180) / Math.PI;
+      const off = Math.abs((((aBearing - approachDeg) % 360) + 540) % 360 - 180);
+      if (!(off > this.oncomingMinDeg)) continue; // (1) the opposite approach
+      if (!this.held.has(row.id)) {
+        // (1) approaching now (R13''): a departing car is never a candidate
+        if (row.dirX === undefined || row.dirY === undefined) continue;
+        const d = Math.sqrt(d2);
+        const radial = d > 0 ? ((row.dirX * tx + row.dirY * ty) / d) * row.speedMps : row.speedMps;
+        const inFrame = -(row.dirX * fx + row.dirY * fy) * row.speedMps;
+        if (!(radial > 0 && Math.max(radial, inFrame) >= this.arrivalFloorMps)) continue;
+      }
+      this.late.add(row.id);
+    }
+    return this.late.size;
+  }
+
+  /**
+   * On a later graded grid point of the visit, after `track`: close the window
+   * of every candidate whose route no longer arrives here or whose route his
+   * body has left, then the FIRST open candidate in row order whose in-way
+   * account (growth before the commit included) is at or above the line — or
+   * null. The caller bills it once and closes every window.
+   */
+  lateRead(rows: readonly GiveWayAccountRow[]): number | null {
+    if (this.late.size === 0) return null;
+    for (const id of this.late) if (this.onRouteNow.get(id) !== true) this.late.delete(id);
+    for (const row of rows) {
+      if (!this.late.has(row.id)) continue;
+      const shed = this.inWay.get(row.id);
+      if (shed !== undefined && shed >= this.shedLineMps) return row.id; // (3), read late
+    }
+    return null;
+  }
+
+  /** Close every late window (the visit was adjudicated, a later turn began, or his turn is complete). */
+  closeLate(): void {
+    this.late.clear();
+  }
+
+  /** Whether any late window is open. */
+  lateOpen(): boolean {
+    return this.late.size > 0;
+  }
+
   /** Diagnostics for probes and pins (never shown, read by no rule). */
   inWayShed(id: number): number | undefined {
     return this.inWay.get(id);
@@ -354,5 +464,8 @@ export class LeftTurnGiveWayEvidence {
   }
   routeMet(id: number): boolean {
     return this.met.has(id);
+  }
+  lateOpenIds(): number[] {
+    return [...this.late];
   }
 }
